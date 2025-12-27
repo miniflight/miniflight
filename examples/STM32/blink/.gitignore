@@ -1,0 +1,20 @@
+# Build directory
+build/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+*.o
+*.elf
+*.hex
+*.map
+*.lst
+
+# Build binaries (but keep backup!)
+build/*.bin
+!betaflight_backup.bin
+
