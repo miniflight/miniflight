@@ -1,44 +1,56 @@
-<div align="center">
-<picture>
-   <img src="https://github.com/user-attachments/assets/4506bc62-75cc-4e99-8465-1384141b9f2d" alt="miniflight logo" width="20%"/>
-</picture>
+# miniflight
 
-miniflight is a minimal flight control firmware
+flight controller firmware. has a mahony filter for orientation and PIDs for control. python version prototypes fast, C version is what you flash.
 
-</div>
+the sim does rigid body physics with RK4 integration. renders in browser with three.js over websockets. quad actually flies around, you can crash it.
 
----
+## run
 
-This may not be the best flight stack, but it is a flight stack.
+python:
+```bash
+TARGET=sitl_python python -m miniflight.main
+```
 
-Open source flight controllers are bloated, complex, and nearly impossible to debug or extend. Due to its extreme simplicity, miniflight aims to be the easiest controller to add targets to, with support for both config and simulation.
+C (build once, then run):
+```bash
+cd target/stm32 && make -f Makefile.lib && cd ../..
+TARGET=sitl_c python -m miniflight.main
+```
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/165a2c2c-b6de-4b1b-a522-d552a0697766" controls autoplay muted loop playsinline style="width: 100%; max-width: 960px; border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.4);"></video>
-</div>
+WASD throttle/yaw, arrows pitch/roll.
 
-## Getting Started
+## configurator
 
-1. Create a virtual environment and install deps (Python 3.10+):
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -e .
-   ```
-   
-2. Run the configurator (IMU viewer at `http://127.0.0.1:8002`, only supports Speedybee STM32F405v3, for now.):
-   ```bash
-   python config/serve.py
-   ```
+web UI for tuning. serves over websockets, plots IMU data in real time. 
 
-3. Run the quad simulation (starts the web viewer on `http://127.0.0.1:8001`):
-   ```bash
-   python sim/serve.py
-   ```
+```bash
+cd config && python serve.py
+# localhost:8080
+```
 
-Keyboard/PS5 Dualsense controls in the sim:
+useful for seeing what the filter is doing. can tune PIDs (soon, not implemented yet) without restarting. 
 
-- W/S or left stick vertical: throttle up/down
-- Arrow keys or right stick: pitch/roll
-- A/D or left stick horizontal: yaw
-- X/Cross or Spacebar: pick/drop
+## how it works
+
+100Hz loop: read sensors → mahony filter → PID controllers → motors
+
+mahony takes gyro+accel, integrates to quaternion. no magnetometer so yaw drifts. needs 20 samples on startup to average the gravity vector.
+
+PIDs: altitude uses collective thrust (feedforward gravity + error correction), attitude uses quaternion error converted to body frame. integral terms are clamped.
+
+the C version is the same code. compiles to a .dylib that python loads. when you run sitl_c, python calls C functions for control but keeps python for physics. proves C works before you flash to hardware.
+
+## stm32
+
+bare metal, ~1MB binary. register access for GPIO. SysTick for timing. no IMU or motor drivers yet - just blinks an LED. proved the toolchain works (arm-none-eabi-gcc, openocd).
+
+## what's missing
+
+- IMU driver (MPU6000 over SPI)
+- motor output (PWM or DShot)  
+- proper calibration routines
+- safety checks (arm/disarm logic, state machine)
+- logging
+- hitl testing
+
+code is structured like it should work but hasn't touched real hardware beyond LED blink.

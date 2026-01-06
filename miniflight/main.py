@@ -19,8 +19,9 @@ logger = get_logger("firmware")
 
 def init_board(target_name: str, dt: float) -> tuple[Board, CommandSource | None]:
     """Instantiate the board and an optional command source for pilot input."""
-    target = (target_name or "sim").lower()
-    if target == "sim":
+    target = (target_name or "sitl_python").lower()
+    
+    if target == "sitl_python":
         from target.simulator import SimBoard
 
         board = SimBoard(dt=dt)
@@ -34,6 +35,22 @@ def init_board(target_name: str, dt: float) -> tuple[Board, CommandSource | None
             get_keys = lambda: board.get_input_state()
             cmd_src = KeyboardCommandSource(get_keys=get_keys)
         return board, cmd_src
+    
+    elif target == "sitl_c":
+        from target.c_firmware_board import CFirmwareBoard
+        
+        board = CFirmwareBoard(dt=dt)
+        # Choose input source
+        input_kind = (os.environ.get("INPUT") or "keyboard").lower()
+        cmd_src: CommandSource | None = None
+        if input_kind == "dualsense":
+            cmd_src = DualSenseCommandSource()
+        else:
+            # keyboard via renderer
+            get_keys = lambda: board.get_input_state()
+            cmd_src = KeyboardCommandSource(get_keys=get_keys)
+        return board, cmd_src
+    
     raise NotImplementedError(f"Unsupported target '{target}'")
 
 class Controls:
@@ -44,11 +61,23 @@ class Controls:
             raise ValueError("rate_hz must be positive")
         self.rate_hz = float(rate_hz)
         self.dt = 1.0 / self.rate_hz
-        self.controller = StabilityController()
-        self.estimator = MahonyEstimator()
 
         # Board
         self.board, self.command_source = init_board(target, self.dt)
+
+        # Check if board handles its own control (C firmware)
+        # Check by class name to avoid circular import
+        self.board_has_firmware = type(self.board).__name__ == 'CFirmwareBoard'
+        
+        # Only instantiate Python estimator/controller if board doesn't have firmware
+        if self.board_has_firmware:
+            self.controller = None
+            self.estimator = None
+            logger.info(f"Board initialized ({type(self.board).__name__}) - Using C firmware")
+        else:
+            self.controller = StabilityController()
+            self.estimator = MahonyEstimator()
+            logger.info(f"Board initialized ({type(self.board).__name__}) - Using Python firmware")
 
         # Mixer inferred from board motor geometry if provided
         geometry = self.board.motor_geometry()
@@ -56,7 +85,6 @@ class Controls:
         if geometry is not None:
             positions, spins = geometry
             self.mixer = GenericMixer(positions, spins)
-        logger.info(f"Board initialized ({type(self.board).__name__})")
 
     # -- Pipeline stages -----------------------------------------------------
 
@@ -68,13 +96,26 @@ class Controls:
 
     def state_control(self, readings: SensorReadings) -> tuple[StateEstimate, list[float]]:
         """Run estimator + controller to produce motor commands."""
-        state = self.estimator.update(readings, self.dt)
-        control_cmd = self.controller.update(state, self.dt)
-        if self.mixer is not None:
-            motor_outputs = list(self.mixer.mix(control_cmd))
+        if self.board_has_firmware:
+            # C firmware already computed control in read_sensors()
+            # Just retrieve state and output
+            state = self.board.get_c_state_estimate()
+            control_cmd = list(self.board._last_control_output)
+            # C firmware outputs [thrust, roll, pitch, yaw] - may need mixing
+            if self.mixer is not None:
+                motor_outputs = list(self.mixer.mix(control_cmd))
+            else:
+                motor_outputs = control_cmd
+            return state, motor_outputs
         else:
-            motor_outputs = list(control_cmd)
-        return state, motor_outputs
+            # Python firmware
+            state = self.estimator.update(readings, self.dt)
+            control_cmd = self.controller.update(state, self.dt)
+            if self.mixer is not None:
+                motor_outputs = list(self.mixer.mix(control_cmd))
+            else:
+                motor_outputs = list(control_cmd)
+            return state, motor_outputs
 
     def publish(self, motor_outputs: list[float]) -> None:
         """Write actuator commands and handle outputs (telemetry, logging, etc.)."""
@@ -92,15 +133,22 @@ class Controls:
             return PilotCommand()
 
     def _apply_pilot_command(self, cmd: PilotCommand) -> None:
-        # Altitude target integrates pilot delta
-        self.controller.z_setpoint += cmd.z_setpoint_delta
-        self.controller.z_setpoint = float(np.clip(self.controller.z_setpoint, 0.0, 20.0))
+        if self.board_has_firmware:
+            # Route to C firmware
+            self.board.update_altitude_setpoint(cmd.z_setpoint_delta)
+            self.board.update_yaw_rate(cmd.yaw_rate, self.dt)
+            self.board.update_attitude_setpoint(cmd.roll_target, cmd.pitch_target)
+        else:
+            # Update Python controller
+            # Altitude target integrates pilot delta
+            self.controller.z_setpoint += cmd.z_setpoint_delta
+            self.controller.z_setpoint = float(np.clip(self.controller.z_setpoint, 0.0, 20.0))
 
-        # Yaw integrates rate command
-        self.controller.yaw_setpoint = wrap_angle(self.controller.yaw_setpoint + cmd.yaw_rate * self.dt)
+            # Yaw integrates rate command
+            self.controller.yaw_setpoint = wrap_angle(self.controller.yaw_setpoint + cmd.yaw_rate * self.dt)
 
-        # Roll/pitch are treated as direct angle targets
-        self.controller.set_attitude_target(cmd.roll_target, cmd.pitch_target, self.controller.yaw_setpoint)
+            # Roll/pitch are treated as direct angle targets
+            self.controller.set_attitude_target(cmd.roll_target, cmd.pitch_target, self.controller.yaw_setpoint)
 
     def run(self):
         logger.info("Starting controls loop")
