@@ -1,0 +1,90 @@
+# Makefile for MiniFlight SITL (Software-in-the-Loop) Shared Library
+# Compiles C firmware as a library callable from Python
+
+# Target name
+TARGET = libminiflight
+
+# Compiler (use native gcc, not cross-compiler)
+CC = gcc
+LD = gcc
+
+# Source files (excluding main.c and board_stm32f4.c)
+C_SOURCES = \
+	estimate.c \
+	control.c \
+	firmware_lib.c
+
+# Build directory
+BUILD_DIR = build_lib
+
+# C includes
+C_INCLUDES = -I.
+
+# Compiler flags for shared library
+CFLAGS = $(C_INCLUDES)
+CFLAGS += -Wall -Wextra -Wpedantic
+CFLAGS += -fPIC  # Position-independent code for shared library
+CFLAGS += -O2    # Optimization
+CFLAGS += -g3    # Debug info
+CFLAGS += -std=c11
+
+# Linker flags for shared library
+LDFLAGS = -shared
+LDFLAGS += -lm  # Math library
+
+# Determine OS and set library extension
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    # macOS
+    LIB_EXT = dylib
+    LDFLAGS += -dynamiclib -install_name @rpath/$(TARGET).$(LIB_EXT)
+else ifeq ($(UNAME_S),Linux)
+    # Linux
+    LIB_EXT = so
+else
+    # Windows (if using MinGW/Cygwin)
+    LIB_EXT = dll
+endif
+
+# Object files
+OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+
+# VPATH for source files
+vpath %.c $(sort $(dir $(C_SOURCES)))
+
+# Default target
+all: $(BUILD_DIR)/$(TARGET).$(LIB_EXT)
+	@echo "=== SITL Library Build Complete ==="
+	@echo "Library: $(BUILD_DIR)/$(TARGET).$(LIB_EXT)"
+	@echo ""
+	@echo "Usage:"
+	@echo "  export DYLD_LIBRARY_PATH=\$$(pwd)/$(BUILD_DIR)  # macOS"
+	@echo "  export LD_LIBRARY_PATH=\$$(pwd)/$(BUILD_DIR)    # Linux"
+	@echo "  python -m target.c_firmware_board"
+
+# Create build directory
+$(BUILD_DIR):
+	mkdir -p $@
+
+# Compile C files
+$(BUILD_DIR)/%.o: %.c Makefile.lib | $(BUILD_DIR)
+	@echo "CC $<"
+	@$(CC) -c $(CFLAGS) $< -o $@
+
+# Link shared library
+$(BUILD_DIR)/$(TARGET).$(LIB_EXT): $(OBJECTS) Makefile.lib
+	@echo "LD $@"
+	@$(LD) $(OBJECTS) $(LDFLAGS) -o $@
+
+# Clean
+clean:
+	rm -rf $(BUILD_DIR)
+
+# Test the library with a simple C program
+test: $(BUILD_DIR)/$(TARGET).$(LIB_EXT)
+	@echo "Testing library..."
+	@$(CC) -o $(BUILD_DIR)/test_lib test_lib.c -L$(BUILD_DIR) -lminiflight -lm -I. $(C_INCLUDES)
+	@echo "Run: $(BUILD_DIR)/test_lib"
+
+.PHONY: all clean test
+
