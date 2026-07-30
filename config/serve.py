@@ -270,8 +270,8 @@ def monitor_device(
                 device,
                 profile,
                 {
-                    "attitude": "alternate",
-                    "raw_imu": "alternate",
+                    "attitude": "unused non-IMU slots",
+                    "raw_imu": "every second request",
                     "status_s": SLOW_POLL_PERIODS[MSP_STATUS],
                     "analog_s": SLOW_POLL_PERIODS[MSP_ANALOG],
                     "motor_s": SLOW_POLL_PERIODS[MSP_MOTOR],
@@ -302,10 +302,10 @@ def monitor_device(
         while not stop_event.is_set():
             loop_started = time.monotonic()
             now = loop_started
-            attitude_slot = fast_tick % 2 == 0
+            imu_slot = fast_tick % 2 == 1
             fast_tick += 1
-            if attitude_slot:
-                command = MSP_ATTITUDE
+            if imu_slot:
+                command = MSP_RAW_IMU
             else:
                 due_slow = [
                     slow_command
@@ -316,7 +316,7 @@ def monitor_device(
                     command = min(due_slow, key=next_slow_poll.get)
                     next_slow_poll[command] = now + SLOW_POLL_PERIODS[command]
                 else:
-                    command = MSP_RAW_IMU
+                    command = MSP_ATTITUDE
 
             payload = client.request(command, timeout=0.05)
             if payload is not None:

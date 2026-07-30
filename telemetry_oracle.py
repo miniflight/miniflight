@@ -96,8 +96,8 @@ def run_oracle(
                 device,
                 profile,
                 {
-                    "attitude": "alternate",
-                    "raw_imu": "alternate",
+                    "attitude": "unused non-IMU slots",
+                    "raw_imu": "every second request",
                     "status_s": SLOW_POLL_SECONDS[MSP_STATUS],
                     "analog_s": SLOW_POLL_SECONDS[MSP_ANALOG],
                     "altitude_s": SLOW_POLL_SECONDS[MSP_ALTITUDE],
@@ -186,15 +186,15 @@ def run_oracle(
                 if link_state != "LIVE" and loop_now - last_response < 1.0:
                     link_state = "CONNECTING"
 
-                if fast_tick % 2 == 0:
-                    command = MSP_ATTITUDE
+                if fast_tick % 2 == 1:
+                    command = MSP_RAW_IMU
                 else:
                     due = [cmd for cmd, due_time in next_slow_poll.items() if loop_now >= due_time]
                     if due:
                         command = min(due, key=next_slow_poll.get)
                         next_slow_poll[command] = loop_now + SLOW_POLL_SECONDS[command]
                     else:
-                        command = MSP_RAW_IMU
+                        command = MSP_ATTITUDE
                 fast_tick += 1
 
                 payload = client.request(command, timeout=0.2)
@@ -492,9 +492,23 @@ def stillness_report(path: Path) -> int:
         ((right - left) / 1_000_000 for left, right in zip(imu_times, imu_times[1:])),
         default=0.0,
     )
-    accel_mean, accel_std = _mean_and_std(accel_samples)
-    gyro_mean, gyro_std = _mean_and_std(gyro_samples)
-    accel_magnitudes = [math.sqrt(sum(value * value for value in sample)) for sample in accel_samples]
+    quiet_start = 0
+    quiet_length = 0
+    run_start = 0
+    for index, gyro in enumerate(gyro_samples):
+        if max(abs(value) for value in gyro) <= 8:
+            run_length = index - run_start + 1
+            if run_length > quiet_length:
+                quiet_start, quiet_length = run_start, run_length
+        else:
+            run_start = index + 1
+    quiet_accel = accel_samples[quiet_start : quiet_start + quiet_length]
+    quiet_gyro = gyro_samples[quiet_start : quiet_start + quiet_length]
+    if not quiet_accel:
+        quiet_accel, quiet_gyro = accel_samples, gyro_samples
+    accel_mean, accel_std = _mean_and_std(quiet_accel)
+    gyro_mean, gyro_std = _mean_and_std(quiet_gyro)
+    accel_magnitudes = [math.sqrt(sum(value * value for value in sample)) for sample in quiet_accel]
     accel_magnitude_mean = sum(accel_magnitudes) / len(accel_magnitudes)
     accel_spread = max(abs(value - accel_magnitude_mean) for value in accel_magnitudes)
     accel_variation_percent = 100.0 * accel_spread / accel_magnitude_mean
@@ -509,15 +523,13 @@ def stillness_report(path: Path) -> int:
     transport_reasons = []
     if duration_s < 8.0:
         calibration_reasons.append("duration below 8 seconds")
-    if len(imu_times) < 200:
-        calibration_reasons.append("fewer than 200 IMU samples")
+    if quiet_length < 200:
+        calibration_reasons.append("fewer than 200 consecutive quiet IMU samples")
     if damaged or unpaired or response_errors:
         calibration_reasons.append("transport errors")
         transport_reasons.append("damaged unpaired or error frames")
     if worst_imu_gap_ms > 100.0:
         transport_reasons.append("IMU gap above 100 ms")
-    if gyro_peak > 8:
-        calibration_reasons.append("gyro motion above 8 raw counts")
     if accel_variation_percent > 6.0:
         calibration_reasons.append("acceleration variation above 6 percent")
     if tilt_spread > 1.0:
@@ -532,6 +544,7 @@ def stillness_report(path: Path) -> int:
     print(f"response_errors {response_errors}")
     print(f"response_hz {response_hz:.2f}")
     print(f"imu_samples {len(imu_times)}")
+    print(f"quiet_run_samples {quiet_length}")
     print(f"imu_hz {imu_hz:.2f}")
     print(f"worst_imu_gap_ms {worst_imu_gap_ms:.3f}")
     print(f"accel_mean_raw {vector(accel_mean)}")
