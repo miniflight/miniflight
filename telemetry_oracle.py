@@ -5,131 +5,40 @@ from __future__ import annotations
 
 import argparse
 import csv
-import glob
 import json
 import os
-import select
 import struct
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, Optional
+from typing import Optional
 
-import termios
+from miniflight.msp import (
+    MSP_ANALOG,
+    MSP_API_VERSION,
+    MSP_ATTITUDE,
+    MSP_ALTITUDE,
+    MSP_BOARD_INFO,
+    MSP_FC_VARIANT,
+    MSP_FC_VERSION,
+    MSP_RAW_IMU,
+    MSP_STATUS,
+    MSPParser,
+    MSPSerial,
+    open_serial,
+    serial_devices,
+)
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
 DEVICE_OVERRIDE = os.environ.get("MINIFLIGHT_SERIAL")
-
-MSP_API_VERSION = 1
-MSP_FC_VARIANT = 2
-MSP_FC_VERSION = 3
-MSP_BOARD_INFO = 4
-MSP_STATUS = 101
-MSP_RAW_IMU = 102
-MSP_ATTITUDE = 108
-MSP_ALTITUDE = 109
-MSP_ANALOG = 110
-
-
-READ_ONLY_COMMANDS = {
-    MSP_API_VERSION,
-    MSP_FC_VARIANT,
-    MSP_FC_VERSION,
-    MSP_BOARD_INFO,
-    MSP_STATUS,
-    MSP_RAW_IMU,
-    MSP_ATTITUDE,
-    MSP_ALTITUDE,
-    MSP_ANALOG,
-}
 
 SLOW_POLL_SECONDS = {
     MSP_STATUS: 1.0,
     MSP_ANALOG: 1.0,
     MSP_ALTITUDE: 0.5,
 }
-
-
-def xor_checksum(data: Iterable[int]) -> int:
-    value = 0
-    for byte in data:
-        value ^= byte
-    return value
-
-
-def msp_request(command: int) -> bytes:
-    if command not in READ_ONLY_COMMANDS:
-        raise ValueError(f"MSP command {command} is not in read-only allowlist")
-    return b"$M<" + bytes((0, command, command))
-
-
-class MSPParser:
-    def __init__(self) -> None:
-        self.buffer = bytearray()
-
-    def feed(self, data: bytes) -> None:
-        self.buffer.extend(data)
-
-    def pop(self) -> Optional[tuple[int, bytes, bytes]]:
-        while True:
-            for marker in (b"$M>", b"$M!"):
-                start = self.buffer.find(marker)
-                if start >= 0:
-                    break
-            else:
-                if len(self.buffer) > 2:
-                    del self.buffer[:-2]
-                return None
-
-            if start:
-                del self.buffer[:start]
-            if len(self.buffer) < 6:
-                return None
-
-            size = self.buffer[3]
-            frame_length = 6 + size
-            if len(self.buffer) < frame_length:
-                return None
-
-            frame = bytes(self.buffer[:frame_length])
-            del self.buffer[:frame_length]
-            expected = xor_checksum(frame[3:-1])
-            if expected != frame[-1]:
-                continue
-
-            return frame[4], frame[5:-1], frame
-
-
-class MSPSerial:
-    def __init__(self, fd: int, on_frame: Optional[Callable[[bytes], None]] = None) -> None:
-        self.fd = fd
-        self.parser = MSPParser()
-        self.on_frame = on_frame
-
-    def request(self, command: int, timeout: float = 0.15) -> Optional[bytes]:
-        os.write(self.fd, msp_request(command))
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            frame = self.parser.pop()
-            if frame is not None:
-                response_command, payload, raw_frame = frame
-                if self.on_frame is not None:
-                    self.on_frame(raw_frame)
-                if response_command != command:
-                    continue
-                return payload
-
-            remaining = max(0.0, deadline - time.monotonic())
-            readable, _, _ = select.select((self.fd,), (), (), min(0.03, remaining))
-            if not readable:
-                continue
-            chunk = os.read(self.fd, 1024)
-            if not chunk:
-                raise OSError("serial link closed")
-            self.parser.feed(chunk)
-        return None
 
 
 class RawCapture:
@@ -162,44 +71,6 @@ def decode_raw_imu(payload: bytes) -> Optional[tuple[tuple[int, int, int], tuple
         return None
     values = struct.unpack_from("<9h", payload)
     return values[0:3], values[3:6]
-
-
-def serial_devices() -> list[str]:
-    if DEVICE_OVERRIDE:
-        return [DEVICE_OVERRIDE] if os.path.exists(DEVICE_OVERRIDE) else []
-
-    patterns = (
-        "/dev/cu.usbmodem*",
-        "/dev/cu.usbserial*",
-        "/dev/cu.wchusbserial*",
-        "/dev/cu.SLAB_USBtoUART*",
-        "/dev/tty.usbmodem*",
-        "/dev/tty.usbserial*",
-    )
-    devices: list[str] = []
-    for pattern in patterns:
-        devices.extend(glob.glob(pattern))
-    return sorted(dict.fromkeys(devices), key=lambda path: ("/dev/tty." in path, path))
-
-
-def open_serial(device: str) -> int:
-    fd = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    try:
-        attributes = termios.tcgetattr(fd)
-        attributes[0] = 0
-        attributes[1] = 0
-        attributes[2] = termios.CREAD | termios.CLOCAL | termios.CS8
-        attributes[3] = 0
-        attributes[4] = getattr(termios, f"B{BAUD}")
-        attributes[5] = getattr(termios, f"B{BAUD}")
-        attributes[6][termios.VMIN] = 0
-        attributes[6][termios.VTIME] = 0
-        termios.tcsetattr(fd, termios.TCSANOW, attributes)
-        termios.tcflush(fd, termios.TCIOFLUSH)
-        return fd
-    except Exception:
-        os.close(fd)
-        raise
 
 
 def decode_identity(client: MSPSerial) -> dict[str, Optional[str]]:
@@ -245,7 +116,7 @@ def run_oracle(
     max_samples: Optional[int] = None,
     raw_path: Optional[Path] = None,
 ) -> None:
-    fd = open_serial(device)
+    fd = open_serial(device, BAUD)
     capture = RawCapture(raw_path) if raw_path is not None else None
     try:
         client = MSPSerial(fd, on_frame=capture.record if capture is not None else None)
@@ -496,7 +367,7 @@ def replay_capture(path: Path) -> int:
                 return 2
 
             while (frame := parser.pop()) is not None:
-                command, payload, _ = frame
+                _, command, payload = frame
                 frame_count += 1
                 if command == MSP_ATTITUDE:
                     attitude = decode_attitude(payload)
@@ -547,7 +418,7 @@ def main() -> int:
             print(f"Device not found: {args.device}", file=sys.stderr)
             return 2
     else:
-        devices = serial_devices()
+        devices = serial_devices(DEVICE_OVERRIDE)
     if not devices:
         print("No USB serial device found.")
         return 2

@@ -3,55 +3,41 @@
 
 from __future__ import annotations
 
-import glob
 import os
-import select
 import struct
-import termios
 import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from common.serve import RendererServer, SharedState, maybe_launch_browser
-from miniflight.probe import (
+from miniflight.msp import (
     MSP_API_VERSION,
+    MSP_ANALOG,
+    MSP_ATTITUDE,
+    MSP_ALTITUDE,
     MSP_BOARD_INFO,
+    MSP_BOXIDS,
     MSP_FC_VARIANT,
     MSP_FC_VERSION,
     MSP_MOTOR,
     MSP_RAW_IMU,
     MSP_STATUS,
-    MspMachineProbe,
+    MSPParser,
+    MSPSerial,
+    msp_request,
+    open_serial,
+    serial_devices,
+    xor_checksum,
 )
+from miniflight.probe import MspMachineProbe
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
 DEVICE_OVERRIDE = os.environ.get("MINIFLIGHT_SERIAL")
 HOST = os.environ.get("MINIFLIGHT_CONFIG_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MINIFLIGHT_CONFIG_PORT", "8002"))
-
-MSP_ATTITUDE = 108
-MSP_ALTITUDE = 109
-MSP_ANALOG = 110
-MSP_BOXIDS = 119
-
-READ_ONLY_COMMANDS = frozenset(
-    {
-        MSP_API_VERSION,
-        MSP_FC_VARIANT,
-        MSP_FC_VERSION,
-        MSP_BOARD_INFO,
-        MSP_STATUS,
-        MSP_RAW_IMU,
-        MSP_MOTOR,
-        MSP_ATTITUDE,
-        MSP_ALTITUDE,
-        MSP_ANALOG,
-        MSP_BOXIDS,
-    }
-)
 
 SLOW_POLL_PERIODS = {
     MSP_STATUS: 1.0,
@@ -67,134 +53,6 @@ class LinkState(str, Enum):
     HANDSHAKE = "handshake"
     LIVE = "live"
     RETRYING = "retrying"
-
-
-def xor_checksum(data: Iterable[int]) -> int:
-    value = 0
-    for byte in data:
-        value ^= byte
-    return value
-
-
-def msp_request(command: int) -> bytes:
-    """Build one read-only MSP v1 request."""
-    if command not in READ_ONLY_COMMANDS:
-        raise ValueError(f"MSP command {command} is not in the read-only allowlist")
-    return b"$M<" + bytes((0, command, command))
-
-
-class MSPParser:
-    """Incrementally parse MSP v1 response frames."""
-
-    def __init__(self) -> None:
-        self.buffer = bytearray()
-
-    def feed(self, data: bytes) -> None:
-        self.buffer.extend(data)
-
-    def pop(self) -> Optional[tuple[str, int, bytes]]:
-        while True:
-            starts = [
-                index
-                for marker in (b"$M>", b"$M!")
-                if (index := self.buffer.find(marker)) >= 0
-            ]
-            if not starts:
-                if len(self.buffer) > 2:
-                    del self.buffer[:-2]
-                return None
-
-            start = min(starts)
-            if start:
-                del self.buffer[:start]
-            if len(self.buffer) < 6:
-                return None
-
-            size = self.buffer[3]
-            frame_length = 6 + size
-            if len(self.buffer) < frame_length:
-                return None
-
-            frame = bytes(self.buffer[:frame_length])
-            del self.buffer[:frame_length]
-            expected = xor_checksum(frame[3:-1])
-            if expected != frame[-1]:
-                continue
-
-            direction = chr(frame[2])
-            command = frame[4]
-            payload = frame[5:-1]
-            return direction, command, payload
-
-
-class MSPSerial:
-    """Small synchronous MSP client over one serial file descriptor."""
-
-    def __init__(self, fd: int) -> None:
-        self.fd = fd
-        self.parser = MSPParser()
-
-    def request(self, command: int, timeout: float = 0.15) -> Optional[bytes]:
-        os.write(self.fd, msp_request(command))
-        deadline = time.monotonic() + timeout
-
-        while time.monotonic() < deadline:
-            frame = self.parser.pop()
-            if frame is not None:
-                direction, response_command, payload = frame
-                if response_command != command:
-                    continue
-                return payload if direction == ">" else None
-
-            remaining = max(0.0, deadline - time.monotonic())
-            readable, _, _ = select.select((self.fd,), (), (), min(0.03, remaining))
-            if not readable:
-                continue
-
-            chunk = os.read(self.fd, 1024)
-            if not chunk:
-                raise OSError("serial link closed")
-            self.parser.feed(chunk)
-
-        return None
-
-
-def serial_devices() -> list[str]:
-    if DEVICE_OVERRIDE:
-        return [DEVICE_OVERRIDE] if os.path.exists(DEVICE_OVERRIDE) else []
-
-    patterns = (
-        "/dev/cu.usbmodem*",
-        "/dev/cu.usbserial*",
-        "/dev/cu.wchusbserial*",
-        "/dev/cu.SLAB_USBtoUART*",
-        "/dev/tty.usbmodem*",
-        "/dev/tty.usbserial*",
-    )
-    devices: list[str] = []
-    for pattern in patterns:
-        devices.extend(glob.glob(pattern))
-    return sorted(dict.fromkeys(devices), key=lambda path: ("/dev/tty." in path, path))
-
-
-def open_serial(device: str) -> int:
-    fd = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    try:
-        attributes = termios.tcgetattr(fd)
-        attributes[0] = 0
-        attributes[1] = 0
-        attributes[2] = termios.CREAD | termios.CLOCAL | termios.CS8
-        attributes[3] = 0
-        attributes[4] = getattr(termios, f"B{BAUD}")
-        attributes[5] = getattr(termios, f"B{BAUD}")
-        attributes[6][termios.VMIN] = 0
-        attributes[6][termios.VTIME] = 0
-        termios.tcsetattr(fd, termios.TCSANOW, attributes)
-        termios.tcflush(fd, termios.TCIOFLUSH)
-        return fd
-    except Exception:
-        os.close(fd)
-        raise
 
 
 def empty_snapshot(
@@ -366,7 +224,7 @@ def monitor_device(shared: SharedState, device: str, stop_event: threading.Event
         device,
         retain_last_sample=True,
     )
-    fd = open_serial(device)
+    fd = open_serial(device, BAUD)
     try:
         client = MSPSerial(fd)
         snapshot = publish_link(
@@ -477,7 +335,7 @@ def monitor_device(shared: SharedState, device: str, stop_event: threading.Event
 def monitor_loop(shared: SharedState, stop_event: threading.Event) -> None:
     last_message = ""
     while not stop_event.is_set():
-        devices = serial_devices()
+        devices = serial_devices(DEVICE_OVERRIDE)
         if not devices:
             message = "Connect the flight controller by USB-C."
             if message != last_message:
