@@ -1,255 +1,520 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>mini_flight configurator</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Flight Seed</title>
     <style>
-      :root { color-scheme: dark; }
-      html,
-      body {
-        height: 100%;
+      :root {
+        --bg: #07090b;
+        --panel: #0d1115;
+        --panel-2: #11171c;
+        --line: #202830;
+        --text: #edf2f5;
+        --muted: #7e8a94;
+        --green: #5cf29a;
+        --amber: #ffbd55;
+        --blue: #5db4ff;
+        --red: #ff626f;
       }
+
+      * { box-sizing: border-box; }
+
+      html, body { min-height: 100%; }
+
       body {
         margin: 0;
-        background: #0b1120;
-        color: #e2e8f0;
-        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px;
-        overflow-y: auto;
+        background:
+          radial-gradient(circle at 38% 10%, rgba(47, 91, 116, 0.12), transparent 34%),
+          var(--bg);
+        color: var(--text);
+        font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
       }
+
       .shell {
-        width: min(960px, 100%);
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
+        width: min(1420px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 22px 0 28px;
       }
+
       header {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        gap: 16px;
-      }
-      header h1 {
-        margin: 0;
-        font-size: 28px;
-        letter-spacing: 0.01em;
-      }
-      header p { margin: 0; opacity: 0.7; }
-      .cards {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
-        grid-auto-rows: minmax(0, auto);
-        gap: 16px;
-        align-items: stretch;
-      }
-      .card {
-        background: #111827;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 14px 30px rgba(8, 12, 24, 0.35);
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .chart-card {
-        grid-column: 1;
-        height: auto;
-      }
-      .card h2 {
-        margin: 0;
-        font-size: 18px;
-        letter-spacing: 0.02em;
-      }
-      .card-header {
-        display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 20px;
+        height: 54px;
+        margin-bottom: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
         gap: 12px;
       }
-      .chart-container {
-        position: relative;
-        width: 100%;
-        height: clamp(160px, 28vh, 220px);
+
+      h1 {
+        margin: 0;
+        font: 750 25px/1 system-ui, sans-serif;
+        letter-spacing: -0.04em;
       }
-      canvas {
-        width: 100% !important;
-        height: 100% !important;
-        display: block;
+
+      .muted, .eyebrow, footer { color: var(--muted); }
+
+      .link-state {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
       }
-      .viz-container {
-        position: relative;
-        flex: 1 1 auto;
-        min-height: clamp(220px, 38vh, 300px);
-        border-radius: 16px;
-        background: radial-gradient(circle at top, rgba(59,130,246,0.12), rgba(15,23,42,0.9));
-        box-shadow: inset 0 0 0 1px rgba(59,130,246,0.08);
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 13%, transparent);
+      }
+
+      .link-state[data-state="live"] .dot {
+        background: var(--green);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 13%, transparent);
+      }
+
+      .link-state[data-state="connecting"] .dot { background: var(--blue); }
+      .link-state[data-state="offline"] .dot { background: var(--red); }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.72fr);
+        gap: 12px;
+        min-height: calc(100vh - 124px);
+      }
+
+      .stage, .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(145deg, rgba(17, 23, 28, 0.98), rgba(9, 12, 15, 0.98));
         overflow: hidden;
       }
-      .viz-overlay {
+
+      .stage {
+        position: relative;
+        min-height: 660px;
+      }
+
+      #viewport {
         position: absolute;
         inset: 0;
+      }
+
+      #viewport canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .stage-top, .stage-bottom {
+        position: absolute;
+        z-index: 2;
+        left: 18px;
+        right: 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        pointer-events: none;
+      }
+
+      .stage-top { top: 16px; align-items: flex-start; }
+      .stage-bottom { bottom: 15px; align-items: flex-end; }
+
+      .axis-convention {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+
+      .eyebrow {
+        margin-bottom: 5px;
+        font-size: 10px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .big {
+        font: 700 23px/1.15 system-ui, sans-serif;
+        letter-spacing: -0.025em;
+      }
+
+      .read-only {
+        border: 1px solid rgba(92, 242, 154, 0.24);
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: var(--green);
+        background: rgba(7, 9, 11, 0.54);
+        font-size: 11px;
+        backdrop-filter: blur(8px);
+      }
+
+      .stage-actions {
         display: flex;
         align-items: center;
-        justify-content: center;
-        background: rgba(15, 23, 42, 0.76);
-        color: #e0f2fe;
-        font-weight: 500;
-        letter-spacing: 0.02em;
-        font-size: 15px;
-        opacity: 0;
-        transition: opacity 0.18s ease;
-        pointer-events: none;
-        z-index: 5;
-      }
-      .viz-overlay.visible {
-        opacity: 1;
-      }
-      .viz-container canvas {
-        width: 100% !important;
-        height: 100% !important;
-        display: block;
-      }
-      .values {
-        font-family: 'JetBrains Mono', 'SFMono-Regular', monospace;
-        font-size: 14px;
-        opacity: 0.85;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-variant-numeric: tabular-nums;
-        font-feature-settings: 'tnum';
-      }
-      #accValues,
-      #gyroValues {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-      #accValues span,
-      #gyroValues span {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 6px;
-        flex: 1 1 30%;
-        min-width: 96px;
-      }
-      .values.attitudes {
-        flex-direction: row;
-        justify-content: space-between;
-        flex-wrap: wrap;
         gap: 8px;
+        pointer-events: auto;
       }
-      .values.attitudes span {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 6px;
-        flex: 1 1 30%;
-        min-width: 96px;
-      }
-      .attitude-card {
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        display: flex;
-        flex-direction: column;
-      }
-        .action-btn {
-        padding: 8px 16px;
-        background: rgba(59,130,246,0.15);
-        border: 1px solid rgba(59,130,246,0.3);
+
+      button {
+        min-height: 31px;
+        border: 1px solid var(--line);
         border-radius: 8px;
-        color: #60a5fa;
+        padding: 0 11px;
+        background: rgba(7, 9, 11, 0.76);
+        color: var(--text);
+        font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        letter-spacing: 0.06em;
         cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        transition: all 0.15s;
       }
-      .action-btn:hover {
-        background: rgba(59,130,246,0.25);
-        border-color: rgba(59,130,246,0.5);
+
+      button:hover { border-color: #435564; }
+      button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+      .mode-switch[aria-pressed="true"] {
+        border-color: rgba(93, 180, 255, 0.48);
+        color: var(--blue);
       }
-      footer {
-        opacity: 0.6;
-        font-size: 12px;
+
+      .ground-state {
+        min-width: 240px;
+        color: var(--muted);
+        font-size: 10px;
         text-align: right;
       }
-      @media (max-width: 640px) {
-        body {
-          padding: 24px 16px;
-        }
-        header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .cards {
-          grid-template-columns: 1fr;
-          grid-auto-rows: auto;
-        }
-        .chart-card,
-        .attitude-card {
-          grid-column: 1;
-          grid-row: auto;
-        }
-        .chart-container {
-          height: clamp(200px, 36vh, 280px);
-        }
+
+      .ground-state[data-state="locked"] { color: var(--green); }
+      .ground-state[data-state="collecting"] { color: var(--amber); }
+      .ground-state[data-state="rejected"] { color: var(--red); }
+
+      #imuScope {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        display: none;
+        width: 100%;
+        height: 100%;
+      }
+
+      .scope-mode #imuScope { display: block; }
+      .scope-mode #viewport { visibility: hidden; }
+
+      .perf {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: rgba(7, 9, 11, 0.62);
+        color: var(--muted);
+        font-size: 11px;
+        backdrop-filter: blur(8px);
+      }
+
+      .perf b { color: var(--text); font-weight: 600; }
+
+      .attitude-strip {
+        display: flex;
+        gap: 8px;
+      }
+
+      .axis {
+        min-width: 92px;
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: rgba(7, 9, 11, 0.62);
+        backdrop-filter: blur(8px);
+      }
+
+      .axis b {
+        display: block;
+        margin-top: 3px;
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .rail {
+        display: grid;
+        grid-template-rows: auto auto auto 1fr;
+        gap: 12px;
+      }
+
+      .panel { padding: 16px; }
+
+      .panel h2 {
+        margin: 0 0 15px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .identity {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .identity .big { font-size: 27px; }
+
+      .armed {
+        border: 1px solid rgba(255, 98, 111, 0.32);
+        border-radius: 7px;
+        padding: 5px 8px;
+        color: var(--red);
+        font-size: 11px;
+      }
+
+      .disarmed {
+        border-color: rgba(92, 242, 154, 0.26);
+        color: var(--green);
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px 16px;
+        margin: 15px 0 0;
+      }
+
+      dt { color: var(--muted); }
+      dd {
+        margin: 0;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .signals {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+      }
+
+      .signal {
+        padding: 10px 7px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(5, 8, 10, 0.5);
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .signal b {
+        display: block;
+        margin-top: 4px;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .motor-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 7px;
+      }
+
+      .motor {
+        position: relative;
+        min-width: 0;
+        height: 82px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(5, 8, 10, 0.5);
+        overflow: hidden;
+      }
+
+      .motor-fill {
+        position: absolute;
+        inset: auto 0 0;
+        height: 0%;
+        background: linear-gradient(to top, rgba(92, 242, 154, 0.24), rgba(93, 180, 255, 0.38));
+        transition: height 80ms linear;
+      }
+
+      .motor-label {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        text-align: center;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .motor-label b {
+        display: block;
+        margin-top: 4px;
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 10px;
+        padding: 0 4px;
+        font-size: 10px;
+      }
+
+      footer a { color: inherit; }
+
+      @media (max-width: 920px) {
+        .layout { grid-template-columns: 1fr; }
+        .stage { min-height: 62vh; }
+        .rail { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+      }
+
+      @media (max-width: 620px) {
+        .shell { width: min(100% - 16px, 1420px); padding-top: 8px; }
+        header { height: 48px; }
+        .brand .muted { display: none; }
+        .stage { min-height: 56vh; }
+        .rail { grid-template-columns: 1fr; }
+        .stage-bottom { flex-direction: column; align-items: flex-start; }
+        .attitude-strip { width: 100%; }
+        .axis { min-width: 0; flex: 1; }
+        .perf { display: none; }
       }
     </style>
     <script type="importmap">
       {
         "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-          "three/examples/jsm/loaders/OBJLoader.js": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/OBJLoader.js"
+          "three": "/js/vendor/three.module.js"
         }
       }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   </head>
   <body>
     <div class="shell">
       <header>
-        <div>
-          <h1>miniflight configurator</h1>
-          <p>Real-time IMU telemetry</p>
+        <div class="brand">
+          <h1>Flight Seed</h1>
+          <span class="muted">live flight-controller state</span>
         </div>
-        <div class="values" id="status">Waiting for data…</div>
+        <div class="link-state" id="linkState" data-state="waiting_usb">
+          <span class="dot"></span>
+          <span id="linkText">Waiting for USB</span>
+        </div>
       </header>
-      <div class="cards">
-        <div class="card chart-card">
-          <h2>Accelerometer (g)</h2>
-          <div class="chart-container">
-            <canvas id="accChart"></canvas>
+
+      <main class="layout">
+        <section class="stage">
+          <div id="viewport"></div>
+          <div class="stage-top">
+            <div>
+              <div class="eyebrow">Attitude</div>
+              <div class="big" id="stageStatus">No telemetry</div>
+              <div class="axis-convention" id="axisConvention">BETAFLIGHT: ROLL → MODEL Z · PITCH → MODEL X · YAW → MODEL Y</div>
+            </div>
+            <div class="stage-actions">
+              <span class="ground-state" id="groundState" data-state="idle" title="Local display reference. This does not change the flight controller.">GROUND · RAW</span>
+              <button id="groundButton" type="button" title="Keep the disarmed drone still on a level surface. This changes only the display.">LOCK GROUND</button>
+              <button class="mode-switch" id="scopeButton" type="button" aria-pressed="false" title="Stop the 3D renderer and show live IMU signals.">IMU SCOPE</button>
+              <div class="read-only">READ ONLY</div>
+            </div>
           </div>
-          <div class="values" id="accValues"></div>
-        </div>
-        <div class="card chart-card">
-          <h2>Gyroscope (°/s)</h2>
-          <div class="chart-container">
-            <canvas id="gyroChart"></canvas>
+          <canvas id="imuScope"></canvas>
+          <div class="stage-bottom">
+            <div class="attitude-strip">
+              <div class="axis">ROLL<b id="roll">—</b></div>
+              <div class="axis">PITCH<b id="pitch">—</b></div>
+              <div class="axis">YAW<b id="yaw">—</b></div>
+            </div>
+            <div class="perf">
+              <span>RENDER <b id="renderFps">—</b></span>
+              <span>STATE <b id="stateHz">—</b></span>
+              <span>MSP <b id="mspFps">—</b></span>
+              <span>ATT <b id="attitudeHz">—</b></span>
+              <span>IMU <b id="imuHz">—</b></span>
+              <span>JITTER <b id="jitter">—</b></span>
+              <span>AGE <b id="age">—</b></span>
+            </div>
           </div>
-          <div class="values" id="gyroValues"></div>
-        </div>
-        <div class="card attitude-card">
-          <div class="card-header">
-            <h2>Orientation</h2>
-              <button class="action-btn" id="calibrateBtn">Calibrate</button>
-          </div>
-          <div class="viz-container" id="attitudeViz">
-            <div class="viz-overlay" id="attitudeOverlay">Calibrating orientation…</div>
-          </div>
-          <div class="values attitudes" id="attitudeValues">Waiting…</div>
-        </div>
-      </div>
+        </section>
+
+        <aside class="rail">
+          <section class="panel">
+            <h2>Controller</h2>
+            <div class="identity">
+              <div>
+                <div class="big" id="controller">—</div>
+                <div class="muted" id="controllerMeta">—</div>
+              </div>
+              <span class="armed disarmed" id="armed">—</span>
+            </div>
+            <dl>
+              <dt>Loop</dt><dd id="loop">—</dd>
+              <dt>CPU</dt><dd id="cpu">—</dd>
+              <dt>I²C errors</dt><dd id="i2c">—</dd>
+              <dt>Sensors</dt><dd id="sensors">—</dd>
+            </dl>
+          </section>
+
+          <section class="panel">
+            <h2>Power</h2>
+            <div class="split">
+              <div>
+                <div class="eyebrow">Voltage</div>
+                <div class="big" id="voltage">—</div>
+              </div>
+              <div>
+                <div class="eyebrow">Current</div>
+                <div class="big" id="current">—</div>
+              </div>
+            </div>
+            <dl>
+              <dt>Used</dt><dd id="mah">—</dd>
+              <dt>RSSI</dt><dd id="rssi">—</dd>
+              <dt>Altitude</dt><dd id="altitude">—</dd>
+              <dt>Vario</dt><dd id="vario">—</dd>
+            </dl>
+          </section>
+
+          <section class="panel">
+            <h2>Body sensors · MSP values</h2>
+            <div class="eyebrow">Gyroscope</div>
+            <div class="signals" id="gyro"></div>
+            <div class="eyebrow" style="margin-top: 13px">Accelerometer</div>
+            <div class="signals" id="accel"></div>
+          </section>
+
+          <section class="panel">
+            <h2>Motor outputs</h2>
+            <div class="motor-grid" id="motors"></div>
+          </section>
+        </aside>
+      </main>
+
       <footer>
-        This viewer streams live IMU readings
+        <span>No settings · no writes · no motor commands</span>
+        <span>
+          Model: <a href="https://github.com/CesiumGS/cesium/tree/main/Apps/SampleData/models/CesiumDrone">CesiumDrone</a>
+          · Apache-2.0
+        </span>
       </footer>
     </div>
     <script type="module" src="/js/app.js"></script>
   </body>
 </html>
-

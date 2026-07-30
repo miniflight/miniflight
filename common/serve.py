@@ -19,6 +19,8 @@ class SharedState:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._changed = threading.Condition(self._lock)
+        self._version = 0
         self._snapshot: Dict[str, Any] = {
             "world_time": 0.0,
             "frame": 0,
@@ -29,14 +31,25 @@ class SharedState:
         self._reset_yaw = False
 
     def set_snapshot(self, snapshot: Dict[str, Any]) -> None:
-        with self._lock:
+        with self._changed:
             snapshot = copy.deepcopy(snapshot)
-            snapshot.setdefault("updated_at", time.time())
+            snapshot["updated_at"] = time.time()
             self._snapshot = snapshot
+            self._version += 1
+            self._changed.notify_all()
 
     def get_snapshot(self) -> Dict[str, Any]:
         with self._lock:
             return copy.deepcopy(self._snapshot)
+
+    def wait_for_snapshot(
+        self, after_version: int, timeout: float = 15.0
+    ) -> tuple[int, Dict[str, Any]]:
+        """Wait for a new snapshot, then return its sequence and value."""
+        with self._changed:
+            if self._version <= after_version:
+                self._changed.wait(timeout)
+            return self._version, copy.deepcopy(self._snapshot)
 
     def set_input_keys(self, keys: Iterable[str]) -> None:
         normalized = {str(k): True for k in keys}
@@ -66,6 +79,10 @@ def _infer_mime_type(path: Path) -> str:
         return "text/css" if path.suffix == ".css" else "application/wasm"
     if path.suffix in {".obj", ".mtl"}:
         return "text/plain"
+    if path.suffix == ".glb":
+        return "model/gltf-binary"
+    if path.suffix == ".gltf":
+        return "model/gltf+json"
     if path.suffix in {".json"}:
         return "application/json"
     return "text/html"
@@ -83,6 +100,10 @@ def _make_handler(shared_state: SharedState, static_dir: Path):
                 snapshot = shared_state.get_snapshot()
                 payload = json.dumps(snapshot).encode("utf-8")
                 self._send_response(200, "application/json", payload)
+                return
+
+            if route == "/events":
+                self._send_events()
                 return
 
             if route in {"/", "/index.html"}:
@@ -144,6 +165,24 @@ def _make_handler(shared_state: SharedState, static_dir: Path):
                 return
             mime_type = _infer_mime_type(path)
             self._send_response(200, mime_type, data)
+
+        def _send_events(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            version = -1
+            try:
+                while True:
+                    version, snapshot = shared_state.wait_for_snapshot(version)
+                    payload = json.dumps(snapshot, separators=(",", ":"))
+                    self.wfile.write(
+                        f"id: {version}\nevent: state\ndata: {payload}\n\n".encode("utf-8")
+                    )
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
         def _send_response(self, status: int, content_type: str, payload: bytes) -> None:
             self.send_response(status)
@@ -221,5 +260,3 @@ __all__ = [
     "maybe_launch_browser",
     "should_open_browser",
 ]
-
-

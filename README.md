@@ -1,6 +1,26 @@
 # miniflight
 
+This repository contains notes about machines
+
 flight controller firmware. has a mahony filter for orientation and PIDs for control. python version prototypes fast, C version is what you flash.
+
+## flight programs
+
+Miniflight programs are plug-and-play behaviors. A program receives calibrated
+IMU and camera observations in one canonical body frame. It returns collective
+acceleration and body-rate intent. It cannot address motors or board drivers.
+
+The runtime owns calibration, vehicle adaptation, actuator limits, arming, and
+mixing. `hover` is the first planned program. The current real-drone path is
+read-only. It must prove units, axes, timestamps, and replay before Miniflight
+can deploy a program to a flight controller.
+
+The clean core has a logical line counter. It ignores comments and docstrings.
+
+```bash
+python3 sz.py
+MAX_LINE_COUNT=400 python3 sz.py
+```
 
 the sim does rigid body physics with RK4 integration. renders in browser with three.js over websockets. quad actually flies around, you can crash it.
 
@@ -19,16 +39,27 @@ TARGET=sitl_c python -m miniflight.main
 
 WASD throttle/yaw, arrows pitch/roll.
 
-## configurator
+## live configurator
 
-web UI for tuning. serves over websockets, plots IMU data in real time. 
+the localhost configurator reads a connected Betaflight controller over USB.
+it shows attitude, controller health, power, motors, and raw IMU signals.
 
 ```bash
-cd config && python serve.py
-# localhost:8080
+python3 -m config.serve
+# http://127.0.0.1:8002
 ```
 
-useful for seeing what the filter is doing. can tune PIDs (soon, not implemented yet) without restarting. 
+plug in the controller and open the URL. no driver selection is necessary on macOS.
+
+`lock ground` creates a local display reference after the disarmed drone becomes still.
+the score reports the quality of that reference. `imu scope` stops the 3D renderer and
+shows the gyroscope and accelerometer signals.
+
+the configurator has an explicit read-only MSP allowlist. it cannot send calibration,
+settings, motor, arming, reboot, or firmware commands.
+
+remove propellers before general bench work. keep the drone disarmed.
+
 
 ## how it works
 
