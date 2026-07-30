@@ -16,7 +16,16 @@ from typing import Iterable
 
 
 COUNTED_TOKENS = frozenset({token.NAME, token.NUMBER, token.OP, token.STRING})
-DEFAULT_PATHS = (Path("miniflight/core"),)
+SOURCE_DIRECTORIES = (
+    Path("common"),
+    Path("config"),
+    Path("examples"),
+    Path("miniflight"),
+    Path("sim"),
+    Path("target"),
+    Path("test"),
+)
+IGNORED_PARTS = frozenset({".git", "__pycache__", "node_modules", "vendor"})
 
 
 def is_docstring(item: tokenize.TokenInfo) -> bool:
@@ -45,7 +54,7 @@ def python_files(paths: Iterable[Path]) -> list[Path]:
         if path.is_file() and path.suffix == ".py":
             files.append(path)
         elif path.is_dir():
-            files.extend(candidate for candidate in path.rglob("*.py") if "__pycache__" not in candidate.parts)
+            files.extend(candidate for candidate in path.rglob("*.py") if not IGNORED_PARTS.intersection(candidate.parts))
     return sorted(set(files))
 
 
@@ -55,7 +64,7 @@ def report(paths: Iterable[Path]) -> int:
     for path, count, density in rows:
         print(f"{count:5d}  {density:4.1f}  {path.as_posix()}")
     total = sum(count for _, count, _ in rows)
-    print(f"\ncore lines: {total}")
+    print(f"\ntotal lines: {total}")
     return total
 
 
@@ -63,7 +72,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="*", type=Path, help="Python files or directories to count")
     args = parser.parse_args()
-    total = report(args.paths or DEFAULT_PATHS)
+    paths = args.paths or (*SOURCE_DIRECTORIES, *sorted(Path(".").glob("*.py")))
+    total = report(paths)
     maximum = int(os.environ.get("MAX_LINE_COUNT", "-1"))
     if maximum >= 0 and total > maximum:
         raise SystemExit(f"OVER {maximum} LINES: {total}")

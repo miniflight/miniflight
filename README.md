@@ -15,7 +15,7 @@ mixing. `hover` is the first planned program. The current real-drone path is
 read-only. It must prove units, axes, timestamps, and replay before Miniflight
 can deploy a program to a flight controller.
 
-The clean core has a logical line counter. It ignores comments and docstrings.
+The line counter measures all project Python files. It ignores comments and docstrings.
 
 ```bash
 python3 sz.py
