@@ -61,6 +61,7 @@ Record and check a ten-second stationary window:
 ```bash
 python3 telemetry_oracle.py --seconds 10 --record-out still.jsonl
 python3 telemetry_oracle.py --stillness still.jsonl
+python3 telemetry_oracle.py --freeze-reference still.jsonl
 ```
 
 plug in the controller and open the URL. no driver selection is necessary on macOS.

@@ -5,16 +5,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
 import struct
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from miniflight.calibration import StationaryImuReferenceEstimator
+from miniflight.core.raw_imu import RawImuSample
 from miniflight.msp import (
     MSP_ANALOG,
     MSP_ATTITUDE,
@@ -421,77 +425,7 @@ def _mean_and_std(samples: list[tuple[int, int, int]]) -> tuple[tuple[float, ...
     return means, deviations
 
 
-def stillness_report(path: Path) -> int:
-    """Report raw stationary-window quality from one flight record."""
-    requests = 0
-    responses = 0
-    damaged = 0
-    unpaired = 0
-    response_errors = 0
-    pending_command = None
-    response_times: list[int] = []
-    imu_times: list[int] = []
-    accel_samples: list[tuple[int, int, int]] = []
-    gyro_samples: list[tuple[int, int, int]] = []
-    attitude_samples: list[tuple[float, float, float]] = []
-
-    try:
-        records = read_flight_record(path)
-        for record in records:
-            record_type = record.get("type")
-            if record_type == "msp_request":
-                requests += 1
-                try:
-                    command = _request_command(record)
-                except ValueError:
-                    damaged += 1
-                    continue
-                if pending_command is not None:
-                    unpaired += 1
-                pending_command = command
-            elif record_type == "msp_response":
-                responses += 1
-                try:
-                    direction, command, payload = _response_frame(record)
-                except ValueError:
-                    damaged += 1
-                    continue
-                if pending_command != command:
-                    unpaired += 1
-                pending_command = None
-                if direction != ">":
-                    response_errors += 1
-                    continue
-                response_times.append(record["monotonic_time_ns"])
-                if command == MSP_RAW_IMU:
-                    imu = decode_raw_imu(payload)
-                    if imu is not None:
-                        accel, gyro = imu
-                        accel_samples.append(accel)
-                        gyro_samples.append(gyro)
-                        imu_times.append(record["monotonic_time_ns"])
-                elif command == MSP_ATTITUDE:
-                    attitude = decode_attitude(payload)
-                    if attitude is not None:
-                        attitude_samples.append(attitude)
-    except ValueError as error:
-        print(f"Invalid flight record: {error}", file=sys.stderr)
-        return 2
-
-    if pending_command is not None:
-        unpaired += 1
-    if not accel_samples or not gyro_samples:
-        print("No raw IMU samples in flight record.", file=sys.stderr)
-        return 2
-
-    duration_s = (response_times[-1] - response_times[0]) / 1_000_000_000
-    imu_duration_s = (imu_times[-1] - imu_times[0]) / 1_000_000_000
-    response_hz = (len(response_times) - 1) / duration_s if duration_s > 0.0 else 0.0
-    imu_hz = (len(imu_times) - 1) / imu_duration_s if imu_duration_s > 0.0 else 0.0
-    worst_imu_gap_ms = max(
-        ((right - left) / 1_000_000 for left, right in zip(imu_times, imu_times[1:])),
-        default=0.0,
-    )
+def _quiet_span(gyro_samples: list[tuple[int, int, int]]) -> tuple[int, int]:
     quiet_start = 0
     quiet_length = 0
     run_start = 0
@@ -502,6 +436,97 @@ def stillness_report(path: Path) -> int:
                 quiet_start, quiet_length = run_start, run_length
         else:
             run_start = index + 1
+    return quiet_start, quiet_length
+
+
+@dataclass
+class CaptureMeasurements:
+    manifest: Optional[dict]
+    requests: int
+    responses: int
+    damaged: int
+    unpaired: int
+    response_errors: int
+    response_times: list[int]
+    imu_samples: list[RawImuSample]
+    attitude_samples: list[tuple[float, float, float]]
+
+
+def _read_measurements(path: Path) -> CaptureMeasurements:
+    data = CaptureMeasurements(None, 0, 0, 0, 0, 0, [], [], [])
+    pending_command = None
+    pending_time_ns = 0
+    for record in read_flight_record(path):
+        record_type = record.get("type")
+        if record_type == "machine":
+            data.manifest = record
+        elif record_type == "msp_request":
+            data.requests += 1
+            try:
+                command = _request_command(record)
+            except ValueError:
+                data.damaged += 1
+                continue
+            if pending_command is not None:
+                data.unpaired += 1
+            pending_command = command
+            pending_time_ns = record["monotonic_time_ns"]
+        elif record_type == "msp_response":
+            data.responses += 1
+            try:
+                direction, command, payload = _response_frame(record)
+            except ValueError:
+                data.damaged += 1
+                continue
+            if pending_command != command:
+                data.unpaired += 1
+            pending_command = None
+            if direction != ">":
+                data.response_errors += 1
+                continue
+            timestamp_ns = record["monotonic_time_ns"]
+            data.response_times.append(timestamp_ns)
+            if command == MSP_RAW_IMU and (imu := decode_raw_imu(payload)) is not None:
+                accel, gyro = imu
+                data.imu_samples.append(
+                    RawImuSample(
+                        sequence=len(data.imu_samples),
+                        timestamp_ns=timestamp_ns,
+                        accel_raw=tuple(float(value) for value in accel),
+                        gyro_raw=tuple(float(value) for value in gyro),
+                        source_age_ns=max(0, timestamp_ns - pending_time_ns),
+                    )
+                )
+            elif command == MSP_ATTITUDE and (attitude := decode_attitude(payload)) is not None:
+                data.attitude_samples.append(attitude)
+    if pending_command is not None:
+        data.unpaired += 1
+    return data
+
+
+def stillness_report(path: Path) -> int:
+    """Report raw stationary-window quality from one flight record."""
+    try:
+        data = _read_measurements(path)
+    except ValueError as error:
+        print(f"Invalid flight record: {error}", file=sys.stderr)
+        return 2
+    if not data.imu_samples:
+        print("No raw IMU samples in flight record.", file=sys.stderr)
+        return 2
+
+    imu_times = [sample.timestamp_ns for sample in data.imu_samples]
+    accel_samples = [tuple(int(value) for value in sample.accel_raw) for sample in data.imu_samples]
+    gyro_samples = [tuple(int(value) for value in sample.gyro_raw) for sample in data.imu_samples]
+    duration_s = (data.response_times[-1] - data.response_times[0]) / 1_000_000_000
+    imu_duration_s = (imu_times[-1] - imu_times[0]) / 1_000_000_000
+    response_hz = (len(data.response_times) - 1) / duration_s if duration_s > 0.0 else 0.0
+    imu_hz = (len(imu_times) - 1) / imu_duration_s if imu_duration_s > 0.0 else 0.0
+    worst_imu_gap_ms = max(
+        ((right - left) / 1_000_000 for left, right in zip(imu_times, imu_times[1:])),
+        default=0.0,
+    )
+    quiet_start, quiet_length = _quiet_span(gyro_samples)
     quiet_accel = accel_samples[quiet_start : quiet_start + quiet_length]
     quiet_gyro = gyro_samples[quiet_start : quiet_start + quiet_length]
     if not quiet_accel:
@@ -514,9 +539,9 @@ def stillness_report(path: Path) -> int:
     accel_variation_percent = 100.0 * accel_spread / accel_magnitude_mean
     gyro_peak = max(abs(value) for sample in gyro_samples for value in sample)
     tilt_spread = 0.0
-    if attitude_samples:
-        roll_values = [sample[0] for sample in attitude_samples]
-        pitch_values = [sample[1] for sample in attitude_samples]
+    if data.attitude_samples:
+        roll_values = [sample[0] for sample in data.attitude_samples]
+        pitch_values = [sample[1] for sample in data.attitude_samples]
         tilt_spread = max(max(roll_values) - min(roll_values), max(pitch_values) - min(pitch_values))
 
     calibration_reasons = []
@@ -525,7 +550,7 @@ def stillness_report(path: Path) -> int:
         calibration_reasons.append("duration below 8 seconds")
     if quiet_length < 200:
         calibration_reasons.append("fewer than 200 consecutive quiet IMU samples")
-    if damaged or unpaired or response_errors:
+    if data.damaged or data.unpaired or data.response_errors:
         calibration_reasons.append("transport errors")
         transport_reasons.append("damaged unpaired or error frames")
     if worst_imu_gap_ms > 100.0:
@@ -537,11 +562,11 @@ def stillness_report(path: Path) -> int:
 
     vector = lambda values: " ".join(f"{value:.3f}" for value in values)
     print(f"duration_s {duration_s:.3f}")
-    print(f"requests {requests}")
-    print(f"responses {responses}")
-    print(f"unpaired {unpaired}")
-    print(f"damaged {damaged}")
-    print(f"response_errors {response_errors}")
+    print(f"requests {data.requests}")
+    print(f"responses {data.responses}")
+    print(f"unpaired {data.unpaired}")
+    print(f"damaged {data.damaged}")
+    print(f"response_errors {data.response_errors}")
     print(f"response_hz {response_hz:.2f}")
     print(f"imu_samples {len(imu_times)}")
     print(f"quiet_run_samples {quiet_length}")
@@ -564,6 +589,64 @@ def stillness_report(path: Path) -> int:
     return 0 if not calibration_reasons else 1
 
 
+def freeze_reference(path: Path) -> int:
+    """Write measured stationary IMU facts tied to one flight record."""
+    try:
+        data = _read_measurements(path)
+    except ValueError as error:
+        print(f"Invalid flight record: {error}", file=sys.stderr)
+        return 2
+    if data.manifest is None:
+        print("Flight record has no machine manifest.", file=sys.stderr)
+        return 2
+
+    quiet_start, quiet_length = _quiet_span(
+        [tuple(int(value) for value in sample.gyro_raw) for sample in data.imu_samples]
+    )
+    if quiet_length < 200:
+        print("Flight record has fewer than 200 consecutive quiet IMU samples.", file=sys.stderr)
+        return 1
+    estimator = StationaryImuReferenceEstimator(quiet_length)
+    for sample in data.imu_samples[quiet_start : quiet_start + quiet_length]:
+        estimator.add(sample)
+    reference = estimator.reference
+    manifest = data.manifest
+    output_path = path.with_suffix(".reference.json")
+    result = {
+        "format": "miniflight-stationary-reference",
+        "version": 1,
+        "source_record": path.name,
+        "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "machine": {
+            "controller": manifest.get("controller"),
+            "board": manifest.get("board"),
+            "firmware": manifest.get("firmware"),
+            "api_version": manifest.get("api_version"),
+            "sensors": manifest.get("sensors"),
+            "motor_count": manifest.get("motor_count"),
+        },
+        "stationary": {
+            "sample_count": reference.sample_count,
+            "accel_mean_raw": reference.accel_mean_raw,
+            "gyro_bias_raw": reference.gyro_bias_raw,
+            "accel_scale_mps2_per_count": reference.accel_scale_mps2_per_count,
+        },
+        "body_from_sensor": None,
+        "gyro_scale_rad_s_per_count": None,
+    }
+    try:
+        with output_path.open("x", encoding="utf-8") as output_file:
+            json.dump(result, output_file, indent=2, sort_keys=True)
+            output_file.write("\n")
+    except FileExistsError:
+        print(f"Reference already exists: {output_path}", file=sys.stderr)
+        return 2
+    print(f"reference {output_path}")
+    print(f"samples {reference.sample_count}")
+    print(f"accel_scale_mps2_per_count {reference.accel_scale_mps2_per_count:.9f}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only MSP telemetry oracle.")
     parser.add_argument("--device", default=None, help="Serial device path")
@@ -578,6 +661,7 @@ def main() -> int:
     parser.add_argument("--replay", default=None, help="Replay a raw MSP capture")
     parser.add_argument("--report", default=None, help="Report machine facts from a raw capture")
     parser.add_argument("--stillness", default=None, help="Report stationary raw IMU quality")
+    parser.add_argument("--freeze-reference", default=None, help="Write a stationary machine reference")
     args = parser.parse_args()
 
     if args.replay:
@@ -600,6 +684,13 @@ def main() -> int:
             print(f"Capture not found: {capture_path}", file=sys.stderr)
             return 2
         return stillness_report(capture_path)
+
+    if args.freeze_reference:
+        capture_path = Path(args.freeze_reference).expanduser().resolve()
+        if not capture_path.is_file():
+            print(f"Capture not found: {capture_path}", file=sys.stderr)
+            return 2
+        return freeze_reference(capture_path)
 
     if args.device:
         devices = [args.device]
