@@ -264,6 +264,19 @@ def monitor_device(
             "motor_count": profile.motor_count,
             "has_imu": profile.has_imu,
         }
+        if record is not None:
+            record.machine(
+                device,
+                profile,
+                {
+                    "attitude": "alternate",
+                    "raw_imu": "alternate",
+                    "status_s": SLOW_POLL_PERIODS[MSP_STATUS],
+                    "analog_s": SLOW_POLL_PERIODS[MSP_ANALOG],
+                    "motor_s": SLOW_POLL_PERIODS[MSP_MOTOR],
+                    "altitude_s": SLOW_POLL_PERIODS[MSP_ALTITUDE],
+                },
+            )
         snapshot["connection"].update(
             state=LinkState.LIVE.value,
             message="Live MSP telemetry.",

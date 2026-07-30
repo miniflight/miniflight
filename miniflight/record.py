@@ -6,6 +6,8 @@ import json
 import time
 from pathlib import Path
 
+from miniflight.core.machine import MachineProfile
+
 
 class FlightRecord:
     """Write ordered transport events without decoding them."""
@@ -31,6 +33,21 @@ class FlightRecord:
 
     def link(self, state: str, device: str) -> None:
         self._write({"type": "link", "state": state, "device": device})
+
+    def machine(self, device: str, profile: MachineProfile, poll_plan: dict) -> None:
+        self._write(
+            {
+                "type": "machine",
+                "device": device,
+                "controller": profile.controller,
+                "firmware": profile.firmware,
+                "api_version": profile.api_version,
+                "board": profile.board,
+                "sensors": sorted(profile.sensors),
+                "motor_count": profile.motor_count,
+                "poll_plan": poll_plan,
+            }
+        )
 
     def close(self) -> None:
         if not self._file.closed:

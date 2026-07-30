@@ -16,12 +16,8 @@ from typing import Optional
 
 from miniflight.msp import (
     MSP_ANALOG,
-    MSP_API_VERSION,
     MSP_ATTITUDE,
     MSP_ALTITUDE,
-    MSP_BOARD_INFO,
-    MSP_FC_VARIANT,
-    MSP_FC_VERSION,
     MSP_RAW_IMU,
     MSP_STATUS,
     MSPParser,
@@ -29,6 +25,7 @@ from miniflight.msp import (
     open_serial,
     serial_devices,
 )
+from miniflight.probe import MspMachineProbe, machine_profile_from_responses
 from miniflight.record import FlightRecord
 
 
@@ -54,25 +51,6 @@ def decode_raw_imu(payload: bytes) -> Optional[tuple[tuple[int, int, int], tuple
         return None
     values = struct.unpack_from("<9h", payload)
     return values[0:3], values[3:6]
-
-
-def decode_identity(client: MSPSerial) -> dict[str, Optional[str]]:
-    api = client.request(MSP_API_VERSION, timeout=0.35)
-    if api is None or len(api) < 3:
-        raise RuntimeError("No MSP response for API version")
-    variant = client.request(MSP_FC_VARIANT, timeout=0.35)
-    version = client.request(MSP_FC_VERSION, timeout=0.35)
-    board = client.request(MSP_BOARD_INFO, timeout=0.35)
-    return {
-        "api_version": f"{api[1]}.{api[2]}" if len(api) >= 3 else None,
-        "variant": variant[:4].decode("ascii", "replace").strip("\x00 ") if variant else None,
-        "firmware": (
-            f"{version[0]}.{version[1]}.{version[2]}"
-            if version and len(version) >= 3
-            else None
-        ),
-        "board": board[:4].decode("ascii", "replace").strip("\x00 ") if board else None,
-    }
 
 
 def safe_float(value: Optional[float]) -> str:
@@ -109,12 +87,23 @@ def run_oracle(
             on_frame=record.response if record is not None else None,
             on_request=record.request if record is not None else None,
         )
-        identity = decode_identity(client)
+        profile = MspMachineProbe().inspect(client)
         if record is not None:
+            record.machine(
+                device,
+                profile,
+                {
+                    "attitude": "alternate",
+                    "raw_imu": "alternate",
+                    "status_s": SLOW_POLL_SECONDS[MSP_STATUS],
+                    "analog_s": SLOW_POLL_SECONDS[MSP_ANALOG],
+                    "altitude_s": SLOW_POLL_SECONDS[MSP_ALTITUDE],
+                },
+            )
             record.link("live", device)
         print(
-            f"Connecting to {device} | variant={identity['variant']} "
-            f"board={identity['board']} fw={identity['firmware']} api={identity['api_version']}"
+            f"Connecting to {device} | variant={profile.controller} "
+            f"board={profile.board} fw={profile.firmware} api={profile.api_version}"
         )
 
         link_state = "LIVE"
@@ -392,6 +381,60 @@ def replay_capture(path: Path) -> int:
     return 0
 
 
+def report_capture(path: Path) -> int:
+    """Print machine facts reconstructed from one raw capture."""
+    parser = MSPParser()
+    responses: dict[int, bytes] = {}
+    frame_count = 0
+    manifest = None
+
+    with path.open(encoding="utf-8") as capture_file:
+        try:
+            header = json.loads(capture_file.readline())
+        except json.JSONDecodeError as error:
+            print(f"Invalid capture header: {error}", file=sys.stderr)
+            return 2
+        capture_format = header.get("format")
+        if capture_format not in {"miniflight-msp-capture", "miniflight-flight-record"}:
+            print("Not a Miniflight MSP capture.", file=sys.stderr)
+            return 2
+
+        for line_number, line in enumerate(capture_file, start=2):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
+                return 2
+            if capture_format == "miniflight-flight-record":
+                if record.get("type") == "machine":
+                    manifest = record
+                if record.get("type") != "msp_response":
+                    continue
+            try:
+                parser.feed(bytes.fromhex(record["frame_hex"]))
+            except (KeyError, TypeError, ValueError) as error:
+                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
+                return 2
+            while (frame := parser.pop()) is not None:
+                direction, command, payload = frame
+                if direction == ">":
+                    responses[command] = payload
+                    frame_count += 1
+
+    profile = machine_profile_from_responses(responses)
+    print(f"frames {frame_count}")
+    print(f"controller {profile.controller or '-'}")
+    print(f"board {profile.board or '-'}")
+    print(f"firmware {profile.firmware or '-'}")
+    print(f"api {profile.api_version or '-'}")
+    print(f"sensors {' '.join(sorted(profile.sensors)) or '-'}")
+    print(f"motor_count {profile.motor_count if profile.motor_count is not None else '-'}")
+    if manifest is not None:
+        print(f"device {manifest['device']}")
+        print(f"poll_plan {json.dumps(manifest['poll_plan'], sort_keys=True, separators=(',', ':'))}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only MSP telemetry oracle.")
     parser.add_argument("--device", default=None, help="Serial device path")
@@ -403,6 +446,7 @@ def main() -> int:
     parser.add_argument("--samples", type=int, default=None, help="Max samples before exit")
     parser.add_argument("--record-out", default=None, help="Append-only flight record path")
     parser.add_argument("--replay", default=None, help="Replay a raw MSP capture")
+    parser.add_argument("--report", default=None, help="Report machine facts from a raw capture")
     args = parser.parse_args()
 
     if args.replay:
@@ -411,6 +455,13 @@ def main() -> int:
             print(f"Capture not found: {capture_path}", file=sys.stderr)
             return 2
         return replay_capture(capture_path)
+
+    if args.report:
+        capture_path = Path(args.report).expanduser().resolve()
+        if not capture_path.is_file():
+            print(f"Capture not found: {capture_path}", file=sys.stderr)
+            return 2
+        return report_capture(capture_path)
 
     if args.device:
         devices = [args.device]

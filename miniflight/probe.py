@@ -4,21 +4,34 @@ from __future__ import annotations
 
 import struct
 import time
-from typing import Optional
+from typing import Mapping, Optional
 
 from miniflight.core.imu import ImuCalibration
 from miniflight.core.machine import MachineProfile
 from miniflight.core.observation import ObservationTick
 from miniflight.core.raw_imu import RawImuSample
+from miniflight.msp import (
+    MSP_API_VERSION,
+    MSP_BOARD_INFO,
+    MSP_FC_VARIANT,
+    MSP_FC_VERSION,
+    MSP_MOTOR,
+    MSP_RAW_IMU,
+    MSP_STATUS,
+)
 
 
-MSP_API_VERSION = 1
-MSP_FC_VARIANT = 2
-MSP_FC_VERSION = 3
-MSP_BOARD_INFO = 4
-MSP_STATUS = 101
-MSP_RAW_IMU = 102
-MSP_MOTOR = 104
+def machine_profile_from_responses(responses: Mapping[int, Optional[bytes]]) -> MachineProfile:
+    """Return a machine profile from raw read-only MSP response payloads."""
+    api = responses.get(MSP_API_VERSION)
+    return MachineProfile.from_observation(
+        controller=MspMachineProbe._text(responses.get(MSP_FC_VARIANT), 4),
+        firmware=MspMachineProbe._version(responses.get(MSP_FC_VERSION)),
+        api_version=f"{api[1]}.{api[2]}" if api and len(api) >= 3 else None,
+        board=MspMachineProbe._text(responses.get(MSP_BOARD_INFO), 4),
+        sensors=MspMachineProbe._sensors(responses.get(MSP_STATUS)),
+        motor_count=MspMachineProbe._motor_count(responses.get(MSP_MOTOR)),
+    )
 
 
 class MspMachineProbe:
@@ -35,13 +48,15 @@ class MspMachineProbe:
         board = client.request(MSP_BOARD_INFO, timeout=0.25)
         status = client.request(MSP_STATUS, timeout=0.25)
         motors = client.request(MSP_MOTOR, timeout=0.25)
-        return MachineProfile.from_observation(
-            controller=self._text(variant, 4),
-            firmware=self._version(version),
-            api_version=f"{api[1]}.{api[2]}",
-            board=self._text(board, 4),
-            sensors=self._sensors(status),
-            motor_count=self._motor_count(motors),
+        return machine_profile_from_responses(
+            {
+                MSP_API_VERSION: api,
+                MSP_FC_VARIANT: variant,
+                MSP_FC_VERSION: version,
+                MSP_BOARD_INFO: board,
+                MSP_STATUS: status,
+                MSP_MOTOR: motors,
+            }
         )
 
     @staticmethod
