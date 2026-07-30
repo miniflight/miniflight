@@ -56,6 +56,13 @@ MINIFLIGHT_RECORD=flight.jsonl python3 -m config.serve
 MINIFLIGHT_REPLAY=flight.jsonl python3 -m config.serve
 ```
 
+Record and check a ten-second stationary window:
+
+```bash
+python3 telemetry_oracle.py --seconds 10 --record-out still.jsonl
+python3 telemetry_oracle.py --stillness still.jsonl
+```
+
 plug in the controller and open the URL. no driver selection is necessary on macOS.
 
 `lock ground` creates a local display reference after the disarmed drone becomes still.

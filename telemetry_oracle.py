@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import struct
 import sys
@@ -24,9 +25,10 @@ from miniflight.msp import (
     MSPSerial,
     open_serial,
     serial_devices,
+    xor_checksum,
 )
 from miniflight.probe import MspMachineProbe, machine_profile_from_responses
-from miniflight.record import FlightRecord
+from miniflight.record import FlightRecord, read_flight_record
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
@@ -75,6 +77,7 @@ def run_oracle(
     device: str,
     out_path: Path,
     max_samples: Optional[int] = None,
+    max_seconds: Optional[float] = None,
     record: Optional[FlightRecord] = None,
 ) -> None:
     if record is not None:
@@ -138,6 +141,7 @@ def run_oracle(
         imu_window = 0
         attitude_window = 0
         rates = {"frames_per_second": 0.0, "imu_per_second": 0.0, "attitude_per_second": 0.0}
+        capture_started = time.monotonic()
 
         with out_path.open("w", newline="", encoding="utf-8") as out_file:
             writer = csv.writer(out_file)
@@ -175,6 +179,8 @@ def run_oracle(
             sample_idx = 0
             while True:
                 loop_started = time.monotonic()
+                if max_seconds is not None and loop_started - capture_started >= max_seconds:
+                    return
                 loop_now = loop_started
 
                 if link_state != "LIVE" and loop_now - last_response < 1.0:
@@ -322,57 +328,50 @@ def run_oracle(
             os.close(fd)
 
 
-def replay_capture(path: Path) -> int:
-    """Decode a raw MSP capture without a serial device."""
+def _response_frame(record: dict) -> tuple[str, int, bytes]:
     parser = MSPParser()
+    try:
+        parser.feed(bytes.fromhex(record["frame_hex"]))
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"invalid MSP response at sequence {record['sequence']}") from error
+    frame = parser.pop()
+    if frame is None:
+        raise ValueError(f"invalid MSP response at sequence {record['sequence']}")
+    return frame
+
+
+def _request_command(record: dict) -> int:
+    try:
+        frame = bytes.fromhex(record["frame_hex"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"invalid MSP request at sequence {record['sequence']}") from error
+    if len(frame) != 6 or frame[:3] != b"$M<" or xor_checksum(frame[3:-1]) != frame[-1]:
+        raise ValueError(f"invalid MSP request at sequence {record['sequence']}")
+    return frame[4]
+
+
+def replay_capture(path: Path) -> int:
+    """Decode a flight record without a serial device."""
     frame_count = 0
     attitude_count = 0
     imu_count = 0
-
-    with path.open(encoding="utf-8") as capture_file:
-        try:
-            header = json.loads(capture_file.readline())
-        except json.JSONDecodeError as error:
-            print(f"Invalid capture header: {error}", file=sys.stderr)
-            return 2
-        capture_format = header.get("format")
-        if capture_format not in {"miniflight-msp-capture", "miniflight-flight-record"}:
-            print("Not a Miniflight MSP capture.", file=sys.stderr)
-            return 2
-
-        for line_number, line in enumerate(capture_file, start=2):
-            try:
-                record = json.loads(line)
-            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
-                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
-                return 2
-            if capture_format == "miniflight-flight-record":
-                if record.get("type") != "msp_response":
-                    continue
-            try:
-                parser.feed(bytes.fromhex(record["frame_hex"]))
-            except (KeyError, TypeError, ValueError) as error:
-                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
-                return 2
-
-            while (frame := parser.pop()) is not None:
-                _, command, payload = frame
-                frame_count += 1
-                if command == MSP_ATTITUDE:
-                    attitude = decode_attitude(payload)
-                    if attitude is not None:
-                        attitude_count += 1
-                        roll, pitch, yaw = attitude
-                        print(
-                            f"ATTITUDE {attitude_count:04d} "
-                            f"rpy=({roll:.1f},{pitch:.1f},{yaw:.1f})"
-                        )
-                elif command == MSP_RAW_IMU:
-                    imu = decode_raw_imu(payload)
-                    if imu is not None:
-                        imu_count += 1
-                        accel, gyro = imu
-                        print(f"IMU {imu_count:04d} accel={accel} gyro={gyro}")
+    try:
+        for record in read_flight_record(path):
+            if record.get("type") != "msp_response":
+                continue
+            _, command, payload = _response_frame(record)
+            frame_count += 1
+            if command == MSP_ATTITUDE and (attitude := decode_attitude(payload)) is not None:
+                attitude_count += 1
+                roll, pitch, yaw = attitude
+                print(f"ATTITUDE {attitude_count:04d} rpy=({roll:.1f},{pitch:.1f},{yaw:.1f})")
+            elif command == MSP_RAW_IMU and (imu := decode_raw_imu(payload)) is not None:
+                imu_count += 1
+                accel, gyro = imu
+                print(f"IMU {imu_count:04d} accel={accel} gyro={gyro}")
+    except ValueError as error:
+        print(f"Invalid flight record: {error}", file=sys.stderr)
+        return 2
 
     print(
         f"Replay complete frames={frame_count} "
@@ -383,43 +382,21 @@ def replay_capture(path: Path) -> int:
 
 def report_capture(path: Path) -> int:
     """Print machine facts reconstructed from one raw capture."""
-    parser = MSPParser()
     responses: dict[int, bytes] = {}
     frame_count = 0
     manifest = None
-
-    with path.open(encoding="utf-8") as capture_file:
-        try:
-            header = json.loads(capture_file.readline())
-        except json.JSONDecodeError as error:
-            print(f"Invalid capture header: {error}", file=sys.stderr)
-            return 2
-        capture_format = header.get("format")
-        if capture_format not in {"miniflight-msp-capture", "miniflight-flight-record"}:
-            print("Not a Miniflight MSP capture.", file=sys.stderr)
-            return 2
-
-        for line_number, line in enumerate(capture_file, start=2):
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as error:
-                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
-                return 2
-            if capture_format == "miniflight-flight-record":
-                if record.get("type") == "machine":
-                    manifest = record
-                if record.get("type") != "msp_response":
-                    continue
-            try:
-                parser.feed(bytes.fromhex(record["frame_hex"]))
-            except (KeyError, TypeError, ValueError) as error:
-                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
-                return 2
-            while (frame := parser.pop()) is not None:
-                direction, command, payload = frame
+    try:
+        for record in read_flight_record(path):
+            if record.get("type") == "machine":
+                manifest = record
+            elif record.get("type") == "msp_response":
+                direction, command, payload = _response_frame(record)
                 if direction == ">":
                     responses[command] = payload
                     frame_count += 1
+    except ValueError as error:
+        print(f"Invalid flight record: {error}", file=sys.stderr)
+        return 2
 
     profile = machine_profile_from_responses(responses)
     print(f"frames {frame_count}")
@@ -435,6 +412,145 @@ def report_capture(path: Path) -> int:
     return 0
 
 
+def _mean_and_std(samples: list[tuple[int, int, int]]) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    means = tuple(sum(sample[axis] for sample in samples) / len(samples) for axis in range(3))
+    deviations = tuple(
+        math.sqrt(sum((sample[axis] - means[axis]) ** 2 for sample in samples) / len(samples))
+        for axis in range(3)
+    )
+    return means, deviations
+
+
+def stillness_report(path: Path) -> int:
+    """Report raw stationary-window quality from one flight record."""
+    requests = 0
+    responses = 0
+    damaged = 0
+    unpaired = 0
+    response_errors = 0
+    pending_command = None
+    response_times: list[int] = []
+    imu_times: list[int] = []
+    accel_samples: list[tuple[int, int, int]] = []
+    gyro_samples: list[tuple[int, int, int]] = []
+    attitude_samples: list[tuple[float, float, float]] = []
+
+    try:
+        records = read_flight_record(path)
+        for record in records:
+            record_type = record.get("type")
+            if record_type == "msp_request":
+                requests += 1
+                try:
+                    command = _request_command(record)
+                except ValueError:
+                    damaged += 1
+                    continue
+                if pending_command is not None:
+                    unpaired += 1
+                pending_command = command
+            elif record_type == "msp_response":
+                responses += 1
+                try:
+                    direction, command, payload = _response_frame(record)
+                except ValueError:
+                    damaged += 1
+                    continue
+                if pending_command != command:
+                    unpaired += 1
+                pending_command = None
+                if direction != ">":
+                    response_errors += 1
+                    continue
+                response_times.append(record["monotonic_time_ns"])
+                if command == MSP_RAW_IMU:
+                    imu = decode_raw_imu(payload)
+                    if imu is not None:
+                        accel, gyro = imu
+                        accel_samples.append(accel)
+                        gyro_samples.append(gyro)
+                        imu_times.append(record["monotonic_time_ns"])
+                elif command == MSP_ATTITUDE:
+                    attitude = decode_attitude(payload)
+                    if attitude is not None:
+                        attitude_samples.append(attitude)
+    except ValueError as error:
+        print(f"Invalid flight record: {error}", file=sys.stderr)
+        return 2
+
+    if pending_command is not None:
+        unpaired += 1
+    if not accel_samples or not gyro_samples:
+        print("No raw IMU samples in flight record.", file=sys.stderr)
+        return 2
+
+    duration_s = (response_times[-1] - response_times[0]) / 1_000_000_000
+    imu_duration_s = (imu_times[-1] - imu_times[0]) / 1_000_000_000
+    response_hz = (len(response_times) - 1) / duration_s if duration_s > 0.0 else 0.0
+    imu_hz = (len(imu_times) - 1) / imu_duration_s if imu_duration_s > 0.0 else 0.0
+    worst_imu_gap_ms = max(
+        ((right - left) / 1_000_000 for left, right in zip(imu_times, imu_times[1:])),
+        default=0.0,
+    )
+    accel_mean, accel_std = _mean_and_std(accel_samples)
+    gyro_mean, gyro_std = _mean_and_std(gyro_samples)
+    accel_magnitudes = [math.sqrt(sum(value * value for value in sample)) for sample in accel_samples]
+    accel_magnitude_mean = sum(accel_magnitudes) / len(accel_magnitudes)
+    accel_spread = max(abs(value - accel_magnitude_mean) for value in accel_magnitudes)
+    accel_variation_percent = 100.0 * accel_spread / accel_magnitude_mean
+    gyro_peak = max(abs(value) for sample in gyro_samples for value in sample)
+    tilt_spread = 0.0
+    if attitude_samples:
+        roll_values = [sample[0] for sample in attitude_samples]
+        pitch_values = [sample[1] for sample in attitude_samples]
+        tilt_spread = max(max(roll_values) - min(roll_values), max(pitch_values) - min(pitch_values))
+
+    calibration_reasons = []
+    transport_reasons = []
+    if duration_s < 8.0:
+        calibration_reasons.append("duration below 8 seconds")
+    if len(imu_times) < 200:
+        calibration_reasons.append("fewer than 200 IMU samples")
+    if damaged or unpaired or response_errors:
+        calibration_reasons.append("transport errors")
+        transport_reasons.append("damaged unpaired or error frames")
+    if worst_imu_gap_ms > 100.0:
+        transport_reasons.append("IMU gap above 100 ms")
+    if gyro_peak > 8:
+        calibration_reasons.append("gyro motion above 8 raw counts")
+    if accel_variation_percent > 6.0:
+        calibration_reasons.append("acceleration variation above 6 percent")
+    if tilt_spread > 1.0:
+        calibration_reasons.append("tilt variation above 1 degree")
+
+    vector = lambda values: " ".join(f"{value:.3f}" for value in values)
+    print(f"duration_s {duration_s:.3f}")
+    print(f"requests {requests}")
+    print(f"responses {responses}")
+    print(f"unpaired {unpaired}")
+    print(f"damaged {damaged}")
+    print(f"response_errors {response_errors}")
+    print(f"response_hz {response_hz:.2f}")
+    print(f"imu_samples {len(imu_times)}")
+    print(f"imu_hz {imu_hz:.2f}")
+    print(f"worst_imu_gap_ms {worst_imu_gap_ms:.3f}")
+    print(f"accel_mean_raw {vector(accel_mean)}")
+    print(f"accel_std_raw {vector(accel_std)}")
+    print(f"accel_magnitude_mean_raw {accel_magnitude_mean:.3f}")
+    print(f"accel_variation_percent {accel_variation_percent:.3f}")
+    print(f"gyro_bias_raw {vector(gyro_mean)}")
+    print(f"gyro_std_raw {vector(gyro_std)}")
+    print(f"gyro_peak_raw {gyro_peak}")
+    print(f"tilt_spread_deg {tilt_spread:.3f}")
+    print(f"transport_window {'PASS' if not transport_reasons else 'WARN'}")
+    for reason in transport_reasons:
+        print(f"transport_reason {reason}")
+    print(f"calibration_window {'PASS' if not calibration_reasons else 'FAIL'}")
+    for reason in calibration_reasons:
+        print(f"calibration_reason {reason}")
+    return 0 if not calibration_reasons else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only MSP telemetry oracle.")
     parser.add_argument("--device", default=None, help="Serial device path")
@@ -444,9 +560,11 @@ def main() -> int:
         help="CSV output path (defaults to oracle_<timestamp>.csv)",
     )
     parser.add_argument("--samples", type=int, default=None, help="Max samples before exit")
+    parser.add_argument("--seconds", type=float, default=None, help="Max capture duration")
     parser.add_argument("--record-out", default=None, help="Append-only flight record path")
     parser.add_argument("--replay", default=None, help="Replay a raw MSP capture")
     parser.add_argument("--report", default=None, help="Report machine facts from a raw capture")
+    parser.add_argument("--stillness", default=None, help="Report stationary raw IMU quality")
     args = parser.parse_args()
 
     if args.replay:
@@ -462,6 +580,13 @@ def main() -> int:
             print(f"Capture not found: {capture_path}", file=sys.stderr)
             return 2
         return report_capture(capture_path)
+
+    if args.stillness:
+        capture_path = Path(args.stillness).expanduser().resolve()
+        if not capture_path.is_file():
+            print(f"Capture not found: {capture_path}", file=sys.stderr)
+            return 2
+        return stillness_report(capture_path)
 
     if args.device:
         devices = [args.device]
@@ -489,7 +614,13 @@ def main() -> int:
     try:
         for device in devices:
             try:
-                run_oracle(device, out_path, max_samples=args.samples, record=record)
+                run_oracle(
+                    device,
+                    out_path,
+                    max_samples=args.samples,
+                    max_seconds=args.seconds,
+                    record=record,
+                )
                 return 0
             except PermissionError:
                 print(f"{device} is busy or not permitted. Try closing configurator.")
