@@ -23,7 +23,6 @@ SOURCE_DIRECTORIES = (
     Path("miniflight"),
     Path("sim"),
     Path("target"),
-    Path("test"),
 )
 IGNORED_PARTS = frozenset({".git", "__pycache__", "node_modules", "vendor"})
 
