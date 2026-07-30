@@ -6,15 +6,15 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
+import json
 import os
 import select
 import struct
 import sys
 import time
-import tty
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 import termios
 
@@ -72,7 +72,7 @@ class MSPParser:
     def feed(self, data: bytes) -> None:
         self.buffer.extend(data)
 
-    def pop(self) -> Optional[tuple[int, bytes]]:
+    def pop(self) -> Optional[tuple[int, bytes, bytes]]:
         while True:
             for marker in (b"$M>", b"$M!"):
                 start = self.buffer.find(marker)
@@ -99,13 +99,14 @@ class MSPParser:
             if expected != frame[-1]:
                 continue
 
-            return frame[4], frame[5:-1]
+            return frame[4], frame[5:-1], frame
 
 
 class MSPSerial:
-    def __init__(self, fd: int) -> None:
+    def __init__(self, fd: int, on_frame: Optional[Callable[[bytes], None]] = None) -> None:
         self.fd = fd
         self.parser = MSPParser()
+        self.on_frame = on_frame
 
     def request(self, command: int, timeout: float = 0.15) -> Optional[bytes]:
         os.write(self.fd, msp_request(command))
@@ -113,7 +114,9 @@ class MSPSerial:
         while time.monotonic() < deadline:
             frame = self.parser.pop()
             if frame is not None:
-                response_command, payload = frame
+                response_command, payload, raw_frame = frame
+                if self.on_frame is not None:
+                    self.on_frame(raw_frame)
                 if response_command != command:
                     continue
                 return payload
@@ -127,6 +130,38 @@ class MSPSerial:
                 raise OSError("serial link closed")
             self.parser.feed(chunk)
         return None
+
+
+class RawCapture:
+    """Append-only raw MSP response capture for offline replay."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.file = path.open("w", encoding="utf-8")
+        self.file.write(json.dumps({"format": "miniflight-msp-capture", "version": 1}) + "\n")
+
+    def record(self, frame: bytes) -> None:
+        self.file.write(
+            json.dumps({"time_ns": time.time_ns(), "frame_hex": frame.hex()}) + "\n"
+        )
+        self.file.flush()
+
+    def close(self) -> None:
+        self.file.close()
+
+
+def decode_attitude(payload: bytes) -> Optional[tuple[float, float, float]]:
+    if len(payload) < 6:
+        return None
+    roll, pitch, yaw = struct.unpack_from("<hhh", payload)
+    return roll / 10.0, pitch / 10.0, float(yaw)
+
+
+def decode_raw_imu(payload: bytes) -> Optional[tuple[tuple[int, int, int], tuple[int, int, int]]]:
+    if len(payload) < 18:
+        return None
+    values = struct.unpack_from("<9h", payload)
+    return values[0:3], values[3:6]
 
 
 def serial_devices() -> list[str]:
@@ -204,10 +239,16 @@ def format_status_line(sample: dict[str, object]) -> str:
     )
 
 
-def run_oracle(device: str, out_path: Path, max_samples: Optional[int] = None) -> None:
+def run_oracle(
+    device: str,
+    out_path: Path,
+    max_samples: Optional[int] = None,
+    raw_path: Optional[Path] = None,
+) -> None:
     fd = open_serial(device)
+    capture = RawCapture(raw_path) if raw_path is not None else None
     try:
-        client = MSPSerial(fd)
+        client = MSPSerial(fd, on_frame=capture.record if capture is not None else None)
         identity = decode_identity(client)
         print(
             f"Connecting to {device} | variant={identity['variant']} "
@@ -313,21 +354,22 @@ def run_oracle(device: str, out_path: Path, max_samples: Optional[int] = None) -
                     last_response = received
                     link_state = "LIVE"
 
-                    if command == MSP_ATTITUDE and len(payload) >= 6:
-                        roll, pitch, yaw = struct.unpack_from("<hhh", payload)
-                        signals["roll"] = roll / 10.0
-                        signals["pitch"] = pitch / 10.0
-                        signals["yaw"] = float(yaw)
-                        attitude_window += 1
-                    elif command == MSP_RAW_IMU and len(payload) >= 18:
-                        values = struct.unpack_from("<9h", payload)
-                        signals["accel"] = values[0:3]
-                        signals["gyro"] = values[3:6]
-                        mean_count += 1
-                        for index in range(3):
-                            acc_mean[index] += (values[index] - acc_mean[index]) / mean_count
-                            gyr_mean[index] += (values[index + 3] - gyr_mean[index]) / mean_count
-                        imu_window += 1
+                    if command == MSP_ATTITUDE:
+                        attitude = decode_attitude(payload)
+                        if attitude is not None:
+                            signals["roll"], signals["pitch"], signals["yaw"] = attitude
+                            attitude_window += 1
+                    elif command == MSP_RAW_IMU:
+                        imu = decode_raw_imu(payload)
+                        if imu is not None:
+                            accel, gyro = imu
+                            signals["accel"] = accel
+                            signals["gyro"] = gyro
+                            mean_count += 1
+                            for index in range(3):
+                                acc_mean[index] += (accel[index] - acc_mean[index]) / mean_count
+                                gyr_mean[index] += (gyro[index] - gyr_mean[index]) / mean_count
+                            imu_window += 1
                     elif command == MSP_STATUS and len(payload) >= 13:
                         cycle_time_us = struct.unpack_from("<H", payload, 0)[0]
                         status["loop_hz"] = round(1_000_000 / cycle_time_us, 2) if cycle_time_us else None
@@ -423,7 +465,60 @@ def run_oracle(device: str, out_path: Path, max_samples: Optional[int] = None) -
 
                 time.sleep(max(0.0, 0.005 - (time.monotonic() - loop_started)))
     finally:
+        if capture is not None:
+            capture.close()
         os.close(fd)
+
+
+def replay_capture(path: Path) -> int:
+    """Decode a raw MSP capture without a serial device."""
+    parser = MSPParser()
+    frame_count = 0
+    attitude_count = 0
+    imu_count = 0
+
+    with path.open(encoding="utf-8") as capture_file:
+        try:
+            header = json.loads(capture_file.readline())
+        except json.JSONDecodeError as error:
+            print(f"Invalid capture header: {error}", file=sys.stderr)
+            return 2
+        if header.get("format") != "miniflight-msp-capture":
+            print("Not a Miniflight MSP capture.", file=sys.stderr)
+            return 2
+
+        for line_number, line in enumerate(capture_file, start=2):
+            try:
+                record = json.loads(line)
+                parser.feed(bytes.fromhex(record["frame_hex"]))
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
+                return 2
+
+            while (frame := parser.pop()) is not None:
+                command, payload, _ = frame
+                frame_count += 1
+                if command == MSP_ATTITUDE:
+                    attitude = decode_attitude(payload)
+                    if attitude is not None:
+                        attitude_count += 1
+                        roll, pitch, yaw = attitude
+                        print(
+                            f"ATTITUDE {attitude_count:04d} "
+                            f"rpy=({roll:.1f},{pitch:.1f},{yaw:.1f})"
+                        )
+                elif command == MSP_RAW_IMU:
+                    imu = decode_raw_imu(payload)
+                    if imu is not None:
+                        imu_count += 1
+                        accel, gyro = imu
+                        print(f"IMU {imu_count:04d} accel={accel} gyro={gyro}")
+
+    print(
+        f"Replay complete frames={frame_count} "
+        f"attitude={attitude_count} imu={imu_count}"
+    )
+    return 0
 
 
 def main() -> int:
@@ -435,7 +530,16 @@ def main() -> int:
         help="CSV output path (defaults to oracle_<timestamp>.csv)",
     )
     parser.add_argument("--samples", type=int, default=None, help="Max samples before exit")
+    parser.add_argument("--raw-out", default=None, help="Raw MSP capture path")
+    parser.add_argument("--replay", default=None, help="Replay a raw MSP capture")
     args = parser.parse_args()
+
+    if args.replay:
+        capture_path = Path(args.replay).expanduser().resolve()
+        if not capture_path.is_file():
+            print(f"Capture not found: {capture_path}", file=sys.stderr)
+            return 2
+        return replay_capture(capture_path)
 
     if args.device:
         devices = [args.device]
@@ -454,10 +558,13 @@ def main() -> int:
 
     out_path = Path(args.out).expanduser().resolve()
     print(f"Writing CSV to {out_path}")
+    raw_path = Path(args.raw_out).expanduser().resolve() if args.raw_out else None
+    if raw_path is not None:
+        print(f"Writing raw MSP capture to {raw_path}")
 
     for device in devices:
         try:
-            run_oracle(device, out_path, max_samples=args.samples)
+            run_oracle(device, out_path, max_samples=args.samples, raw_path=raw_path)
             return 0
         except PermissionError:
             print(f"{device} is busy or not permitted. Try closing configurator.")
