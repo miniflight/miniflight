@@ -98,13 +98,22 @@ class MSPParser:
 class MSPSerial:
     """Small synchronous MSP client over one serial file descriptor."""
 
-    def __init__(self, fd: int, on_frame: Optional[Callable[[bytes], None]] = None) -> None:
+    def __init__(
+        self,
+        fd: int,
+        on_frame: Optional[Callable[[bytes], None]] = None,
+        on_request: Optional[Callable[[bytes], None]] = None,
+    ) -> None:
         self.fd = fd
         self.parser = MSPParser()
         self.on_frame = on_frame
+        self.on_request = on_request
 
     def request(self, command: int, timeout: float = 0.15) -> Optional[bytes]:
-        os.write(self.fd, msp_request(command))
+        request = msp_request(command)
+        if self.on_request is not None:
+            self.on_request(request)
+        os.write(self.fd, request)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             response = self.parser.pop()

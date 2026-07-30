@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import struct
 import threading
 import time
@@ -32,6 +33,7 @@ from miniflight.msp import (
     xor_checksum,
 )
 from miniflight.probe import MspMachineProbe
+from miniflight.record import FlightRecord
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
@@ -53,6 +55,10 @@ class LinkState(str, Enum):
     HANDSHAKE = "handshake"
     LIVE = "live"
     RETRYING = "retrying"
+
+
+def stop_signal(_signal_number, _frame) -> None:
+    raise KeyboardInterrupt
 
 
 def empty_snapshot(
@@ -216,7 +222,14 @@ def publish_link(
     return snapshot
 
 
-def monitor_device(shared: SharedState, device: str, stop_event: threading.Event) -> None:
+def monitor_device(
+    shared: SharedState,
+    device: str,
+    stop_event: threading.Event,
+    record: Optional[FlightRecord] = None,
+) -> None:
+    if record is not None:
+        record.link("opening", device)
     publish_link(
         shared,
         LinkState.OPENING,
@@ -224,9 +237,14 @@ def monitor_device(shared: SharedState, device: str, stop_event: threading.Event
         device,
         retain_last_sample=True,
     )
-    fd = open_serial(device, BAUD)
+    fd: Optional[int] = None
     try:
-        client = MSPSerial(fd)
+        fd = open_serial(device, BAUD)
+        client = MSPSerial(
+            fd,
+            on_frame=record.response if record is not None else None,
+            on_request=record.request if record is not None else None,
+        )
         snapshot = publish_link(
             shared,
             LinkState.HANDSHAKE,
@@ -252,6 +270,8 @@ def monitor_device(shared: SharedState, device: str, stop_event: threading.Event
             port=device,
         )
         shared.set_snapshot(snapshot)
+        if record is not None:
+            record.link("live", device)
 
         last_response = time.monotonic()
         rate_window_start = last_response
@@ -329,10 +349,17 @@ def monitor_device(shared: SharedState, device: str, stop_event: threading.Event
             shared.set_snapshot(snapshot)
             stop_event.wait(max(0.0, 0.005 - (time.monotonic() - loop_started)))
     finally:
-        os.close(fd)
+        if record is not None:
+            record.link("closed", device)
+        if fd is not None:
+            os.close(fd)
 
 
-def monitor_loop(shared: SharedState, stop_event: threading.Event) -> None:
+def monitor_loop(
+    shared: SharedState,
+    stop_event: threading.Event,
+    record: Optional[FlightRecord] = None,
+) -> None:
     last_message = ""
     while not stop_event.is_set():
         devices = serial_devices(DEVICE_OVERRIDE)
@@ -352,10 +379,12 @@ def monitor_loop(shared: SharedState, stop_event: threading.Event) -> None:
         connected = False
         for device in devices:
             try:
-                monitor_device(shared, device, stop_event)
+                monitor_device(shared, device, stop_event, record)
                 connected = True
             except PermissionError:
                 last_message = "Serial port is busy. Close Betaflight Configurator."
+                if record is not None:
+                    record.link("retrying", device)
                 publish_link(
                     shared,
                     LinkState.RETRYING,
@@ -365,6 +394,8 @@ def monitor_loop(shared: SharedState, stop_event: threading.Event) -> None:
                 )
             except (OSError, RuntimeError) as error:
                 last_message = f"{error}. Retrying."
+                if record is not None:
+                    record.link("retrying", device)
                 publish_link(
                     shared,
                     LinkState.RETRYING,
@@ -396,9 +427,15 @@ def main() -> None:
         delay=0.3,
     )
 
+    record_path = os.environ.get("MINIFLIGHT_RECORD")
+    record = FlightRecord(Path(record_path).expanduser()) if record_path else None
+    if record is not None:
+        print(f"Writing flight record to {record.path}")
+
     stop_event = threading.Event()
-    worker = threading.Thread(target=monitor_loop, args=(shared, stop_event), daemon=True)
+    worker = threading.Thread(target=monitor_loop, args=(shared, stop_event, record), daemon=True)
     worker.start()
+    signal.signal(signal.SIGTERM, stop_signal)
     try:
         while True:
             time.sleep(1.0)
@@ -409,6 +446,8 @@ def main() -> None:
         if worker.is_alive():
             worker.join(timeout=2.0)
         server.shutdown()
+        if record is not None:
+            record.close()
 
 
 if __name__ == "__main__":

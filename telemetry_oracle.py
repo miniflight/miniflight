@@ -29,6 +29,7 @@ from miniflight.msp import (
     open_serial,
     serial_devices,
 )
+from miniflight.record import FlightRecord
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
@@ -39,24 +40,6 @@ SLOW_POLL_SECONDS = {
     MSP_ANALOG: 1.0,
     MSP_ALTITUDE: 0.5,
 }
-
-
-class RawCapture:
-    """Append-only raw MSP response capture for offline replay."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.file = path.open("w", encoding="utf-8")
-        self.file.write(json.dumps({"format": "miniflight-msp-capture", "version": 1}) + "\n")
-
-    def record(self, frame: bytes) -> None:
-        self.file.write(
-            json.dumps({"time_ns": time.time_ns(), "frame_hex": frame.hex()}) + "\n"
-        )
-        self.file.flush()
-
-    def close(self) -> None:
-        self.file.close()
 
 
 def decode_attitude(payload: bytes) -> Optional[tuple[float, float, float]]:
@@ -114,13 +97,21 @@ def run_oracle(
     device: str,
     out_path: Path,
     max_samples: Optional[int] = None,
-    raw_path: Optional[Path] = None,
+    record: Optional[FlightRecord] = None,
 ) -> None:
-    fd = open_serial(device, BAUD)
-    capture = RawCapture(raw_path) if raw_path is not None else None
+    if record is not None:
+        record.link("opening", device)
+    fd: Optional[int] = None
     try:
-        client = MSPSerial(fd, on_frame=capture.record if capture is not None else None)
+        fd = open_serial(device, BAUD)
+        client = MSPSerial(
+            fd,
+            on_frame=record.response if record is not None else None,
+            on_request=record.request if record is not None else None,
+        )
         identity = decode_identity(client)
+        if record is not None:
+            record.link("live", device)
         print(
             f"Connecting to {device} | variant={identity['variant']} "
             f"board={identity['board']} fw={identity['firmware']} api={identity['api_version']}"
@@ -336,9 +327,10 @@ def run_oracle(
 
                 time.sleep(max(0.0, 0.005 - (time.monotonic() - loop_started)))
     finally:
-        if capture is not None:
-            capture.close()
-        os.close(fd)
+        if record is not None:
+            record.link("closed", device)
+        if fd is not None:
+            os.close(fd)
 
 
 def replay_capture(path: Path) -> int:
@@ -354,15 +346,23 @@ def replay_capture(path: Path) -> int:
         except json.JSONDecodeError as error:
             print(f"Invalid capture header: {error}", file=sys.stderr)
             return 2
-        if header.get("format") != "miniflight-msp-capture":
+        capture_format = header.get("format")
+        if capture_format not in {"miniflight-msp-capture", "miniflight-flight-record"}:
             print("Not a Miniflight MSP capture.", file=sys.stderr)
             return 2
 
         for line_number, line in enumerate(capture_file, start=2):
             try:
                 record = json.loads(line)
-                parser.feed(bytes.fromhex(record["frame_hex"]))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
+                return 2
+            if capture_format == "miniflight-flight-record":
+                if record.get("type") != "msp_response":
+                    continue
+            try:
+                parser.feed(bytes.fromhex(record["frame_hex"]))
+            except (KeyError, TypeError, ValueError) as error:
                 print(f"Invalid capture frame at line {line_number}: {error}", file=sys.stderr)
                 return 2
 
@@ -401,7 +401,7 @@ def main() -> int:
         help="CSV output path (defaults to oracle_<timestamp>.csv)",
     )
     parser.add_argument("--samples", type=int, default=None, help="Max samples before exit")
-    parser.add_argument("--raw-out", default=None, help="Raw MSP capture path")
+    parser.add_argument("--record-out", default=None, help="Append-only flight record path")
     parser.add_argument("--replay", default=None, help="Replay a raw MSP capture")
     args = parser.parse_args()
 
@@ -429,21 +429,27 @@ def main() -> int:
 
     out_path = Path(args.out).expanduser().resolve()
     print(f"Writing CSV to {out_path}")
-    raw_path = Path(args.raw_out).expanduser().resolve() if args.raw_out else None
-    if raw_path is not None:
-        print(f"Writing raw MSP capture to {raw_path}")
+    record = None
+    if args.record_out:
+        record_path = Path(args.record_out).expanduser().resolve()
+        print(f"Writing flight record to {record_path}")
+        record = FlightRecord(record_path)
 
-    for device in devices:
-        try:
-            run_oracle(device, out_path, max_samples=args.samples, raw_path=raw_path)
-            return 0
-        except PermissionError:
-            print(f"{device} is busy or not permitted. Try closing configurator.")
-        except OSError as error:
-            print(f"{device} failed: {error}")
-        except KeyboardInterrupt:
-            print("\nStopped by user.")
-            return 0
+    try:
+        for device in devices:
+            try:
+                run_oracle(device, out_path, max_samples=args.samples, record=record)
+                return 0
+            except PermissionError:
+                print(f"{device} is busy or not permitted. Try closing configurator.")
+            except OSError as error:
+                print(f"{device} failed: {error}")
+            except KeyboardInterrupt:
+                print("\nStopped by user.")
+                return 0
+    finally:
+        if record is not None:
+            record.close()
 
     return 1
 
