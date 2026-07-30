@@ -9,6 +9,36 @@ from pathlib import Path
 from miniflight.core.machine import MachineProfile
 
 
+def read_flight_record(path: Path):
+    """Yield one validated flight record in sequence order."""
+    previous_time = -1
+    record_count = 0
+    with path.open(encoding="utf-8") as record_file:
+        for line_number, line in enumerate(record_file, start=1):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"invalid JSON at line {line_number}") from error
+            if not isinstance(record, dict):
+                raise ValueError(f"invalid record at line {line_number}")
+            if record.get("sequence") != line_number - 1:
+                raise ValueError(f"invalid sequence at line {line_number}")
+            record_time = record.get("monotonic_time_ns")
+            if not isinstance(record_time, int) or record_time < previous_time:
+                raise ValueError(f"invalid monotonic time at line {line_number}")
+            if line_number == 1 and (
+                record.get("type") != "header"
+                or record.get("format") != "miniflight-flight-record"
+                or record.get("version") != 1
+            ):
+                raise ValueError("invalid flight record header")
+            previous_time = record_time
+            record_count += 1
+            yield record
+    if record_count == 0:
+        raise ValueError("empty flight record")
+
+
 class FlightRecord:
     """Write ordered transport events without decoding them."""
 

@@ -49,6 +49,13 @@ python3 -m config.serve
 # http://127.0.0.1:8002
 ```
 
+Record or replay the same read-only controller stream:
+
+```bash
+MINIFLIGHT_RECORD=flight.jsonl python3 -m config.serve
+MINIFLIGHT_REPLAY=flight.jsonl python3 -m config.serve
+```
+
 plug in the controller and open the URL. no driver selection is necessary on macOS.
 
 `lock ground` creates a local display reference after the disarmed drone becomes still.

@@ -33,13 +33,14 @@ from miniflight.msp import (
     xor_checksum,
 )
 from miniflight.probe import MspMachineProbe
-from miniflight.record import FlightRecord
+from miniflight.record import FlightRecord, read_flight_record
 
 
 BAUD = int(os.environ.get("MINIFLIGHT_SERIAL_BAUD", "115200"))
 DEVICE_OVERRIDE = os.environ.get("MINIFLIGHT_SERIAL")
 HOST = os.environ.get("MINIFLIGHT_CONFIG_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MINIFLIGHT_CONFIG_PORT", "8002"))
+REPLAY_OVERRIDE = os.environ.get("MINIFLIGHT_REPLAY")
 
 SLOW_POLL_PERIODS = {
     MSP_STATUS: 1.0,
@@ -423,16 +424,122 @@ def monitor_loop(
             stop_event.wait(0.5)
 
 
+def replay_loop(shared: SharedState, path: Path, stop_event: threading.Event) -> None:
+    """Publish recorded MSP responses with their original timing."""
+    parser = MSPParser()
+    snapshot = empty_snapshot(LinkState.OPENING, "Loading flight record.")
+    box_ids: list[int] = []
+    first_record_ns: Optional[int] = None
+    replay_started = time.monotonic()
+    rate_started_ns: Optional[int] = None
+    rate_frames = 0
+    rate_attitude = 0
+    rate_imu = 0
+
+    for record in read_flight_record(path):
+        if stop_event.is_set():
+            return
+        record_ns = record["monotonic_time_ns"]
+        if first_record_ns is None:
+            first_record_ns = record_ns
+            rate_started_ns = record_ns
+        due_s = (record_ns - first_record_ns) / 1_000_000_000
+        remaining_s = due_s - (time.monotonic() - replay_started)
+        if stop_event.wait(max(0.0, remaining_s)):
+            return
+
+        record_type = record.get("type")
+        if record_type == "machine":
+            snapshot["controller"] = {
+                "variant": record.get("controller"),
+                "version": record.get("firmware"),
+                "api_version": record.get("api_version"),
+                "board": record.get("board"),
+            }
+            sensors = list(record.get("sensors") or [])
+            snapshot["machine"] = {
+                "sensors": sensors,
+                "motor_count": record.get("motor_count"),
+                "has_imu": "acc" in sensors and "gyro" in sensors,
+            }
+        elif record_type == "link":
+            state = record.get("state")
+            snapshot["connection"].update(
+                state=LinkState.LIVE.value if state == "live" else LinkState.OPENING.value,
+                message="Replaying flight record." if state == "live" else "Loading flight record.",
+                port=record.get("device"),
+                last_port=record.get("device"),
+            )
+        elif record_type == "msp_response":
+            try:
+                parser.feed(bytes.fromhex(record["frame_hex"]))
+            except (KeyError, TypeError, ValueError) as error:
+                raise ValueError(f"invalid MSP response at sequence {record['sequence']}") from error
+            while (frame := parser.pop()) is not None:
+                direction, command, payload = frame
+                if direction != ">":
+                    continue
+                if command == MSP_BOXIDS:
+                    box_ids = list(payload)
+                else:
+                    decode_payload(command, payload, snapshot, box_ids)
+                snapshot["traffic"]["frames_total"] += 1
+                rate_frames += 1
+                if command == MSP_ATTITUDE:
+                    snapshot["traffic"]["attitude_samples_total"] += 1
+                    rate_attitude += 1
+                elif command == MSP_RAW_IMU:
+                    snapshot["traffic"]["imu_samples_total"] += 1
+                    rate_imu += 1
+                snapshot["connection"]["last_frame_at_ms"] = round(time.time() * 1000)
+                snapshot["connection"]["last_frame_age_ms"] = 0
+
+        if rate_started_ns is not None and record_ns - rate_started_ns >= 1_000_000_000:
+            elapsed_s = (record_ns - rate_started_ns) / 1_000_000_000
+            snapshot["traffic"].update(
+                frames_per_second=round(rate_frames / elapsed_s, 1),
+                updates_per_second=round(rate_frames / elapsed_s, 1),
+                attitude_per_second=round(rate_attitude / elapsed_s, 1),
+                imu_per_second=round(rate_imu / elapsed_s, 1),
+            )
+            rate_started_ns = record_ns
+            rate_frames = 0
+            rate_attitude = 0
+            rate_imu = 0
+        shared.set_snapshot(snapshot)
+
+    snapshot["connection"].update(
+        state=LinkState.WAITING_USB.value,
+        message="Replay complete.",
+        port=None,
+    )
+    shared.set_snapshot(snapshot)
+    while not stop_event.wait(0.1):
+        last_frame_at_ms = snapshot["connection"].get("last_frame_at_ms")
+        if isinstance(last_frame_at_ms, (int, float)):
+            snapshot["connection"]["last_frame_age_ms"] = round(
+                max(0.0, time.time() * 1000 - last_frame_at_ms)
+            )
+            shared.set_snapshot(snapshot)
+
+
 def main() -> None:
     static_dir = Path(__file__).resolve().parent
     shared = SharedState()
-    publish_link(shared, LinkState.WAITING_USB, "Connect the flight controller by USB-C.")
+    replay_path = Path(REPLAY_OVERRIDE).expanduser() if REPLAY_OVERRIDE else None
+    if replay_path is not None and not replay_path.is_file():
+        raise SystemExit(f"Flight record not found: {replay_path}")
+    publish_link(
+        shared,
+        LinkState.OPENING if replay_path is not None else LinkState.WAITING_USB,
+        "Loading flight record." if replay_path is not None else "Connect the flight controller by USB-C.",
+    )
 
     server = RendererServer(shared, host=HOST, port=PORT, static_dir=static_dir)
     server.start()
     url = f"http://{HOST}:{PORT}".replace("0.0.0.0", "127.0.0.1")
     print(f"Flight Seed is live at {url}")
-    print("Read-only MSP. Waiting for USB.")
+    print(f"Replaying {replay_path}" if replay_path is not None else "Read-only MSP. Waiting for USB.")
     maybe_launch_browser(
         url,
         env_var="MINIFLIGHT_CONFIG_OPEN_BROWSER",
@@ -441,12 +548,16 @@ def main() -> None:
     )
 
     record_path = os.environ.get("MINIFLIGHT_RECORD")
+    if replay_path is not None and record_path:
+        raise SystemExit("MINIFLIGHT_REPLAY and MINIFLIGHT_RECORD cannot be used together")
     record = FlightRecord(Path(record_path).expanduser()) if record_path else None
     if record is not None:
         print(f"Writing flight record to {record.path}")
 
     stop_event = threading.Event()
-    worker = threading.Thread(target=monitor_loop, args=(shared, stop_event, record), daemon=True)
+    target = replay_loop if replay_path is not None else monitor_loop
+    worker_args = (shared, replay_path, stop_event) if replay_path is not None else (shared, stop_event, record)
+    worker = threading.Thread(target=target, args=worker_args, daemon=True)
     worker.start()
     signal.signal(signal.SIGTERM, stop_signal)
     try:
