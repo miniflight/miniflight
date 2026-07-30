@@ -449,7 +449,7 @@ class CaptureMeasurements:
     response_errors: int
     response_times: list[int]
     imu_samples: list[RawImuSample]
-    attitude_samples: list[tuple[float, float, float]]
+    attitude_samples: list[tuple[int, tuple[float, float, float]]]
 
 
 def _read_measurements(path: Path) -> CaptureMeasurements:
@@ -498,7 +498,7 @@ def _read_measurements(path: Path) -> CaptureMeasurements:
                     )
                 )
             elif command == MSP_ATTITUDE and (attitude := decode_attitude(payload)) is not None:
-                data.attitude_samples.append(attitude)
+                data.attitude_samples.append((timestamp_ns, attitude))
     if pending_command is not None:
         data.unpaired += 1
     return data
@@ -540,8 +540,8 @@ def stillness_report(path: Path) -> int:
     gyro_peak = max(abs(value) for sample in gyro_samples for value in sample)
     tilt_spread = 0.0
     if data.attitude_samples:
-        roll_values = [sample[0] for sample in data.attitude_samples]
-        pitch_values = [sample[1] for sample in data.attitude_samples]
+        roll_values = [sample[1][0] for sample in data.attitude_samples]
+        pitch_values = [sample[1][1] for sample in data.attitude_samples]
         tilt_spread = max(max(roll_values) - min(roll_values), max(pitch_values) - min(pitch_values))
 
     calibration_reasons = []
@@ -647,6 +647,93 @@ def freeze_reference(path: Path) -> int:
     return 0
 
 
+def _angle_change(right: float, left: float) -> float:
+    """Return the shortest signed angle change in degrees."""
+    return (right - left + 180.0) % 360.0 - 180.0
+
+
+def motion_report(path: Path, reference_path: Path, body_axis: str) -> int:
+    """Compare one deliberate attitude motion with each raw gyro axis."""
+    try:
+        data = _read_measurements(path)
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        gyro_bias = tuple(float(value) for value in reference["stationary"]["gyro_bias_raw"])
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
+        print(f"Invalid motion input: {error}", file=sys.stderr)
+        return 2
+    if len(gyro_bias) != 3 or len(data.attitude_samples) < 2 or not data.imu_samples:
+        print("Motion input has insufficient attitude or IMU samples.", file=sys.stderr)
+        return 2
+
+    body_index = {"roll": 0, "pitch": 1, "yaw": 2}[body_axis]
+    gyro_rows = []
+    target_rates = []
+    total_motion_deg = 0.0
+    imu_index = 0
+    for left, right in zip(data.attitude_samples, data.attitude_samples[1:]):
+        left_time, left_attitude = left
+        right_time, right_attitude = right
+        dt = (right_time - left_time) / 1_000_000_000
+        if dt <= 0.0:
+            continue
+        midpoint = (left_time + right_time) // 2
+        while (
+            imu_index + 1 < len(data.imu_samples)
+            and abs(data.imu_samples[imu_index + 1].timestamp_ns - midpoint)
+            < abs(data.imu_samples[imu_index].timestamp_ns - midpoint)
+        ):
+            imu_index += 1
+        change_deg = _angle_change(
+            right_attitude[body_index],
+            left_attitude[body_index],
+        )
+        target_rate = math.radians(change_deg) / dt
+        total_motion_deg += abs(change_deg)
+        if abs(math.degrees(target_rate)) < 3.0:
+            continue
+        target_rates.append(target_rate)
+        gyro_rows.append(
+            tuple(
+                raw - bias
+                for raw, bias in zip(data.imu_samples[imu_index].gyro_raw, gyro_bias)
+            )
+        )
+
+    if total_motion_deg < 20.0:
+        print("motion FAIL")
+        print(f"reason {body_axis} motion below 20 degrees")
+        print(f"total_motion_deg {total_motion_deg:.3f}")
+        return 1
+
+    fits = []
+    target_energy = sum(value * value for value in target_rates)
+    for sensor_index in range(3):
+        sensor = [row[sensor_index] for row in gyro_rows]
+        sensor_energy = sum(value * value for value in sensor)
+        cross = sum(raw * rate for raw, rate in zip(sensor, target_rates))
+        scale = cross / sensor_energy if sensor_energy > 0.0 else 0.0
+        correlation = cross / math.sqrt(sensor_energy * target_energy) if sensor_energy > 0.0 else 0.0
+        fits.append((abs(correlation), correlation, scale))
+
+    best_index = max(range(3), key=lambda index: fits[index][0])
+    _, correlation, signed_scale = fits[best_index]
+    sign = "+" if signed_scale >= 0.0 else "-"
+    print("motion PASS")
+    print(f"body_axis {body_axis}")
+    print(f"total_motion_deg {total_motion_deg:.3f}")
+    for index, (_, axis_correlation, axis_scale) in enumerate(fits, start=1):
+        print(f"sensor_axis_{index}_correlation {axis_correlation:.4f}")
+        print(f"sensor_axis_{index}_signed_scale_rad_s_per_count {axis_scale:.9f}")
+    print(f"candidate_body_from_sensor {sign}{best_index + 1}")
+    print(f"gyro_scale_rad_s_per_count {abs(signed_scale):.9f}")
+    if abs(correlation) < 0.8:
+        print("confidence WARN")
+        print("reason dominant correlation below 0.8")
+        return 1
+    print("confidence PASS")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only MSP telemetry oracle.")
     parser.add_argument("--device", default=None, help="Serial device path")
@@ -662,6 +749,9 @@ def main() -> int:
     parser.add_argument("--report", default=None, help="Report machine facts from a raw capture")
     parser.add_argument("--stillness", default=None, help="Report stationary raw IMU quality")
     parser.add_argument("--freeze-reference", default=None, help="Write a stationary machine reference")
+    parser.add_argument("--motion", default=None, help="Report one controlled motion")
+    parser.add_argument("--reference", default=None, help="Stationary reference for motion report")
+    parser.add_argument("--axis", choices=("roll", "pitch", "yaw"), help="Body axis moved")
     args = parser.parse_args()
 
     if args.replay:
@@ -691,6 +781,17 @@ def main() -> int:
             print(f"Capture not found: {capture_path}", file=sys.stderr)
             return 2
         return freeze_reference(capture_path)
+
+    if args.motion:
+        capture_path = Path(args.motion).expanduser().resolve()
+        reference_path = Path(args.reference).expanduser().resolve() if args.reference else None
+        if not capture_path.is_file():
+            print(f"Capture not found: {capture_path}", file=sys.stderr)
+            return 2
+        if reference_path is None or not reference_path.is_file() or args.axis is None:
+            print("Motion report requires --reference and --axis.", file=sys.stderr)
+            return 2
+        return motion_report(capture_path, reference_path, args.axis)
 
     if args.device:
         devices = [args.device]

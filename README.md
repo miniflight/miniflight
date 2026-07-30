@@ -64,6 +64,13 @@ python3 telemetry_oracle.py --stillness still.jsonl
 python3 telemetry_oracle.py --freeze-reference still.jsonl
 ```
 
+Record one deliberate body-axis motion. Then compare it with the raw gyro axes:
+
+```bash
+python3 telemetry_oracle.py --seconds 8 --record-out roll.jsonl
+python3 telemetry_oracle.py --motion roll.jsonl --reference still.reference.json --axis roll
+```
+
 plug in the controller and open the URL. no driver selection is necessary on macOS.
 
 `lock ground` creates a local display reference after the disarmed drone becomes still.
