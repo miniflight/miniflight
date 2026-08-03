@@ -15,13 +15,6 @@ mixing. `hover` is the first planned program. The current real-drone path is
 read-only. It must prove units, axes, timestamps, and replay before Miniflight
 can deploy a program to a flight controller.
 
-The line counter measures all project Python files except tests. It ignores comments and docstrings.
-
-```bash
-python3 sz.py
-MAX_LINE_COUNT=400 python3 sz.py
-```
-
 the sim does rigid body physics with RK4 integration. renders in browser with three.js over websockets. quad actually flies around, you can crash it.
 
 ## run
