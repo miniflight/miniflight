@@ -21,4 +21,4 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["miniflight", "common", "sim", "target"]
+include = ["miniflight*", "common*", "sim*", "target*"]
