@@ -1,171 +1,130 @@
-"""State estimation primitives shared across firmware, sim, and configurator."""
+"""Companion-computer attitude estimation in body FRD and world NED."""
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
+import math
 from typing import Optional
 
-from common.interface import Estimator
 from common.math import Quaternion, Vector3D
-from common.types import SensorReadings, StateEstimate
 
 
-@dataclass
+@dataclass(frozen=True)
 class MahonyGains:
-    kp: float = 0.5
-    ki: float = 0.001  # Very small for slow gyro bias correction
+    kp: float = 0.2
+    ki: float = 0.0
 
 
-class MahonyEstimator(Estimator):
-    """Mahony AHRS: attitude estimation from gyro + accelerometer."""
+class NedMahonyEstimator:
+    """Estimate body-to-NED attitude from metric FRD IMU samples."""
 
-    def __init__(self, gains: MahonyGains | None = None):
+    def __init__(
+        self,
+        initial_yaw_rad: float,
+        gains: MahonyGains | None = None,
+        required_samples: int = 20,
+        acceleration_tolerance_mps2: float = 0.2,
+    ) -> None:
+        if not math.isfinite(initial_yaw_rad):
+            raise ValueError("initial yaw must be finite")
+        if required_samples < 1:
+            raise ValueError("required samples must be positive")
+        if acceleration_tolerance_mps2 <= 0.0:
+            raise ValueError("acceleration tolerance must be positive")
         gains = gains or MahonyGains()
-        self.kp = gains.kp
-        self.ki = gains.ki
-        self._bias = Vector3D()
-        self._q = Quaternion()  # body → world (z-up)
-        self._initialized = False
-        self._last_state: Optional[StateEstimate] = None
-        self._last_alt: Optional[float] = None
-        self._init_samples = []
-        self._init_sample_count = 20  # Average 20 samples before initializing
+        self.initial_yaw_rad = float(initial_yaw_rad)
+        self.kp = float(gains.kp)
+        self.required_samples = int(required_samples)
+        self.acceleration_tolerance_mps2 = float(acceleration_tolerance_mps2)
+        self._last_timestamp_ns: Optional[int] = None
+        self._initial_accel = []
+        self._initial_gyro = []
+        self._accel_reference: Optional[tuple[float, float, float]] = None
+        self._gyro_bias = Vector3D()
+        self._attitude: Optional[Quaternion] = None
 
     @property
     def initialized(self) -> bool:
-        return self._initialized
+        return self._attitude is not None
 
     @property
     def initialization_progress(self) -> float:
-        if self._initialized:
-            return 1.0
-        if not self._init_samples:
-            return 0.0
-        return min(len(self._init_samples) / self._init_sample_count, 1.0)
+        return min(len(self._initial_accel) / self.required_samples, 1.0)
 
-    def set_initial_bias_deg(self, gx_deg: float, gy_deg: float, gz_deg: float) -> None:
-        """Seed gyro bias (in deg/s). Helpful right after bias calibration."""
-        self._bias = Vector3D(
-            math.radians(gx_deg),
-            math.radians(gy_deg),
-            math.radians(gz_deg),
-        )
+    @property
+    def gyro_bias_rad_s(self) -> tuple[float, float, float]:
+        return tuple(float(value) for value in self._gyro_bias.v)
+
+    @property
+    def accel_reference_mps2(self) -> tuple[float, float, float]:
+        if self._accel_reference is None:
+            raise RuntimeError("acceleration reference is not initialized")
+        return self._accel_reference
+
+    @property
+    def attitude_body_to_ned(self) -> tuple[float, float, float, float]:
+        if self._attitude is None:
+            raise RuntimeError("NED attitude is not initialized")
+        return tuple(float(value) for value in self._attitude.q)
 
     def reset(self) -> None:
-        self._bias = Vector3D()
-        self._q = Quaternion()
-        self._initialized = False
-        self._last_state = None
-        self._last_alt = None
-        self._init_samples = []
+        self._last_timestamp_ns = None
+        self._initial_accel = []
+        self._initial_gyro = []
+        self._accel_reference = None
+        self._gyro_bias = Vector3D()
+        self._attitude = None
 
-    def update(self, readings: SensorReadings, dt: float) -> StateEstimate:
-        if dt <= 0.0:
-            return self._fallback()
+    def update(
+        self,
+        timestamp_ns: int,
+        accel_frd_mps2: tuple[float, float, float],
+        gyro_frd_rad_s: tuple[float, float, float],
+    ) -> Optional[tuple[float, float, float, float]]:
+        values = (*accel_frd_mps2, *gyro_frd_rad_s)
+        if timestamp_ns < 0 or not all(math.isfinite(value) for value in values):
+            raise ValueError("IMU sample must be finite")
+        if self._last_timestamp_ns is not None and timestamp_ns <= self._last_timestamp_ns:
+            return None if self._attitude is None else self.attitude_body_to_ned
+        previous_timestamp_ns = self._last_timestamp_ns
+        self._last_timestamp_ns = timestamp_ns
+        if self._attitude is None:
+            self._initial_accel.append(accel_frd_mps2)
+            self._initial_gyro.append(gyro_frd_rad_s)
+            if len(self._initial_accel) < self.required_samples:
+                return None
+            count = self.required_samples
+            mean = tuple(
+                sum(sample[axis] for sample in self._initial_accel) / count
+                for axis in range(3)
+            )
+            self._accel_reference = mean
+            gyro_mean = tuple(
+                sum(sample[axis] for sample in self._initial_gyro) / count
+                for axis in range(3)
+            )
+            roll = math.atan2(-mean[1], -mean[2])
+            pitch = math.atan2(mean[0], math.hypot(mean[1], mean[2]))
+            self._attitude = Quaternion.from_euler(roll, pitch, self.initial_yaw_rad)
+            self._attitude.normalize()
+            self._gyro_bias = Vector3D(*gyro_mean)
+            self._initial_accel = []
+            self._initial_gyro = []
+            return self.attitude_body_to_ned
 
-        sample = readings.imu
-        ax, ay, az = sample.accel  # specific force (points up at rest)
-        # Input gyro is in degrees/sec; convert to rad/sec for integration
-        gx, gy, gz = [math.radians(v) for v in sample.gyro]
-
-        # Convert specific force to gravity direction (pointing down)
-        norm = math.sqrt(ax * ax + ay * ay + az * az)
-        if norm < 1e-6:
-            return self._fallback()
-
-        # Measured gravity direction (opposite of specific force)
-        grav_x = -ax / norm
-        grav_y = -ay / norm
-        grav_z = -az / norm
-
-        if not self._initialized:
-            # Collect samples for stable initialization
-            self._init_samples.append((grav_x, grav_y, grav_z))
-            if len(self._init_samples) < self._init_sample_count:
-                return self._fallback()
-            
-            # Average gravity samples to reduce noise
-            avg_gx = sum(s[0] for s in self._init_samples) / len(self._init_samples)
-            avg_gy = sum(s[1] for s in self._init_samples) / len(self._init_samples)
-            avg_gz = sum(s[2] for s in self._init_samples) / len(self._init_samples)
-            
-            # Initialize attitude from averaged gravity: z-up frame, gravity points down
-            roll0 = math.atan2(-avg_gy, -avg_gz)
-            pitch0 = math.atan2(avg_gx, math.sqrt(avg_gy * avg_gy + avg_gz * avg_gz))
-            self._q = Quaternion.from_euler(roll0, pitch0, 0.0)
-            self._q.normalize()
-            self._initialized = True
-            self._init_samples = []  # Clear samples after initialization
-
-        # Predicted gravity in body frame (rotate world gravity by conjugate of body→world)
-        v = self._q.conjugate().rotate(Vector3D(0, 0, -1))
-        vx, vy, vz = v.v
-
-        # Skip accel correction if magnitude deviates too far from 1g (tight threshold)
-        if abs(norm - 1.0) > 0.05:
-            ex = ey = ez = 0.0
-        else:
-            # Error between measured and predicted gravity
-            ex = grav_y * vz - grav_z * vy
-            ey = grav_z * vx - grav_x * vz
-            ez = grav_x * vy - grav_y * vx
-
-        # For IMU-only (no magnetometer), do not correct yaw from accelerometer
-        ez = 0.0
-
-        # Only adapt bias when nearly still (accel trustworthy and angular rate low)
-        ang_mag = math.sqrt(gx * gx + gy * gy + gz * gz)
-        if self.ki > 0.0 and abs(norm - 1.0) <= 0.02 and ang_mag < math.radians(20.0):
-            # Integrate bias for roll/pitch only; ignore yaw without mag
-            self._bias += Vector3D(ex, ey, 0.0) * (self.ki * dt)
-
-        # Corrected gyro
-        gx_c = gx + self.kp * ex + self._bias.v[0]
-        gy_c = gy + self.kp * ey + self._bias.v[1]
-        gz_c = gz + self._bias.v[2]  # no accel-based yaw correction
-
-        # Integrate quaternion: q̇ = 0.5 * q ⊗ ω
-        omega = Quaternion(0.0, gx_c, gy_c, gz_c)
-        q_dot = self._q * omega * 0.5
-        self._q = Quaternion(*(self._q.q + q_dot.q * dt))
-        self._q.normalize()
-
-        # Position / velocity placeholders (can be extended with baro/GNSS later)
-        position = self._last_state.position if self._last_state else Vector3D()
-        velocity = self._last_state.velocity if self._last_state else Vector3D()
-        angular_velocity = Vector3D(*sample.gyro)
-
-        if readings.altitude is not None:
-            z = float(readings.altitude)
-            if self._last_alt is not None and dt > 0.0:
-                vz = (z - self._last_alt) / dt
-            else:
-                vz = 0.0
-            self._last_alt = z
-            position = Vector3D(0.0, 0.0, z)
-            velocity = Vector3D(0.0, 0.0, vz)
-
-        state = StateEstimate(
-            position=position,
-            velocity=velocity,
-            orientation=self._q,
-            angular_velocity=angular_velocity,
-        )
-        self._last_state = state
-        return state
-
-    def _fallback(self) -> StateEstimate:
-        if self._last_state is not None:
-            return self._last_state
-        zero = Vector3D()
-        quat = Quaternion()
-        state = StateEstimate(position=zero, velocity=zero, orientation=quat, angular_velocity=zero)
-        self._last_state = state
-        self._last_alt = None
-        return state
+        dt = (timestamp_ns - previous_timestamp_ns) / 1_000_000_000.0
+        corrected_gyro = Vector3D(*gyro_frd_rad_s) - self._gyro_bias
+        acceleration_magnitude = math.sqrt(sum(value * value for value in accel_frd_mps2))
+        if abs(acceleration_magnitude - 9.80665) <= self.acceleration_tolerance_mps2:
+            measured_down = Vector3D(*(
+                -value / acceleration_magnitude for value in accel_frd_mps2
+            ))
+            predicted_down = self._attitude.conjugate().rotate(Vector3D(0.0, 0.0, 1.0))
+            corrected_gyro += measured_down.cross(predicted_down) * self.kp
+        derivative = self._attitude * Quaternion(0.0, *corrected_gyro.v) * 0.5
+        self._attitude = Quaternion(*(self._attitude.q + derivative.q * dt))
+        self._attitude.normalize()
+        return self.attitude_body_to_ned
 
 
-__all__ = ["MahonyEstimator", "MahonyGains"]
-
-
+__all__ = ["MahonyGains", "NedMahonyEstimator"]

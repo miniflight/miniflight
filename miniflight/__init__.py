@@ -1,17 +1,27 @@
 """Miniflight flight runtime."""
 
 from miniflight.program import (
-    BodyCommand,
+    AccelerationNed,
+    Attitude,
+    BodyRates,
+    FlightCommand,
     FlightObservation,
     FlightProgram,
-    ProgramCapabilities,
+    MotorThrusts,
+    PositionNed,
     ReadOnlyProgramRuntime,
+    VelocityNed,
 )
 
 __all__ = [
-    "BodyCommand",
+    "AccelerationNed",
+    "Attitude",
+    "BodyRates",
+    "FlightCommand",
     "FlightObservation",
     "FlightProgram",
-    "ProgramCapabilities",
+    "MotorThrusts",
+    "PositionNed",
     "ReadOnlyProgramRuntime",
+    "VelocityNed",
 ]
