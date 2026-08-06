@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import math
 
 from miniflight.core.observation import Vector3
-from miniflight.program import FlightObservation, FlightProgram, PositionNed
+from miniflight.program import FlightProgram, PositionNed
 
 
 def _norm(vector: Vector3) -> float:
@@ -58,7 +58,7 @@ class ThreadGatesProgram(FlightProgram):
             raise IndexError("active gate is outside the course")
         self._active_gate = index
 
-    def step(self, observation: FlightObservation) -> PositionNed:
+    def step(self) -> PositionNed:
         return self._commands[self._active_gate]
 
 

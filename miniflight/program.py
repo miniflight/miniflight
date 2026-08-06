@@ -5,14 +5,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import math
 from dataclasses import dataclass
-from typing import Optional, Protocol, Tuple, Union
-
-from miniflight.core.observation import ObservationTick
+from typing import Optional, Tuple, Union
 
 
 Vector3 = Tuple[float, float, float]
 Quaternion = Tuple[float, float, float, float]
-FlightObservation = ObservationTick
 
 
 def _finite(values: tuple[float, ...], name: str) -> None:
@@ -140,53 +137,11 @@ class FlightProgram(ABC):
         """Initialize program-local state."""
 
     @abstractmethod
-    def step(self, observation: FlightObservation) -> FlightCommand:
-        """Return one command for one fresh observation."""
+    def step(self) -> FlightCommand:
+        """Return the next command."""
 
     def stop(self, reason: str) -> None:
         """Release program-local state."""
-
-
-class ObservationSource(Protocol):
-    """Read one canonical observation."""
-
-    def read(self) -> ObservationTick:
-        """Return one fresh observation."""
-
-
-class ReadOnlyProgramRuntime:
-    """Evaluate a program without a control plane."""
-
-    def __init__(self, source: ObservationSource, program: FlightProgram) -> None:
-        self._source = source
-        self._program = program
-        self._last_timestamp_ns: Optional[int] = None
-        self._started = False
-        self.last_command: Optional[FlightCommand] = None
-
-    def start(self) -> None:
-        if self._started:
-            raise RuntimeError("program runtime already started")
-        self._program.start()
-        self._started = True
-
-    def step(self) -> FlightCommand:
-        if not self._started:
-            raise RuntimeError("start the program runtime before step")
-        observation = self._source.read()
-        if (
-            self._last_timestamp_ns is not None
-            and observation.timestamp_ns <= self._last_timestamp_ns
-        ):
-            raise RuntimeError("observation timestamps must increase")
-        self._last_timestamp_ns = observation.timestamp_ns
-        self.last_command = self._program.step(observation)
-        return self.last_command
-
-    def stop(self, reason: str = "operator") -> None:
-        if self._started:
-            self._program.stop(reason)
-            self._started = False
 
 
 __all__ = [
@@ -194,11 +149,8 @@ __all__ = [
     "Attitude",
     "BodyRates",
     "FlightCommand",
-    "FlightObservation",
     "FlightProgram",
     "MotorThrusts",
-    "ObservationSource",
     "PositionNed",
-    "ReadOnlyProgramRuntime",
     "VelocityNed",
 ]

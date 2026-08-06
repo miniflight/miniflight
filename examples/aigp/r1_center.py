@@ -12,7 +12,7 @@ from pymavlink import mavutil
 
 from common.math import Quaternion
 from miniflight.camera import PinholeCamera
-from miniflight.core.observation import MetricState, ObservationTick
+from miniflight.core.observation import MetricState
 from miniflight.estimate import NedMahonyEstimator
 from miniflight.program import BodyRates
 from miniflight.race import ThreadGatesProgram
@@ -318,7 +318,6 @@ def run():
     target = None
     target_body = None
     flight_command = None
-    sequence = 0
     armed_by_us = False
     arm_sent_at = 0.0
     run_started_at = None
@@ -503,15 +502,7 @@ def run():
                             flush=True,
                         )
                         return
-                    observation = ObservationTick(
-                        sequence=sequence,
-                        timestamp_ns=latest_state.timestamp_ns,
-                        accel_mps2=(0.0, 0.0, 0.0),
-                        gyro_rad_s=latest_state.body_rates_rad_s,
-                        source_age_ns=0,
-                        metric_state=latest_state,
-                    )
-                    flight_command = program.step(observation)
+                    flight_command = program.step()
                     target_body = rotate_ned_to_body(
                         latest_raw_quaternion,
                         tuple(
@@ -519,9 +510,8 @@ def run():
                             for axis in range(3)
                         ),
                     )
-                    vq1.send_position_ned(flight_command)
+                    vq1.send(flight_command)
                     command_sent = True
-                    sequence += 1
                     distance = norm(tuple(
                         target[axis] - latest_state.position_ned_m[axis]
                         for axis in range(3)
@@ -567,7 +557,7 @@ def run():
                         *latest_actuators,
                     ))
                 if (not new_state or not command_sent) and flight_command is not None:
-                    vq1.send_position_ned(flight_command)
+                    vq1.send(flight_command)
 
                 next_tick += 1.0 / CONTROL_HZ
                 delay = next_tick - time.monotonic()

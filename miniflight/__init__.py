@@ -5,11 +5,9 @@ from miniflight.program import (
     Attitude,
     BodyRates,
     FlightCommand,
-    FlightObservation,
     FlightProgram,
     MotorThrusts,
     PositionNed,
-    ReadOnlyProgramRuntime,
     VelocityNed,
 )
 
@@ -18,10 +16,8 @@ __all__ = [
     "Attitude",
     "BodyRates",
     "FlightCommand",
-    "FlightObservation",
     "FlightProgram",
     "MotorThrusts",
     "PositionNed",
-    "ReadOnlyProgramRuntime",
     "VelocityNed",
 ]

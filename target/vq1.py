@@ -10,6 +10,7 @@ from miniflight.program import (
     AccelerationNed,
     Attitude,
     BodyRates,
+    FlightCommand,
     PositionNed,
     VelocityNed,
 )
@@ -53,6 +54,21 @@ class Vq1Link:
         self._mavlink = mavlink
         self._collective = collective or Vq1CollectiveModel()
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
+
+    def send(self, command: FlightCommand) -> None:
+        """Submit one command through its matching VQ1 input."""
+        if isinstance(command, PositionNed):
+            self.send_position_ned(command)
+        elif isinstance(command, VelocityNed):
+            self.send_velocity_ned(command)
+        elif isinstance(command, AccelerationNed):
+            self.send_acceleration_ned(command)
+        elif isinstance(command, Attitude):
+            self.send_attitude(command)
+        elif isinstance(command, BodyRates):
+            self.send_body_rates(command)
+        else:
+            raise TypeError(f"VQ1 does not accept {type(command).__name__}")
 
     def send_position_ned(self, command: PositionNed) -> None:
         mask = (
