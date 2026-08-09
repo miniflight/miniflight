@@ -2,13 +2,27 @@
 
 Miniflight is a companion-computer flight stack.
 
-A `FlightProgram` receives one canonical observation and returns one explicit
-flight command. The command can target position, velocity, acceleration,
-attitude, body rates, or motors. A target link sends that command to a simulator
-or a real vehicle.
+A `FlightProgram` returns one explicit flight command. A target link sends that
+command to a simulator or a real vehicle.
 
 The companion stack uses world NED, body FRD, SI units, and `w, x, y, z`
 quaternions. Target adapters own all wire-format and frame conversions.
+
+## Replay
+
+The first recorded Miniflight flight passed all six VQ1 gates without a
+collision. Replay it without the simulator:
+
+```bash
+python3 -m miniflight replay test/data/vq1_six_gates.mflog
+```
+
+Replay starts `ThreadGatesProgram` in a fresh process. It feeds the recorded
+gate sequence to that process and compares every new command.
+
+The simulator screen, login, network, and physics are not replay dependencies.
+VQ1 only produced the checked-in trace. Another simulator can produce the same
+target-independent flight records.
 
 ## VQ1
 
