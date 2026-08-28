@@ -8,6 +8,9 @@ class Target:
     def position(self) -> tuple[float, float, float]:
         raise NotImplementedError
 
+    def velocity(self) -> tuple[float, float, float]:
+        raise NotImplementedError
+
     def arm(self) -> None:
         raise NotImplementedError
 

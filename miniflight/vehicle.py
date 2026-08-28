@@ -11,6 +11,13 @@ class PositionNED:
     down: float
 
 
+@dataclass(frozen=True)
+class VelocityNED:
+    north: float
+    east: float
+    down: float
+
+
 class Vehicle:
     def __init__(self, target: Target) -> None:
         self._target = target
@@ -24,6 +31,10 @@ class Vehicle:
     @property
     def position(self) -> PositionNED:
         return PositionNED(*self._target.position())
+
+    @property
+    def velocity(self) -> VelocityNED:
+        return VelocityNED(*self._target.velocity())
 
     def arm(self) -> None:
         self._target.arm()

@@ -9,7 +9,6 @@ class VQ1(Target):
     def __init__(self):
         self._link = None
         self._boot_ms = None
-        self._messages = {}
 
     def connect(self) -> None:
         self._boot_ms = int(time.time() * 1000)
@@ -24,7 +23,6 @@ class VQ1(Target):
 
         self._link = None
         self._boot_ms = None
-        self._messages.clear()
 
     def arm(self) -> None:
         self._set_armed(True)
@@ -33,14 +31,12 @@ class VQ1(Target):
         self._set_armed(False)
 
     def position(self) -> tuple[float, float, float]:
-        while "LOCAL_POSITION_NED" not in self._messages:
-            self._receive(blocking=True)
-
-        while self._receive(blocking=False):
-            pass
-
-        message = self._messages["LOCAL_POSITION_NED"]
+        message = self._message("LOCAL_POSITION_NED")
         return message.x, message.y, message.z
+
+    def velocity(self) -> tuple[float, float, float]:
+        message = self._message("LOCAL_POSITION_NED")
+        return message.vx, message.vy, message.vz
 
     def position_ned(
         self,
@@ -77,16 +73,13 @@ class VQ1(Target):
             0.0,
         )
 
-    def _receive(self, blocking: bool) -> bool:
-        message = self._link.recv_match(blocking=blocking)
+    def _message(self, message_type: str):
+        message = self._link.recv_match(
+            type=message_type,
+            blocking=True,
+        )
 
-        if message is None:
-            return False
-
-        if message.get_type() != "BAD_DATA":
-            self._messages[message.get_type()] = message
-
-        return True
+        return message
 
     def _set_armed(self, armed: bool) -> None:
         self._link.mav.command_long_send(
