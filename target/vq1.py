@@ -1,178 +1,104 @@
-"""Anduril VQ1 control plane."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
 import time
-from typing import Callable
 
-from miniflight.program import (
-    AccelerationNed,
-    Attitude,
-    BodyRates,
-    FlightCommand,
-    PositionNed,
-    VelocityNed,
-)
+from pymavlink import mavutil
+
+from target import Target
 
 
-@dataclass(frozen=True)
-class Vq1CollectiveModel:
-    """Convert physical collective acceleration to the VQ1 wire value."""
+class VQ1(Target):
+    def __init__(self):
+        self._link = None
+        self._boot_ms = None
+        self._messages = {}
 
-    hover_accel_mps2: float = 9.80665
-    hover_wire_value: float = 0.264
-    reference_accel_mps2: float = 19.7
-    reference_wire_value: float = 0.450
-    minimum_wire_value: float = 0.15
-    maximum_wire_value: float = 0.45
+    def connect(self) -> None:
+        self._boot_ms = int(time.time() * 1000)
+        self._link = mavutil.mavlink_connection("udpin:127.0.0.1:14550")
 
-    def wire_value(self, acceleration_mps2: float) -> float:
-        slope = (
-            (self.reference_wire_value - self.hover_wire_value)
-            / (self.reference_accel_mps2 - self.hover_accel_mps2)
-        )
-        value = self.hover_wire_value + (
-            acceleration_mps2 - self.hover_accel_mps2
-        ) * slope
-        return max(self.minimum_wire_value, min(self.maximum_wire_value, value))
+        heartbeat = self._link.wait_heartbeat()
+        print(heartbeat)
 
+    def disconnect(self) -> None:
+        if self._link is not None:
+            self._link.close()
 
-class Vq1Link:
-    """Send explicit commands through the VQ1 MAVLink transport."""
+        self._link = None
+        self._boot_ms = None
+        self._messages.clear()
 
-    def __init__(
+    def arm(self) -> None:
+        self._set_armed(True)
+
+    def disarm(self) -> None:
+        self._set_armed(False)
+
+    def position(self) -> tuple[float, float, float]:
+        while "LOCAL_POSITION_NED" not in self._messages:
+            self._receive(blocking=True)
+
+        while self._receive(blocking=False):
+            pass
+
+        message = self._messages["LOCAL_POSITION_NED"]
+        return message.x, message.y, message.z
+
+    def position_ned(
         self,
-        link,
-        boot_ms: int,
-        mavlink,
-        collective: Vq1CollectiveModel | None = None,
-        clock_ms: Callable[[], int] | None = None,
+        north: float,
+        east: float,
+        down: float,
     ) -> None:
-        self._link = link
-        self._boot_ms = int(boot_ms)
-        self._mavlink = mavlink
-        self._collective = collective or Vq1CollectiveModel()
-        self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
-
-    def send(self, command: FlightCommand) -> None:
-        """Submit one command through its matching VQ1 input."""
-        if isinstance(command, PositionNed):
-            self.send_position_ned(command)
-        elif isinstance(command, VelocityNed):
-            self.send_velocity_ned(command)
-        elif isinstance(command, AccelerationNed):
-            self.send_acceleration_ned(command)
-        elif isinstance(command, Attitude):
-            self.send_attitude(command)
-        elif isinstance(command, BodyRates):
-            self.send_body_rates(command)
-        else:
-            raise TypeError(f"VQ1 does not accept {type(command).__name__}")
-
-    def send_position_ned(self, command: PositionNed) -> None:
         mask = (
-            self._mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
         )
-        self._submit_local_ned(
-            mask,
-            command.position_ned_m,
-            (0.0, 0.0, 0.0),
-            (0.0, 0.0, 0.0),
-            command.yaw_rad,
-        )
-
-    def send_velocity_ned(self, command: VelocityNed) -> None:
-        mask = (
-            self._mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
-        )
-        self._submit_local_ned(
-            mask,
-            (0.0, 0.0, 0.0),
-            command.velocity_ned_mps,
-            (0.0, 0.0, 0.0),
-            command.yaw_rad,
-        )
-
-    def send_acceleration_ned(self, command: AccelerationNed) -> None:
-        mask = (
-            self._mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE
-            | self._mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
-        )
-        self._submit_local_ned(
-            mask,
-            (0.0, 0.0, 0.0),
-            (0.0, 0.0, 0.0),
-            command.acceleration_ned_mps2,
-            command.yaw_rad,
-        )
-
-    def _submit_local_ned(self, mask, position, velocity, acceleration, yaw_rad) -> None:
-        yaw = 0.0 if yaw_rad is None else yaw_rad
-        if yaw_rad is None:
-            mask |= self._mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
         self._link.mav.set_position_target_local_ned_send(
-            self._clock_ms() - self._boot_ms,
+            int(time.time() * 1000) - self._boot_ms,
             self._link.target_system,
             self._link.target_component,
-            self._mavlink.MAV_FRAME_LOCAL_NED,
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
             mask,
-            *position,
-            *velocity,
-            *acceleration,
-            yaw,
+            north,
+            east,
+            down,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
             0.0,
         )
 
-    def send_attitude(self, command: Attitude) -> None:
-        mask = (
-            self._mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE
-            | self._mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE
-            | self._mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE
-            | 16
-        )
-        self._link.mav.set_attitude_target_send(
-            self._clock_ms() - self._boot_ms,
+    def _receive(self, blocking: bool) -> bool:
+        message = self._link.recv_match(blocking=blocking)
+
+        if message is None:
+            return False
+
+        if message.get_type() != "BAD_DATA":
+            self._messages[message.get_type()] = message
+
+        return True
+
+    def _set_armed(self, armed: bool) -> None:
+        self._link.mav.command_long_send(
             self._link.target_system,
             self._link.target_component,
-            mask,
-            list(command.attitude_body_to_ned),
-            0.0,
-            0.0,
-            0.0,
-            self._collective.wire_value(command.collective_accel_mps2),
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            int(armed),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
         )
-
-    def send_body_rates(self, command: BodyRates) -> None:
-        mask = self._mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16
-        self._link.mav.set_attitude_target_send(
-            self._clock_ms() - self._boot_ms,
-            self._link.target_system,
-            self._link.target_component,
-            mask,
-            [1.0, 0.0, 0.0, 0.0],
-            command.roll_rate_rad_s,
-            command.pitch_rate_rad_s,
-            command.yaw_rate_rad_s,
-            self._collective.wire_value(command.collective_accel_mps2),
-        )
-
-
-__all__ = ["Vq1CollectiveModel", "Vq1Link"]
