@@ -73,6 +73,41 @@ class VQ1(Target):
             0.0,
         )
 
+    def velocity_ned(
+        self,
+        north: float,
+        east: float,
+        down: float,
+    ) -> None:
+        mask = (
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
+            | mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
+        )
+        self._link.mav.set_position_target_local_ned_send(
+            int(time.time() * 1000) - self._boot_ms,
+            self._link.target_system,
+            self._link.target_component,
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+            mask,
+            0.0,
+            0.0,
+            0.0,
+            north,
+            east,
+            down,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        )
+
     def _message(self, message_type: str):
         message = self._link.recv_match(
             type=message_type,

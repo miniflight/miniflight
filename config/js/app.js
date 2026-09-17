@@ -492,6 +492,44 @@ function updateMotors(motors) {
   });
 }
 
+function readinessFor(data) {
+  const connection = data.connection || {};
+  const health = data.health || {};
+  const signals = data.signals || {};
+
+  if (connection.state !== "live") {
+    return ["waiting", "CONNECT USB", "Waiting for live controller data."];
+  }
+  const ageMs = connectionAgeMs(connection);
+  if (!finite(ageMs)) {
+    return ["waiting", "WAIT FOR TELEMETRY", "No controller sample is available yet."];
+  }
+  if (ageMs > 500) {
+    return ["blocked", "TELEMETRY STALE", "Reconnect the controller."];
+  }
+  if (health.armed !== false) {
+    return health.armed === true
+      ? ["blocked", "DISARM", "Miniflight setup requires a disarmed controller."]
+      : ["waiting", "WAIT FOR STATUS", "The controller arm state is not available."];
+  }
+  if (data.machine?.has_imu !== true) {
+    return ["blocked", "IMU NOT FOUND", "The controller did not report an accelerometer and gyroscope."];
+  }
+  if (finite(health.i2c_errors) && health.i2c_errors > 0) {
+    return ["blocked", "CHECK I2C", `${health.i2c_errors} controller errors reported.`];
+  }
+  const hasAttitude = signals.attitude_deg?.length === 3 && signals.attitude_deg.every(finite);
+  const hasRawImu = [signals.gyro_msp, signals.accel_msp]
+    .every((values) => values?.length === 3 && values.every(finite));
+  if (!hasAttitude || !hasRawImu) {
+    return ["waiting", "WAIT FOR IMU", "Waiting for attitude and raw IMU samples."];
+  }
+  if (groundReference.mode !== GroundMode.LOCKED) {
+    return ["waiting", "KEEP STILL", "Put the disarmed vehicle on a level surface."];
+  }
+  return ["ready", "MINIFLIGHT INPUT READY", `Ground reference quality ${groundReference.quality}.`];
+}
+
 function renderTelemetry(data) {
   const connection = data.connection || {};
   const controller = data.controller || {};
@@ -549,6 +587,11 @@ function renderTelemetry(data) {
   $("imuHz").textContent = `${formatted(traffic.imu_per_second, "", 0)} Hz`;
   $("jitter").textContent = formatted(telemetry.attitudeJitterMs, " ms", 1);
   $("age").textContent = formatted(connectionAgeMs(connection), " ms", 0);
+
+  const [readinessState, readinessTitle, readinessDetail] = readinessFor(data);
+  $("readiness").dataset.state = readinessState;
+  $("readinessTitle").textContent = readinessTitle;
+  $("readinessDetail").textContent = readinessDetail;
 }
 
 function acceptState(data) {

@@ -1,0 +1,7 @@
+/.runtime/
+/AI-GP*/
+/*.zip
+.DS_Store
+*.log
+*.dmp
+exit.request

@@ -25,6 +25,14 @@ class Target:
     ) -> None:
         raise NotImplementedError
 
+    def velocity_ned(
+        self,
+        north: float,
+        east: float,
+        down: float,
+    ) -> None:
+        raise NotImplementedError
+
     def body_rates(
         self,
         roll: float,

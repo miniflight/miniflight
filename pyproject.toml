@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "miniflight"
 version = "0.1.0"
-description = "Physics engine"
+description = "Companion-computer flight stack"
 dependencies = [
     "numpy>=1.24",
     "matplotlib",
@@ -15,6 +15,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+aigp = [
+    "pymavlink==2.4.49",
+    "opencv-python-headless>=4.8",
+]
 test = [
     "pytest>=7.0",
     "scipy>=1.10 ; extra == 'test'",
@@ -22,3 +26,4 @@ test = [
 
 [tool.setuptools.packages.find]
 include = ["miniflight*", "common*", "sim*", "target*"]
+namespaces = false

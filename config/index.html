@@ -284,6 +284,26 @@
         color: var(--green);
       }
 
+      .readiness {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 11px;
+        background: rgba(5, 8, 10, 0.5);
+      }
+
+      .readiness strong {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--amber);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+
+      .readiness[data-state="ready"] strong { color: var(--green); }
+      .readiness[data-state="blocked"] strong { color: var(--red); }
+      .readiness .muted { font-size: 11px; }
+
       dl {
         display: grid;
         grid-template-columns: 1fr auto;
@@ -463,6 +483,10 @@
                 <div class="muted" id="controllerMeta">—</div>
               </div>
               <span class="armed disarmed" id="armed">—</span>
+            </div>
+            <div class="readiness" id="readiness" data-state="waiting">
+              <strong id="readinessTitle">CONNECT USB</strong>
+              <div class="muted" id="readinessDetail">Waiting for live controller data.</div>
             </div>
             <dl>
               <dt>Loop</dt><dd id="loop">—</dd>

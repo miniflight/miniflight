@@ -53,6 +53,17 @@ class Vehicle:
 
         self._target.position_ned(north, east, down)
 
+    def velocity_ned(
+        self,
+        north: float,
+        east: float,
+        down: float,
+    ) -> None:
+        if not all(math.isfinite(value) for value in (north, east, down)):
+            raise ValueError("velocity must be finite")
+
+        self._target.velocity_ned(north, east, down)
+
     def body_rates(
         self,
         roll: float,
