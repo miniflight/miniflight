@@ -97,15 +97,19 @@ class VQ1PackageTest(unittest.TestCase):
                         extract_vq1.prepare(self.base)
                 self.assert_no_install()
 
-    def test_executable_only_install_is_refused_and_preserved(self):
+    def test_executable_only_install_is_recovered_and_preserved(self):
         executable = self.sim / extract_vq1.REQUIRED[0]
         executable.parent.mkdir(parents=True)
         executable.write_bytes(b"partial")
-        with self.assertRaisesRegex(SystemExit, "Incomplete or different"):
-            extract_vq1.prepare(self.base)
-        self.assertEqual(executable.read_bytes(), b"partial")
-        self.assertFalse((self.sim / ".installed").exists())
-        self.assertEqual(list(self.sim.parent.iterdir()), [self.sim])
+        (self.sim / "notes.txt").write_text("keep my notes")
+        self.assertEqual(extract_vq1.prepare(self.base), self.sim)
+        self.assertEqual(executable.read_bytes(), str(extract_vq1.REQUIRED[0]).encode())
+        self.assertTrue((self.sim / ".installed").is_file())
+        backups = list(self.sim.parent.glob("vq1-backup-*/vq1"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual((backups[0] / extract_vq1.REQUIRED[0]).read_bytes(), b"partial")
+        self.assertEqual((backups[0] / "notes.txt").read_text(), "keep my notes")
+        self.assertFalse((backups[0] / ".installed").exists())
 
     def test_missing_required_asset_leaves_no_install(self):
         self.archive(missing=extract_vq1.REQUIRED[-1])
@@ -113,14 +117,15 @@ class VQ1PackageTest(unittest.TestCase):
             extract_vq1.prepare(self.base)
         self.assert_no_install()
 
-    def test_stale_marker_is_refused_and_preserved(self):
+    def test_stale_marker_is_recovered_and_preserved(self):
         extract_vq1.prepare(self.base)
         marker = self.sim / ".installed"
         marker.write_text("old version")
-        with self.assertRaisesRegex(SystemExit, "Incomplete or different"):
-            extract_vq1.prepare(self.base)
-        self.assertEqual(marker.read_text(), "old version")
-        self.assertEqual(list(self.sim.parent.iterdir()), [self.sim])
+        self.assertEqual(extract_vq1.prepare(self.base), self.sim)
+        self.assertNotEqual(marker.read_text(), "old version")
+        backups = list(self.sim.parent.glob("vq1-backup-*/vq1"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual((backups[0] / ".installed").read_text(), "old version")
 
     def test_pdf_is_not_required(self):
         self.assertFalse(list(self.base.glob("*.pdf")))

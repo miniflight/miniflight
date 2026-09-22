@@ -1,0 +1,36 @@
+#!/bin/zsh
+set -eu
+
+readonly SCRIPT_DIR="${0:A:h}"
+readonly PROGRAM="$0"
+
+usage() {
+  print "usage: $PROGRAM {vq1|vq1.r1|vq1.r2|vq2.r1|vq2.r2} [simulator arguments...]"
+}
+
+if [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if (( $# == 0 )); then
+  usage >&2
+  exit 2
+fi
+
+readonly TARGET="$1"
+shift
+
+case "$TARGET" in
+  vq1|vq1.r1) exec "$SCRIPT_DIR/run_vq1.sh" "$@" ;;
+  vq2.r1) exec "$SCRIPT_DIR/run_vq2.sh" --mode r1 "$@" ;;
+  vq2.r2) exec "$SCRIPT_DIR/run_vq2.sh" --mode r2 "$@" ;;
+  vq1.r2)
+    print -u2 "$TARGET startup is not integrated yet; no simulator was launched."
+    exit 2
+    ;;
+  *)
+    print -u2 "unknown simulator target: $TARGET"
+    usage >&2
+    exit 2
+    ;;
+esac
