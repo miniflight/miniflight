@@ -10,7 +10,7 @@ import time
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from controllers.r1_gates import GATES
+from target.aigp.controllers.r1_gates import GATES
 
 
 def main():

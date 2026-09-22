@@ -10,9 +10,8 @@ import subprocess
 import sys
 import time
 
-import controllers
 from miniflight import Control, PositionNed
-from target.aigp import SimulatorClient
+from target.aigp import SimulatorClient, controllers
 
 
 class _RaceSignals:
@@ -223,7 +222,7 @@ def main(argv=None):
     simulator_args = argv[boundary + 1:]
     if simulator_args and args.simulator is None:
         parser.error("simulator arguments require --simulator")
-    controller = importlib.import_module(f"controllers.{args.controller}").Controller()
+    controller = importlib.import_module(f"{controllers.__name__}.{args.controller}").Controller()
 
     def stop(signum, frame):
         raise KeyboardInterrupt

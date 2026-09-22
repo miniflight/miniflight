@@ -34,11 +34,11 @@ VQ2 R2:
 
 One command starts both simulator and controller. Ctrl+C stops both.
 `r1_gates` is the VQ1 six-gate position-control baseline. `zero` sends zero thrust.
-Replace the controller name with your module in `controllers/`.
+Replace the controller name with your module in `target/aigp/controllers/`.
 Omit `--controller` to run only the simulator. Run one simulator at a time.
 
 `client.py` handles UDP. `_runtime/` installs and runs the simulator and controller.
 `archives/` holds one archive per simulator and `docs/` holds its reference material.
 `.runtime/` holds local installations and caches and is ignored by Git.
 
-[Controllers](../../controllers/README.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf) · [Bundled Python example](docs/reference/PyAIPilotExample-v4)
+[Controllers](controllers/README.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf) · [Bundled Python example](docs/reference/PyAIPilotExample-v4)

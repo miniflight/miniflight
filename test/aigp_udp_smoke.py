@@ -17,7 +17,7 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from target.aigp._runtime.controller_runner import run, run_session
-from controllers.r1_gates import Controller as Gates
+from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import Control
 from target.aigp import SimulatorClient
 from target.aigp.client import _Camera as Camera

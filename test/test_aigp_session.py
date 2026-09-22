@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
-from controllers.r1_gates import Controller as Gates
-from controllers.zero import Controller as Zero
+from target.aigp.controllers.r1_gates import Controller as Gates
+from target.aigp.controllers.zero import Controller as Zero
 from miniflight import Control, Race
 from target.aigp._runtime.controller_runner import _RaceSignals, _drive, _stop_process, run_session
 

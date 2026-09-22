@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
-from target.aigp._runtime.controller_runner import run
-from controllers.zero import Controller
+from target.aigp._runtime.controller_runner import main, run
+from target.aigp.controllers.zero import Controller
 from miniflight import Control, PositionNed, Race
 
 
@@ -176,6 +176,18 @@ class ControllerTest(unittest.TestCase):
             with self.subTest(hz=hz), self.assertRaises(ValueError):
                 run(self.controller, self.sim, hz)
         self.sim.connect.assert_not_called()
+
+
+class ControllerSelectionTest(unittest.TestCase):
+    def test_loads_aigp_controllers_by_short_name(self):
+        for name, simulator in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1")):
+            with self.subTest(name=name), \
+                    patch("target.aigp._runtime.controller_runner.signal.signal"), \
+                    patch("target.aigp._runtime.controller_runner.run_session") as session:
+                main([name, "--simulator", simulator])
+                controller = session.call_args.args[0]
+                self.assertEqual(type(controller).__module__, f"target.aigp.controllers.{name}")
+                session.assert_called_once_with(controller, simulator, 50.0, [], 120.0)
 
 
 @unittest.skipUnless(shutil.which("zsh"), "zsh is required")

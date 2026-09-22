@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from controllers.r1_gates import Controller, GATES
+from target.aigp.controllers.r1_gates import Controller, GATES
 from miniflight import PositionNed, Race, State
 
 
@@ -15,7 +15,7 @@ class GateControllerTest(unittest.TestCase):
     def setUp(self):
         self.controller = Controller()
         self.now = 10.0
-        self.enterContext(patch("controllers.r1_gates.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.controllers.r1_gates.time.monotonic", side_effect=lambda: self.now))
         self.enterContext(redirect_stdout(io.StringIO()))
 
     def state(self, index=0, position=(0, 0, 0), stamp=1, finished=-1):
