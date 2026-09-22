@@ -1,0 +1,72 @@
+#!/bin/zsh
+set -eu
+
+readonly SCRIPT_DIR="${0:A:h}"
+readonly PROGRAM="$0"
+
+usage() {
+  print "usage: $PROGRAM {vq1.r1|vq2.r1|vq2.r2} [--controller NAME] [--hz 50] [simulator arguments...]"
+}
+
+if [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if (( $# == 0 )); then
+  usage >&2
+  exit 2
+fi
+
+readonly TARGET="$1"
+shift
+
+case "$TARGET" in
+  vq1|vq1.r1|vq2.r1|vq2.r2) ;;
+  vq1.r2)
+    print -u2 "$TARGET startup is not integrated yet; no simulator was launched."
+    exit 2
+    ;;
+  *)
+    print -u2 "unknown simulator target: $TARGET"
+    usage >&2
+    exit 2
+    ;;
+esac
+
+controller=""
+runner_args=()
+simulator_args=()
+while (( $# )); do
+  case "$1" in
+    --controller|--hz|--startup-timeout)
+      if (( $# < 2 )) || [[ "$2" == -* ]]; then
+        print -ru2 -- "$1 requires a value"
+        exit 2
+      fi
+      if [[ "$1" == --controller ]]; then
+        controller="$2"
+      else
+        runner_args+=("$1" "$2")
+      fi
+      shift 2
+      ;;
+    --) shift; simulator_args+=("$@"); break ;;
+    *) simulator_args+=("$1"); shift ;;
+  esac
+done
+
+if [[ -n "$controller" ]]; then
+  target="$TARGET"
+  [[ "$target" == vq1 ]] && target=vq1.r1
+  exec "$SCRIPT_DIR/control" "$controller" --simulator "$target" "${runner_args[@]}" -- "${simulator_args[@]}"
+fi
+if (( ${#runner_args} )); then
+  print -ru2 -- "--hz and --startup-timeout require --controller"
+  exit 2
+fi
+
+case "$TARGET" in
+  vq1|vq1.r1) exec "$SCRIPT_DIR/_runtime/run_vq1.sh" "${simulator_args[@]}" ;;
+  vq2.r1) exec "$SCRIPT_DIR/_runtime/run_vq2.sh" --mode r1 "${simulator_args[@]}" ;;
+  vq2.r2) exec "$SCRIPT_DIR/_runtime/run_vq2.sh" --mode r2 "${simulator_args[@]}" ;;
+esac

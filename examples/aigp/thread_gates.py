@@ -1,7 +1,7 @@
 import time
 
 from miniflight import Vehicle
-from target.vq1 import VQ1
+from target.aigp import SimulatorClient
 
 
 GATES = (
@@ -17,7 +17,7 @@ RATE_HZ = 20.0
 HOLD_SECONDS = 12.0
 
 
-vehicle = Vehicle(VQ1())
+vehicle = Vehicle(SimulatorClient())
 vehicle.connect()
 
 try:

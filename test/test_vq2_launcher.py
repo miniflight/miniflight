@@ -5,7 +5,7 @@ import unittest
 from test import test_vq1_launcher as shared
 
 
-LAUNCHER = Path(__file__).resolve().parents[1] / "target/aigp/run_vq2.sh"
+LAUNCHER = Path(__file__).resolve().parents[1] / "sim/aigp/_runtime/run_vq2.sh"
 
 
 @unittest.skipUnless(shared.ZSH, "zsh is required")
@@ -32,7 +32,7 @@ class VQ2LauncherTest(unittest.TestCase):
         source = source.replace('"pid": os.getpid()',
                                 '"mode": os.getenv("MINIFLIGHT_VQ2_MODE"), "pid": os.getpid()')
         helper.write_text(source)
-        self.launcher = self.base / "run_vq2.sh"
+        self.launcher = self.base / "_runtime/run_vq2.sh"
         self.launcher.write_text(LAUNCHER.read_text())
 
     def assert_mode(self, mode, master, *selection):
@@ -41,7 +41,7 @@ class VQ2LauncherTest(unittest.TestCase):
         events = self.runtime_events()
         self.assertEqual([event["kind"] for event in events],
                          ["prepare", "wineserver", "wine", "wineserver"])
-        self.assertEqual(events[0]["args"], [str(self.base / "extract_vq2.py")])
+        self.assertEqual(events[0]["args"], [str(self.base / "_runtime/vq2.py")])
         sim = self.base / ".runtime/vq2"
         wine = events[2]
         self.assertEqual(wine["cwd"], str(sim))

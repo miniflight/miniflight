@@ -6,7 +6,7 @@ import unittest
 
 
 ZSH = shutil.which("zsh")
-RUN = Path(__file__).resolve().parents[1] / "target/aigp/run"
+RUN = Path(__file__).resolve().parents[1] / "sim/aigp/run"
 
 
 @unittest.skipUnless(ZSH, "zsh is required")
@@ -15,12 +15,16 @@ class AIGPRunTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.base = Path(temporary.name)
+        (self.base / "_runtime").mkdir()
         self.run = self.base / "run"
         shutil.copyfile(RUN, self.run)
-        stub = self.base / "run_vq1.sh"
+        stub = self.base / "_runtime/run_vq1.sh"
         stub.write_text("#!/bin/zsh\nprint -r -- \"${(j:|:)@}\"\n")
         stub.chmod(0o755)
-        stub = self.base / "run_vq2.sh"
+        control = self.base / "control"
+        control.write_text('#!/bin/zsh\nprint -r -- "control:${(j:|:)@}"\n')
+        control.chmod(0o755)
+        stub = self.base / "_runtime/run_vq2.sh"
         stub.write_text("#!/bin/zsh\nprint -r -- \"vq2:${(j:|:)@}\"\n")
         stub.chmod(0o755)
 
@@ -54,6 +58,24 @@ class AIGPRunTest(unittest.TestCase):
         result = self.invoke("--help")
         self.assertEqual(result.returncode, 0)
         self.assertIn(f"usage: {self.run}", result.stdout)
+
+    def test_controller_and_simulator_are_one_command(self):
+        result = self.invoke("vq1", "--controller", "r1_gates", "--hz", "40", "-test", "value with spaces")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(),
+                         "control:r1_gates|--simulator|vq1.r1|--hz|40|--|-test|value with spaces")
+
+    def test_vq2_controller_forwards_round_and_startup_timeout(self):
+        result = self.invoke("vq2.r2", "--controller", "zero", "--startup-timeout", "60")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "control:zero|--simulator|vq2.r2|--startup-timeout|60|--")
+
+    def test_incomplete_controller_options_do_not_launch(self):
+        for args in (("--controller",), ("--controller", "--hz", "50"), ("--hz", "50")):
+            with self.subTest(args=args):
+                result = self.invoke("vq1.r1", *args)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
 
     def test_invalid_or_missing_mode(self):
         for args in ((), ("unknown",)):

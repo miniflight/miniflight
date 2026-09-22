@@ -7,6 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "miniflight"
 version = "0.1.0"
 description = "Companion-computer flight stack"
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
     "matplotlib",
@@ -25,5 +26,5 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["miniflight*", "common*", "sim*", "target*"]
+include = ["miniflight*", "common*", "sim*", "target*", "controllers*"]
 namespaces = false

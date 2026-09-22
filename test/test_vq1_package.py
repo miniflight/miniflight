@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from target.aigp import extract_vq1
+from sim.aigp._runtime import vq1 as extract_vq1
 
 
 class VQ1PackageTest(unittest.TestCase):
@@ -16,9 +16,10 @@ class VQ1PackageTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.base = Path(temporary.name)
         self.sim = self.base / ".runtime/vq1"
-        (self.base / "vq1").mkdir()
+        (self.base / "config/vq1").mkdir(parents=True)
+        (self.base / "archives").mkdir()
         for name in extract_vq1.CONFIG:
-            (self.base / "vq1" / name).write_text(f"source {name}")
+            (self.base / "config/vq1" / name).write_text(f"source {name}")
         self.archive()
         self.enterContext(redirect_stdout(io.StringIO()))
 
@@ -37,12 +38,12 @@ class VQ1PackageTest(unittest.TestCase):
         self.parts = []
         checksums = []
         for suffix, data in zip(("aa", "ab"), halves):
-            path = self.base / f"vq1-unlocked.tar.gz.part-{suffix}"
+            path = self.base / "archives" / f"vq1-unlocked.tar.gz.part-{suffix}"
             path.write_bytes(data)
             self.parts.append(path)
             checksums.append(f"{hashlib.sha256(data).hexdigest()}  {path.name}")
         checksums.append(f"{'0' * 64}  VQ1-Technical-Specification-00.02.pdf")
-        (self.base / "SHA256SUMS").write_text("\n".join(checksums) + "\n")
+        (self.base / "archives/SHA256SUMS").write_text("\n".join(checksums) + "\n")
 
     def assert_no_install(self):
         self.assertFalse(self.sim.exists())
@@ -57,7 +58,7 @@ class VQ1PackageTest(unittest.TestCase):
             self.assertEqual((self.sim / path).read_bytes(), str(path).encode())
         for name, path in extract_vq1.CONFIG.items():
             self.assertEqual((self.sim / path).read_text(), f"source {name}")
-            (self.base / "vq1" / name).write_text(f"updated {name}")
+            (self.base / "config/vq1" / name).write_text(f"updated {name}")
         for path in self.parts:
             path.unlink()
         with patch.object(tarfile, "open", side_effect=AssertionError("re-extraction")):

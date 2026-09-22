@@ -1,9 +1,9 @@
 @echo off
 setlocal
-set "SIM_DIR=%~dp0.runtime\vq1"
+set "SIM_DIR=%~dp0..\.runtime\vq1"
 set "SHIPPING=%SIM_DIR%\FlightSim\Binaries\Win64\DCGame-Win64-Shipping.exe"
 
-python "%~dp0extract_vq1.py"
+python "%~dp0vq1.py"
 if errorlevel 1 exit /b 1
 
 pushd "%SIM_DIR%"

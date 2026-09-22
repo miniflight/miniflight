@@ -1,12 +1,14 @@
 from pathlib import Path
 
 if __package__:
-    from .runtime import install
+    from .install import install
 else:
-    from runtime import install
+    from install import install
 
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parent.parent
+# The split archive and the single archive contain the identical tar stream.
+LEGACY_VERSION = "3d6527764f43862ad7860694f0783c6f4332eb87b8ccad7bd4c2bb376ce0702e"
 ARCHIVE_ROOT = Path("AI-GP Simulator v1.0.3391-VQ2/AIGP_VQ2_3391")
 BINARIES = Path("FlightSim/Binaries/Win64")
 SHIPPING = BINARIES / "DCGame-Win64-Shipping.exe"
@@ -29,10 +31,12 @@ CONFIG = {
 
 
 def prepare(base=BASE):
-    parts = [line.split() for line in (base / "SHA256SUMS").read_text().splitlines()
-             if line.strip() and line.split()[-1].startswith("vq2-unlocked.tar.gz.part-")]
-    config = {Path("vq2") / name: path for name, path in CONFIG.items()}
-    return install(base, "vq2", parts, ARCHIVE_ROOT, REQUIRED, config, PAYLOAD_SHA256)
+    parts = [line.split() for line in (base / "archives/SHA256SUMS").read_text().splitlines()
+             if line.strip() and (line.split()[-1] == "vq2.tar.xz"
+                                  or line.split()[-1].startswith("vq2-unlocked.tar.gz.part-"))]
+    config = {Path("config/vq2") / name: path for name, path in CONFIG.items()}
+    return install(base, "vq2", parts, ARCHIVE_ROOT, REQUIRED, config, PAYLOAD_SHA256,
+                   archive_dir=base / "archives", cache_versions=(LEGACY_VERSION,))
 
 
 if __name__ == "__main__":

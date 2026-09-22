@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 import hashlib
 from pathlib import Path
 import shutil
@@ -21,19 +22,21 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def install(base, name, parts, archive_root, required, config=None, payload_sha256=None):
+def install(base, name, parts, archive_root, required, config=None, payload_sha256=None, *,
+            archive_dir=None, cache_versions=()):
     if not hasattr(tarfile, "data_filter"):
         raise SystemExit("Use a current Python 3.11 or newer to prepare the simulator.")
     if not parts:
         raise SystemExit(f"No archive parts listed for {name}.")
     config = config or {}
+    archive_dir = base if archive_dir is None else archive_dir
     version = hashlib.sha256(repr(parts).encode()).hexdigest()
     runtime = base / ".runtime"
     sim = runtime / name
     marker = sim / ".installed"
 
     try:
-        installed = (marker.is_file() and marker.read_text() == version
+        installed = (marker.is_file() and marker.read_text() in (version, *cache_versions)
                      and all((sim / path).is_file() for path in required))
     except (OSError, UnicodeError):
         installed = False
@@ -44,26 +47,31 @@ def install(base, name, parts, archive_root, required, config=None, payload_sha2
     runtime.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f"{name}-install-", dir=runtime) as temporary:
         staging = Path(temporary)
-        with tempfile.TemporaryFile(dir=staging) as combined:
+        with ExitStack() as files:
+            combined = (files.enter_context(tempfile.TemporaryFile(dir=staging))
+                        if len(parts) > 1 else None)
             for expected, filename in parts:
-                path = base / filename
+                path = archive_dir / filename
                 if not path.is_file():
                     raise SystemExit(f"Missing {filename}. Supply the archive before installing {name}.")
                 digest = hashlib.sha256()
-                with path.open("rb") as source:
-                    for block in iter(lambda: source.read(1024 * 1024), b""):
-                        digest.update(block)
+                source = files.enter_context(path.open("rb"))
+                for block in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(block)
+                    if combined is not None:
                         combined.write(block)
                 if digest.hexdigest() != expected:
                     raise SystemExit(f"Checksum mismatch: {filename}. Download the expected archive and retry.")
                 print(f"Verified {filename}", flush=True)
+            if combined is None:
+                combined = source
             combined.seek(0)
             if zipfile.is_zipfile(combined):
                 with zipfile.ZipFile(combined) as archive:
                     archive.extractall(staging)
             else:
                 combined.seek(0)
-                with tarfile.open(fileobj=combined, mode="r:gz") as archive:
+                with tarfile.open(fileobj=combined, mode="r:*") as archive:
                     archive.extractall(staging, filter="data")
 
         extracted = staging / archive_root

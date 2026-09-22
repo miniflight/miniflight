@@ -5,12 +5,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
 
-from target.aigp import extract_vq1, runtime
+from sim.aigp._runtime import vq1 as extract_vq1, install as runtime
 
 
 REQUIRED = (
@@ -54,6 +55,32 @@ class AIGPRuntimeTest(unittest.TestCase):
         self.assertEqual({path.relative_to(sim) for path in sim.rglob("*") if path.is_file()},
                          {*REQUIRED, Path(".installed")})
         self.assertEqual(list(sim.parent.iterdir()), [sim])
+
+    def test_single_xz_archive_from_archive_directory(self):
+        archives = self.base / "archives"
+        archives.mkdir()
+        path = archives / "vq2.tar.xz"
+        with tarfile.open(path, "w:xz") as archive:
+            for required in REQUIRED:
+                data = str(required).encode()
+                member = tarfile.TarInfo(str(required))
+                member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+        parts = [[hashlib.sha256(path.read_bytes()).hexdigest(), path.name]]
+        with patch.object(runtime.tempfile, "TemporaryFile", side_effect=AssertionError("archive copied")):
+            sim = runtime.install(self.base, "vq2", parts, Path("."), REQUIRED, archive_dir=archives)
+        for required in REQUIRED:
+            self.assertEqual((sim / required).read_bytes(), str(required).encode())
+
+    def test_recompressed_archive_can_reuse_identical_installed_payload(self):
+        old_parts, sim = self.cached_vq1()
+        old_version = hashlib.sha256(repr(old_parts).encode()).hexdigest()
+        new_parts = [["c" * 64, "vq1.tar.xz"]]
+        self.assertEqual(runtime.install(self.base, "vq1", new_parts, extract_vq1.ARCHIVE_ROOT,
+                                         extract_vq1.REQUIRED, cache_versions=(old_version,)), sim)
+        self.assertEqual((sim / ".installed").read_text(), old_version)
+        with self.assertRaisesRegex(SystemExit, "Missing"):
+            runtime.install(self.base, "vq1", new_parts, extract_vq1.ARCHIVE_ROOT, extract_vq1.REQUIRED)
 
     def test_vq2_failure_preserves_existing_vq1(self):
         _, vq1 = self.cached_vq1()
@@ -194,13 +221,15 @@ class AIGPRuntimeTest(unittest.TestCase):
 
     def test_vq1_wrapper_runs_directly_outside_repository(self):
         parts, sim = self.cached_vq1()
+        (self.base / "_runtime").mkdir()
+        (self.base / "archives").mkdir()
         for module in (extract_vq1, runtime):
-            shutil.copyfile(module.__file__, self.base / Path(module.__file__).name)
-        (self.base / "SHA256SUMS").write_text("\n".join(f"{digest}  {name}" for digest, name in parts))
-        (self.base / "vq1").mkdir()
+            shutil.copyfile(module.__file__, self.base / "_runtime" / Path(module.__file__).name)
+        (self.base / "archives/SHA256SUMS").write_text("\n".join(f"{digest}  {name}" for digest, name in parts))
+        (self.base / "config/vq1").mkdir(parents=True)
         for name in extract_vq1.CONFIG:
-            (self.base / "vq1" / name).write_text(f"configuration {name}")
-        result = subprocess.run([sys.executable, str(self.base / "extract_vq1.py")],
+            (self.base / "config/vq1" / name).write_text(f"configuration {name}")
+        result = subprocess.run([sys.executable, str(self.base / "_runtime/vq1.py")],
                                 cwd=self.base, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         for name, relative in extract_vq1.CONFIG.items():

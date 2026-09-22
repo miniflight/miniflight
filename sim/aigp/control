@@ -1,0 +1,17 @@
+#!/bin/zsh
+set -eu
+
+readonly SCRIPT_DIR="${0:A:h}"
+if (( $# == 0 )); then
+  print -u2 "usage: $0 CONTROLLER [--hz 50]"
+  exit 2
+fi
+if [[ "$1" == --help || "$1" == -h ]]; then
+  print "usage: $0 CONTROLLER [--hz 50]"
+  exit 0
+fi
+source "$SCRIPT_DIR/_runtime/python.sh"
+check_python
+prepare_python "$SCRIPT_DIR"
+cd "$SCRIPT_DIR/../.."
+exec "$SCRIPT_DIR/.runtime/client-venv/bin/python" -m sim.aigp._runtime.controller_runner "$@"

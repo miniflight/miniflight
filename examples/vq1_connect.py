@@ -1,8 +1,8 @@
-from target.vq1 import VQ1
+from target.aigp import SimulatorClient
 from miniflight.vehicle import Vehicle
 
 
-vehicle = Vehicle(VQ1())
+vehicle = Vehicle(SimulatorClient())
 
 print("Connecting to VQ1...")
 vehicle.connect()

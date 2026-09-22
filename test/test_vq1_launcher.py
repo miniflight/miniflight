@@ -12,7 +12,7 @@ import unittest
 
 
 ZSH = shutil.which("zsh")
-LAUNCHER = Path(__file__).resolve().parents[1] / "target/aigp/run_vq1.sh"
+LAUNCHER = Path(__file__).resolve().parents[1] / "sim/aigp/_runtime/run_vq1.sh"
 WINE_HELPER = LAUNCHER.with_name("wine.sh")
 PYTHON_HELPER = LAUNCHER.with_name("python.sh")
 
@@ -23,8 +23,9 @@ class VQ1LauncherTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.repo = Path(temporary.name).resolve() / "repo with spaces"
-        self.base = self.repo / "target/aigp"
+        self.base = self.repo / "sim/aigp"
         self.base.mkdir(parents=True)
+        (self.base / "_runtime").mkdir()
         self.python = self.base / ".runtime/client-venv/bin/python"
         self.events = self.base / "events.jsonl"
         helper = self.base / "stub.py"
@@ -96,9 +97,9 @@ if kind == "wineserver":
             original = next(line for line in source.splitlines()
                             if line.startswith(f"readonly {name}="))
             source = source.replace(original, f"readonly {name}={shlex.quote(str(self.stubs[kind]))}")
-        (self.base / "wine.sh").write_text(source)
-        (self.base / "python.sh").write_text(PYTHON_HELPER.read_text())
-        self.launcher = self.base / "run_vq1.sh"
+        (self.base / "_runtime/wine.sh").write_text(source)
+        (self.base / "_runtime/python.sh").write_text(PYTHON_HELPER.read_text())
+        self.launcher = self.base / "_runtime/run_vq1.sh"
         self.launcher.write_text(LAUNCHER.read_text())
 
     def launch(self, *args, launcher=None, **options):
@@ -150,7 +151,22 @@ if kind == "wineserver":
         self.assertEqual(code, 7, output)
         events = self.runtime_events()
         self.assertEqual([event["kind"] for event in events], ["prepare"])
-        self.assertEqual(events[0]["args"], [str(self.base / "extract_vq1.py")])
+        self.assertEqual(events[0]["args"], [str(self.base / "_runtime/vq1.py")])
+
+    def test_existing_runtime_is_reused_after_layout_change(self):
+        legacy = self.repo / "target/aigp/.runtime"
+        interpreter = legacy / "client-venv/bin/python"
+        interpreter.parent.mkdir(parents=True)
+        shutil.copyfile(self.stubs["prepare"], interpreter)
+        interpreter.chmod(0o755)
+        (legacy / "keep.txt").write_text("existing runtime")
+        code, output = self.finish(self.launch())
+        self.assertEqual(code, 0, output)
+        self.assertTrue((self.base / ".runtime").is_symlink())
+        self.assertEqual((self.base / ".runtime").resolve(), legacy)
+        self.assertEqual((legacy / "keep.txt").read_text(), "existing runtime")
+        self.assertFalse(any(event["kind"] == "uv" and event["args"][0] == "venv"
+                             for event in self.read_events()))
 
     def test_success_forwards_arguments_and_uses_local_runtime(self):
         code, output = self.finish(self.launch("-test", "value with spaces"))
@@ -213,7 +229,7 @@ if kind == "wineserver":
         launcher = self.base / "run_second.sh"
         launcher.write_text(
             "#!/bin/zsh\nset -eu\n"
-            f"source {shlex.quote(str(self.base / 'wine.sh'))}\n"
+            f"source {shlex.quote(str(self.base / '_runtime/wine.sh'))}\n"
             "check_wine\n"
             f"run_wine {shlex.quote(str(second_sim))} "
             f"{shlex.quote(str(second_prefix))} FlightSim.exe\n"
