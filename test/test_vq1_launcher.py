@@ -12,7 +12,7 @@ import unittest
 
 
 ZSH = shutil.which("zsh")
-LAUNCHER = Path(__file__).resolve().parents[1] / "sim/aigp/_runtime/run_vq1.sh"
+LAUNCHER = Path(__file__).resolve().parents[1] / "target/aigp/_runtime/run_vq1.sh"
 WINE_HELPER = LAUNCHER.with_name("wine.sh")
 PYTHON_HELPER = LAUNCHER.with_name("python.sh")
 
@@ -23,7 +23,7 @@ class VQ1LauncherTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.repo = Path(temporary.name).resolve() / "repo with spaces"
-        self.base = self.repo / "sim/aigp"
+        self.base = self.repo / "target/aigp"
         self.base.mkdir(parents=True)
         (self.base / "_runtime").mkdir()
         self.python = self.base / ".runtime/client-venv/bin/python"
@@ -153,18 +153,17 @@ if kind == "wineserver":
         self.assertEqual([event["kind"] for event in events], ["prepare"])
         self.assertEqual(events[0]["args"], [str(self.base / "_runtime/vq1.py")])
 
-    def test_existing_runtime_is_reused_after_layout_change(self):
-        legacy = self.repo / "target/aigp/.runtime"
-        interpreter = legacy / "client-venv/bin/python"
+    def test_existing_runtime_is_reused_in_place(self):
+        runtime = self.base / ".runtime"
+        interpreter = runtime / "client-venv/bin/python"
         interpreter.parent.mkdir(parents=True)
         shutil.copyfile(self.stubs["prepare"], interpreter)
         interpreter.chmod(0o755)
-        (legacy / "keep.txt").write_text("existing runtime")
+        (runtime / "keep.txt").write_text("existing runtime")
         code, output = self.finish(self.launch())
         self.assertEqual(code, 0, output)
-        self.assertTrue((self.base / ".runtime").is_symlink())
-        self.assertEqual((self.base / ".runtime").resolve(), legacy)
-        self.assertEqual((legacy / "keep.txt").read_text(), "existing runtime")
+        self.assertFalse(runtime.is_symlink())
+        self.assertEqual((runtime / "keep.txt").read_text(), "existing runtime")
         self.assertFalse(any(event["kind"] == "uv" and event["args"][0] == "venv"
                              for event in self.read_events()))
 

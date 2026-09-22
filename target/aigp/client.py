@@ -15,7 +15,7 @@ from target import Target
 
 
 class SimulatorClient(Target):
-    """Local UDP client shared by VQ1 and VQ2. Connecting never arms or resets."""
+    """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets."""
 
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
@@ -142,7 +142,15 @@ class SimulatorClient(Target):
         self._received_at[kind] = now
         self._messages.append(message)
         if kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
-            self._race = Race(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
+            race = Race(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
+            if (self._race is not None and race.sim_boot_time_ms < self._race.sim_boot_time_ms
+                    and all(r.race_start_boot_time_ms < 0 or r.sim_boot_time_ms < r.race_start_boot_time_ms
+                            for r in (self._race, race))):
+                # The native sensor clock can restart before GO.
+                self._telemetry.pop("HIGHRES_IMU", None)
+                self._received_at.pop("HIGHRES_IMU", None)
+                self._last_imu = self._previous_time = None
+            self._race = race
 
     def _wait(self, deadline, description):
         remaining = deadline - time.monotonic()

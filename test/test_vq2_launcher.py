@@ -5,7 +5,7 @@ import unittest
 from test import test_vq1_launcher as shared
 
 
-LAUNCHER = Path(__file__).resolve().parents[1] / "sim/aigp/_runtime/run_vq2.sh"
+LAUNCHER = Path(__file__).resolve().parents[1] / "target/aigp/_runtime/run_vq2.sh"
 
 
 @unittest.skipUnless(shared.ZSH, "zsh is required")

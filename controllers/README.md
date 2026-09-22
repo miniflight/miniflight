@@ -3,17 +3,18 @@
 Run the simulator and controller together:
 
 ```sh
-./sim/aigp/run vq1.r1 --controller r1_gates
+./target/aigp/run vq1.r1 --controller r1_gates
 ```
 
 `r1_gates` follows the six R1 gate centers using VQ1's built-in position control.
 It targets one metre beyond each center and advances on the reported gate index.
+After the last gate it holds that target until the native finish signal.
 It requires VQ1 position telemetry; VQ2 does not publish it, including on R1.
 
 Copy `controllers/zero.py` to `controllers/mine.py`, then select it by name:
 
 ```sh
-./sim/aigp/run vq2.r2 --controller mine
+./target/aigp/run vq2.r2 --controller mine
 ```
 
 ```python
@@ -56,4 +57,4 @@ The default loop rate is 50 Hz (`--hz 50`), with a 2 Hz heartbeat.
 Missing IMU or race data for one second stops the runner. Slow updates skip ticks.
 Use one controller at a time: MAVLink uses local UDP 14550, camera uses 5600.
 
-[Setup](../sim/aigp/README.md) · [Race event chain](../docs/aigp/race-lifecycle.md)
+[Setup](../target/aigp/README.md) · [Race event chain](../target/aigp/docs/race-lifecycle.md)

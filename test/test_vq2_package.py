@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sim.aigp._runtime import vq2 as extract_vq2, install as runtime
+from target.aigp._runtime import vq2 as extract_vq2, install as runtime
 
 
 class VQ2PackageTest(unittest.TestCase):

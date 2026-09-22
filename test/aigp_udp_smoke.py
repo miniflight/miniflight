@@ -16,10 +16,11 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from sim.aigp._runtime.controller_runner import run, run_session
+from target.aigp._runtime.controller_runner import run, run_session
 from controllers.r1_gates import Controller as Gates
 from miniflight import Control
-from target.aigp import SimulatorClient, _Camera as Camera
+from target.aigp import SimulatorClient
+from target.aigp.client import _Camera as Camera
 from test.test_aigp_client import heartbeat, imu, packet
 
 
@@ -135,9 +136,9 @@ class UDPSmokeTest(unittest.TestCase):
             children.append(child)
             return child
 
-        with patch("sim.aigp._runtime.controller_runner.SimulatorClient", return_value=sim), \
-                patch("sim.aigp._runtime.controller_runner._check_simulator_ports"), \
-                patch("sim.aigp._runtime.controller_runner.subprocess.Popen", side_effect=launch):
+        with patch("target.aigp._runtime.controller_runner.SimulatorClient", return_value=sim), \
+                patch("target.aigp._runtime.controller_runner._check_simulator_ports"), \
+                patch("target.aigp._runtime.controller_runner.subprocess.Popen", side_effect=launch):
             if expect_timeout:
                 with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
                     run_session(Gates(), "vq1.r1", startup_timeout=8)

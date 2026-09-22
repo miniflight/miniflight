@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from sim.aigp._runtime import vq1 as extract_vq1
+from target.aigp._runtime import vq1 as extract_vq1
 
 
 class VQ1PackageTest(unittest.TestCase):

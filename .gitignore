@@ -5,6 +5,4 @@ __pycache__/
 
 work/
 
-/target/aigp/
-
 telemetry_oracle_*.csv

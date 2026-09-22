@@ -27,6 +27,11 @@ extrapolate countdown completion from host time or IMU time. Race packets have
 their own receipt timestamp, so camera/IMU/track traffic cannot keep stale race
 state alive. The heartbeat is 2 Hz; control defaults to 50 Hz.
 
+VQ2 R2 restarts its telemetry clock during startup. A backwards boot timestamp
+in a pre-GO race packet resets the client's IMU timestamp filter. The next
+sample starts with `dt=0`. Backwards IMU timestamps alone are still rejected;
+a race reset after GO stops the run.
+
 Race completion does not require another IMU sample. The runner checks the
 latest race packet during bounded IMU waits and keeps sending heartbeats.
 Without a finish packet, a one-second IMU gap is still an error; it is never

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
-from sim.aigp._runtime.controller_runner import run
+from target.aigp._runtime.controller_runner import run
 from controllers.zero import Controller
 from miniflight import Control, PositionNed, Race
 
@@ -15,14 +15,14 @@ from miniflight import Control, PositionNed, Race
 class ControllerTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
         self.sleeps = []
 
         def sleep(seconds):
             self.sleeps.append(seconds)
             self.now += seconds
 
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.time.sleep", side_effect=sleep))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=sleep))
         self.sim = Mock()
         self.state = SimpleNamespace(received_at={"HIGHRES_IMU": self.now},
                                      race=Race(1000, 0, -1, 0, 0, self.now))
@@ -184,10 +184,10 @@ class ControlLauncherTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.repo = Path(temporary.name)
-        self.base = self.repo / "sim/aigp"
+        self.base = self.repo / "target/aigp"
         self.base.mkdir(parents=True)
         (self.base / "_runtime").mkdir()
-        source = Path(__file__).resolve().parents[1] / "sim/aigp/control"
+        source = Path(__file__).resolve().parents[1] / "target/aigp/control"
         self.launcher = self.base / "control"
         shutil.copyfile(source, self.launcher)
         (self.base / "_runtime/python.sh").write_text("check_python() { :; }\nprepare_python() { :; }\n")
@@ -205,7 +205,7 @@ class ControlLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         directory, command = result.stdout.splitlines()
         self.assertEqual(Path(directory).resolve(), self.repo.resolve())
-        self.assertEqual(command, "-m|sim.aigp._runtime.controller_runner|mine|--hz|40")
+        self.assertEqual(command, "-m|target.aigp._runtime.controller_runner|mine|--hz|40")
 
     def test_help_and_missing_controller_do_not_prepare_environment(self):
         (self.base / "_runtime/python.sh").write_text("exit 99\n")

@@ -14,4 +14,4 @@ source "$SCRIPT_DIR/_runtime/python.sh"
 check_python
 prepare_python "$SCRIPT_DIR"
 cd "$SCRIPT_DIR/../.."
-exec "$SCRIPT_DIR/.runtime/client-venv/bin/python" -m sim.aigp._runtime.controller_runner "$@"
+exec "$SCRIPT_DIR/.runtime/client-venv/bin/python" -m target.aigp._runtime.controller_runner "$@"

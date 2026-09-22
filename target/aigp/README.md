@@ -17,19 +17,19 @@ git lfs pull
 VQ1:
 
 ```sh
-./sim/aigp/run vq1.r1 --controller r1_gates
+./target/aigp/run vq1.r1 --controller r1_gates
 ```
 
 VQ2 R1:
 
 ```sh
-./sim/aigp/run vq2.r1 --controller zero
+./target/aigp/run vq2.r1 --controller zero
 ```
 
 VQ2 R2:
 
 ```sh
-./sim/aigp/run vq2.r2 --controller zero
+./target/aigp/run vq2.r2 --controller zero
 ```
 
 One command starts both simulator and controller. Ctrl+C stops both.
@@ -37,4 +37,8 @@ One command starts both simulator and controller. Ctrl+C stops both.
 Replace the controller name with your module in `controllers/`.
 Omit `--controller` to run only the simulator. Run one simulator at a time.
 
-[Controllers](../../controllers/README.md) · [Specification](../../docs/aigp/VQ1-Technical-Specification-00.02.pdf) · [Bundled Python example](../../docs/aigp/reference/PyAIPilotExample-v4)
+`client.py` handles UDP. `_runtime/` installs and runs the simulator and controller.
+`archives/` holds one archive per simulator and `docs/` holds its reference material.
+`.runtime/` holds local installations and caches and is ignored by Git.
+
+[Controllers](../../controllers/README.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf) · [Bundled Python example](docs/reference/PyAIPilotExample-v4)

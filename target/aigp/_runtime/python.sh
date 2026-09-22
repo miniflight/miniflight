@@ -8,10 +8,6 @@ check_python() {
 prepare_python() {
   local base="$1"
   local repo="${base:h:h}"
-  local legacy="$repo/target/aigp/.runtime"
-  if [[ -d "$legacy" && ! -e "$base/.runtime" && ! -L "$base/.runtime" ]]; then
-    ln -s "$legacy" "$base/.runtime"
-  fi
   local venv="$base/.runtime/client-venv"
   local interpreter="$venv/bin/python"
 

@@ -50,11 +50,13 @@ class Controller:
             raise ValueError(f"gate index {index} does not belong to the six-gate R1 course")
         if self.gate is not None and index < self.gate:
             raise ValueError("race reset during control; start a new run")
-        if race.race_finish_time_ns >= 0 or index == len(GATES):
+        if race.race_finish_time_ns >= 0:
             print("r1_gates: finished", flush=True)
             raise StopIteration
         if race.race_start_boot_time_ms < 0 or race.sim_boot_time_ms < race.race_start_boot_time_ms:
             return None
+        if index == len(GATES):
+            return self.target  # Hold the final target until the native finish signal.
 
         if index != self.gate:
             center = GATES[index]

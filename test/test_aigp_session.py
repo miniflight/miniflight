@@ -9,7 +9,7 @@ from unittest.mock import Mock, call, patch
 from controllers.r1_gates import Controller as Gates
 from controllers.zero import Controller as Zero
 from miniflight import Control, Race
-from sim.aigp._runtime.controller_runner import _RaceSignals, _drive, _stop_process, run_session
+from target.aigp._runtime.controller_runner import _RaceSignals, _drive, _stop_process, run_session
 
 
 class RaceSignalsTest(unittest.TestCase):
@@ -56,8 +56,8 @@ class RaceLoopTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.time.sleep", side_effect=self.sleep))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=self.sleep))
         self.sim, self.controller = Mock(), Mock()
         self.controller.update.return_value = Control(thrust=.3)
 
@@ -201,14 +201,14 @@ class SessionTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
         self.sim, self.process = Mock(), Mock(pid=98765)
         self.process.poll.return_value = None
         self.process.wait.return_value = 0
-        self.enterContext(patch("sim.aigp._runtime.controller_runner.SimulatorClient", return_value=self.sim))
-        self.ports = self.enterContext(patch("sim.aigp._runtime.controller_runner._check_simulator_ports"))
-        self.popen = self.enterContext(patch("sim.aigp._runtime.controller_runner.subprocess.Popen", return_value=self.process))
-        self.drive = self.enterContext(patch("sim.aigp._runtime.controller_runner._drive"))
+        self.enterContext(patch("target.aigp._runtime.controller_runner.SimulatorClient", return_value=self.sim))
+        self.ports = self.enterContext(patch("target.aigp._runtime.controller_runner._check_simulator_ports"))
+        self.popen = self.enterContext(patch("target.aigp._runtime.controller_runner.subprocess.Popen", return_value=self.process))
+        self.drive = self.enterContext(patch("target.aigp._runtime.controller_runner._drive"))
 
     def test_owns_one_simulator_and_waits_for_telemetry(self):
         self.sim.read.side_effect = [TimeoutError("loading"), object()]
@@ -283,7 +283,7 @@ class SessionTest(unittest.TestCase):
 
     def test_unresponsive_owned_process_group_is_killed(self):
         self.process.wait.side_effect = [subprocess.TimeoutExpired("simulator", 10), 0]
-        with patch("sim.aigp._runtime.controller_runner.os.killpg") as kill:
+        with patch("target.aigp._runtime.controller_runner.os.killpg") as kill:
             _stop_process(self.process)
         kill.assert_called_once_with(98765, signal.SIGKILL)
         self.assertEqual(self.process.wait.call_args_list, [call(timeout=10), call(timeout=5)])

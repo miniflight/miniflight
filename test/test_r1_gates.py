@@ -94,10 +94,15 @@ class GateControllerTest(unittest.TestCase):
             with self.subTest(index=index), self.assertRaisesRegex(ValueError, "six-gate"):
                 Controller().update(self.state(index=index))
 
-    def test_finished_race_or_all_gates_passed_stops(self):
-        for state in (self.state(finished=123), self.state(index=len(GATES))):
-            with self.subTest(state=state), self.assertRaises(StopIteration):
-                self.controller.update(state)
+    def test_finished_race_stops(self):
+        with self.assertRaises(StopIteration):
+            self.controller.update(self.state(finished=123))
+
+    def test_last_gate_keeps_the_target_until_native_finish(self):
+        target = self.controller.update(self.state(index=len(GATES) - 1))
+        self.assertEqual(self.controller.update(self.state(index=len(GATES), stamp=2)), target)
+        with self.assertRaises(StopIteration):
+            self.controller.update(self.state(index=len(GATES), stamp=3, finished=123))
 
     def test_starting_at_a_gate_center_still_produces_a_finite_target(self):
         for index, center in enumerate(GATES):
@@ -112,7 +117,7 @@ class GateControllerTest(unittest.TestCase):
         for tick in range(2000):
             if index == len(GATES):
                 with self.assertRaises(StopIteration):
-                    self.controller.update(self.state(index=index, position=position, stamp=tick * .02))
+                    self.controller.update(self.state(index=index, position=position, stamp=tick * .02, finished=123))
                 break
             command = self.controller.update(self.state(index=index, position=position, stamp=tick * .02))
             target = (command.north, command.east, command.down)

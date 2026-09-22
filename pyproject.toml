@@ -26,5 +26,5 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["miniflight*", "common*", "sim*", "target*", "controllers*"]
+include = ["miniflight*", "common*", "target*", "controllers*"]
 namespaces = false

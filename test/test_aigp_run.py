@@ -6,7 +6,7 @@ import unittest
 
 
 ZSH = shutil.which("zsh")
-RUN = Path(__file__).resolve().parents[1] / "sim/aigp/run"
+RUN = Path(__file__).resolve().parents[1] / "target/aigp/run"
 
 
 @unittest.skipUnless(ZSH, "zsh is required")

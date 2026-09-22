@@ -8,7 +8,8 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Control, PositionNed, Vehicle
-from target.aigp import SimulatorClient, _Camera as Camera
+from target.aigp import SimulatorClient
+from target.aigp.client import _Camera as Camera
 
 
 PEER = ("127.0.0.1", 14560)
@@ -51,9 +52,9 @@ class ClientTest(unittest.TestCase):
         self.camera = Socket()
         self.sim = SimulatorClient()
         self.enterContext(patch.object(SimulatorClient, "_bind", side_effect=[self.wire, self.camera]))
-        self.enterContext(patch("target.aigp.select.select", side_effect=
+        self.enterContext(patch("target.aigp.client.select.select", side_effect=
                                 lambda sockets, *args: ([s for s in sockets if s.packets], [], [])))
-        self.enterContext(patch("target.aigp.time.monotonic", return_value=10.0))
+        self.enterContext(patch("target.aigp.client.time.monotonic", return_value=10.0))
         self.sim.connect()
         self.addCleanup(self.sim.disconnect)
 
@@ -114,6 +115,35 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(len(state.messages), 1)
         self.assertAlmostEqual(state.dt, .02)
 
+    def test_startup_clock_reset_accepts_the_new_imu_stream(self):
+        for boot, start in ((2000, -1), (3000, 4000)):
+            with self.subTest(start=start):
+                payload = struct.pack("<BQqqIq", 1, boot, start, -1, 0, 0).ljust(253, b"\0")
+                self.feed(mavlink.MAVLink_encapsulated_data_message(0, payload))
+                self.feed(imu(boot * 1000))
+                self.sim.read(timeout=0)
+                payload = struct.pack("<BQqqIq", 1, 100, start, -1, 0, 0).ljust(253, b"\0")
+                self.feed(mavlink.MAVLink_encapsulated_data_message(0, payload))
+                self.feed(imu(100000))
+                state = self.sim.read(timeout=0)
+                self.assertAlmostEqual(state.time, .1)
+                self.assertEqual(state.dt, 0.0)
+                self.assertEqual(state.race.sim_boot_time_ms, 100)
+                self.feed(imu(120000))
+                self.assertAlmostEqual(self.sim.read(timeout=0).dt, .02)
+
+    def test_clock_reset_after_go_does_not_rebase_the_imu(self):
+        payload = struct.pack("<BQqqIq", 1, 2000, 1000, -1, 0, 0).ljust(253, b"\0")
+        self.feed(mavlink.MAVLink_encapsulated_data_message(0, payload))
+        self.feed(imu(2000000))
+        self.sim.read(timeout=0)
+        payload = struct.pack("<BQqqIq", 1, 100, -1, -1, 0, 0).ljust(253, b"\0")
+        self.feed(mavlink.MAVLink_encapsulated_data_message(0, payload))
+        self.feed(imu(100000))
+        with self.assertRaisesRegex(TimeoutError, "fresh IMU"):
+            self.sim.read(timeout=0)
+        self.assertEqual(self.sim.race.sim_boot_time_ms, 100)
+
     def test_read_requires_fresh_data(self):
         self.feed(imu())
         self.sim.read()
@@ -141,7 +171,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.sim.race.active_gate_index, 6)
         self.assertEqual(self.sim.race.received_at, 10.0)
         # Other packet types must not refresh the race packet's own age.
-        with patch("target.aigp.time.monotonic", return_value=10.5):
+        with patch("target.aigp.client.time.monotonic", return_value=10.5):
             self.feed(heartbeat())
             self.sim.poll()
         self.assertEqual(self.sim.race.received_at, 10.0)
@@ -226,7 +256,7 @@ class ConnectionFailureTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "already open"):
                 sim.open()
             sock.packets.append((packet(heartbeat()), PEER))
-            with patch("target.aigp.select.select", side_effect=
+            with patch("target.aigp.client.select.select", side_effect=
                        lambda *args: ([sock] if sock.packets else [], [], [])):
                 sim.connect()
             self.assertTrue(sim.connected)

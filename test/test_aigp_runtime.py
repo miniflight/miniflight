@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from sim.aigp._runtime import vq1 as extract_vq1, install as runtime
+from target.aigp._runtime import vq1 as extract_vq1, install as runtime
 
 
 REQUIRED = (
