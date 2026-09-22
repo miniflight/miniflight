@@ -2,7 +2,7 @@
 
 VQ1 1.0.3391 with UE4SS 3.0.1 and the existing DirectVQ1 startup mod.
 Simulator binaries are stored in Git LFS as 1 GiB archive parts.
-The launcher, Lua mod, and configuration are stored as ordinary Git files.
+The launcher and editable files in `vq1/` are ordinary Git files.
 
 Use Git LFS and a current Python 3.11 or newer. Allow about 8 GiB for the
 simulator archives, extraction, and temporary files, plus Git LFS storage.
@@ -16,18 +16,28 @@ cd miniflight
 git lfs pull
 ```
 
-On macOS, set up Python and restore the simulator:
+On macOS, set up Python and launch the simulator:
 
 ```sh
 python3 -m venv target/aigp/.runtime/client-venv
 source target/aigp/.runtime/client-venv/bin/activate
 python -m pip install -e '.[aigp,test]'
-python target/aigp/extract_vq1.py
 ./target/aigp/run_vq1.sh
 ```
 
 The macOS launcher requires `/Applications/Game Porting Toolkit.app` with
 `Contents/Resources/wine/bin/wine64` and `wineserver` installed.
+It uses `python3` from the active environment. To choose another interpreter,
+run `PYTHON=python3.11 ./target/aigp/run_vq1.sh`.
+
+The first launch verifies the archive checksums and prepares `.runtime/vq1`.
+Later launches reuse it and refresh the three Lua/config files from `vq1/`.
+Installation happens in a temporary directory and is only marked complete
+after extraction and configuration succeed. A failed or interrupted install
+can be retried with the same command. The PDF is not needed to launch.
+
+To prepare the files without starting Wine, run
+`python target/aigp/extract_vq1.py`.
 
 On Windows, use Command Prompt:
 
@@ -35,7 +45,6 @@ On Windows, use Command Prompt:
 py -3 -m venv target\aigp\.runtime\client-venv
 target\aigp\.runtime\client-venv\Scripts\activate.bat
 python -m pip install -e ".[aigp,test]"
-python target\aigp\extract_vq1.py
 target\aigp\run_vq1.bat
 ```
 
@@ -67,8 +76,12 @@ On macOS, stop the client first, then press Ctrl+C in the simulator terminal.
 The launcher stops Wine processes in VQ1's dedicated prefix. On Windows,
 close the simulator window after stopping the client.
 
-The archive excludes the separately tracked DirectVQ1 Lua script,
-`Mods/mods.txt`, and `UE4SS-settings.ini`, so extraction preserves those files.
+Edit `vq1/main.lua`, `vq1/mods.txt`, or `vq1/UE4SS-settings.ini`, not their
+generated copies inside `.runtime/vq1`. The archive excludes those files.
+Simulator binaries and logs live in `.runtime/vq1`; Wine uses the dedicated
+`.runtime/vq1-wine` prefix. Preparation does not delete or migrate an older
+installation under `AI-GP Simulator v1.0.3391-VQ1/`; the launchers no longer use it.
+
 Wine prefixes, Python environments, logs, crash dumps, and duplicate downloads
 are not included. VQ2 is not included.
 
