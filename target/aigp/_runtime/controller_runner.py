@@ -11,7 +11,8 @@ import sys
 import time
 
 from miniflight import Control, PositionNed
-from target.aigp import SimulatorClient, controllers
+from target.aigp import controllers
+from target.aigp.controllers import BaseController
 
 
 class _RaceSignals:
@@ -44,17 +45,17 @@ class _RaceSignals:
         return "running"
 
 
-def run(controller, sim, hz=50.0, timeout=1.0):
+def run(controller: BaseController, hz=50.0, timeout=1.0):
     if not math.isfinite(hz) or hz <= 0:
         raise ValueError("hz must be positive and finite")
     try:
-        sim.connect()
-        _drive(controller, sim, hz, timeout)
+        controller.connect()
+        _drive(controller, hz, timeout)
     finally:
-        sim.disconnect()
+        controller.disconnect()
 
 
-def _drive(controller, sim, hz, timeout=1.0, process=None, startup_deadline=None):
+def _drive(controller: BaseController, hz, timeout=1.0, process=None, startup_deadline=None):
     armed = False
     period = 1.0 / hz
     next_tick = next_heartbeat = time.monotonic()
@@ -68,12 +69,12 @@ def _drive(controller, sim, hz, timeout=1.0, process=None, startup_deadline=None
             _check_process(process)
             try:
                 # Race events and heartbeats must keep moving when IMU stops.
-                state = sim.read(timeout=min(timeout, 0.1))
+                state = controller.read(timeout=min(timeout, 0.1))
                 last_imu_at = state.received_at["HIGHRES_IMU"]
             except TimeoutError:
                 state = None
             now = time.monotonic()
-            race = state.race if state is not None else sim.race
+            race = state.race if state is not None else controller.race
             current_phase = signals.update(race, now)
             if current_phase != phase:
                 print(f"race: {current_phase}", flush=True)
@@ -107,13 +108,13 @@ def _drive(controller, sim, hz, timeout=1.0, process=None, startup_deadline=None
                         raise TypeError("controller.update(state) must return Control or PositionNed")
                     if not armed:
                         armed = True
-                        sim.arm()
+                        controller.arm()
                         print(f"controller: running at {hz:g} Hz", flush=True)
-                    sim.send(control)
+                    controller.send(control)
             elif phase != "running" and now >= startup_deadline:
                 raise TimeoutError("race never reported GO before the startup deadline")
             if now >= next_heartbeat:
-                sim.heartbeat()
+                controller.heartbeat()
                 next_heartbeat = now + 0.5
             next_tick += period
             if next_tick <= now:
@@ -122,10 +123,10 @@ def _drive(controller, sim, hz, timeout=1.0, process=None, startup_deadline=None
         if armed:
             try:
                 with suppress(OSError):
-                    sim.send(Control())
+                    controller.send(Control())
             finally:
                 with suppress(OSError):
-                    sim.disarm()
+                    controller.disarm()
 
 
 def _check_process(process):
@@ -134,7 +135,7 @@ def _check_process(process):
 
 
 def _check_simulator_ports():
-    # The controller ports are reserved separately by SimulatorClient.open().
+    # The controller ports are reserved separately by BaseController.open().
     # Refuse an existing simulator before the Wine launcher can touch its prefix.
     for port in (14560, 5601):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -157,7 +158,7 @@ def _stop_process(process):
         process.wait(timeout=5)
 
 
-def run_session(controller, target, hz=50.0, simulator_args=(), startup_timeout=120.0):
+def run_session(controller: BaseController, target, hz=50.0, simulator_args=(), startup_timeout=120.0):
     """Start -> wait for telemetry -> drive -> stop, owning only this child process."""
     if not math.isfinite(hz) or hz <= 0:
         raise ValueError("hz must be positive and finite")
@@ -174,10 +175,10 @@ def run_session(controller, target, hz=50.0, simulator_args=(), startup_timeout=
         raise ValueError(f"this controller does not support {target}")
     command = launchers[target].copy()
     command[0] = str(Path(__file__).resolve().parent / command[0])
-    sim, process = SimulatorClient(), None
+    process = None
     try:
         _check_simulator_ports()
-        sim.open()  # Reserve both receive ports before launching anything.
+        controller.open()  # Reserve both receive ports before launching anything.
         print(f"{target}: starting", flush=True)
         process = subprocess.Popen([*command, *simulator_args], start_new_session=True)
         deadline = time.monotonic() + startup_timeout
@@ -188,20 +189,20 @@ def run_session(controller, target, hz=50.0, simulator_args=(), startup_timeout=
             if remaining <= 0:
                 raise TimeoutError(f"{target} did not produce IMU telemetry within {startup_timeout:g}s")
             try:
-                sim.read(timeout=min(0.2, remaining))
+                controller.read(timeout=min(0.2, remaining))
                 break
             except TimeoutError:
                 # Heartbeats can arrive before the pawn begins publishing IMU.
                 now = time.monotonic()
-                if sim.connected and now >= next_heartbeat:
-                    sim.heartbeat()
+                if controller.connected and now >= next_heartbeat:
+                    controller.heartbeat()
                     next_heartbeat = now + 0.5
         _check_process(process)
         print(f"{target}: ready", flush=True)
-        _drive(controller, sim, hz, process=process, startup_deadline=deadline)
+        _drive(controller, hz, process=process, startup_deadline=deadline)
     finally:
         try:
-            sim.disconnect()
+            controller.disconnect()
         finally:
             _stop_process(process)
             if process is not None:
@@ -223,6 +224,8 @@ def main(argv=None):
     if simulator_args and args.simulator is None:
         parser.error("simulator arguments require --simulator")
     controller = importlib.import_module(f"{controllers.__name__}.{args.controller}").Controller()
+    if not isinstance(controller, BaseController):
+        parser.error("Controller must inherit BaseController")
 
     def stop(signum, frame):
         raise KeyboardInterrupt
@@ -233,7 +236,7 @@ def main(argv=None):
             run_session(controller, args.simulator, args.hz, simulator_args, args.startup_timeout)
         else:
             print(f"{args.controller}: waiting for simulator; {args.hz:g} Hz. Ctrl+C stops control.", flush=True)
-            run(controller, SimulatorClient(), args.hz)
+            run(controller, args.hz)
     except KeyboardInterrupt:
         return
     except (OSError, ValueError, TypeError, RuntimeError) as error:

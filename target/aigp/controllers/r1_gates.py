@@ -4,6 +4,7 @@ import math
 import time
 
 from miniflight import PositionNed, State
+from target.aigp.controllers import BaseController
 
 
 # R1 NED gate centers, retained from examples/aigp/thread_gates.py.
@@ -17,10 +18,11 @@ GATES = (
 )
 
 
-class Controller:
+class Controller(BaseController):
     targets = ("vq1.r1",)
 
-    def __init__(self):
+    def __init__(self, port=14550, camera_port=5600):
+        super().__init__(port=port, camera_port=camera_port)
         self.gate = None
         self.target = None
         self.started_at = None

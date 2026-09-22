@@ -19,8 +19,9 @@ Copy `target/aigp/controllers/zero.py` to `target/aigp/controllers/mine.py`, the
 
 ```python
 from miniflight import Control, State
+from target.aigp.controllers import BaseController
 
-class Controller:
+class Controller(BaseController):
     def update(self, state: State) -> Control:
         return Control(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
 ```

@@ -17,9 +17,9 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from target.aigp._runtime.controller_runner import run, run_session
+from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import Control
-from target.aigp import SimulatorClient
 from target.aigp.client import _Camera as Camera
 from test.test_aigp_client import heartbeat, imu, packet
 
@@ -35,7 +35,6 @@ class UDPSmokeTest(unittest.TestCase):
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
         server.setblocking(False)
-        sim = SimulatorClient(port=0, camera_port=0)
         stop = threading.Event()
         received, failures, states = [], [], []
         _, encoded = cv2.imencode(".jpg", np.zeros((12, 16, 3), dtype=np.uint8))
@@ -75,18 +74,19 @@ class UDPSmokeTest(unittest.TestCase):
             except BaseException as error:
                 failures.append(error)
 
-        class Controller:
+        class Controller(BaseController):
             def update(self, state):
                 states.append(state)
                 if len(states) == 5:
                     raise KeyboardInterrupt
                 return Control(.1, -.2, .3, .4)
 
+        sim = Controller(port=0, camera_port=0)
         worker = threading.Thread(target=serve)
         worker.start()
         try:
             with self.assertRaises(KeyboardInterrupt):
-                run(Controller(), sim)
+                run(sim)
         finally:
             stop.set()
             worker.join(timeout=2)
@@ -124,7 +124,7 @@ class UDPSmokeTest(unittest.TestCase):
 
     def owned_session(self, *fixture_args, expect_timeout=False):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
-        sim = SimulatorClient(port=0, camera_port=None)
+        sim = Gates(port=0, camera_port=None)
         popen = subprocess.Popen
         children = []
 
@@ -136,14 +136,13 @@ class UDPSmokeTest(unittest.TestCase):
             children.append(child)
             return child
 
-        with patch("target.aigp._runtime.controller_runner.SimulatorClient", return_value=sim), \
-                patch("target.aigp._runtime.controller_runner._check_simulator_ports"), \
+        with patch("target.aigp._runtime.controller_runner._check_simulator_ports"), \
                 patch("target.aigp._runtime.controller_runner.subprocess.Popen", side_effect=launch):
             if expect_timeout:
                 with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
-                    run_session(Gates(), "vq1.r1", startup_timeout=8)
+                    run_session(sim, "vq1.r1", startup_timeout=8)
             else:
-                run_session(Gates(), "vq1.r1", startup_timeout=8)
+                run_session(sim, "vq1.r1", startup_timeout=8)
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)

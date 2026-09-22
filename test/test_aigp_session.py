@@ -8,6 +8,7 @@ from unittest.mock import Mock, call, patch
 
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller as Zero
+from target.aigp.controllers import BaseController
 from miniflight import Control, Race
 from target.aigp._runtime.controller_runner import _RaceSignals, _drive, _stop_process, run_session
 
@@ -58,7 +59,7 @@ class RaceLoopTest(unittest.TestCase):
         self.enterContext(redirect_stdout(io.StringIO()))
         self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
         self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=self.sleep))
-        self.sim, self.controller = Mock(), Mock()
+        self.sim = self.controller = Mock()
         self.controller.update.return_value = Control(thrust=.3)
 
     def sleep(self, seconds):
@@ -81,7 +82,7 @@ class RaceLoopTest(unittest.TestCase):
             return state
 
         self.sim.read.side_effect = read
-        _drive(self.controller, self.sim, 50)
+        _drive(self.controller, 50)
         self.controller.update.assert_called_once()
         self.sim.arm.assert_called_once()
         self.assertEqual(self.sim.send.call_args_list, [call(Control(thrust=.3)), call(Control())])
@@ -98,7 +99,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.sim.read.side_effect = read
         with self.assertRaises(KeyboardInterrupt):
-            _drive(self.controller, self.sim, 50)
+            _drive(self.controller, 50)
         self.sim.send.assert_not_called()
         self.sim.arm.assert_not_called()
         self.sim.disarm.assert_not_called()
@@ -107,14 +108,14 @@ class RaceLoopTest(unittest.TestCase):
     def test_no_go_times_out_without_arming(self):
         self.sim.read.side_effect = [self.state(), self.state()]
         with self.assertRaisesRegex(TimeoutError, "never reported GO"):
-            _drive(self.controller, self.sim, 50, startup_deadline=10.01)
+            _drive(self.controller, 50, startup_deadline=10.01)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
     def test_reset_disarms_instead_of_restarting(self):
         self.sim.read.side_effect = [self.state(start=500), self.state(start=-1)]
         with self.assertRaisesRegex(RuntimeError, "reset"):
-            _drive(self.controller, self.sim, 50)
+            _drive(self.controller, 50)
         self.sim.arm.assert_called_once()
         self.sim.disarm.assert_called_once()
         self.assertEqual(self.sim.send.call_args, call(Control()))
@@ -125,7 +126,7 @@ class RaceLoopTest(unittest.TestCase):
         state.received_at["HIGHRES_IMU"] = self.now
         self.sim.read.return_value = state
         with self.assertRaisesRegex(TimeoutError, "race telemetry is stale"):
-            _drive(self.controller, self.sim, 50)
+            _drive(self.controller, 50)
         self.sim.arm.assert_not_called()
         self.controller.update.assert_not_called()
 
@@ -142,7 +143,7 @@ class RaceLoopTest(unittest.TestCase):
             raise TimeoutError("timed out waiting for fresh IMU telemetry")
 
         self.sim.read.side_effect = read
-        _drive(self.controller, self.sim, 50)
+        _drive(self.controller, 50)
         self.controller.update.assert_called_once()
         self.assertEqual(self.sim.send.call_args_list, [call(Control(thrust=.3)), call(Control())])
         self.sim.disarm.assert_called_once()
@@ -163,7 +164,7 @@ class RaceLoopTest(unittest.TestCase):
             raise TimeoutError("fresh IMU")
 
         self.sim.read.side_effect = read
-        _drive(self.controller, self.sim, 50)
+        _drive(self.controller, 50)
         self.assertEqual(self.controller.update.call_count, 2)
         self.assertEqual(self.sim.heartbeat.call_count, 2)
         self.assertEqual(self.sim.send.call_args_list,
@@ -178,7 +179,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.sim.read.side_effect = read
         with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=0.*finish_ns=-1"):
-            _drive(self.controller, self.sim, 50)
+            _drive(self.controller, 50)
         self.controller.update.assert_not_called()
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
@@ -193,7 +194,7 @@ class RaceLoopTest(unittest.TestCase):
                                  else Race(2000, 500, 123, 6, 0, self.now - 2))
                 with self.assertRaisesRegex(RuntimeError if reset else TimeoutError,
                                             "reset" if reset else "stale"):
-                    _drive(self.controller, self.sim, 50)
+                    _drive(self.controller, 50)
                 self.sim.disarm.assert_called_once()
 
 
@@ -202,17 +203,16 @@ class SessionTest(unittest.TestCase):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
         self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
-        self.sim, self.process = Mock(), Mock(pid=98765)
+        self.sim, self.process = Mock(spec=BaseController), Mock(pid=98765)
         self.process.poll.return_value = None
         self.process.wait.return_value = 0
-        self.enterContext(patch("target.aigp._runtime.controller_runner.SimulatorClient", return_value=self.sim))
         self.ports = self.enterContext(patch("target.aigp._runtime.controller_runner._check_simulator_ports"))
         self.popen = self.enterContext(patch("target.aigp._runtime.controller_runner.subprocess.Popen", return_value=self.process))
         self.drive = self.enterContext(patch("target.aigp._runtime.controller_runner._drive"))
 
     def test_owns_one_simulator_and_waits_for_telemetry(self):
         self.sim.read.side_effect = [TimeoutError("loading"), object()]
-        run_session(Zero(), "vq2.r2", simulator_args=("-ResX=800", "value with spaces"))
+        run_session(self.sim, "vq2.r2", simulator_args=("-ResX=800", "value with spaces"))
         command = self.popen.call_args.args[0]
         self.assertTrue(command[0].endswith("/_runtime/run_vq2.sh"))
         self.assertEqual(command[1:], ["--mode", "r2", "-ResX=800", "value with spaces"])
@@ -220,6 +220,7 @@ class SessionTest(unittest.TestCase):
         self.sim.open.assert_called_once()
         self.assertEqual(self.sim.read.call_count, 2)
         self.drive.assert_called_once()
+        self.assertEqual(self.drive.call_args.args, (self.sim, 50.0))
         self.assertEqual(self.drive.call_args.kwargs, {"process": self.process, "startup_deadline": 130})
         self.sim.disconnect.assert_called_once()
         self.process.terminate.assert_called_once()
@@ -235,25 +236,25 @@ class SessionTest(unittest.TestCase):
     def test_busy_simulator_or_controller_does_not_launch(self):
         self.ports.side_effect = OSError("existing simulator")
         with self.assertRaises(OSError):
-            run_session(Zero(), "vq1.r1")
+            run_session(self.sim, "vq1.r1")
         self.popen.assert_not_called()
         self.ports.side_effect = None
         self.sim.open.side_effect = OSError("existing controller")
         with self.assertRaises(OSError):
-            run_session(Zero(), "vq1.r1")
+            run_session(self.sim, "vq1.r1")
         self.popen.assert_not_called()
 
     def test_launch_failure_closes_the_receive_ports(self):
         self.popen.side_effect = OSError("launcher missing")
         with self.assertRaises(OSError):
-            run_session(Zero(), "vq1.r1")
+            run_session(self.sim, "vq1.r1")
         self.sim.disconnect.assert_called_once()
         self.drive.assert_not_called()
 
     def test_early_process_exit_never_runs_or_arms_controller(self):
         self.process.poll.return_value = 2
         with self.assertRaisesRegex(RuntimeError, "status 2"):
-            run_session(Zero(), "vq1.r1")
+            run_session(self.sim, "vq1.r1")
         self.sim.arm.assert_not_called()
         self.drive.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -265,7 +266,7 @@ class SessionTest(unittest.TestCase):
 
         self.sim.read.side_effect = loading
         with self.assertRaisesRegex(TimeoutError, "produce IMU"):
-            run_session(Zero(), "vq1.r1", startup_timeout=.3)
+            run_session(self.sim, "vq1.r1", startup_timeout=.3)
         self.drive.assert_not_called()
         self.process.terminate.assert_called_once()
         self.sim.disconnect.assert_called_once()
@@ -277,7 +278,7 @@ class SessionTest(unittest.TestCase):
                 self.sim.reset_mock()
                 self.drive.side_effect = error
                 with self.assertRaises(type(error)):
-                    run_session(Zero(), "vq1.r1")
+                    run_session(self.sim, "vq1.r1")
                 self.process.terminate.assert_called_once()
                 self.sim.disconnect.assert_called_once()
 

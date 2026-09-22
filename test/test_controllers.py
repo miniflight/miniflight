@@ -1,4 +1,6 @@
 import math
+from contextlib import redirect_stderr
+import io
 from pathlib import Path
 import shutil
 import subprocess
@@ -8,8 +10,49 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from target.aigp._runtime.controller_runner import main, run
+from target.aigp.controllers import BaseController
+from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller
 from miniflight import Control, PositionNed, Race
+
+
+class BaseControllerTest(unittest.TestCase):
+    def test_construction_is_passive_and_defaults_to_aigp_ports(self):
+        with patch.object(BaseController, "_bind") as bind:
+            controller = BaseController()
+        self.assertEqual((controller.port, controller.camera_port), (14550, 5600))
+        self.assertFalse(controller.connected)
+        self.assertIsNone(controller._socket)
+        self.assertIsNone(controller._vision)
+        bind.assert_not_called()
+
+    def test_defaults_inherit_the_port_wrapper(self):
+        for kind in (Controller, Gates):
+            with self.subTest(kind=kind):
+                controller = kind(port=0, camera_port=None)
+                self.assertIsInstance(controller, BaseController)
+                self.assertEqual((controller.port, controller.camera_port), (0, None))
+
+    def test_owns_one_pair_of_receive_sockets(self):
+        wire, camera = Mock(), Mock()
+        controller = Controller(port=14600, camera_port=5700)
+        with patch.object(BaseController, "_bind", side_effect=[wire, camera]) as bind:
+            controller.open()
+            try:
+                bind.assert_has_calls([call(14600), call(5700)])
+                self.assertEqual(bind.call_count, 2)
+                with self.assertRaisesRegex(RuntimeError, "already open"):
+                    controller.open()
+            finally:
+                controller.disconnect()
+        wire.close.assert_called_once()
+        camera.close.assert_called_once()
+        self.assertIsNone(controller._socket)
+        self.assertIsNone(controller._vision)
+
+    def test_update_must_be_implemented(self):
+        with self.assertRaises(NotImplementedError):
+            BaseController().update(None)
 
 
 class ControllerTest(unittest.TestCase):
@@ -27,7 +70,7 @@ class ControllerTest(unittest.TestCase):
         self.state = SimpleNamespace(received_at={"HIGHRES_IMU": self.now},
                                      race=Race(1000, 0, -1, 0, 0, self.now))
         self.sim.read.side_effect = [self.state, KeyboardInterrupt()]
-        self.controller = Mock()
+        self.controller = self.sim
         self.control = Control(thrust=.3)
         self.controller.update.return_value = self.control
 
@@ -36,9 +79,9 @@ class ControllerTest(unittest.TestCase):
 
     def test_normal_start_and_interrupt_shutdown(self):
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.assertEqual(self.sim.method_calls, [
-            call.connect(), call.read(timeout=0.1), call.arm(), call.send(self.control),
+            call.connect(), call.read(timeout=0.1), call.update(self.state), call.arm(), call.send(self.control),
             call.heartbeat(), call.read(timeout=0.1), call.send(Control()),
             call.disarm(), call.disconnect(),
         ])
@@ -47,7 +90,7 @@ class ControllerTest(unittest.TestCase):
     def test_connection_failure_does_not_arm_or_send(self):
         self.sim.connect.side_effect = TimeoutError("no heartbeat")
         with self.assertRaises(TimeoutError):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -55,7 +98,7 @@ class ControllerTest(unittest.TestCase):
     def test_position_controller_uses_the_same_loop(self):
         self.controller.update.return_value = PositionNed(1, 2, -3)
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.assertEqual(self.sim.send.call_args_list, [call(PositionNed(1, 2, -3)), call(Control())])
         self.sim.disarm.assert_called_once()
 
@@ -63,24 +106,24 @@ class ControllerTest(unittest.TestCase):
         self.controller.update.side_effect = [None, self.control]
         self.sim.read.side_effect = [self.state, self.state, KeyboardInterrupt()]
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller, self.sim)
-        self.assertEqual(self.sim.method_calls[:5], [
-            call.connect(), call.read(timeout=0.1), call.heartbeat(),
-            call.read(timeout=0.1), call.arm(),
+            run(self.controller)
+        self.assertEqual(self.sim.method_calls[:7], [
+            call.connect(), call.read(timeout=0.1), call.update(self.state), call.heartbeat(),
+            call.read(timeout=0.1), call.update(self.state), call.arm(),
         ])
         self.sim.arm.assert_called_once()
 
     def test_completion_disarms_and_closes(self):
         self.controller.update.side_effect = [self.control, StopIteration()]
         self.sim.read.side_effect = [self.state, self.state]
-        run(self.controller, self.sim)
+        run(self.controller)
         self.assertEqual(self.sim.send.call_args, call(Control()))
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_completion_before_first_command_does_not_arm(self):
         self.controller.update.side_effect = StopIteration()
-        run(self.controller, self.sim)
+        run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.disarm.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -89,7 +132,7 @@ class ControllerTest(unittest.TestCase):
         self.controller.update.side_effect = [self.control, None]
         self.sim.read.side_effect = [self.state, self.state]
         with self.assertRaisesRegex(ValueError, "no command"):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.assertEqual(self.sim.send.call_args, call(Control()))
         self.sim.disarm.assert_called_once()
 
@@ -102,7 +145,7 @@ class ControllerTest(unittest.TestCase):
         self.sim.read.side_effect = read
         self.controller.update.return_value = None
         with self.assertRaisesRegex(TimeoutError, "startup telemetry"):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -110,7 +153,7 @@ class ControllerTest(unittest.TestCase):
     def test_invalid_initial_action_never_arms(self):
         self.controller.update.return_value = (0, 0, 0, 0)
         with self.assertRaisesRegex(TypeError, "return Control"):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -131,7 +174,7 @@ class ControllerTest(unittest.TestCase):
                 self.state.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
                 self.sim.read.side_effect = read
                 with self.assertRaises(type(error)):
-                    run(self.controller, self.sim)
+                    run(self.controller)
                 self.assertEqual(self.sim.send.call_args, call(Control()))
                 self.sim.disarm.assert_called_once()
                 self.sim.disconnect.assert_called_once()
@@ -143,7 +186,7 @@ class ControllerTest(unittest.TestCase):
 
         self.controller.update.side_effect = slow
         with self.assertRaisesRegex(TimeoutError, "stale"):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
@@ -154,27 +197,27 @@ class ControllerTest(unittest.TestCase):
 
         self.controller.update.side_effect = slow
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.assertAlmostEqual(self.sleeps[1], .02)
 
     def test_disarm_and_close_survive_send_failure(self):
         self.sim.send.side_effect = OSError("socket failed")
         with self.assertRaises(OSError):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_close_survives_unexpected_cleanup_failure(self):
         self.sim.send.side_effect = [None, ValueError("cleanup failed")]
         with self.assertRaises(ValueError):
-            run(self.controller, self.sim)
+            run(self.controller)
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_invalid_rate_does_not_connect(self):
         for hz in (0, -1, math.inf, math.nan):
             with self.subTest(hz=hz), self.assertRaises(ValueError):
-                run(self.controller, self.sim, hz)
+                run(self.controller, hz)
         self.sim.connect.assert_not_called()
 
 
@@ -188,6 +231,16 @@ class ControllerSelectionTest(unittest.TestCase):
                 controller = session.call_args.args[0]
                 self.assertEqual(type(controller).__module__, f"target.aigp.controllers.{name}")
                 session.assert_called_once_with(controller, simulator, 50.0, [], 120.0)
+
+    def test_plain_controller_is_rejected_before_launch(self):
+        with patch("target.aigp._runtime.controller_runner.run_session") as session, \
+                patch("target.aigp._runtime.controller_runner.importlib.import_module",
+                      return_value=SimpleNamespace(Controller=object)), \
+                redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit) as raised:
+            main(["zero", "--simulator", "vq2.r2"])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("Controller must inherit BaseController", error.getvalue())
+        session.assert_not_called()
 
 
 @unittest.skipUnless(shutil.which("zsh"), "zsh is required")
