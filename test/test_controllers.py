@@ -1,5 +1,6 @@
 import math
 from contextlib import redirect_stderr
+from dataclasses import replace
 import io
 from pathlib import Path
 import shutil
@@ -13,17 +14,21 @@ from target.aigp._runtime.controller_runner import main, run
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller
-from miniflight import Control, PositionNed, Race
+from miniflight import BodyRates, PositionNed, State, Vehicle, VelocityNed
+from target.aigp import Race, SimulatorClient
 
 
 class BaseControllerTest(unittest.TestCase):
     def test_construction_is_passive_and_defaults_to_aigp_ports(self):
-        with patch.object(BaseController, "_bind") as bind:
+        with patch.object(SimulatorClient, "_bind") as bind:
             controller = BaseController()
-        self.assertEqual((controller.port, controller.camera_port), (14550, 5600))
-        self.assertFalse(controller.connected)
-        self.assertIsNone(controller._socket)
-        self.assertIsNone(controller._vision)
+        client = controller.client
+        self.assertEqual((client.port, client.camera_port), (14550, 5600))
+        self.assertIs(controller.vehicle._target, client)
+        self.assertIsNone(controller.vehicle.state)
+        self.assertFalse(client.connected)
+        self.assertIsNone(client._socket)
+        self.assertIsNone(client._vision)
         bind.assert_not_called()
 
     def test_defaults_inherit_the_port_wrapper(self):
@@ -31,24 +36,24 @@ class BaseControllerTest(unittest.TestCase):
             with self.subTest(kind=kind):
                 controller = kind(port=0, camera_port=None)
                 self.assertIsInstance(controller, BaseController)
-                self.assertEqual((controller.port, controller.camera_port), (0, None))
+                self.assertEqual((controller.client.port, controller.client.camera_port), (0, None))
 
     def test_owns_one_pair_of_receive_sockets(self):
         wire, camera = Mock(), Mock()
         controller = Controller(port=14600, camera_port=5700)
-        with patch.object(BaseController, "_bind", side_effect=[wire, camera]) as bind:
-            controller.open()
+        with patch.object(SimulatorClient, "_bind", side_effect=[wire, camera]) as bind:
+            controller.client.open()
             try:
                 bind.assert_has_calls([call(14600), call(5700)])
                 self.assertEqual(bind.call_count, 2)
                 with self.assertRaisesRegex(RuntimeError, "already open"):
-                    controller.open()
+                    controller.client.open()
             finally:
-                controller.disconnect()
+                controller.vehicle.disconnect()
         wire.close.assert_called_once()
         camera.close.assert_called_once()
-        self.assertIsNone(controller._socket)
-        self.assertIsNone(controller._vision)
+        self.assertIsNone(controller.client._socket)
+        self.assertIsNone(controller.client._vision)
 
     def test_update_must_be_implemented(self):
         with self.assertRaises(NotImplementedError):
@@ -66,25 +71,29 @@ class ControllerTest(unittest.TestCase):
             self.now += seconds
 
         self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=sleep))
-        self.sim = Mock()
-        self.state = SimpleNamespace(received_at={"HIGHRES_IMU": self.now},
-                                     race=Race(1000, 0, -1, 0, 0, self.now))
+        self.sim = Mock(spec=SimulatorClient)
+        self.sim.commands = SimulatorClient.commands
+        self.sim.race = Race(1000, 0, -1, 0, 0, self.now)
+        self.state = State(1, .02, (0, 0, 0), (0, 0, 0), self.now)
         self.sim.read.side_effect = [self.state, KeyboardInterrupt()]
-        self.controller = self.sim
-        self.control = Control(thrust=.3)
-        self.controller.update.return_value = self.control
+        self.controller = BaseController()
+        self.controller.client = self.sim
+        self.controller.vehicle = Vehicle(self.sim)
+        self.control = BodyRates(thrust=.3)
+        self.controller.update = Mock(return_value=self.control)
 
     def test_zero_is_a_complete_controller(self):
-        self.assertEqual(Controller().update(self.state), Control())
+        self.assertEqual(Controller().update(self.state), BodyRates())
 
     def test_normal_start_and_interrupt_shutdown(self):
         with self.assertRaises(KeyboardInterrupt):
             run(self.controller)
         self.assertEqual(self.sim.method_calls, [
-            call.connect(), call.read(timeout=0.1), call.update(self.state), call.arm(), call.send(self.control),
-            call.heartbeat(), call.read(timeout=0.1), call.send(Control()),
+            call.connect(), call.read(timeout=0.1), call.arm(), call.send(self.control),
+            call.heartbeat(), call.read(timeout=0.1), call.send(BodyRates()),
             call.disarm(), call.disconnect(),
         ])
+        self.controller.update.assert_called_once_with(self.state)
         self.assertAlmostEqual(self.sleeps[1], .02)
 
     def test_connection_failure_does_not_arm_or_send(self):
@@ -95,21 +104,33 @@ class ControllerTest(unittest.TestCase):
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
 
-    def test_position_controller_uses_the_same_loop(self):
+    def test_position_and_velocity_controllers_use_the_same_loop(self):
+        for command in (PositionNed(1, 2, -3), VelocityNed(1, 2, -3)):
+            with self.subTest(command=command):
+                self.sim.reset_mock()
+                self.sim.read.side_effect = [self.state, KeyboardInterrupt()]
+                self.controller.update.return_value = command
+                with self.assertRaises(KeyboardInterrupt):
+                    run(self.controller)
+                self.assertEqual(self.sim.send.call_args_list, [call(command), call(BodyRates())])
+                self.sim.disarm.assert_called_once()
+
+    def test_unsupported_command_does_not_arm(self):
+        self.sim.commands = frozenset((BodyRates,))
         self.controller.update.return_value = PositionNed(1, 2, -3)
-        with self.assertRaises(KeyboardInterrupt):
+        with self.assertRaisesRegex(NotImplementedError, "PositionNed"):
             run(self.controller)
-        self.assertEqual(self.sim.send.call_args_list, [call(PositionNed(1, 2, -3)), call(Control())])
-        self.sim.disarm.assert_called_once()
+        self.sim.arm.assert_not_called()
+        self.sim.send.assert_not_called()
 
     def test_startup_wait_does_not_arm(self):
         self.controller.update.side_effect = [None, self.control]
         self.sim.read.side_effect = [self.state, self.state, KeyboardInterrupt()]
         with self.assertRaises(KeyboardInterrupt):
             run(self.controller)
-        self.assertEqual(self.sim.method_calls[:7], [
-            call.connect(), call.read(timeout=0.1), call.update(self.state), call.heartbeat(),
-            call.read(timeout=0.1), call.update(self.state), call.arm(),
+        self.assertEqual(self.sim.method_calls[:5], [
+            call.connect(), call.read(timeout=0.1), call.heartbeat(),
+            call.read(timeout=0.1), call.arm(),
         ])
         self.sim.arm.assert_called_once()
 
@@ -117,7 +138,7 @@ class ControllerTest(unittest.TestCase):
         self.controller.update.side_effect = [self.control, StopIteration()]
         self.sim.read.side_effect = [self.state, self.state]
         run(self.controller)
-        self.assertEqual(self.sim.send.call_args, call(Control()))
+        self.assertEqual(self.sim.send.call_args, call(BodyRates()))
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
@@ -133,14 +154,14 @@ class ControllerTest(unittest.TestCase):
         self.sim.read.side_effect = [self.state, self.state]
         with self.assertRaisesRegex(ValueError, "no command"):
             run(self.controller)
-        self.assertEqual(self.sim.send.call_args, call(Control()))
+        self.assertEqual(self.sim.send.call_args, call(BodyRates()))
         self.sim.disarm.assert_called_once()
 
     def test_startup_wait_is_bounded(self):
         def read(**kwargs):
             self.now += 1
-            return SimpleNamespace(received_at={"HIGHRES_IMU": self.now},
-                                   race=Race(int(self.now * 1000), 0, -1, 0, 0, self.now))
+            self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
+            return replace(self.state, received_at=self.now)
 
         self.sim.read.side_effect = read
         self.controller.update.return_value = None
@@ -152,7 +173,7 @@ class ControllerTest(unittest.TestCase):
 
     def test_invalid_initial_action_never_arms(self):
         self.controller.update.return_value = (0, 0, 0, 0)
-        with self.assertRaisesRegex(TypeError, "return Control"):
+        with self.assertRaisesRegex(TypeError, "expected BodyRates"):
             run(self.controller)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
@@ -170,12 +191,12 @@ class ControllerTest(unittest.TestCase):
                     self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
                     raise error
 
-                self.state.received_at["HIGHRES_IMU"] = self.now
-                self.state.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
+                self.state = replace(self.state, received_at=self.now)
+                self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
                 self.sim.read.side_effect = read
                 with self.assertRaises(type(error)):
                     run(self.controller)
-                self.assertEqual(self.sim.send.call_args, call(Control()))
+                self.assertEqual(self.sim.send.call_args, call(BodyRates()))
                 self.sim.disarm.assert_called_once()
                 self.sim.disconnect.assert_called_once()
 

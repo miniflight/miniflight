@@ -1,5 +1,5 @@
 """AI-GP target and its local simulator runtime."""
 
-from target.aigp.client import SimulatorClient
+from target.aigp.client import Race, SimulatorClient
 
-__all__ = ["SimulatorClient"]
+__all__ = ["Race", "SimulatorClient"]

@@ -16,6 +16,7 @@ try:
     vehicle.arm()
     time.sleep(1.0)
 
+    vehicle.read()
     print("start", vehicle.position)
 
     start = time.monotonic()
@@ -29,6 +30,7 @@ try:
 
     elapsed = time.monotonic() - start
     print("command rate", commands / elapsed)
+    vehicle.read()
     print("after move", vehicle.position)
 
     deadline = time.monotonic() + STOP_SECONDS
@@ -37,6 +39,7 @@ try:
         vehicle.velocity_ned(0.0, 0.0, 0.0)
         time.sleep(1.0 / RATE_HZ)
 
+    vehicle.read()
     print("after stop", vehicle.position)
     print("velocity", vehicle.velocity)
 finally:

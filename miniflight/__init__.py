@@ -1,5 +1,6 @@
-from miniflight.control import Control, Frame, PositionNed, Race, State
-from miniflight.vehicle import Vehicle
+from miniflight.control import BodyRates, Command, PositionNed, VelocityNed
+from miniflight.vehicle import Attitude, Frame, Motion, MotorOutputs, Ned, State, Vehicle
 
 
-__all__ = ["Control", "Frame", "PositionNed", "Race", "State", "Vehicle"]
+__all__ = ["BodyRates", "Command", "PositionNed", "VelocityNed", "Attitude", "Frame",
+           "Motion", "MotorOutputs", "Ned", "State", "Vehicle"]

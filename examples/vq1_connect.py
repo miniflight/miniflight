@@ -9,6 +9,7 @@ vehicle.connect()
 
 try:
     print("Connected to VQ1")
+    vehicle.read()
     print(vehicle.position)
     print(vehicle.velocity)
 finally:

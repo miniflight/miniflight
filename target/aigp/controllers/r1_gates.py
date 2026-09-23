@@ -31,19 +31,16 @@ class Controller(BaseController):
     def update(self, state: State) -> PositionNed | None:
         if self.started_at is None:
             self.started_at = state.time
-        pose = state.telemetry.get("LOCAL_POSITION_NED")
-        race = state.race
-        if pose is None or race is None:
+        motion, race = state.motion, self.race
+        if motion is None or race is None:
             if self.gate is not None or state.time - self.started_at >= 10:
-                raise ValueError("r1_gates needs VQ1 LOCAL_POSITION_NED and race telemetry")
+                raise ValueError("r1_gates needs VQ1 position and race telemetry")
             return None  # Wait for startup telemetry without arming.
 
         now = time.monotonic()
-        if now - state.received_at.get("LOCAL_POSITION_NED", -math.inf) > 1:
+        if now - motion.received_at > 1:
             raise TimeoutError("R1 position telemetry is stale")
-        if now - race.received_at > 2:
-            raise TimeoutError("R1 race telemetry is stale")
-        position = (pose.x, pose.y, pose.z)
+        position = motion.position
         if not all(math.isfinite(v) for v in position):
             raise ValueError("R1 position telemetry must be finite")
 

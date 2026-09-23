@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import Control, PositionNed, Vehicle
+from miniflight import BodyRates, Ned, PositionNed, Vehicle, VelocityNed
 from target.aigp import SimulatorClient
 from target.aigp.client import _Camera as Camera
 
@@ -77,22 +77,30 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(state.acceleration, (1, 2, 3))
         self.assertEqual(state.gyro, (4, 5, 6))
         self.assertIsNone(state.frame)
-        self.assertIsNone(state.race)
-        self.assertNotIn("LOCAL_POSITION_NED", state.telemetry)
-        self.assertEqual(state.received_at["HIGHRES_IMU"], 10.0)
+        self.assertIsNone(state.motion)
+        self.assertIsNone(state.attitude)
+        self.assertIsNone(state.motors)
+        self.assertFalse(hasattr(state, "race"))
+        self.assertFalse(hasattr(state, "telemetry"))
+        self.assertEqual(state.received_at, 10.0)
+        telemetry = self.sim.telemetry
         self.feed(imu(1020000))
         second = self.sim.read()
         self.assertAlmostEqual(second.dt, .02)
-        self.assertEqual(len(second.messages), 1)
-        self.assertEqual(state.telemetry["HIGHRES_IMU"].time_usec, 1000000)
+        self.assertEqual(len(self.sim.messages), 1)
+        self.assertEqual(telemetry["HIGHRES_IMU"].time_usec, 1000000)
         with self.assertRaises(TypeError):
-            state.telemetry["fake"] = 1
+            telemetry["fake"] = 1
 
     def test_vq1_pose_is_preserved_without_changing_common_input(self):
         self.feed(mavlink.MAVLink_local_position_ned_message(1, 1, 2, 3, 4, 5, 6))
         self.feed(imu())
         state = self.sim.read()
-        self.assertEqual(state.telemetry["LOCAL_POSITION_NED"].vx, 4)
+        self.assertEqual(state.motion.position, Ned(1, 2, 3))
+        self.assertEqual(state.motion.velocity, Ned(4, 5, 6))
+        self.assertEqual(state.motion.time, .001)
+        self.assertEqual(state.motion.received_at, 10.0)
+        self.assertEqual(self.sim.telemetry["LOCAL_POSITION_NED"].vx, 4)
         self.assertEqual(state.gyro, (4, 5, 6))
 
     def test_sensor_component_can_differ_from_heartbeat(self):
@@ -112,7 +120,7 @@ class ClientTest(unittest.TestCase):
             self.feed(sample)
         self.feed(imu(1020000))
         state = self.sim.read()
-        self.assertEqual(len(state.messages), 1)
+        self.assertEqual(len(self.sim.messages), 1)
         self.assertAlmostEqual(state.dt, .02)
 
     def test_startup_clock_reset_accepts_the_new_imu_stream(self):
@@ -128,7 +136,7 @@ class ClientTest(unittest.TestCase):
                 state = self.sim.read(timeout=0)
                 self.assertAlmostEqual(state.time, .1)
                 self.assertEqual(state.dt, 0.0)
-                self.assertEqual(state.race.sim_boot_time_ms, 100)
+                self.assertEqual(self.sim.race.sim_boot_time_ms, 100)
                 self.feed(imu(120000))
                 self.assertAlmostEqual(self.sim.read(timeout=0).dt, .02)
 
@@ -156,10 +164,11 @@ class ClientTest(unittest.TestCase):
         self.feed(mavlink.MAVLink_collision_message(0, 1001, 0, 2, 0, 0, 8))
         self.feed(imu())
         state = self.sim.read()
-        self.assertEqual(state.race.active_gate_index, 3)
-        self.assertEqual(state.race.race_start_boot_time_ms, -1)
-        self.assertEqual(state.race.received_at, 10.0)
-        self.assertIn("COLLISION", [m.get_type() for m in state.messages])
+        self.assertEqual(self.sim.race.active_gate_index, 3)
+        self.assertEqual(self.sim.race.race_start_boot_time_ms, -1)
+        self.assertEqual(self.sim.race.received_at, 10.0)
+        self.assertIn("COLLISION", [m.get_type() for m in self.sim.messages])
+        self.assertFalse(hasattr(state, "messages"))
 
     def test_race_finish_is_available_without_imu(self):
         self.assertIsNone(self.sim.race)
@@ -177,7 +186,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.sim.race.received_at, 10.0)
 
     def test_body_rates_use_radians_extension_and_discovered_target(self):
-        self.sim.send(Control(.1, -.2, .3, .4))
+        self.sim.send(BodyRates(.1, -.2, .3, .4))
         message, = self.output()
         self.assertEqual(message.get_type(), "SET_ATTITUDE_TARGET")
         self.assertEqual((message.target_system, message.target_component), (42, 7))
@@ -222,11 +231,51 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(velocity.type_mask, 3527)
         self.assertEqual((velocity.vx, velocity.vy, velocity.vz), (4, 5, -6))
 
-    def test_position_and_velocity_remain_callable(self):
+    def test_vehicle_reads_position_and_velocity_from_one_snapshot(self):
+        vehicle = Vehicle(self.sim)
         self.feed(mavlink.MAVLink_local_position_ned_message(1, 1, 2, 3, 4, 5, 6))
-        self.assertEqual(self.sim.position(), (1, 2, 3))
+        self.feed(imu())
+        state = vehicle.read()
+        self.assertIs(vehicle.state, state)
+        self.assertEqual(vehicle.position, (1, 2, 3))
+        self.assertEqual(vehicle.velocity, (4, 5, 6))
         self.feed(mavlink.MAVLink_local_position_ned_message(2, 7, 8, 9, 10, 11, 12))
-        self.assertEqual(self.sim.velocity(), (10, 11, 12))
+        # Property access cannot consume another packet or change either value.
+        self.assertEqual(vehicle.position, (1, 2, 3))
+        self.assertEqual(vehicle.velocity, (4, 5, 6))
+        self.feed(imu(1020000))
+        vehicle.read()
+        self.assertEqual(vehicle.position, (7, 8, 9))
+        self.assertEqual(vehicle.velocity, (10, 11, 12))
+        self.assertEqual(state.motion.position, (1, 2, 3))
+
+    def test_optional_samples_keep_their_own_clocks_and_ages(self):
+        self.feed(mavlink.MAVLink_local_position_ned_message(500, 1, 2, 3, 4, 5, 6))
+        self.feed(mavlink.MAVLink_attitude_message(600, .1, .2, .3, 0, 0, 0))
+        self.feed(mavlink.MAVLink_actuator_output_status_message(700000, 0b0101, [.1, .2] + [0] * 30))
+        self.feed(imu())
+        first = self.sim.read()
+        self.assertEqual(first.motion.time, .5)
+        self.assertEqual(first.attitude.time, .6)
+        self.assertAlmostEqual(first.attitude.pitch, .2)
+        self.assertAlmostEqual(first.motors.time, .7)
+        self.assertEqual(first.motors.active, 0b0101)
+        self.assertEqual(len(first.motors.outputs), 32)
+        self.assertAlmostEqual(first.motors.outputs[1], .2)
+        with patch("target.aigp.client.time.monotonic", return_value=10.5):
+            self.feed(imu(1020000))
+            second = self.sim.read()
+        self.assertEqual(second.received_at, 10.5)
+        for sample in (second.motion, second.attitude, second.motors):
+            self.assertEqual(sample.received_at, 10.0)
+        self.assertEqual(first.received_at, 10.0)
+
+    def test_velocity_command_is_not_encoded_as_position(self):
+        self.sim.send(VelocityNed(1, 2, -3))
+        message, = self.output()
+        self.assertEqual(message.type_mask, 3527)
+        self.assertEqual((message.x, message.y, message.z), (0, 0, 0))
+        self.assertEqual((message.vx, message.vy, message.vz), (1, 2, -3))
 
     def test_disconnect_closes_both_sockets_and_is_idempotent(self):
         self.sim.disconnect()
@@ -237,7 +286,7 @@ class ClientTest(unittest.TestCase):
     def test_invalid_control_does_not_send(self):
         for values in ((math.nan, 0, 0, 0), (0, math.inf, 0, 0), (0, 0, 0, -1), (0, 0, 0, 1.01)):
             with self.subTest(values=values), self.assertRaises(ValueError):
-                Control(*values)
+                BodyRates(*values)
         with self.assertRaises(TypeError):
             self.sim.send((0, 0, 0, 0))
         self.assertEqual(self.wire.sent, [])

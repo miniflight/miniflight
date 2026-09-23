@@ -1,43 +1,26 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from miniflight import Command, State
+
+
 class Target:
+    commands: frozenset[type] = frozenset()
+
     def connect(self) -> None:
         raise NotImplementedError
 
     def disconnect(self) -> None:
         raise NotImplementedError
 
-    def position(self) -> tuple[float, float, float]:
+    def read(self, timeout=1.0) -> "State":
         raise NotImplementedError
 
-    def velocity(self) -> tuple[float, float, float]:
+    def send(self, command: "Command") -> None:
         raise NotImplementedError
 
     def arm(self) -> None:
         raise NotImplementedError
 
     def disarm(self) -> None:
-        raise NotImplementedError
-
-    def position_ned(
-        self,
-        north: float,
-        east: float,
-        down: float,
-    ) -> None:
-        raise NotImplementedError
-
-    def velocity_ned(
-        self,
-        north: float,
-        east: float,
-        down: float,
-    ) -> None:
-        raise NotImplementedError
-
-    def body_rates(
-        self,
-        roll: float,
-        pitch: float,
-        yaw: float,
-        thrust: float,
-    ) -> None:
         raise NotImplementedError

@@ -18,44 +18,54 @@ Copy `target/aigp/controllers/zero.py` to `target/aigp/controllers/mine.py`, the
 ```
 
 ```python
-from miniflight import Control, State
+from miniflight import BodyRates, State
 from target.aigp.controllers import BaseController
 
 class Controller(BaseController):
-    def update(self, state: State) -> Control:
-        return Control(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
+    def update(self, state: State) -> BodyRates:
+        return BodyRates(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
 ```
 
 Rates are rad/s. Thrust is 0–1. `zero` sends zero thrust; it does not hover.
 Return `PositionNed(north, east, down)` for absolute position commands in metres.
+Return `VelocityNed(north, east, down)` for velocity commands in m/s.
 Return `None` to wait for required telemetry before arming; raise `StopIteration`
-to finish. Controllers do not open sockets, launch processes, or manage timing.
+to stop control. Controllers do not open sockets, launch processes, or manage timing.
 
 The runner launches the simulator, waits for fresh race telemetry to report GO,
 then arms and runs the controller. Countdown packets do not permit movement.
-Finish, Ctrl+C, reset, stale telemetry, or an error sends zero thrust and disarm,
-then stops the simulator it launched. It never takes over an existing simulator.
+Native finish, Ctrl+C, reset, or a controller error ends the run with zero thrust
+and disarm. It never takes over an existing simulator.
 
-The shared target is `target.aigp.SimulatorClient`. It connects to the running
-simulator; version and round are selected by the launch command.
+`self.vehicle` reads and commands the vehicle through `self.client`, the shared
+`SimulatorClient`. `update` receives the same snapshot as `self.vehicle.state`.
+Return a command from `update`; the runner validates and sends it through the vehicle.
 
 `state.acceleration` and `state.gyro` are the latest body-frame IMU sample
 (m/s² and rad/s). `state.time` and `state.dt` are simulator seconds; the first
-`dt` is zero. Every update has a new IMU sample.
+`dt` is zero. Every update has a new IMU sample. `state.received_at` is that
+sample's host-monotonic receipt time.
 
 `state.frame` is the latest complete camera frame, or `None`. It holds `bgr`,
 `id`, `time_ns` from the simulator, and host-monotonic `received_at`. Frames
-can repeat across updates. `state.race` contains the simulator's race fields.
+can repeat across updates.
 
-`state.telemetry` holds the latest raw MAVLink messages by name;
-`state.received_at` holds their host-monotonic receipt times. For example,
-`state.telemetry.get("LOCAL_POSITION_NED")` returns a received position message
-or `None`. VQ2 gets no fabricated pose or extra track information.
-`state.messages` contains packets received since the previous update, capped
-at 2048; this includes IMU samples, collisions and track-data packets.
+`state.motion` holds local NED `position` in metres and `velocity` in m/s with
+named `north`, `east`, `down` components. `state.attitude` holds `roll`, `pitch`,
+`yaw` in radians. Both are `None` on VQ2. `state.motors` holds reported output
+channels and their active mask, not measured RPM. Each has its own device `time`
+and host `received_at`; a fresh IMU does not make the other samples fresh.
+
+`self.race` contains native race signals, including gate progress and finish.
+Raw diagnostics remain on `self.client.telemetry`, `self.client.received_at`,
+and `self.client.messages`. No observations are synthesized.
 
 The default loop rate is 50 Hz (`--hz 50`), with a 2 Hz heartbeat.
-Missing IMU or race data for one second stops the runner. Slow updates skip ticks.
+After GO, race packet gaps retain the last confirmed phase and gate index.
+Only the native finish value completes the race. A one-second IMU outage stops
+control and disarms, then allows five seconds to receive a delayed finish.
+If none arrives the run fails. Control never resumes during that finish wait.
+Slow updates skip ticks.
 Use one controller at a time: MAVLink uses local UDP 14550, camera uses 5600.
 
-[Setup](../README.md) · [Race event chain](../docs/race-lifecycle.md)
+[Setup](../README.md) · [Vehicle API](../docs/vehicle-api.md) · [Race event chain](../docs/race-lifecycle.md)

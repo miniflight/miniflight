@@ -1,4 +1,5 @@
 from collections import deque
+from dataclasses import dataclass
 import math
 import select
 import socket
@@ -10,12 +11,25 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight.control import Control, Frame, PositionNed, Race, State
+from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutputs,
+                       Ned, PositionNed, State, VelocityNed)
 from target import Target
+
+
+@dataclass(frozen=True)
+class Race:
+    sim_boot_time_ms: int
+    race_start_boot_time_ms: int
+    race_finish_time_ns: int
+    active_gate_index: int
+    last_gate_race_time: int  # unchanged wire value
+    received_at: float = 0.0  # host monotonic seconds
 
 
 class SimulatorClient(Target):
     """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets."""
+
+    commands = frozenset((BodyRates, PositionNed, VelocityNed))
 
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
@@ -27,6 +41,7 @@ class SimulatorClient(Target):
         self._telemetry = {}
         self._received_at = {}
         self._messages = deque(maxlen=2048)
+        self.messages = ()
         self._camera = _Camera()
         self._race = None
         self._previous_time = None
@@ -41,6 +56,15 @@ class SimulatorClient(Target):
         """Latest race packet, even when read() is waiting for a new IMU sample."""
         return self._race
 
+    @property
+    def telemetry(self):
+        """Raw MAVLink diagnostics, separate from the vehicle state."""
+        return MappingProxyType(self._telemetry.copy())
+
+    @property
+    def received_at(self):
+        return MappingProxyType(self._received_at.copy())
+
     def open(self):
         """Reserve the UDP ports without waiting for or commanding the simulator."""
         if self._socket is not None:
@@ -48,6 +72,7 @@ class SimulatorClient(Target):
         self._telemetry.clear()
         self._received_at.clear()
         self._messages.clear()
+        self.messages = ()
         self._camera = _Camera()
         self._race = self._previous_time = self._last_imu = None
         self._boot = time.monotonic()
@@ -172,28 +197,49 @@ class SimulatorClient(Target):
         self._previous_time, self._last_imu = stamp, imu
         state = State(
             stamp, dt, (imu.xacc, imu.yacc, imu.zacc), (imu.xgyro, imu.ygyro, imu.zgyro),
-            self._camera.latest, self._race,
-            MappingProxyType(self._telemetry.copy()), MappingProxyType(self._received_at.copy()),
-            tuple(self._messages),
+            self._received_at["HIGHRES_IMU"], self._camera.latest,
+            self._motion(), self._attitude(), self._motors(),
         )
+        self.messages = tuple(self._messages)
         self._messages.clear()
         return state
 
-    def send(self, control: Control | PositionNed):
+    def _motion(self):
+        message = self._telemetry.get("LOCAL_POSITION_NED")
+        if message is None:
+            return None
+        return Motion(message.time_boot_ms * 1e-3, self._received_at["LOCAL_POSITION_NED"],
+                      Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz))
+
+    def _attitude(self):
+        message = self._telemetry.get("ATTITUDE")
+        if message is None:
+            return None
+        return Attitude(message.time_boot_ms * 1e-3, self._received_at["ATTITUDE"],
+                        message.roll, message.pitch, message.yaw)
+
+    def _motors(self):
+        message = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
+        if message is None:
+            return None
+        return MotorOutputs(message.time_usec * 1e-6, self._received_at["ACTUATOR_OUTPUT_STATUS"],
+                            tuple(message.actuator), message.active)
+
+    def send(self, control: Command):
         if isinstance(control, PositionNed):
-            self.position_ned(control.north, control.east, control.down)
+            self._ned(control.north, control.east, control.down, velocity=False)
             return
-        if not isinstance(control, Control):
-            raise TypeError("controller.update(state) must return Control or PositionNed")
+        if isinstance(control, VelocityNed):
+            self._ned(control.north, control.east, control.down, velocity=True)
+            return
+        if not isinstance(control, BodyRates):
+            raise TypeError("expected BodyRates, PositionNed or VelocityNed")
         self._mav.set_attitude_target_send(
             self._time_ms(), *self._target,
             mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
             [1.0, 0.0, 0.0, 0.0],
             control.roll_rate, control.pitch_rate, control.yaw_rate, control.thrust,
         )
-
-    def body_rates(self, roll, pitch, yaw, thrust):
-        self.send(Control(roll, pitch, yaw, thrust))
 
     def heartbeat(self):
         self._mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
@@ -211,27 +257,6 @@ class SimulatorClient(Target):
 
     def _time_ms(self):
         return int((time.monotonic() - self._boot) * 1000) & 0xffffffff
-
-    def _message(self, kind, timeout=2.0):
-        previous = self._telemetry.get(kind)
-        deadline = time.monotonic() + timeout
-        while self._telemetry.get(kind) is previous:
-            self._wait(deadline, kind)
-        return self._telemetry[kind]
-
-    def position(self):
-        message = self._message("LOCAL_POSITION_NED")
-        return message.x, message.y, message.z
-
-    def velocity(self):
-        message = self._message("LOCAL_POSITION_NED")
-        return message.vx, message.vy, message.vz
-
-    def position_ned(self, north, east, down):
-        self._ned(north, east, down, velocity=False)
-
-    def velocity_ned(self, north, east, down):
-        self._ned(north, east, down, velocity=True)
 
     def _ned(self, north, east, down, *, velocity):
         if not all(math.isfinite(v) for v in (north, east, down)):

@@ -19,7 +19,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from target.aigp._runtime.controller_runner import run, run_session
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
-from miniflight import Control
+from miniflight import BodyRates, State
 from target.aigp.client import _Camera as Camera
 from test.test_aigp_client import heartbeat, imu, packet
 
@@ -52,7 +52,7 @@ class UDPSmokeTest(unittest.TestCase):
             sequence = 0
             try:
                 while not stop.wait(.005):
-                    sock, vision = sim._socket, sim._vision
+                    sock, vision = sim.client._socket, sim.client._vision
                     if sock is None or vision is None:
                         continue
                     try:
@@ -76,10 +76,12 @@ class UDPSmokeTest(unittest.TestCase):
 
         class Controller(BaseController):
             def update(self, state):
+                if not isinstance(state, State) or self.vehicle.state is not state:
+                    raise AssertionError("controller did not receive the vehicle snapshot")
                 states.append(state)
                 if len(states) == 5:
                     raise KeyboardInterrupt
-                return Control(.1, -.2, .3, .4)
+                return BodyRates(.1, -.2, .3, .4)
 
         sim = Controller(port=0, camera_port=0)
         worker = threading.Thread(target=serve)
@@ -90,7 +92,7 @@ class UDPSmokeTest(unittest.TestCase):
         finally:
             stop.set()
             worker.join(timeout=2)
-            sim.disconnect()
+            sim.vehicle.disconnect()
         self.assertFalse(worker.is_alive())
         self.assertEqual(failures, [])
         drain()
@@ -98,7 +100,8 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(states[0].dt, 0)
         self.assertTrue(all(s.dt > 0 for s in states[1:]))
         self.assertTrue(any(s.frame is not None for s in states))
-        self.assertEqual("LOCAL_POSITION_NED" in states[-1].telemetry, with_pose)
+        self.assertEqual(states[-1].motion is not None, with_pose)
+        self.assertTrue(all(not hasattr(s, "telemetry") and not hasattr(s, "race") for s in states))
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]
         self.assertEqual(len(rates), 5)
         self.assertTrue(all(m.type_mask == 144 and m.target_system == 42 for m in rates))
@@ -117,9 +120,21 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(result["finish_sent"])
         self.assertEqual(result["imu_after_last_gate"], 0)
 
+    def test_owned_process_race_packet_gap_is_not_a_sensor_failure(self):
+        result = self.owned_session("--race-gap")
+        self.assertGreater(result["race_packets_skipped"], 0)
+        self.assertTrue(result["finish_sent"])
+
+    def test_owned_process_waits_for_delayed_finish_after_disarming(self):
+        result = self.owned_session("--finish-without-imu", "--delayed-finish")
+        self.assertTrue(result["finish_sent"])
+        self.assertTrue(result["disarmed_before_finish"])
+        self.assertEqual(result["imu_after_last_gate"], 0)
+
     def test_owned_process_no_finish_remains_a_timeout(self):
         result = self.owned_session("--finish-without-imu", "--no-finish", expect_timeout=True)
         self.assertFalse(result["finish_sent"])
+        self.assertTrue(result["disarmed_before_finish"])
         self.assertEqual(result["imu_after_last_gate"], 0)
 
     def owned_session(self, *fixture_args, expect_timeout=False):
@@ -130,7 +145,7 @@ class UDPSmokeTest(unittest.TestCase):
 
         def launch(command, **kwargs):
             self.assertTrue(command[0].endswith("run_vq1.sh"))
-            port = sim._socket.getsockname()[1]
+            port = sim.client._socket.getsockname()[1]
             child = popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs)
             children.append(child)
@@ -153,7 +168,8 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertGreater(result["positions"], 6)
         self.assertEqual(result["position_masks"], [3576])
         self.assertTrue(result["stopped_by_parent"])
-        self.assertIsNone(sim._socket)
+        self.assertIsNone(sim.client._socket)
+        self.assertIsNone(sim.vehicle.state)
         return result
 
 

@@ -1,14 +1,15 @@
 import ast
 from contextlib import redirect_stdout
+from dataclasses import replace
 import io
 import math
 from pathlib import Path
-from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from target.aigp.controllers.r1_gates import Controller, GATES
-from miniflight import PositionNed, Race, State
+from target.aigp import Race
+from miniflight import Motion, Ned, PositionNed, State
 
 
 class GateControllerTest(unittest.TestCase):
@@ -18,11 +19,14 @@ class GateControllerTest(unittest.TestCase):
         self.enterContext(patch("target.aigp.controllers.r1_gates.time.monotonic", side_effect=lambda: self.now))
         self.enterContext(redirect_stdout(io.StringIO()))
 
-    def state(self, index=0, position=(0, 0, 0), stamp=1, finished=-1):
-        pose = SimpleNamespace(x=position[0], y=position[1], z=position[2])
-        race = Race(1000, 0, finished, index, 0, received_at=self.now)
-        return State(stamp, .02, (0, 0, 0), (0, 0, 0), None, race,
-                     {"LOCAL_POSITION_NED": pose}, {"LOCAL_POSITION_NED": self.now}, ())
+    def state(self, position=(0, 0, 0), stamp=1):
+        return State(stamp, .02, (0, 0, 0), (0, 0, 0), self.now,
+                     motion=Motion(stamp, self.now, Ned(*position), Ned(0, 0, 0)))
+
+    def update(self, index=0, position=(0, 0, 0), stamp=1, finished=-1, controller=None):
+        controller = self.controller if controller is None else controller
+        controller.client._race = Race(1000, 0, finished, index, 0, received_at=self.now)
+        return controller.update(self.state(position, stamp))
 
     def test_reuses_the_existing_r1_coordinates(self):
         source = Path(__file__).resolve().parents[1] / "examples/aigp/thread_gates.py"
@@ -32,7 +36,7 @@ class GateControllerTest(unittest.TestCase):
         self.assertEqual(GATES, original)
 
     def test_target_is_one_metre_beyond_gate_on_approach_line(self):
-        command = self.controller.update(self.state())
+        command = self.update()
         center = GATES[0]
         target = (command.north, command.east, command.down)
         distance = math.hypot(*center)
@@ -41,73 +45,75 @@ class GateControllerTest(unittest.TestCase):
         self.assertAlmostEqual(math.dist(target, center), 1)
 
     def test_position_or_time_alone_does_not_advance_the_gate(self):
-        first = self.controller.update(self.state())
-        self.assertEqual(self.controller.update(self.state(position=GATES[0], stamp=20)), first)
+        first = self.update()
+        self.assertEqual(self.update(position=GATES[0], stamp=20), first)
         beyond = (first.north, first.east, first.down)
-        self.assertEqual(self.controller.update(self.state(position=beyond, stamp=25)), first)
+        self.assertEqual(self.update(position=beyond, stamp=25), first)
         self.assertEqual(self.controller.gate, 0)
 
     def test_reported_gate_pass_advances_the_target(self):
-        first = self.controller.update(self.state())
-        second = self.controller.update(self.state(index=1, position=GATES[0], stamp=5))
+        first = self.update()
+        second = self.update(index=1, position=GATES[0], stamp=5)
         self.assertNotEqual(first, second)
         self.assertEqual(self.controller.gate, 1)
         self.assertAlmostEqual(math.dist((second.north, second.east, second.down), GATES[1]), 1)
 
     def test_waits_for_pose_and_race_without_commanding(self):
-        for pose, race in ((None, self.state().race), (self.state().telemetry, None), (None, None)):
-            with self.subTest(pose=pose, race=race):
+        for motion, race in ((None, Race(1000, 0, -1, 0, 0, self.now)),
+                             (self.state().motion, None), (None, None)):
+            with self.subTest(motion=motion, race=race):
                 controller = Controller()
-                state = self.state()
-                missing = State(1, .02, state.acceleration, state.gyro, None, race, pose or {}, {}, ())
+                controller.client._race = race
+                missing = replace(self.state(), motion=motion)
                 self.assertIsNone(controller.update(missing))
-                late = State(11, .02, state.acceleration, state.gyro, None, race, pose or {}, {}, ())
-                with self.assertRaisesRegex(ValueError, "LOCAL_POSITION_NED"):
-                    controller.update(late)
+                with self.assertRaisesRegex(ValueError, "position"):
+                    controller.update(replace(missing, time=11))
 
-    def test_stale_pose_and_race_are_rejected(self):
+    def test_stale_pose_is_rejected(self):
         state = self.state()
+        self.controller.client._race = Race(1000, 0, -1, 0, 0, self.now)
         self.now += 1.1
         with self.assertRaisesRegex(TimeoutError, "position"):
             self.controller.update(state)
-        fresh_pose = self.state()
-        self.now += 2.1
-        state = State(2, .02, state.acceleration, state.gyro, None, fresh_pose.race,
-                      fresh_pose.telemetry, {"LOCAL_POSITION_NED": self.now}, ())
-        with self.assertRaisesRegex(TimeoutError, "race"):
-            self.controller.update(state)
+
+    def test_race_packet_gap_holds_the_last_target_with_fresh_pose(self):
+        first = self.update()
+        self.now += 3
+        position = (first.north, first.east, first.down)
+        self.assertEqual(self.controller.update(self.state(position, stamp=4)), first)
+        self.assertEqual(self.controller.gate, 0)
 
     def test_nonfinite_pose_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "finite"):
-            self.controller.update(self.state(position=(math.nan, 0, 0)))
+            self.update(position=(math.nan, 0, 0))
 
     def test_no_gate_pass_times_out(self):
-        self.controller.update(self.state())
+        self.update()
         with self.assertRaisesRegex(TimeoutError, "gate 1"):
-            self.controller.update(self.state(stamp=47))
+            self.update(stamp=47)
 
     def test_reset_and_wrong_course_index_are_rejected(self):
-        self.controller.update(self.state(index=2))
+        self.update(index=2)
         with self.assertRaisesRegex(ValueError, "reset"):
-            self.controller.update(self.state(index=0))
+            self.update(index=0)
         for index in (-1, 7, 0xffffffff):
             with self.subTest(index=index), self.assertRaisesRegex(ValueError, "six-gate"):
-                Controller().update(self.state(index=index))
+                self.update(index=index, controller=Controller())
 
     def test_finished_race_stops(self):
         with self.assertRaises(StopIteration):
-            self.controller.update(self.state(finished=123))
+            self.update(finished=123)
 
     def test_last_gate_keeps_the_target_until_native_finish(self):
-        target = self.controller.update(self.state(index=len(GATES) - 1))
-        self.assertEqual(self.controller.update(self.state(index=len(GATES), stamp=2)), target)
+        target = self.update(index=len(GATES) - 1)
+        self.assertEqual(self.update(index=len(GATES), stamp=100), target)
         with self.assertRaises(StopIteration):
-            self.controller.update(self.state(index=len(GATES), stamp=3, finished=123))
+            self.update(index=len(GATES), stamp=101, finished=123)
 
     def test_starting_at_a_gate_center_still_produces_a_finite_target(self):
         for index, center in enumerate(GATES):
             with self.subTest(index=index):
-                command = Controller().update(self.state(index=index, position=center))
+                command = self.update(index=index, position=center, controller=Controller())
                 self.assertIsInstance(command, PositionNed)
                 self.assertAlmostEqual(math.dist((command.north, command.east, command.down), center), 1)
 
@@ -117,9 +123,9 @@ class GateControllerTest(unittest.TestCase):
         for tick in range(2000):
             if index == len(GATES):
                 with self.assertRaises(StopIteration):
-                    self.controller.update(self.state(index=index, position=position, stamp=tick * .02, finished=123))
+                    self.update(index=index, position=position, stamp=tick * .02, finished=123)
                 break
-            command = self.controller.update(self.state(index=index, position=position, stamp=tick * .02))
+            command = self.update(index=index, position=position, stamp=tick * .02)
             target = (command.north, command.east, command.down)
             distance = math.dist(position, target)
             scale = min(1, .2 / distance) if distance else 0
@@ -132,6 +138,13 @@ class GateControllerTest(unittest.TestCase):
                 index += 1
             position = next_position
         self.assertEqual(index, len(GATES))
+
+    def test_gate_controller_has_no_transport_fields(self):
+        # The baseline must remain expressible without a single MAVLink object.
+        source = Path(__file__).resolve().parents[1] / "target/aigp/controllers/r1_gates.py"
+        tree = ast.parse(source.read_text())
+        attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        self.assertTrue(attributes.isdisjoint({"telemetry", "received_at_map", "_target", "_socket"}))
 
 
 if __name__ == "__main__":
