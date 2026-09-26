@@ -7,6 +7,46 @@ import tempfile
 import zipfile
 
 
+BASE = Path(__file__).resolve().parent
+BINARIES = Path("FlightSim/Binaries/Win64")
+SHIPPING = BINARIES / "DCGame-Win64-Shipping.exe"
+PAK = Path("FlightSim/Content/Paks/FlightSim-WindowsNoEditor.pak")
+REQUIRED = (SHIPPING, BINARIES / "dwmapi.dll", BINARIES / "UE4SS.dll", PAK)
+VERSIONS = {
+    "vq1": {
+        "root": Path("AI-GP Simulator v1.0.3391-VQ1/AIGP_VQ1_3391"),
+        "legacy": "3a6923f2207a45bf64345b096d2bbd2a789916e32d1fb55beb15417b23003122",
+        "hashes": {},
+    },
+    "vq2": {
+        "root": Path("AI-GP Simulator v1.0.3391-VQ2/AIGP_VQ2_3391"),
+        "legacy": "3d6527764f43862ad7860694f0783c6f4332eb87b8ccad7bd4c2bb376ce0702e",
+        "hashes": {
+            SHIPPING: "68dfd80d5c9057ec92785baad61194bf5d178ddde8d6df66a6add4da5d83332b",
+            PAK: "5d424b4ee0de36053914461da56696cfff10c1ed9fab2c6bd883ace58e85883f",
+        },
+    },
+}
+
+
+def configuration(version):
+    return {
+        "main.lua": BINARIES / f"Mods/Direct{version.upper()}/Scripts/main.lua",
+        "mods.txt": BINARIES / "Mods/mods.txt",
+        "UE4SS-settings.ini": BINARIES / "UE4SS-settings.ini",
+    }
+
+
+def prepare(version, base=BASE):
+    profile = VERSIONS[version]
+    parts = [line.split() for line in (base / "archives/SHA256SUMS").read_text().splitlines()
+             if line.strip() and (line.split()[-1] == f"{version}.tar.xz"
+                                  or line.split()[-1].startswith(f"{version}-unlocked.tar.gz.part-"))]
+    config = {Path("config") / version / name: path for name, path in configuration(version).items()}
+    return install(base, version, parts, profile["root"], REQUIRED, config, profile["hashes"],
+                   archive_dir=base / "archives", cache_versions=(profile["legacy"],))
+
+
 def configure(base, sim, files):
     for source, relative in files.items():
         destination = sim / relative
@@ -98,3 +138,10 @@ def install(base, name, parts, archive_root, required, config=None, payload_sha2
             print(f"Preserved previous {name} installation at {backup}", flush=True)
     print(f"Prepared {name} at {sim}", flush=True)
     return sim
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Prepare a local simulator installation.")
+    parser.add_argument("version", choices=VERSIONS)
+    prepare(parser.parse_args().version)

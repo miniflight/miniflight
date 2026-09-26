@@ -1,88 +1,127 @@
+from contextlib import redirect_stderr, redirect_stdout
+import io
+import json
+import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+
+from target.aigp import runner
 
 
-ZSH = shutil.which("zsh")
-RUN = Path(__file__).resolve().parents[1] / "target/aigp/run"
-
-
-@unittest.skipUnless(ZSH, "zsh is required")
 class AIGPRunTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.base = Path(temporary.name)
-        (self.base / "_runtime").mkdir()
+        self.repo = Path(temporary.name).resolve() / "repo with spaces"
+        self.base = self.repo / "target/aigp"
+        self.base.mkdir(parents=True)
         self.run = self.base / "run"
-        shutil.copyfile(RUN, self.run)
-        stub = self.base / "_runtime/run_vq1.sh"
-        stub.write_text("#!/bin/zsh\nprint -r -- \"${(j:|:)@}\"\n")
-        stub.chmod(0o755)
-        control = self.base / "control"
-        control.write_text('#!/bin/zsh\nprint -r -- "control:${(j:|:)@}"\n')
-        control.chmod(0o755)
-        stub = self.base / "_runtime/run_vq2.sh"
-        stub.write_text("#!/bin/zsh\nprint -r -- \"vq2:${(j:|:)@}\"\n")
-        stub.chmod(0o755)
+        shutil.copyfile(Path(runner.__file__).with_name("run"), self.run)
+        code = ('import json, os, sys; '
+                'print(json.dumps({"args": sys.argv[1:], "cache": os.environ["UV_CACHE_DIR"], '
+                '"python": os.environ["UV_PYTHON_INSTALL_DIR"]})); '
+                'sys.exit(int(os.getenv("UV_TEST_EXIT", "0")))')
+        self.uv = self.base / "uv"
+        self.uv.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -c {shlex.quote(code)} "$@"\n')
+        self.uv.chmod(0o755)
+        self.env = dict(os.environ, PATH=f"{self.base}:/usr/bin:/bin")
 
     def invoke(self, *args):
-        return subprocess.run([ZSH, str(self.run), *args], capture_output=True,
-                              text=True, timeout=5)
+        return subprocess.run(["/bin/sh", str(self.run), *args], env=self.env, cwd="/",
+                              capture_output=True, text=True, timeout=5)
 
-    def test_vq1_aliases_forward_arguments(self):
-        for mode in ("vq1", "vq1.r1"):
-            with self.subTest(mode=mode):
-                result = self.invoke(mode, "-test", "value with spaces")
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout.strip(), "-test|value with spaces")
-
-    def test_unintegrated_modes_do_not_fall_back_to_vq1(self):
-        for mode in ("vq1.r2",):
-            with self.subTest(mode=mode):
-                result = self.invoke(mode)
-                self.assertEqual(result.returncode, 2)
-                self.assertEqual(result.stdout, "")
-                self.assertIn(f"{mode} startup is not integrated", result.stderr)
-
-    def test_vq2_rounds_forward_mode_and_arguments(self):
-        for mode in ("r1", "r2"):
-            with self.subTest(mode=mode):
-                result = self.invoke(f"vq2.{mode}", "-test", "value with spaces")
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout.strip(), f"vq2:--mode|{mode}|-test|value with spaces")
-
-    def test_help(self):
-        result = self.invoke("--help")
-        self.assertEqual(result.returncode, 0)
-        self.assertIn(f"usage: {self.run}", result.stdout)
-
-    def test_controller_and_simulator_are_one_command(self):
-        result = self.invoke("vq1", "--controller", "r1_gates", "--hz", "40", "-test", "value with spaces")
+    def test_one_bootstrap_from_any_directory_preserves_arguments(self):
+        args = ["vq2.r2", "--controller", "zero", "--", "-test", "value with spaces"]
+        result = self.invoke(*args)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(),
-                         "control:r1_gates|--simulator|vq1.r1|--hz|40|--|-test|value with spaces")
+        event = json.loads(result.stdout)
+        self.assertEqual(event["args"], ["run", "--no-project", "--python", "3.11", "--with-editable",
+                                        f"{self.repo}[aigp]", "python", "-m", "target.aigp.runner", *args])
+        self.assertEqual(event["cache"], str(self.base / ".runtime/uv-cache"))
+        self.assertEqual(event["python"], str(self.base / ".runtime/uv-python"))
 
-    def test_vq2_controller_forwards_round_and_startup_timeout(self):
-        result = self.invoke("vq2.r2", "--controller", "zero", "--startup-timeout", "60")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "control:zero|--simulator|vq2.r2|--startup-timeout|60|--")
+    def test_dependency_failure_is_preserved(self):
+        self.env["UV_TEST_EXIT"] = "23"
+        self.assertEqual(self.invoke("vq1.r1").returncode, 23)
 
-    def test_incomplete_controller_options_do_not_launch(self):
-        for args in (("--controller",), ("--controller", "--hz", "50"), ("--hz", "50")):
-            with self.subTest(args=args):
-                result = self.invoke("vq1.r1", *args)
-                self.assertEqual(result.returncode, 2)
-                self.assertEqual(result.stdout, "")
-
-    def test_invalid_or_missing_mode(self):
-        for args in ((), ("unknown",)):
+    def test_help_and_missing_target_do_not_need_uv(self):
+        self.uv.unlink()
+        for args, code in ((["--help"], 0), ([], 2)):
             with self.subTest(args=args):
                 result = self.invoke(*args)
-                self.assertEqual(result.returncode, 2)
-                self.assertIn("usage:", result.stderr)
+                self.assertEqual(result.returncode, code)
+                self.assertIn("usage:", result.stdout)
+
+    def test_missing_uv_fails_without_setup(self):
+        self.uv.unlink()
+        result = self.invoke("vq1.r1")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("install uv", result.stderr)
+        self.assertFalse((self.base / ".runtime").exists())
+
+
+class CommandTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(runner.signal, "signal"))
+        self.enterContext(redirect_stdout(io.StringIO()))
+        self.enterContext(redirect_stderr(io.StringIO()))
+        self.session = self.enterContext(patch.object(runner, "run_session"))
+        self.attach = self.enterContext(patch.object(runner, "run"))
+        self.launch = self.enterContext(patch.object(runner, "launch"))
+        self.process = self.launch.return_value.__enter__.return_value
+        self.process.wait.return_value = 0
+
+    def test_simulator_targets_and_alias(self):
+        for target in ("vq1", *runner.TARGETS):
+            with self.subTest(target=target):
+                self.launch.reset_mock()
+                self.assertEqual(runner.main([target, "-test", "value with spaces"]), 0)
+                self.launch.assert_called_once_with("vq1.r1" if target == "vq1" else target,
+                                                    ["-test", "value with spaces"])
+        self.session.assert_not_called()
+
+    def test_simulator_exit_code_is_preserved(self):
+        for status, expected in ((23, 23), (-15, 143)):
+            self.process.wait.return_value = status
+            self.assertEqual(runner.main(["vq2.r2"]), expected)
+
+    def test_controller_options_and_simulator_arguments(self):
+        self.assertEqual(runner.main(["vq2.r2", "--controller", "zero", "--hz", "40",
+                                      "--startup-timeout", "60", "--", "-ResX=800", "value with spaces"]), 0)
+        controller = self.session.call_args.args[0]
+        self.session.assert_called_once_with(controller, "vq2.r2", 40, ["-ResX=800", "value with spaces"], 60)
+        self.launch.assert_not_called()
+
+    def test_attach_never_launches_or_stops_a_simulator(self):
+        self.assertEqual(runner.main(["--attach", "--controller", "zero", "--hz", "40"]), 0)
+        controller = self.attach.call_args.args[0]
+        self.attach.assert_called_once_with(controller, 40)
+        self.session.assert_not_called()
+        self.launch.assert_not_called()
+
+    def test_invalid_options_do_not_launch(self):
+        for args in ([], ["vq1.r2"], ["unknown"], ["vq1.r1", "--controller"],
+                     ["vq1.r1", "--controller", "missing"], ["vq1.r1", "--hz", "50"],
+                     ["--attach"], ["vq1.r1", "--attach", "--controller", "zero"],
+                     ["--attach", "--controller", "zero", "--startup-timeout", "10"],
+                     ["--attach", "--controller", "zero", "--", "-test"]):
+            with self.subTest(args=args), self.assertRaises(SystemExit) as raised:
+                runner.main(args)
+            self.assertEqual(raised.exception.code, 2)
+        self.launch.assert_not_called()
+        self.session.assert_not_called()
+        self.attach.assert_not_called()
+
+    def test_keyboard_interrupt_exits_130(self):
+        self.process.wait.side_effect = KeyboardInterrupt
+        self.assertEqual(runner.main(["vq1.r1"]), 130)
+        self.launch.return_value.__exit__.assert_called_once()
 
 
 if __name__ == "__main__":

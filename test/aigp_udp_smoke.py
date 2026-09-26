@@ -3,6 +3,7 @@
 Run explicitly: python -m unittest test.aigp_udp_smoke -v
 """
 
+from contextlib import contextmanager
 import socket
 import struct
 import subprocess
@@ -16,7 +17,7 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp._runtime.controller_runner import run, run_session
+from target.aigp.runner import _stop_process, run, run_session
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State
@@ -140,19 +141,21 @@ class UDPSmokeTest(unittest.TestCase):
     def owned_session(self, *fixture_args, expect_timeout=False):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
         sim = Gates(port=0, camera_port=None)
-        popen = subprocess.Popen
         children = []
 
-        def launch(command, **kwargs):
-            self.assertTrue(command[0].endswith("run_vq1.sh"))
+        @contextmanager
+        def launch(target, simulator_args=()):
+            self.assertEqual(target, "vq1.r1")
             port = sim.client._socket.getsockname()[1]
-            child = popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs)
+            child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
             children.append(child)
-            return child
+            try:
+                yield child
+            finally:
+                _stop_process(child)
 
-        with patch("target.aigp._runtime.controller_runner._check_simulator_ports"), \
-                patch("target.aigp._runtime.controller_runner.subprocess.Popen", side_effect=launch):
+        with patch("target.aigp.runner.launch", side_effect=launch):
             if expect_timeout:
                 with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
                     run_session(sim, "vq1.r1", startup_timeout=8)

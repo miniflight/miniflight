@@ -2,15 +2,11 @@ import math
 from contextlib import redirect_stderr
 from dataclasses import replace
 import io
-from pathlib import Path
-import shutil
-import subprocess
-import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
-from target.aigp._runtime.controller_runner import main, run
+from target.aigp.runner import main, run
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller
@@ -63,14 +59,14 @@ class BaseControllerTest(unittest.TestCase):
 class ControllerTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
-        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.runner.time.monotonic", side_effect=lambda: self.now))
         self.sleeps = []
 
         def sleep(seconds):
             self.sleeps.append(seconds)
             self.now += seconds
 
-        self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=sleep))
+        self.enterContext(patch("target.aigp.runner.time.sleep", side_effect=sleep))
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
         self.sim.race = Race(1000, 0, -1, 0, 0, self.now)
@@ -246,57 +242,22 @@ class ControllerSelectionTest(unittest.TestCase):
     def test_loads_aigp_controllers_by_short_name(self):
         for name, simulator in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1")):
             with self.subTest(name=name), \
-                    patch("target.aigp._runtime.controller_runner.signal.signal"), \
-                    patch("target.aigp._runtime.controller_runner.run_session") as session:
-                main([name, "--simulator", simulator])
+                    patch("target.aigp.runner.signal.signal"), \
+                    patch("target.aigp.runner.run_session") as session:
+                main([simulator, "--controller", name])
                 controller = session.call_args.args[0]
                 self.assertEqual(type(controller).__module__, f"target.aigp.controllers.{name}")
                 session.assert_called_once_with(controller, simulator, 50.0, [], 120.0)
 
     def test_plain_controller_is_rejected_before_launch(self):
-        with patch("target.aigp._runtime.controller_runner.run_session") as session, \
-                patch("target.aigp._runtime.controller_runner.importlib.import_module",
+        with patch("target.aigp.runner.run_session") as session, \
+                patch("target.aigp.runner.importlib.import_module",
                       return_value=SimpleNamespace(Controller=object)), \
                 redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit) as raised:
-            main(["zero", "--simulator", "vq2.r2"])
+            main(["vq2.r2", "--controller", "zero"])
         self.assertEqual(raised.exception.code, 2)
         self.assertIn("Controller must inherit BaseController", error.getvalue())
         session.assert_not_called()
-
-
-@unittest.skipUnless(shutil.which("zsh"), "zsh is required")
-class ControlLauncherTest(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.repo = Path(temporary.name)
-        self.base = self.repo / "target/aigp"
-        self.base.mkdir(parents=True)
-        (self.base / "_runtime").mkdir()
-        source = Path(__file__).resolve().parents[1] / "target/aigp/control"
-        self.launcher = self.base / "control"
-        shutil.copyfile(source, self.launcher)
-        (self.base / "_runtime/python.sh").write_text("check_python() { :; }\nprepare_python() { :; }\n")
-        interpreter = self.base / ".runtime/client-venv/bin/python"
-        interpreter.parent.mkdir(parents=True)
-        interpreter.write_text('#!/bin/zsh\nprint -r -- "$PWD"\nprint -r -- "${(j:|:)@}"\n')
-        interpreter.chmod(0o755)
-
-    def invoke(self, *args):
-        return subprocess.run(["zsh", str(self.launcher), *args], capture_output=True,
-                              text=True, cwd="/", timeout=5)
-
-    def test_uses_shared_environment_from_any_directory(self):
-        result = self.invoke("mine", "--hz", "40")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        directory, command = result.stdout.splitlines()
-        self.assertEqual(Path(directory).resolve(), self.repo.resolve())
-        self.assertEqual(command, "-m|target.aigp._runtime.controller_runner|mine|--hz|40")
-
-    def test_help_and_missing_controller_do_not_prepare_environment(self):
-        (self.base / "_runtime/python.sh").write_text("exit 99\n")
-        self.assertEqual(self.invoke("--help").returncode, 0)
-        self.assertEqual(self.invoke().returncode, 2)
 
 
 if __name__ == "__main__":

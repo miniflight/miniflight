@@ -1,44 +1,51 @@
-# AI-GP simulators
+# aigp
 
-## Setup
+run the simulator and a python controller with one command
 
-Requires macOS and `/Applications/Game Porting Toolkit.app`.
+## setup
+
+macos needs [game porting toolkit](https://github.com/Gcenx/homebrew-wine) in `/Applications`
 
 ```sh
 brew install git-lfs uv
+brew install --cask gcenx/wine/game-porting-toolkit
+```
+
+linux needs an x86_64 desktop with [wine](https://gitlab.winehq.org/wine/wine/-/wikis/Download),
+`wineserver`, git lfs and [uv](https://docs.astral.sh/uv/getting-started/installation/)
+linux support is experimental and has not been tested on a linux host
+
+```sh
 git lfs install
 git clone https://github.com/miniflight/miniflight.git
 cd miniflight
 git lfs pull
 ```
 
-## Run
-
-VQ1:
+## run
 
 ```sh
 ./target/aigp/run vq1.r1 --controller r1_gates
-```
-
-VQ2 R1:
-
-```sh
 ./target/aigp/run vq2.r1 --controller zero
-```
-
-VQ2 R2:
-
-```sh
 ./target/aigp/run vq2.r2 --controller zero
 ```
 
-One command starts both simulator and controller. Ctrl+C stops both.
-`r1_gates` is the VQ1 six-gate position-control baseline. `zero` sends zero thrust.
-Replace the controller name with your module in `target/aigp/controllers/`.
-Omit `--controller` to run only the simulator. Run one simulator at a time.
+run one at a time and use ctrl+c to stop both processes
+omit `--controller` to run just the simulator
+the first run prepares python and extracts the selected archive
 
-`client.py` handles UDP. `_runtime/` installs and runs the simulator and controller.
-`archives/` holds one archive per simulator and `docs/` holds its reference material.
-`.runtime/` holds local installations and caches and is ignored by Git.
+`r1_gates` flies the six vq1 gates using position control
+`zero` sends zero thrust and does not hover
+add your controller to `controllers/` and select it by name
 
-[Controllers](controllers/README.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf) · [Bundled Python example](docs/reference/PyAIPilotExample-v4)
+the runner finds wine automatically
+set `WINE` and `WINESERVER` to use a different installation
+
+## code
+
+`client.py` handles udp and `runner.py` owns the simulator and controller lifecycle
+`install.py` verifies and extracts the archives
+`config/` holds the existing simulator configuration and `docs/` holds the references
+`.runtime/` is generated local data and is not committed
+
+[controllers](controllers/README.md) · [specification](docs/VQ1-Technical-Specification-00.02.pdf) · [python example](docs/reference/PyAIPilotExample-v4)

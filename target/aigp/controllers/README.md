@@ -6,6 +6,9 @@ Run the simulator and controller together:
 ./target/aigp/run vq1.r1 --controller r1_gates
 ```
 
+To control a simulator you started separately, use `./target/aigp/run --attach --controller zero`.
+Attach mode leaves that simulator running when the controller stops.
+
 `r1_gates` follows the six R1 gate centers using VQ1's built-in position control.
 It targets one metre beyond each center and advances on the reported gate index.
 After the last gate it holds that target until the native finish signal.

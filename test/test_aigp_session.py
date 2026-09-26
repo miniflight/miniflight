@@ -12,7 +12,7 @@ from target.aigp.controllers.zero import Controller as Zero
 from target.aigp.controllers import BaseController
 from miniflight import BodyRates, State, Vehicle
 from target.aigp import Race, SimulatorClient
-from target.aigp._runtime.controller_runner import _RaceSignals, _drive, _stop_process, run_session
+from target.aigp.runner import _RaceSignals, _drive, _stop_process, run_session
 
 
 class RaceSignalsTest(unittest.TestCase):
@@ -76,8 +76,8 @@ class RaceLoopTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
-        self.enterContext(patch("target.aigp._runtime.controller_runner.time.sleep", side_effect=self.sleep))
+        self.enterContext(patch("target.aigp.runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.runner.time.sleep", side_effect=self.sleep))
         self.controller = BaseController()
         self.sim = self.controller.client = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
@@ -401,7 +401,7 @@ class SessionTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("target.aigp._runtime.controller_runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.runner.time.monotonic", side_effect=lambda: self.now))
         self.controller = BaseController()
         self.sim = self.controller.client = Mock(spec=SimulatorClient)
         self.controller.vehicle = Vehicle(self.sim)
@@ -409,46 +409,38 @@ class SessionTest(unittest.TestCase):
         self.process = Mock(pid=98765)
         self.process.poll.return_value = None
         self.process.wait.return_value = 0
-        self.ports = self.enterContext(patch("target.aigp._runtime.controller_runner._check_simulator_ports"))
-        self.popen = self.enterContext(patch("target.aigp._runtime.controller_runner.subprocess.Popen", return_value=self.process))
-        self.drive = self.enterContext(patch("target.aigp._runtime.controller_runner._drive"))
+        self.launch = self.enterContext(patch("target.aigp.runner.launch"))
+        self.owned = self.launch.return_value
+        self.owned.__enter__.return_value = self.process
+        self.drive = self.enterContext(patch("target.aigp.runner._drive"))
 
     def test_owns_one_simulator_and_waits_for_telemetry(self):
         self.sim.read.side_effect = [TimeoutError("loading"), self.sim.read.return_value]
         run_session(self.controller, "vq2.r2", simulator_args=("-ResX=800", "value with spaces"))
-        command = self.popen.call_args.args[0]
-        self.assertTrue(command[0].endswith("/_runtime/run_vq2.sh"))
-        self.assertEqual(command[1:], ["--mode", "r2", "-ResX=800", "value with spaces"])
-        self.assertTrue(self.popen.call_args.kwargs["start_new_session"])
+        self.launch.assert_called_once_with("vq2.r2", ("-ResX=800", "value with spaces"))
         self.sim.open.assert_called_once()
         self.assertEqual(self.sim.read.call_count, 2)
         self.drive.assert_called_once()
         self.assertEqual(self.drive.call_args.args, (self.controller, 50.0))
         self.assertEqual(self.drive.call_args.kwargs, {"process": self.process, "startup_deadline": 130})
         self.sim.disconnect.assert_called_once()
-        self.process.terminate.assert_called_once()
-        self.process.wait.assert_called_once_with(timeout=10)
+        self.owned.__exit__.assert_called_once_with(None, None, None)
 
     def test_invalid_target_or_incompatible_controller_does_not_launch(self):
         for target, controller in (("vq1.r2", Zero()), ("vq2.r1", Gates()), ("vq2.r2", Gates())):
             with self.subTest(target=target), self.assertRaises(ValueError):
                 run_session(controller, target)
-        self.popen.assert_not_called()
+        self.launch.assert_not_called()
         self.sim.open.assert_not_called()
 
-    def test_busy_simulator_or_controller_does_not_launch(self):
-        self.ports.side_effect = OSError("existing simulator")
-        with self.assertRaises(OSError):
-            run_session(self.controller, "vq1.r1")
-        self.popen.assert_not_called()
-        self.ports.side_effect = None
+    def test_busy_controller_does_not_launch(self):
         self.sim.open.side_effect = OSError("existing controller")
         with self.assertRaises(OSError):
             run_session(self.controller, "vq1.r1")
-        self.popen.assert_not_called()
+        self.launch.assert_not_called()
 
     def test_launch_failure_closes_the_receive_ports(self):
-        self.popen.side_effect = OSError("launcher missing")
+        self.owned.__enter__.side_effect = OSError("launcher missing")
         with self.assertRaises(OSError):
             run_session(self.controller, "vq1.r1")
         self.sim.disconnect.assert_called_once()
@@ -471,7 +463,7 @@ class SessionTest(unittest.TestCase):
         with self.assertRaisesRegex(TimeoutError, "produce IMU"):
             run_session(self.controller, "vq1.r1", startup_timeout=.3)
         self.drive.assert_not_called()
-        self.process.terminate.assert_called_once()
+        self.owned.__exit__.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_controller_error_or_interrupt_stops_the_simulator(self):
@@ -479,15 +471,16 @@ class SessionTest(unittest.TestCase):
             with self.subTest(error=error):
                 self.process.reset_mock()
                 self.sim.reset_mock()
+                self.owned.reset_mock()
                 self.drive.side_effect = error
                 with self.assertRaises(type(error)):
                     run_session(self.controller, "vq1.r1")
-                self.process.terminate.assert_called_once()
+                self.owned.__exit__.assert_called_once()
                 self.sim.disconnect.assert_called_once()
 
     def test_unresponsive_owned_process_group_is_killed(self):
         self.process.wait.side_effect = [subprocess.TimeoutExpired("simulator", 10), 0]
-        with patch("target.aigp._runtime.controller_runner.os.killpg") as kill:
+        with patch("target.aigp.runner.os.killpg") as kill:
             _stop_process(self.process)
         kill.assert_called_once_with(98765, signal.SIGKILL)
         self.assertEqual(self.process.wait.call_args_list, [call(timeout=10), call(timeout=5)])

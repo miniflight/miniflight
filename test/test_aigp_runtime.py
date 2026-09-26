@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from target.aigp._runtime import vq1 as extract_vq1, install as runtime
+from target.aigp import install as runtime
 
 
 REQUIRED = (
@@ -39,7 +39,7 @@ class AIGPRuntimeTest(unittest.TestCase):
         parts = [["a" * 64, "vq1-unlocked.tar.gz.part-aa"],
                  ["b" * 64, "vq1-unlocked.tar.gz.part-ab"]]
         sim = self.base / ".runtime/vq1"
-        for required in extract_vq1.REQUIRED:
+        for required in runtime.REQUIRED:
             path = sim / required
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"existing vq1")
@@ -76,11 +76,11 @@ class AIGPRuntimeTest(unittest.TestCase):
         old_parts, sim = self.cached_vq1()
         old_version = hashlib.sha256(repr(old_parts).encode()).hexdigest()
         new_parts = [["c" * 64, "vq1.tar.xz"]]
-        self.assertEqual(runtime.install(self.base, "vq1", new_parts, extract_vq1.ARCHIVE_ROOT,
-                                         extract_vq1.REQUIRED, cache_versions=(old_version,)), sim)
+        self.assertEqual(runtime.install(self.base, "vq1", new_parts, runtime.VERSIONS["vq1"]["root"],
+                                         runtime.REQUIRED, cache_versions=(old_version,)), sim)
         self.assertEqual((sim / ".installed").read_text(), old_version)
         with self.assertRaisesRegex(SystemExit, "Missing"):
-            runtime.install(self.base, "vq1", new_parts, extract_vq1.ARCHIVE_ROOT, extract_vq1.REQUIRED)
+            runtime.install(self.base, "vq1", new_parts, runtime.VERSIONS["vq1"]["root"], runtime.REQUIRED)
 
     def test_vq2_failure_preserves_existing_vq1(self):
         _, vq1 = self.cached_vq1()
@@ -121,8 +121,8 @@ class AIGPRuntimeTest(unittest.TestCase):
         self.assertFalse(any((self.base / name).exists() for _, name in parts))
         with patch.object(runtime.tarfile, "open", side_effect=AssertionError("archive accessed")):
             with patch.object(runtime.zipfile, "ZipFile", side_effect=AssertionError("archive accessed")):
-                self.assertEqual(runtime.install(self.base, "vq1", parts, extract_vq1.ARCHIVE_ROOT,
-                                                 extract_vq1.REQUIRED), sim)
+                self.assertEqual(runtime.install(self.base, "vq1", parts, runtime.VERSIONS["vq1"]["root"],
+                                                 runtime.REQUIRED), sim)
 
     def test_independent_installations_and_configuration(self):
         installed = {}
@@ -219,20 +219,18 @@ class AIGPRuntimeTest(unittest.TestCase):
         self.assertEqual({path.relative_to(vq1): path.read_bytes()
                           for path in vq1.rglob("*") if path.is_file()}, before)
 
-    def test_vq1_wrapper_runs_directly_outside_repository(self):
+    def test_installer_runs_directly_outside_repository(self):
         parts, sim = self.cached_vq1()
-        (self.base / "_runtime").mkdir()
         (self.base / "archives").mkdir()
-        for module in (extract_vq1, runtime):
-            shutil.copyfile(module.__file__, self.base / "_runtime" / Path(module.__file__).name)
+        shutil.copyfile(runtime.__file__, self.base / "install.py")
         (self.base / "archives/SHA256SUMS").write_text("\n".join(f"{digest}  {name}" for digest, name in parts))
         (self.base / "config/vq1").mkdir(parents=True)
-        for name in extract_vq1.CONFIG:
+        for name in runtime.configuration("vq1"):
             (self.base / "config/vq1" / name).write_text(f"configuration {name}")
-        result = subprocess.run([sys.executable, str(self.base / "_runtime/vq1.py")],
+        result = subprocess.run([sys.executable, str(self.base / "install.py"), "vq1"],
                                 cwd=self.base, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
-        for name, relative in extract_vq1.CONFIG.items():
+        for name, relative in runtime.configuration("vq1").items():
             self.assertEqual((sim / relative).read_text(), f"configuration {name}")
 
 
