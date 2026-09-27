@@ -8,8 +8,8 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates, Ned, PositionNed, Vehicle, VelocityNed
-from target.aigp.aigp import SimulatorClient
-from target.aigp.aigp import _Camera as Camera
+from target.aigp.simulator import SimulatorClient
+from target.aigp.simulator import _Camera as Camera
 
 
 PEER = ("127.0.0.1", 14560)
@@ -52,9 +52,9 @@ class ClientTest(unittest.TestCase):
         self.camera = Socket()
         self.sim = SimulatorClient()
         self.enterContext(patch.object(SimulatorClient, "_bind", side_effect=[self.wire, self.camera]))
-        self.enterContext(patch("target.aigp.aigp.select.select", side_effect=
+        self.enterContext(patch("target.aigp.simulator.select.select", side_effect=
                                 lambda sockets, *args: ([s for s in sockets if s.packets], [], [])))
-        self.enterContext(patch("target.aigp.aigp.time.monotonic", return_value=10.0))
+        self.enterContext(patch("target.aigp.simulator.time.monotonic", return_value=10.0))
         self.sim.connect()
         self.addCleanup(self.sim.disconnect)
 
@@ -180,7 +180,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.sim.race_status.active_gate_index, 6)
         self.assertEqual(self.sim.race_status.received_at, 10.0)
         # Other packet types must not refresh the race packet's own age.
-        with patch("target.aigp.aigp.time.monotonic", return_value=10.5):
+        with patch("target.aigp.simulator.time.monotonic", return_value=10.5):
             self.feed(heartbeat())
             self.sim.poll()
         self.assertEqual(self.sim.race_status.received_at, 10.0)
@@ -262,7 +262,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(first.motors.active, 0b0101)
         self.assertEqual(len(first.motors.outputs), 32)
         self.assertAlmostEqual(first.motors.outputs[1], .2)
-        with patch("target.aigp.aigp.time.monotonic", return_value=10.5):
+        with patch("target.aigp.simulator.time.monotonic", return_value=10.5):
             self.feed(imu(1020000))
             second = self.sim.read()
         self.assertEqual(second.received_at, 10.5)
@@ -305,7 +305,7 @@ class ConnectionFailureTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "already open"):
                 sim.open()
             sock.packets.append((packet(heartbeat()), PEER))
-            with patch("target.aigp.aigp.select.select", side_effect=
+            with patch("target.aigp.simulator.select.select", side_effect=
                        lambda *args: ([sock] if sock.packets else [], [], [])):
                 sim.connect()
             self.assertTrue(sim.connected)

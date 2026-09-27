@@ -14,7 +14,7 @@ class Controller(BaseController):
 Save it as `target/aigp/controllers/mine.py`, then run:
 
 ```sh
-./target/aigp/run vq1.r1 --controller mine
+python target/aigp/simulator.py vq1.r1 --controller mine
 ```
 
 `state` contains vehicle observations. `gate_index` is the zero-based active gate

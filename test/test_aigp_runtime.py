@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from target.aigp import aigp as runtime
+from target.aigp import simulator as runtime
 
 
 REQUIRED = (
@@ -223,13 +223,13 @@ class AIGPRuntimeTest(unittest.TestCase):
     def test_installer_runs_directly_outside_repository(self):
         parts, sim = self.cached_vq1()
         (self.base / "archives").mkdir()
-        shutil.copyfile(runtime.__file__, self.base / "aigp.py")
+        shutil.copyfile(runtime.__file__, self.base / "simulator.py")
         (self.base / "archives/SHA256SUMS").write_text("\n".join(f"{digest}  {name}" for digest, name in parts))
         (self.base / "config/vq1").mkdir(parents=True)
         for name in runtime.configuration("vq1"):
             (self.base / "config/vq1" / name).write_text(f"configuration {name}")
         env = dict(os.environ, PYTHONPATH=str(Path(runtime.__file__).resolve().parents[2]), WINE="preparation-must-not-launch-wine")
-        result = subprocess.run([sys.executable, str(self.base / "aigp.py"), "--prepare", "vq1"],
+        result = subprocess.run([sys.executable, str(self.base / "simulator.py"), "--prepare", "vq1"],
                                 cwd=self.base, env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         for name, relative in runtime.configuration("vq1").items():

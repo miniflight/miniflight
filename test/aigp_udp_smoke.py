@@ -17,12 +17,12 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.aigp import AIGPSimulator, _stop_process
+from target.aigp.simulator import AIGPSimulator, _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State
-from target.aigp.aigp import SimulatorClient
-from target.aigp.aigp import _Camera as Camera
+from target.aigp.simulator import SimulatorClient
+from target.aigp.simulator import _Camera as Camera
 from test.test_aigp_client import heartbeat, imu, packet
 
 
@@ -91,7 +91,7 @@ class UDPSmokeTest(unittest.TestCase):
         worker.start()
         try:
             with self.assertRaises(KeyboardInterrupt):
-                AIGPSimulator(controller, client=client).run(attach=True)
+                AIGPSimulator(controller, client=client).rollout(attach=True)
         finally:
             stop.set()
             worker.join(timeout=2)
@@ -158,12 +158,12 @@ class UDPSmokeTest(unittest.TestCase):
             finally:
                 _stop_process(child)
 
-        with patch("target.aigp.aigp.launch", side_effect=launch):
+        with patch("target.aigp.simulator.launch", side_effect=launch):
             if expect_timeout:
                 with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
-                    AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).run()
+                    AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
             else:
-                AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).run()
+                AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)

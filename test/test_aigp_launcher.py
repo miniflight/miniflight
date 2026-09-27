@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from target.aigp import aigp
+from target.aigp import simulator as aigp
 
 
 class WineDiscoveryTest(unittest.TestCase):
@@ -124,7 +124,7 @@ if kind == "wineserver":
             self.env.pop(name, None)
 
     def launch(self, target="vq1.r1", *args, platform=sys.platform, **env):
-        code = ("from target.aigp import aigp; import sys; from pathlib import Path; "
+        code = ("from target.aigp import simulator as aigp; import sys; from pathlib import Path; "
                 "aigp.BASE = Path(sys.argv[1]); aigp.sys.platform = sys.argv[2]; "
                 "aigp._check_simulator_ports = lambda: None; sys.exit(aigp.main(sys.argv[3:]))")
         process = subprocess.Popen([sys.executable, "-c", code, str(self.base), platform, target, *args],

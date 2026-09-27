@@ -1,7 +1,7 @@
 import time
 
 from miniflight import Vehicle
-from target.aigp.aigp import SimulatorClient
+from target.aigp.simulator import SimulatorClient
 
 
 RATE_HZ = 250.0

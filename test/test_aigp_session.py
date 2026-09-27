@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from contextlib import nullcontext, redirect_stdout
 from dataclasses import replace
 import io
 import signal
@@ -10,78 +10,89 @@ from unittest.mock import Mock, call, patch
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller as Zero
 from miniflight import BodyRates, State
-from target.aigp.aigp import RaceStatus, SimulatorClient
-from target.aigp.aigp import AIGPSimulator, _RaceSignals, _stop_process
+from target.aigp.simulator import RaceStatus, SimulatorClient
+from target.aigp.simulator import AIGPSimulator, _stop_process
 
 
-class RaceSignalsTest(unittest.TestCase):
+class RaceStatusTest(unittest.TestCase):
     def setUp(self):
-        self.signals = _RaceSignals()
+        self.simulator = AIGPSimulator(Zero(), client=Mock(spec=SimulatorClient))
+        self.enterContext(redirect_stdout(io.StringIO()))
 
     def race(self, boot=1000, start=-1, finish=-1, gate=0, received=10):
         return RaceStatus(boot, start, finish, gate, 0, received)
 
+    def update(self, status, now):
+        self.simulator._update_status(status, now)
+        return self.simulator.phase
+
     def test_wait_countdown_go_gate_pass_finish(self):
-        self.assertEqual(self.signals.update(None, 10), "waiting")
-        self.assertEqual(self.signals.update(self.race(), 10), "waiting")
-        self.assertEqual(self.signals.update(self.race(start=4000), 10), "countdown")
-        self.assertEqual(self.signals.update(self.race(boot=3999, start=4000), 10), "countdown")
-        self.assertEqual(self.signals.update(self.race(boot=4000, start=4000), 10), "running")
-        self.assertEqual(self.signals.update(self.race(boot=5000, start=4000, gate=1), 10), "running")
-        self.assertEqual(self.signals.update(self.race(boot=6000, start=4000, gate=6, finish=123), 10), "finished")
+        self.assertEqual(self.update(None, 10), "waiting")
+        self.assertEqual(self.update(self.race(), 10), "waiting")
+        self.assertEqual(self.update(self.race(start=4000), 10), "countdown")
+        self.assertEqual(self.update(self.race(boot=3999, start=4000), 10), "countdown")
+        self.assertEqual(self.update(self.race(boot=4000, start=4000), 10), "running")
+        self.assertEqual(self.update(self.race(boot=5000, start=4000, gate=1), 10), "running")
+        self.assertEqual(self.update(self.race(boot=6000, start=4000, gate=6, finish=123), 10), "finished")
 
     def test_host_elapsed_time_does_not_turn_countdown_into_go(self):
-        race = self.race(boot=1000, start=1100)
-        self.assertEqual(self.signals.update(race, 10), "countdown")
-        self.assertEqual(self.signals.update(race, 10.9), "countdown")
-        self.assertEqual(self.signals.update(race, 100), "countdown")
-        self.assertIsNone(self.signals.start)
+        status = self.race(boot=1000, start=1100)
+        self.assertEqual(self.update(status, 10), "countdown")
+        self.assertEqual(self.update(status, 10.9), "countdown")
+        self.assertEqual(self.update(status, 100), "countdown")
 
     def test_a_stale_initial_go_waits_for_a_fresh_packet(self):
-        race = self.race(start=0)
-        self.assertEqual(self.signals.update(race, 12), "waiting")
-        self.assertIsNone(self.signals.start)
-        self.assertEqual(self.signals.update(replace(race, received_at=12), 12), "running")
+        status = self.race(start=0)
+        self.assertEqual(self.update(status, 12), "waiting")
+        self.assertEqual(self.update(replace(status, received_at=12), 12), "running")
 
     def test_reset_signals_stop_a_running_race(self):
         for reset in (self.race(boot=900, start=500), self.race(start=-1),
                       self.race(start=600), self.race(start=500, gate=0)):
             with self.subTest(reset=reset):
-                signals = _RaceSignals()
-                signals.update(self.race(start=500, gate=1), 10)
+                simulator = AIGPSimulator(Zero(), client=Mock(spec=SimulatorClient))
+                simulator._update_status(self.race(start=500, gate=1), 10)
                 with self.assertRaisesRegex(RuntimeError, "reset"):
-                    signals.update(reset, 10)
+                    simulator._update_status(reset, 10)
 
     def test_running_is_latched_through_race_packet_gaps(self):
-        race = self.race(start=0)
-        self.assertEqual(self.signals.update(race, 10), "running")
-        self.assertEqual(self.signals.update(None, 20), "running")
-        self.assertEqual(self.signals.update(race, 30), "running")
-        self.assertEqual(self.signals.update(self.race(boot=2000, start=0, gate=6), 30), "running")
+        status = self.race(start=0)
+        self.assertEqual(self.update(status, 10), "running")
+        self.assertEqual(self.update(None, 20), "running")
+        self.assertEqual(self.update(status, 30), "running")
+        self.assertEqual(self.update(self.race(boot=2000, start=0, gate=6), 30), "running")
 
     def test_finish_is_a_terminal_event_not_an_expiring_sample(self):
-        self.signals.update(self.race(start=0), 10)
-        self.assertEqual(self.signals.update(self.race(boot=2000, start=0, finish=123), 20), "finished")
-        self.assertEqual(self.signals.update(None, 30), "finished")
-        self.assertEqual(self.signals.update(self.race(start=0), 30), "finished")
+        self.update(self.race(start=0), 10)
+        self.assertEqual(self.update(self.race(boot=2000, start=0, finish=123), 20), "finished")
+        self.assertEqual(self.update(None, 30), "finished")
+        self.assertEqual(self.update(self.race(start=0), 30), "finished")
 
     def test_finish_from_a_different_race_is_not_accepted(self):
-        self.signals.update(self.race(start=500), 10)
+        self.update(self.race(start=500), 10)
         with self.assertRaisesRegex(RuntimeError, "reset"):
-            self.signals.update(self.race(start=600, finish=123), 10)
+            self.update(self.race(start=600, finish=123), 10)
 
 
 class RaceLoopTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("target.aigp.aigp.time.monotonic", side_effect=lambda: self.now))
-        self.enterContext(patch("target.aigp.aigp.time.sleep", side_effect=self.sleep))
+        self.enterContext(patch("target.aigp.simulator.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.simulator.time.sleep", side_effect=self.sleep))
         self.controller = SimpleNamespace()
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
         self.simulator = AIGPSimulator(self.controller, client=self.sim)
         self.controller.update = Mock(return_value=BodyRates(thrust=.3))
+
+    def execute(self, process=None, startup_deadline=None):
+        if startup_deadline is not None:
+            self.simulator.startup_timeout = startup_deadline - self.now
+        if process is None:
+            return self.simulator.rollout(attach=True)
+        with patch("target.aigp.simulator.launch", return_value=nullcontext(process)):
+            return self.simulator.rollout()
 
     def sleep(self, seconds):
         self.now += seconds
@@ -115,7 +126,7 @@ class RaceLoopTest(unittest.TestCase):
             return state
 
         self.reading(read)
-        self.simulator.rollout()
+        self.execute()
         self.controller.update.assert_called_once()
         self.sim.arm.assert_called_once()
         self.assertEqual(self.sim.send.call_args_list, [call(BodyRates(thrust=.3)), call(BodyRates())])
@@ -132,7 +143,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaises(KeyboardInterrupt):
-            self.simulator.rollout()
+            self.execute()
         self.sim.send.assert_not_called()
         self.sim.arm.assert_not_called()
         self.sim.disarm.assert_not_called()
@@ -141,7 +152,7 @@ class RaceLoopTest(unittest.TestCase):
     def test_no_go_times_out_without_arming(self):
         self.reading([self.state(), self.state()])
         with self.assertRaisesRegex(TimeoutError, "never reported GO"):
-            self.simulator.rollout(startup_deadline=10.01)
+            self.execute(startup_deadline=10.01)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
@@ -153,7 +164,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaisesRegex(TimeoutError, "never reported GO"):
-            self.simulator.rollout(startup_deadline=12)
+            self.execute(startup_deadline=12)
         self.assertLess(self.now, 12.2)
         self.controller.update.assert_not_called()
         self.sim.arm.assert_not_called()
@@ -162,7 +173,7 @@ class RaceLoopTest(unittest.TestCase):
     def test_reset_disarms_instead_of_restarting(self):
         self.reading([self.state(start=500), self.state(start=-1)])
         with self.assertRaisesRegex(RuntimeError, "reset"):
-            self.simulator.rollout()
+            self.execute()
         self.sim.arm.assert_called_once()
         self.sim.disarm.assert_called_once()
         self.assertEqual(self.sim.send.call_args, call(BodyRates()))
@@ -173,7 +184,7 @@ class RaceLoopTest(unittest.TestCase):
         state.state = replace(state.state, received_at=self.now)
         self.reading([state])
         with self.assertRaisesRegex(TimeoutError, "never reported GO"):
-            self.simulator.rollout(startup_deadline=self.now)
+            self.execute(startup_deadline=self.now)
         self.sim.arm.assert_not_called()
         self.controller.update.assert_not_called()
 
@@ -189,7 +200,7 @@ class RaceLoopTest(unittest.TestCase):
             return sample
 
         self.reading(read)
-        self.simulator.rollout()
+        self.execute()
         self.assertGreater(self.now - running.received_at, 3)
         self.assertEqual(self.controller.update.call_count, 160)
         self.sim.arm.assert_called_once()
@@ -207,7 +218,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaises(KeyboardInterrupt):
-            self.simulator.rollout()
+            self.execute()
         self.assertGreater(self.controller.update.call_count, 200)
         self.sim.disarm.assert_called_once()
 
@@ -224,7 +235,7 @@ class RaceLoopTest(unittest.TestCase):
             raise TimeoutError("timed out waiting for fresh IMU telemetry")
 
         self.reading(read)
-        self.simulator.rollout()
+        self.execute()
         self.controller.update.assert_called_once()
         self.assertEqual(self.sim.send.call_args_list, [call(BodyRates(thrust=.3)), call(BodyRates())])
         self.sim.disarm.assert_called_once()
@@ -245,7 +256,7 @@ class RaceLoopTest(unittest.TestCase):
             raise TimeoutError("fresh IMU")
 
         self.reading(read)
-        self.simulator.rollout()
+        self.execute()
         self.assertEqual(self.controller.update.call_count, 2)
         self.assertEqual(self.sim.heartbeat.call_count, 2)
         self.assertEqual(self.sim.send.call_args_list,
@@ -260,7 +271,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=0.*finish_ns=-1"):
-            self.simulator.rollout()
+            self.execute()
         self.controller.update.assert_not_called()
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
@@ -277,7 +288,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaisesRegex(RuntimeError, "reset"):
-            self.simulator.rollout()
+            self.execute()
         self.sim.disarm.assert_called_once()
 
     def test_delayed_finish_is_received_after_disarming_for_imu_loss(self):
@@ -306,7 +317,7 @@ class RaceLoopTest(unittest.TestCase):
             raise TimeoutError("fresh IMU")
 
         self.reading(read)
-        self.simulator.rollout()
+        self.execute()
         self.sim.arm.assert_called_once()
         self.sim.disarm.assert_called_once()
         self.assertGreaterEqual(self.sim.heartbeat.call_count, 4)
@@ -323,7 +334,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaisesRegex(TimeoutError, "no native finish within 5s"):
-            self.simulator.rollout()
+            self.execute()
         self.assertGreaterEqual(self.now - started, 6)
         self.assertLess(self.now - started, 6.3)
         self.controller.update.assert_called_once()
@@ -359,7 +370,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading(read)
         with self.assertRaisesRegex(error, message):
-            self.simulator.rollout(process=process)
+            self.execute(process=process)
         self.assertLess(self.now - started, 1.7)
         self.controller.update.assert_called_once()
         self.sim.arm.assert_called_once()
@@ -374,7 +385,7 @@ class RaceLoopTest(unittest.TestCase):
 
         self.reading([self.state(start=500)])
         self.controller.update.side_effect = update
-        self.simulator.rollout()
+        self.execute()
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
@@ -382,7 +393,7 @@ class RaceLoopTest(unittest.TestCase):
         process = Mock()
         process.poll.return_value = 0
         self.reading([self.state(start=500, finish=123)])
-        self.simulator.rollout(process=process)
+        self.execute(process=process)
         self.controller.update.assert_not_called()
         self.sim.arm.assert_not_called()
 
@@ -391,7 +402,7 @@ class RaceLoopTest(unittest.TestCase):
         process.poll.side_effect = [None, 9]
         self.reading([self.state(start=500), self.state(start=500)])
         with self.assertRaisesRegex(RuntimeError, "simulator exited with status 9"):
-            self.simulator.rollout(process=process)
+            self.execute(process=process)
         self.controller.update.assert_called_once()
         self.sim.disarm.assert_called_once()
 
@@ -400,66 +411,82 @@ class SessionTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.enterContext(redirect_stdout(io.StringIO()))
-        self.enterContext(patch("target.aigp.aigp.time.monotonic", side_effect=lambda: self.now))
-        self.controller = SimpleNamespace()
+        self.enterContext(patch("target.aigp.simulator.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.simulator.time.sleep", side_effect=self.sleep))
+        self.controller = SimpleNamespace(update=Mock(return_value=BodyRates(thrust=.3)))
         self.sim = Mock(spec=SimulatorClient)
-        self.sim.read.return_value = State(1, 0, (0, 0, 0), (0, 0, 0), self.now)
+        self.sim.commands = SimulatorClient.commands
+        self.sim.race_status = None
+        self.sim.read.side_effect = self.read
         self.process = Mock(pid=98765)
         self.process.poll.return_value = None
         self.process.wait.return_value = 0
-        self.launch = self.enterContext(patch("target.aigp.aigp.launch"))
+        self.launch = self.enterContext(patch("target.aigp.simulator.launch"))
         self.owned = self.launch.return_value
         self.owned.__enter__.return_value = self.process
-        self.drive = self.enterContext(patch.object(AIGPSimulator, "rollout"))
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+    def read(self, **kwargs):
+        finished = self.sim.read.call_count > 1
+        self.sim.race_status = RaceStatus(int(self.now * 1000), 0, 123 if finished else -1,
+                                          6 if finished else 0, 0, self.now)
+        return State(self.now, .02, (0, 0, 0), (0, 0, 0), self.now)
 
     def test_owns_one_simulator_and_waits_for_telemetry(self):
-        self.sim.read.side_effect = [TimeoutError("loading"), self.sim.read.return_value]
-        AIGPSimulator(self.controller, "vq2.r2", client=self.sim).run(simulator_args=("-ResX=800", "value with spaces"))
+        def enter():
+            self.sim.open.assert_called_once()
+            self.sim.read.assert_not_called()
+            return self.process
+        self.owned.__enter__.side_effect = enter
+        result = AIGPSimulator(self.controller, "vq2.r2", client=self.sim).rollout(
+            simulator_args=("-ResX=800", "value with spaces"))
         self.launch.assert_called_once_with("vq2.r2", ("-ResX=800", "value with spaces"))
-        self.sim.open.assert_called_once()
         self.assertEqual(self.sim.read.call_count, 2)
-        self.drive.assert_called_once()
-        self.drive.assert_called_once_with(self.process, 130)
+        self.controller.update.assert_called_once()
+        self.assertEqual(result.active_gate_index, 6)
+        self.assertEqual(result.race_finish_time_ns, 123)
+        self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
         self.owned.__exit__.assert_called_once_with(None, None, None)
 
     def test_invalid_target_or_incompatible_controller_does_not_launch(self):
         for target, controller in (("vq1.r2", Zero()), ("vq2.r1", Gates()), ("vq2.r2", Gates())):
             with self.subTest(target=target), self.assertRaises(ValueError):
-                AIGPSimulator(controller, target, client=self.sim).run()
+                AIGPSimulator(controller, target, client=self.sim).rollout()
         self.launch.assert_not_called()
         self.sim.open.assert_not_called()
 
     def test_busy_controller_does_not_launch(self):
         self.sim.open.side_effect = OSError("existing controller")
         with self.assertRaises(OSError):
-            AIGPSimulator(self.controller, "vq1.r1", client=self.sim).run()
+            AIGPSimulator(self.controller, client=self.sim).rollout()
         self.launch.assert_not_called()
 
     def test_launch_failure_closes_the_receive_ports(self):
         self.owned.__enter__.side_effect = OSError("launcher missing")
         with self.assertRaises(OSError):
-            AIGPSimulator(self.controller, "vq1.r1", client=self.sim).run()
+            AIGPSimulator(self.controller, client=self.sim).rollout()
         self.sim.disconnect.assert_called_once()
-        self.drive.assert_not_called()
+        self.controller.update.assert_not_called()
 
     def test_early_process_exit_never_runs_or_arms_controller(self):
         self.process.poll.return_value = 2
         with self.assertRaisesRegex(RuntimeError, "status 2"):
-            AIGPSimulator(self.controller, "vq1.r1", client=self.sim).run()
+            AIGPSimulator(self.controller, client=self.sim).rollout()
         self.sim.arm.assert_not_called()
-        self.drive.assert_not_called()
+        self.controller.update.assert_not_called()
         self.sim.disconnect.assert_called_once()
 
     def test_startup_timeout_stops_only_the_owned_process(self):
         def loading(**kwargs):
             self.now += .2
             raise TimeoutError("no IMU")
-
         self.sim.read.side_effect = loading
-        with self.assertRaisesRegex(TimeoutError, "produce IMU"):
-            AIGPSimulator(self.controller, "vq1.r1", startup_timeout=.3, client=self.sim).run()
-        self.drive.assert_not_called()
+        with self.assertRaisesRegex(TimeoutError, "startup deadline"):
+            AIGPSimulator(self.controller, startup_timeout=.3, client=self.sim).rollout()
+        self.controller.update.assert_not_called()
         self.owned.__exit__.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
@@ -469,15 +496,15 @@ class SessionTest(unittest.TestCase):
                 self.process.reset_mock()
                 self.sim.reset_mock()
                 self.owned.reset_mock()
-                self.drive.side_effect = error
+                self.controller.update.side_effect = error
                 with self.assertRaises(type(error)):
-                    AIGPSimulator(self.controller, "vq1.r1", client=self.sim).run()
+                    AIGPSimulator(self.controller, client=self.sim).rollout()
                 self.owned.__exit__.assert_called_once()
                 self.sim.disconnect.assert_called_once()
 
     def test_unresponsive_owned_process_group_is_killed(self):
         self.process.wait.side_effect = [subprocess.TimeoutExpired("simulator", 10), 0]
-        with patch("target.aigp.aigp.os.killpg") as kill:
+        with patch("target.aigp.simulator.os.killpg") as kill:
             _stop_process(self.process)
         kill.assert_called_once_with(98765, signal.SIGKILL)
         self.assertEqual(self.process.wait.call_args_list, [call(timeout=10), call(timeout=5)])
