@@ -7,7 +7,7 @@ from miniflight import BodyRates
 from target.aigp.controllers import BaseController
 
 class Controller(BaseController):
-    def update(self, state, gate_index):
+    def update(self, state, gate_index, gates):
         return BodyRates(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
 ```
 
@@ -18,8 +18,10 @@ python target/aigp/simulator.py vq1.r1 --controller mine
 ```
 
 `state` contains vehicle observations. `gate_index` is the zero-based active gate
-reported by the simulator. Return one `BodyRates`, `PositionNed`, or `VelocityNed`
-command. `BodyRates` uses rad/s and thrust from 0 to 1. NED position and velocity
+reported by the simulator. `gates` is an immutable tuple of `Gate` values, or
+`None` until a complete usable track arrives. Each gate has an `id`, a NED `center`
+in metres, a wxyz `orientation`, and reported `width` and `height` in metres.
+Return one `BodyRates`, `PositionNed`, or `VelocityNed` command. `BodyRates` uses rad/s and thrust from 0 to 1. NED position and velocity
 use metres and metres per second. Zero thrust does not hover.
 
 A constructor initializes the controller's own memory, such as PID integrals.
@@ -44,11 +46,24 @@ calling the controller. The underlying client retains the original telemetry.
 
 ## r1 baseline
 
-`r1_gates` uses VQ1 position telemetry to choose a point one metre beyond each gate.
-It keeps that point until the reported gate index advances, then chooses the next.
-At index six it holds the final point until the simulator reports native finish.
-The pure `gate_target(position, index)` function is reusable by a lower-plane R1
-controller. A fresh controller can replay the same `(state, gate_index)` sequence
+`r1_gates` uses the published track and VQ1 position telemetry to choose a point
+one metre beyond each gate. It keeps that point until the reported gate index
+advances, then chooses the next. After the last gate it holds the final point until
+native finish. The controller has no stored course coordinates or fixed gate count.
+
+The simulator assembles track packets and converts each gate's published origin
+to its opening center with `position + rotate(orientation, (0, 0, -height / 2))`.
+It publishes only a complete track, retaining the last one during an incomplete
+replacement. Missing or nulled geometry remains unavailable; there is no fallback
+map. Course data is separate from generic vehicle state and does not expire on an
+IMU timeout.
+
+Start R1 through the simulator so the receiver is listening when track data is
+published. A late attach can miss that transfer and leave the controller waiting
+for geometry without arming.
+
+The pure `gate_target(position, index, gates)` function is reusable by a lower-plane
+controller. A fresh controller can replay `(state, gate_index, gates)` samples
 without a connection or clock.
 
 The default command rate is 50 Hz. Missed ticks are skipped. Loss of fresh IMU

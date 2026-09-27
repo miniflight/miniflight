@@ -3,5 +3,5 @@ from target.aigp.controllers import BaseController
 
 
 class Controller(BaseController):
-    def update(self, state: State, gate_index: int) -> BodyRates:
+    def update(self, state: State, gate_index: int, gates) -> BodyRates:
         return BodyRates()

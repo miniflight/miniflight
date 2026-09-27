@@ -10,7 +10,8 @@ import time
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.controllers.r1_gates import GATES
+# Deliberately different from VQ1: the controller must follow this wire input.
+GATES = tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6))
 
 
 def main():
@@ -18,10 +19,11 @@ def main():
     finish_without_imu = "--finish-without-imu" in sys.argv[2:]
     no_finish = "--no-finish" in sys.argv[2:]
     race_gap = "--race-gap" in sys.argv[2:]
+    track_after_go = "--track-after-go" in sys.argv[2:]
     delayed_finish = "--delayed-finish" in sys.argv[2:]
     result = {"too_soon": [], "gates": [], "arms": [], "positions": 0,
               "position_masks": [], "stopped_by_parent": False,
-              "finish_sent": False, "imu_after_last_gate": 0,
+              "track_sent": False, "finish_sent": False, "imu_after_last_gate": 0,
               "disarmed_before_finish": False, "race_packets_skipped": 0}
 
     def stop(signum, frame):
@@ -55,6 +57,8 @@ def main():
                         result["arms"].append(int(armed))
                         if not armed and index == len(GATES) and not result["finish_sent"]:
                             result["disarmed_before_finish"] = True
+                        if armed and not result["track_sent"]:
+                            result["too_soon"].append("arm_without_track")
                         if armed and (start < 0 or boot < start):
                             result["too_soon"].append("arm")
                     elif kind == "SET_POSITION_TARGET_LOCAL_NED":
@@ -83,6 +87,13 @@ def main():
                 position = next_position
             count += 1
             send(mavlink.MAVLink_heartbeat_message(2, 0, 0, 0, 4, 3))
+            if not result["track_sent"] and (not track_after_go or boot >= 800):
+                data = struct.pack("<H", len(GATES))
+                for i, (north, east, down) in enumerate(GATES):
+                    data += struct.pack("<H9f", i, north, east, down + 1, 1, 0, 0, 0, 2, 2)
+                send(mavlink.MAVLink_data_transmission_handshake_message(0, len(data), 7, 0, 1, 253, 1))
+                send(mavlink.MAVLink_encapsulated_data_message(0, (struct.pack("<BH", 2, 7) + data).ljust(253, b"\0")))
+                result["track_sent"] = True
             at_end = index == len(GATES)
             now = time.monotonic()
             if at_end and ended_at is None:

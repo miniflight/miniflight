@@ -27,10 +27,11 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
+from common.math import Quaternion, Vector3D
 from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutputs,
                        Ned, PositionNed, State, Vehicle, VelocityNed)
 from target import Target
-from target.aigp.controllers import BaseController
+from target.aigp.controllers import BaseController, Gate
 
 
 BASE = Path(__file__).resolve().parent
@@ -179,7 +180,7 @@ class AIGPSimulator:
 
         observations = replace(state, motion=fresh(state.motion), attitude=fresh(state.attitude),
                                motors=fresh(state.motors), frame=fresh(state.frame))
-        return self.controller.update(observations, gate_index)
+        return self.controller.update(observations, gate_index, self.client.gates)
 
     def stop(self):
         if not self.armed:
@@ -273,6 +274,7 @@ class SimulatorClient(Target):
         self._messages = deque(maxlen=2048)
         self.messages = ()
         self._camera = _Camera()
+        self._track = _Track()
         self._race_status = None
         self._last_imu = None
 
@@ -284,6 +286,11 @@ class SimulatorClient(Target):
     def race_status(self):
         """Latest race packet, even when read() is waiting for a new IMU sample."""
         return self._race_status
+
+    @property
+    def gates(self):
+        """The last complete track; partial transfers never replace it."""
+        return self._track.gates
 
     @property
     def telemetry(self):
@@ -303,6 +310,7 @@ class SimulatorClient(Target):
         self._messages.clear()
         self.messages = ()
         self._camera = _Camera()
+        self._track = _Track()
         self._race_status = self._last_imu = None
         self._boot = time.monotonic()
         self._mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
@@ -394,6 +402,10 @@ class SimulatorClient(Target):
         self._telemetry[kind] = message
         self._received_at[kind] = now
         self._messages.append(message)
+        if kind == "DATA_TRANSMISSION_HANDSHAKE":
+            self._track.start(message, now)
+        elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
+            self._track.receive(message, now)
         if kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
             if (self._race_status is not None and race.sim_boot_time_ms < self._race_status.sim_boot_time_ms
@@ -507,6 +519,89 @@ class SimulatorClient(Target):
             self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
             mask, *position, *speed, 0, 0, 0, 0, 0,
         )
+
+
+class _Track:
+    """Assemble the advertised track before publishing immutable gate geometry."""
+
+    GATE = struct.Struct("<H9f")
+    CHUNK_BYTES = 250  # ENCAPSULATED_DATA minus its type and transfer ID.
+    MAX_GATES = 1024
+    MAX_TRANSFERS = 2
+    MAX_AGE = 5.0
+
+    def __init__(self):
+        self.pending = {}
+        self.gates = None
+
+    def _expire(self, now):
+        self.pending = {key: value for key, value in self.pending.items() if now - value[0] < self.MAX_AGE}
+
+    def start(self, message, now):
+        self._expire(now)
+        size, packets = message.size, message.packets
+        if not 2 <= size <= 2 + self.MAX_GATES * self.GATE.size:
+            return
+        if packets != (size + self.CHUNK_BYTES - 1) // self.CHUNK_BYTES:
+            return
+        transfer_id = message.width
+        previous = self.pending.get(transfer_id)
+        if previous is not None and previous[1:3] == (size, packets):
+            return  # A repeated handshake must not discard received chunks.
+        if transfer_id not in self.pending and len(self.pending) == self.MAX_TRANSFERS:
+            del self.pending[next(iter(self.pending))]
+        self.pending[transfer_id] = (now, size, packets, {})
+
+    def receive(self, message, now):
+        self._expire(now)
+        payload = bytes(message.data)
+        if len(payload) < 3 or payload[0] != 2:
+            return
+        transfer_id, = struct.unpack_from("<H", payload, 1)
+        transfer = self.pending.get(transfer_id)
+        if transfer is None:
+            return
+        _, size, packets, chunks = transfer
+        index = message.seqnr
+        if not 0 <= index < packets:
+            return
+        length = min(self.CHUNK_BYTES, size - index * self.CHUNK_BYTES)
+        chunk = payload[3:3 + length]
+        if len(chunk) != length:
+            return
+        if index in chunks and chunks[index] != chunk:
+            del self.pending[transfer_id]
+            return
+        chunks[index] = chunk
+        if len(chunks) != packets:
+            return
+        del self.pending[transfer_id]
+        data = b"".join(chunks[i] for i in range(packets))
+        gates = self.decode(data)
+        if gates != self.gates:
+            self.gates = gates
+
+    @classmethod
+    def decode(cls, data):
+        if len(data) < 2:
+            return None
+        count, = struct.unpack_from("<H", data)
+        if not 0 < count <= cls.MAX_GATES or len(data) != 2 + count * cls.GATE.size:
+            return None
+        gates = []
+        for index, row in enumerate(cls.GATE.iter_unpack(data[2:])):
+            gate_id, north, east, down, w, x, y, z, width, height = row
+            if gate_id != index or not all(math.isfinite(value) for value in row[1:]) or width <= 0 or height <= 0:
+                return None
+            norm = math.hypot(w, x, y, z)
+            if not 0.99 <= norm <= 1.01:
+                return None
+            orientation = tuple(value / norm for value in (w, x, y, z))
+            # The published origin is at the gate base; offset to the opening center.
+            offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
+            center = Ned(*(float(p + d) for p, d in zip((north, east, down), offset)))
+            gates.append(Gate(gate_id, center, orientation, width, height))
+        return tuple(gates)
 
 
 class _Camera:

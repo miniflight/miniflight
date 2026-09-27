@@ -10,6 +10,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import BodyRates, Ned, PositionNed, Vehicle, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
+from test.test_aigp_track import course, handshake, packets
 
 
 PEER = ("127.0.0.1", 14560)
@@ -169,6 +170,29 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.sim.race_status.received_at, 10.0)
         self.assertIn("COLLISION", [m.get_type() for m in self.sim.messages])
         self.assertFalse(hasattr(state, "messages"))
+
+    def test_track_is_available_separately_from_vehicle_state(self):
+        data = course(1)
+        self.feed(handshake(data))
+        for chunk in packets(data):
+            self.feed(chunk)
+        self.feed(imu())
+        state = self.sim.read()
+        self.assertEqual(self.sim.gates[0].center, (10, 20, 28))
+        self.assertFalse(hasattr(state, "gates"))
+        self.assertFalse(hasattr(state, "track"))
+
+    def test_new_connection_does_not_reuse_an_old_course(self):
+        data = course(1)
+        self.feed(handshake(data))
+        for chunk in packets(data):
+            self.feed(chunk)
+        self.sim.poll()
+        self.assertIsNotNone(self.sim.gates)
+        self.sim.disconnect()
+        with patch.object(SimulatorClient, "_bind", side_effect=[Socket(), Socket()]):
+            self.sim.open()
+        self.assertIsNone(self.sim.gates)
 
     def test_race_finish_is_available_without_imu(self):
         self.assertIsNone(self.sim.race_status)

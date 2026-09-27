@@ -88,7 +88,20 @@ standard message fields are defined by [MAVLink](https://mavlink.io/en/messages/
 `r1_gates` consumes `State.motion.position` and returns `PositionNed`
 `zero` returns `BodyRates`
 `AIGPSimulator` owns the connection and uses `Vehicle.read` and `Vehicle.send` for both
-controllers implement `BaseController.update(state, gate_index)`
+controllers implement `BaseController.update(state, gate_index, gates)`
 native `RaceStatus` packets stay inside the AI-GP simulator and client
 optional observations older than the simulator timeout are `None` at controller update
 the client and generic vehicle API retain the original timestamped observations
+
+## track input
+
+`SimulatorClient.gates` exposes the last complete usable track as immutable gate values
+`DATA_TRANSMISSION_HANDSHAKE` announces its byte count and chunks
+`ENCAPSULATED_DATA` type 2 supplies those chunks, grouped by transfer ID
+the adapter converts gate origins to opening centers using orientation and half-height
+`AIGPSimulator` passes the gates separately from `State` to the controller
+missing or withheld geometry stays `None`; no course coordinates are synthesized
+
+The captured VQ1 build 3391 packet is preserved in `test/fixtures/vq1_track.json`.
+Its decoded centers match the previously flight-tested R1 coordinates.
+This validates that build's geometry; it does not establish VQ2 geometry availability.

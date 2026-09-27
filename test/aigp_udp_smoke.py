@@ -77,8 +77,8 @@ class UDPSmokeTest(unittest.TestCase):
                 failures.append(error)
 
         class Controller(BaseController):
-            def update(self, state, gate_index):
-                if not isinstance(state, State) or gate_index != 0:
+            def update(self, state, gate_index, gates):
+                if not isinstance(state, State) or gate_index != 0 or gates is not None:
                     raise AssertionError("controller did not receive the observations and active gate index")
                 states.append(state)
                 if len(states) == 5:
@@ -117,6 +117,11 @@ class UDPSmokeTest(unittest.TestCase):
         result = self.owned_session()
         self.assertTrue(result["finish_sent"])
         self.assertGreater(result["imu_after_last_gate"], 0)
+
+    def test_waits_for_track_input_after_go_before_arming(self):
+        result = self.owned_session("--track-after-go")
+        self.assertTrue(result["track_sent"])
+        self.assertTrue(result["finish_sent"])
 
     def test_owned_process_finish_without_final_imu(self):
         result = self.owned_session("--finish-without-imu")

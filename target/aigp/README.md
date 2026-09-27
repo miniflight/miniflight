@@ -25,7 +25,7 @@ sim = AIGPSimulator(Controller(), "vq1.r1")
 result = sim.rollout()
 ```
 
-The simulator calls `controller.update(state, gate_index)` and sends its returned
+The simulator calls `controller.update(state, gate_index, gates)` and sends its returned
 command. It owns the connection, timing, arming, native start/finish, and cleanup.
 `r1_gates` uses position commands. `zero` sends zero thrust; it does not hover.
 [Write a controller](controllers/README.md).

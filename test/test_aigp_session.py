@@ -83,6 +83,7 @@ class RaceLoopTest(unittest.TestCase):
         self.controller = SimpleNamespace()
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
+        self.sim.gates = None
         self.simulator = AIGPSimulator(self.controller, client=self.sim)
         self.controller.update = Mock(return_value=BodyRates(thrust=.3))
 
@@ -378,7 +379,7 @@ class RaceLoopTest(unittest.TestCase):
         self.assertEqual(self.sim.send.call_args_list, [call(BodyRates(thrust=.3)), call(BodyRates())])
 
     def test_finish_during_a_slow_update_does_not_send_the_late_command(self):
-        def update(state, gate_index):
+        def update(state, gate_index, gates):
             self.now += 2
             self.sim.race_status = self.state(boot=3000, start=500, finish=123).race
             return BodyRates(thrust=.3)
@@ -416,6 +417,7 @@ class SessionTest(unittest.TestCase):
         self.controller = SimpleNamespace(update=Mock(return_value=BodyRates(thrust=.3)))
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
+        self.sim.gates = None
         self.sim.race_status = None
         self.sim.read.side_effect = self.read
         self.process = Mock(pid=98765)
