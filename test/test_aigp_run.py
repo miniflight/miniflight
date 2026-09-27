@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from target.aigp import runner
+from target.aigp import aigp as runner
 
 
 class AIGPRunTest(unittest.TestCase):
@@ -42,7 +42,7 @@ class AIGPRunTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         event = json.loads(result.stdout)
         self.assertEqual(event["args"], ["run", "--no-project", "--python", "3.11", "--with-editable",
-                                        f"{self.repo}[aigp]", "python", "-m", "target.aigp.runner", *args])
+                                        f"{self.repo}[aigp]", "python", "-m", "target.aigp.aigp", *args])
         self.assertEqual(event["cache"], str(self.base / ".runtime/uv-cache"))
         self.assertEqual(event["python"], str(self.base / ".runtime/uv-python"))
 
@@ -71,9 +71,9 @@ class CommandTest(unittest.TestCase):
         self.enterContext(patch.object(runner.signal, "signal"))
         self.enterContext(redirect_stdout(io.StringIO()))
         self.enterContext(redirect_stderr(io.StringIO()))
-        self.session = self.enterContext(patch.object(runner, "run_session"))
-        self.attach = self.enterContext(patch.object(runner, "run"))
+        self.simulator = self.enterContext(patch.object(runner, "AIGPSimulator"))
         self.launch = self.enterContext(patch.object(runner, "launch"))
+        self.prepare = self.enterContext(patch.object(runner, "prepare"))
         self.process = self.launch.return_value.__enter__.return_value
         self.process.wait.return_value = 0
 
@@ -84,7 +84,7 @@ class CommandTest(unittest.TestCase):
                 self.assertEqual(runner.main([target, "-test", "value with spaces"]), 0)
                 self.launch.assert_called_once_with("vq1.r1" if target == "vq1" else target,
                                                     ["-test", "value with spaces"])
-        self.session.assert_not_called()
+        self.simulator.assert_not_called()
 
     def test_simulator_exit_code_is_preserved(self):
         for status, expected in ((23, 23), (-15, 143)):
@@ -94,29 +94,35 @@ class CommandTest(unittest.TestCase):
     def test_controller_options_and_simulator_arguments(self):
         self.assertEqual(runner.main(["vq2.r2", "--controller", "zero", "--hz", "40",
                                       "--startup-timeout", "60", "--", "-ResX=800", "value with spaces"]), 0)
-        controller = self.session.call_args.args[0]
-        self.session.assert_called_once_with(controller, "vq2.r2", 40, ["-ResX=800", "value with spaces"], 60)
+        controller = self.simulator.call_args.args[0]
+        self.simulator.assert_called_once_with(controller, "vq2.r2", 40, startup_timeout=60)
+        self.simulator.return_value.run.assert_called_once_with(attach=False, simulator_args=["-ResX=800", "value with spaces"])
         self.launch.assert_not_called()
 
     def test_attach_never_launches_or_stops_a_simulator(self):
         self.assertEqual(runner.main(["--attach", "--controller", "zero", "--hz", "40"]), 0)
-        controller = self.attach.call_args.args[0]
-        self.attach.assert_called_once_with(controller, 40)
-        self.session.assert_not_called()
+        self.simulator.return_value.run.assert_called_once_with(attach=True, simulator_args=[])
         self.launch.assert_not_called()
+
+    def test_prepare_never_launches_or_constructs_a_controller(self):
+        self.assertEqual(runner.main(["--prepare", "vq1"]), 0)
+        self.prepare.assert_called_once_with("vq1")
+        self.launch.assert_not_called()
+        self.simulator.assert_not_called()
 
     def test_invalid_options_do_not_launch(self):
         for args in ([], ["vq1.r2"], ["unknown"], ["vq1.r1", "--controller"],
                      ["vq1.r1", "--controller", "missing"], ["vq1.r1", "--hz", "50"],
                      ["--attach"], ["vq1.r1", "--attach", "--controller", "zero"],
                      ["--attach", "--controller", "zero", "--startup-timeout", "10"],
-                     ["--attach", "--controller", "zero", "--", "-test"]):
+                     ["--attach", "--controller", "zero", "--", "-test"],
+                     ["--prepare", "vq1", "--controller", "zero"]):
             with self.subTest(args=args), self.assertRaises(SystemExit) as raised:
                 runner.main(args)
             self.assertEqual(raised.exception.code, 2)
         self.launch.assert_not_called()
-        self.session.assert_not_called()
-        self.attach.assert_not_called()
+        self.simulator.assert_not_called()
+        self.prepare.assert_not_called()
 
     def test_keyboard_interrupt_exits_130(self):
         self.process.wait.side_effect = KeyboardInterrupt

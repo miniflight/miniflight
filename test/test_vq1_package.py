@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from target.aigp import install as runtime
+from target.aigp import aigp as runtime
 
 
 class VQ1PackageTest(unittest.TestCase):

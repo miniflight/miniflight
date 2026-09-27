@@ -6,96 +6,88 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
-from target.aigp.runner import main, run
+from target.aigp.aigp import AIGPSimulator, main
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller
-from miniflight import BodyRates, PositionNed, State, Vehicle, VelocityNed
-from target.aigp import Race, SimulatorClient
+from miniflight import BodyRates, Motion, Ned, PositionNed, State, VelocityNed
+from target.aigp.aigp import RaceStatus, SimulatorClient
 
 
-class BaseControllerTest(unittest.TestCase):
-    def test_construction_is_passive_and_defaults_to_aigp_ports(self):
-        with patch.object(SimulatorClient, "_bind") as bind:
-            controller = BaseController()
-        client = controller.client
-        self.assertEqual((client.port, client.camera_port), (14550, 5600))
-        self.assertIs(controller.vehicle._target, client)
-        self.assertIsNone(controller.vehicle.state)
-        self.assertFalse(client.connected)
-        self.assertIsNone(client._socket)
-        self.assertIsNone(client._vision)
-        bind.assert_not_called()
-
-    def test_defaults_inherit_the_port_wrapper(self):
-        for kind in (Controller, Gates):
-            with self.subTest(kind=kind):
-                controller = kind(port=0, camera_port=None)
-                self.assertIsInstance(controller, BaseController)
-                self.assertEqual((controller.client.port, controller.client.camera_port), (0, None))
-
-    def test_owns_one_pair_of_receive_sockets(self):
-        wire, camera = Mock(), Mock()
-        controller = Controller(port=14600, camera_port=5700)
-        with patch.object(SimulatorClient, "_bind", side_effect=[wire, camera]) as bind:
-            controller.client.open()
-            try:
-                bind.assert_has_calls([call(14600), call(5700)])
-                self.assertEqual(bind.call_count, 2)
-                with self.assertRaisesRegex(RuntimeError, "already open"):
-                    controller.client.open()
-            finally:
-                controller.vehicle.disconnect()
-        wire.close.assert_called_once()
-        camera.close.assert_called_once()
-        self.assertIsNone(controller.client._socket)
-        self.assertIsNone(controller.client._vision)
-
-    def test_update_must_be_implemented(self):
+class ControllerConstructionTest(unittest.TestCase):
+    def test_base_controller_is_only_an_update_contract(self):
         with self.assertRaises(NotImplementedError):
-            BaseController().update(None)
+            BaseController().update(None, 0)
+
+    def test_controllers_construct_without_creating_a_client(self):
+        with patch.object(SimulatorClient, "__init__", side_effect=AssertionError("controller created a client")):
+            Controller()
+            Gates()
 
 
 class ControllerTest(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
-        self.enterContext(patch("target.aigp.runner.time.monotonic", side_effect=lambda: self.now))
+        self.enterContext(patch("target.aigp.aigp.time.monotonic", side_effect=lambda: self.now))
         self.sleeps = []
 
         def sleep(seconds):
             self.sleeps.append(seconds)
             self.now += seconds
 
-        self.enterContext(patch("target.aigp.runner.time.sleep", side_effect=sleep))
+        self.enterContext(patch("target.aigp.aigp.time.sleep", side_effect=sleep))
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
-        self.sim.race = Race(1000, 0, -1, 0, 0, self.now)
+        self.sim.race_status = RaceStatus(1000, 0, -1, 0, 0, self.now)
         self.state = State(1, .02, (0, 0, 0), (0, 0, 0), self.now)
         self.sim.read.side_effect = [self.state, KeyboardInterrupt()]
-        self.controller = BaseController()
-        self.controller.client = self.sim
-        self.controller.vehicle = Vehicle(self.sim)
+        self.controller = SimpleNamespace()
         self.control = BodyRates(thrust=.3)
         self.controller.update = Mock(return_value=self.control)
 
     def test_zero_is_a_complete_controller(self):
-        self.assertEqual(Controller().update(self.state), BodyRates())
+        self.assertEqual(Controller().update(self.state, 0), BodyRates())
+
+    def test_simulator_omits_stale_optional_observations_without_mutating_the_snapshot(self):
+        motion = Motion(1, self.now - 2, Ned(1, 2, 3), Ned(0, 0, 0))
+        state = replace(self.state, motion=motion)
+        simulator = AIGPSimulator(self.controller, client=self.sim)
+        simulator.control_step(state, 2)
+        self.controller.update.assert_called_once_with(replace(state, motion=None), 2)
+        self.assertIs(state.motion, motion)
+
+    def test_position_controller_stops_when_its_position_sample_becomes_stale(self):
+        motion = Motion(1, self.now, Ned(0, 0, 0), Ned(0, 0, 0))
+        state = replace(self.state, motion=motion)
+        simulator = AIGPSimulator(Gates(), client=self.sim)
+        self.assertIsInstance(simulator.control_step(state, 0), PositionNed)
+        self.now += 2
+        with self.assertRaisesRegex(ValueError, "fresh VQ1 position"):
+            simulator.control_step(replace(state, received_at=self.now), 0)
+
+    def test_runner_creates_its_client_when_none_is_supplied(self):
+        with patch("target.aigp.aigp.SimulatorClient", return_value=self.sim) as create:
+            with self.assertRaises(KeyboardInterrupt):
+                AIGPSimulator(self.controller).run(attach=True)
+        create.assert_called_once_with()
+        self.sim.connect.assert_called_once()
+        self.sim.disconnect.assert_called_once()
 
     def test_normal_start_and_interrupt_shutdown(self):
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.assertEqual(self.sim.method_calls, [
             call.connect(), call.read(timeout=0.1), call.arm(), call.send(self.control),
             call.heartbeat(), call.read(timeout=0.1), call.send(BodyRates()),
             call.disarm(), call.disconnect(),
         ])
-        self.controller.update.assert_called_once_with(self.state)
+        self.controller.update.assert_called_once_with(self.state, 0)
         self.assertAlmostEqual(self.sleeps[1], .02)
 
     def test_connection_failure_does_not_arm_or_send(self):
         self.sim.connect.side_effect = TimeoutError("no heartbeat")
         with self.assertRaises(TimeoutError):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -107,7 +99,7 @@ class ControllerTest(unittest.TestCase):
                 self.sim.read.side_effect = [self.state, KeyboardInterrupt()]
                 self.controller.update.return_value = command
                 with self.assertRaises(KeyboardInterrupt):
-                    run(self.controller)
+                    AIGPSimulator(self.controller, client=self.sim).run(attach=True)
                 self.assertEqual(self.sim.send.call_args_list, [call(command), call(BodyRates())])
                 self.sim.disarm.assert_called_once()
 
@@ -115,7 +107,7 @@ class ControllerTest(unittest.TestCase):
         self.sim.commands = frozenset((BodyRates,))
         self.controller.update.return_value = PositionNed(1, 2, -3)
         with self.assertRaisesRegex(NotImplementedError, "PositionNed"):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
@@ -123,7 +115,7 @@ class ControllerTest(unittest.TestCase):
         self.controller.update.side_effect = [None, self.control]
         self.sim.read.side_effect = [self.state, self.state, KeyboardInterrupt()]
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.assertEqual(self.sim.method_calls[:5], [
             call.connect(), call.read(timeout=0.1), call.heartbeat(),
             call.read(timeout=0.1), call.arm(),
@@ -133,14 +125,14 @@ class ControllerTest(unittest.TestCase):
     def test_completion_disarms_and_closes(self):
         self.controller.update.side_effect = [self.control, StopIteration()]
         self.sim.read.side_effect = [self.state, self.state]
-        run(self.controller)
+        AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.assertEqual(self.sim.send.call_args, call(BodyRates()))
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_completion_before_first_command_does_not_arm(self):
         self.controller.update.side_effect = StopIteration()
-        run(self.controller)
+        AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.disarm.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -149,20 +141,20 @@ class ControllerTest(unittest.TestCase):
         self.controller.update.side_effect = [self.control, None]
         self.sim.read.side_effect = [self.state, self.state]
         with self.assertRaisesRegex(ValueError, "no command"):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.assertEqual(self.sim.send.call_args, call(BodyRates()))
         self.sim.disarm.assert_called_once()
 
     def test_startup_wait_is_bounded(self):
         def read(**kwargs):
             self.now += 1
-            self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
+            self.sim.race_status = RaceStatus(int(self.now * 1000), 0, -1, 0, 0, self.now)
             return replace(self.state, received_at=self.now)
 
         self.sim.read.side_effect = read
         self.controller.update.return_value = None
         with self.assertRaisesRegex(TimeoutError, "startup telemetry"):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -170,7 +162,7 @@ class ControllerTest(unittest.TestCase):
     def test_invalid_initial_action_never_arms(self):
         self.controller.update.return_value = (0, 0, 0, 0)
         with self.assertRaisesRegex(TypeError, "expected BodyRates"):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
         self.sim.disconnect.assert_called_once()
@@ -184,80 +176,80 @@ class ControllerTest(unittest.TestCase):
                     if self.sim.read.call_count == 1:
                         return self.state
                     self.now += kwargs["timeout"]
-                    self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
+                    self.sim.race_status = RaceStatus(int(self.now * 1000), 0, -1, 0, 0, self.now)
                     raise error
 
                 self.state = replace(self.state, received_at=self.now)
-                self.sim.race = Race(int(self.now * 1000), 0, -1, 0, 0, self.now)
+                self.sim.race_status = RaceStatus(int(self.now * 1000), 0, -1, 0, 0, self.now)
                 self.sim.read.side_effect = read
                 with self.assertRaises(type(error)):
-                    run(self.controller)
+                    AIGPSimulator(self.controller, client=self.sim).run(attach=True)
                 self.assertEqual(self.sim.send.call_args, call(BodyRates()))
                 self.sim.disarm.assert_called_once()
                 self.sim.disconnect.assert_called_once()
 
     def test_slow_controller_command_is_not_sent(self):
-        def slow(state):
+        def slow(state, gate_index):
             self.now += 2
             return self.control
 
         self.controller.update.side_effect = slow
         with self.assertRaisesRegex(TimeoutError, "stale"):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.arm.assert_not_called()
         self.sim.send.assert_not_called()
 
     def test_late_tick_does_not_catch_up_in_a_burst(self):
-        def slow(state):
+        def slow(state, gate_index):
             self.now += .15
             return self.control
 
         self.controller.update.side_effect = slow
         with self.assertRaises(KeyboardInterrupt):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.assertAlmostEqual(self.sleeps[1], .02)
 
     def test_disarm_and_close_survive_send_failure(self):
         self.sim.send.side_effect = OSError("socket failed")
         with self.assertRaises(OSError):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_close_survives_unexpected_cleanup_failure(self):
         self.sim.send.side_effect = [None, ValueError("cleanup failed")]
         with self.assertRaises(ValueError):
-            run(self.controller)
+            AIGPSimulator(self.controller, client=self.sim).run(attach=True)
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
     def test_invalid_rate_does_not_connect(self):
         for hz in (0, -1, math.inf, math.nan):
             with self.subTest(hz=hz), self.assertRaises(ValueError):
-                run(self.controller, hz)
+                AIGPSimulator(self.controller, hz=hz, client=self.sim).run(attach=True)
         self.sim.connect.assert_not_called()
 
 
 class ControllerSelectionTest(unittest.TestCase):
     def test_loads_aigp_controllers_by_short_name(self):
-        for name, simulator in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1")):
-            with self.subTest(name=name), \
-                    patch("target.aigp.runner.signal.signal"), \
-                    patch("target.aigp.runner.run_session") as session:
-                main([simulator, "--controller", name])
-                controller = session.call_args.args[0]
+        for name, target in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1")):
+            with self.subTest(name=name), patch("target.aigp.aigp.signal.signal"), \
+                    patch("target.aigp.aigp.AIGPSimulator") as simulator:
+                main([target, "--controller", name])
+                controller = simulator.call_args.args[0]
+                self.assertIsInstance(controller, BaseController)
                 self.assertEqual(type(controller).__module__, f"target.aigp.controllers.{name}")
-                session.assert_called_once_with(controller, simulator, 50.0, [], 120.0)
+                simulator.assert_called_once_with(controller, target, 50.0, startup_timeout=120.0)
+                simulator.return_value.run.assert_called_once_with(attach=False, simulator_args=[])
 
-    def test_plain_controller_is_rejected_before_launch(self):
-        with patch("target.aigp.runner.run_session") as session, \
-                patch("target.aigp.runner.importlib.import_module",
-                      return_value=SimpleNamespace(Controller=object)), \
+    def test_controller_without_base_contract_is_rejected_before_launch(self):
+        with patch("target.aigp.aigp.AIGPSimulator") as simulator, \
+                patch("target.aigp.aigp.importlib.import_module", return_value=SimpleNamespace(Controller=object)), \
                 redirect_stderr(io.StringIO()) as error, self.assertRaises(SystemExit) as raised:
             main(["vq2.r2", "--controller", "zero"])
         self.assertEqual(raised.exception.code, 2)
         self.assertIn("Controller must inherit BaseController", error.getvalue())
-        session.assert_not_called()
+        simulator.assert_not_called()
 
 
 if __name__ == "__main__":

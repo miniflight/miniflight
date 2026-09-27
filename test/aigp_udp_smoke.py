@@ -17,11 +17,12 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.runner import _stop_process, run, run_session
+from target.aigp.aigp import AIGPSimulator, _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State
-from target.aigp.client import _Camera as Camera
+from target.aigp.aigp import SimulatorClient
+from target.aigp.aigp import _Camera as Camera
 from test.test_aigp_client import heartbeat, imu, packet
 
 
@@ -53,7 +54,7 @@ class UDPSmokeTest(unittest.TestCase):
             sequence = 0
             try:
                 while not stop.wait(.005):
-                    sock, vision = sim.client._socket, sim.client._vision
+                    sock, vision = client._socket, client._vision
                     if sock is None or vision is None:
                         continue
                     try:
@@ -76,24 +77,25 @@ class UDPSmokeTest(unittest.TestCase):
                 failures.append(error)
 
         class Controller(BaseController):
-            def update(self, state):
-                if not isinstance(state, State) or self.vehicle.state is not state:
-                    raise AssertionError("controller did not receive the vehicle snapshot")
+            def update(self, state, gate_index):
+                if not isinstance(state, State) or gate_index != 0:
+                    raise AssertionError("controller did not receive the observations and active gate index")
                 states.append(state)
                 if len(states) == 5:
                     raise KeyboardInterrupt
                 return BodyRates(.1, -.2, .3, .4)
 
-        sim = Controller(port=0, camera_port=0)
+        controller = Controller()
+        client = SimulatorClient(port=0, camera_port=0)
         worker = threading.Thread(target=serve)
         worker.start()
         try:
             with self.assertRaises(KeyboardInterrupt):
-                run(sim)
+                AIGPSimulator(controller, client=client).run(attach=True)
         finally:
             stop.set()
             worker.join(timeout=2)
-            sim.vehicle.disconnect()
+            client.disconnect()
         self.assertFalse(worker.is_alive())
         self.assertEqual(failures, [])
         drain()
@@ -140,13 +142,14 @@ class UDPSmokeTest(unittest.TestCase):
 
     def owned_session(self, *fixture_args, expect_timeout=False):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
-        sim = Gates(port=0, camera_port=None)
+        controller = Gates()
+        client = SimulatorClient(port=0, camera_port=None)
         children = []
 
         @contextmanager
         def launch(target, simulator_args=()):
             self.assertEqual(target, "vq1.r1")
-            port = sim.client._socket.getsockname()[1]
+            port = client._socket.getsockname()[1]
             child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
             children.append(child)
@@ -155,12 +158,12 @@ class UDPSmokeTest(unittest.TestCase):
             finally:
                 _stop_process(child)
 
-        with patch("target.aigp.runner.launch", side_effect=launch):
+        with patch("target.aigp.aigp.launch", side_effect=launch):
             if expect_timeout:
                 with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
-                    run_session(sim, "vq1.r1", startup_timeout=8)
+                    AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).run()
             else:
-                run_session(sim, "vq1.r1", startup_timeout=8)
+                AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).run()
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)
@@ -171,8 +174,8 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertGreater(result["positions"], 6)
         self.assertEqual(result["position_masks"], [3576])
         self.assertTrue(result["stopped_by_parent"])
-        self.assertIsNone(sim.client._socket)
-        self.assertIsNone(sim.vehicle.state)
+        self.assertIsNone(client._socket)
+        self.assertFalse(client.connected)
         return result
 
 

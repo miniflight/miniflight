@@ -1,7 +1,6 @@
 """Six-gate R1 baseline using the simulator's built-in position controller."""
 
 import math
-import time
 
 from miniflight import PositionNed, State
 from target.aigp.controllers import BaseController
@@ -18,58 +17,49 @@ GATES = (
 )
 
 
+def gate_target(position, index: int) -> PositionNed:
+    """Aim one metre beyond the gate center along the approach from position."""
+    center = GATES[index]
+    direction = tuple(c - p for c, p in zip(center, position))
+    distance = math.hypot(*direction)
+    if distance < 0.1:
+        previous = GATES[index - 1] if index else (0.0, 0.0, 0.0)
+        direction = tuple(c - p for c, p in zip(center, previous))
+        distance = math.hypot(*direction)
+    return PositionNed(*(c + d / distance for c, d in zip(center, direction)))
+
+
 class Controller(BaseController):
     targets = ("vq1.r1",)
 
-    def __init__(self, port=14550, camera_port=5600):
-        super().__init__(port=port, camera_port=camera_port)
+    def __init__(self):
         self.gate = None
         self.target = None
-        self.started_at = None
         self.gate_started_at = None
 
-    def update(self, state: State) -> PositionNed | None:
-        if self.started_at is None:
-            self.started_at = state.time
-        motion, race = state.motion, self.race
-        if motion is None or race is None:
-            if self.gate is not None or state.time - self.started_at >= 10:
-                raise ValueError("r1_gates needs VQ1 position and race telemetry")
+    def update(self, state: State, gate_index: int) -> PositionNed | None:
+        motion = state.motion
+        if motion is None:
+            if self.gate is not None:
+                raise ValueError("r1_gates needs fresh VQ1 position telemetry")
             return None  # Wait for startup telemetry without arming.
 
-        now = time.monotonic()
-        if now - motion.received_at > 1:
-            raise TimeoutError("R1 position telemetry is stale")
         position = motion.position
         if not all(math.isfinite(v) for v in position):
             raise ValueError("R1 position telemetry must be finite")
 
-        index = race.active_gate_index
+        index = gate_index
         if not 0 <= index <= len(GATES):
             raise ValueError(f"gate index {index} does not belong to the six-gate R1 course")
         if self.gate is not None and index < self.gate:
             raise ValueError("race reset during control; start a new run")
-        if race.race_finish_time_ns >= 0:
-            print("r1_gates: finished", flush=True)
-            raise StopIteration
-        if race.race_start_boot_time_ms < 0 or race.sim_boot_time_ms < race.race_start_boot_time_ms:
-            return None
         if index == len(GATES):
             return self.target  # Hold the final target until the native finish signal.
 
         if index != self.gate:
-            center = GATES[index]
-            direction = tuple(c - p for c, p in zip(center, position))
-            distance = math.hypot(*direction)
-            if distance < 0.1:
-                previous = GATES[index - 1] if index else (0.0, 0.0, 0.0)
-                direction = tuple(c - p for c, p in zip(center, previous))
-                distance = math.hypot(*direction)
-            # A fixed target one metre beyond the center crosses the gate instead
-            # of stopping in its plane. Only the reported gate index advances us.
-            self.target = PositionNed(*(c + d / distance for c, d in zip(center, direction)))
+            # Hold this target until the simulator reports the gate was passed.
+            self.target = gate_target(position, index)
             self.gate, self.gate_started_at = index, state.time
-            print(f"r1_gates: gate {index + 1}/{len(GATES)}", flush=True)
         if state.time - self.gate_started_at > 45:
             raise TimeoutError(f"gate {index + 1} was not passed within 45 simulator seconds")
         return self.target

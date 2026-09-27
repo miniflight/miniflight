@@ -1,17 +1,11 @@
-from miniflight import Command, State, Vehicle
-from target.aigp import SimulatorClient
+from miniflight import Command, State
 
 
 class BaseController:
-    """One vehicle connection and the AI-GP race signals for a control loop."""
+    def update(self, state: State, gate_index: int) -> Command | None:
+        """Return one vehicle command, or None while waiting for required observations.
 
-    def __init__(self, port=14550, camera_port=5600):
-        self.client = SimulatorClient(port=port, camera_port=camera_port)
-        self.vehicle = Vehicle(self.client)
-
-    @property
-    def race(self):
-        return self.client.race
-
-    def update(self, state: State) -> Command | None:
+        state: Current vehicle observations. Unavailable or stale optional samples are None.
+        gate_index: The zero-based active gate reported by the simulator.
+        """
         raise NotImplementedError

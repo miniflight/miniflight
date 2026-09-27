@@ -8,8 +8,8 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates, Ned, PositionNed, Vehicle, VelocityNed
-from target.aigp import SimulatorClient
-from target.aigp.client import _Camera as Camera
+from target.aigp.aigp import SimulatorClient
+from target.aigp.aigp import _Camera as Camera
 
 
 PEER = ("127.0.0.1", 14560)
@@ -52,9 +52,9 @@ class ClientTest(unittest.TestCase):
         self.camera = Socket()
         self.sim = SimulatorClient()
         self.enterContext(patch.object(SimulatorClient, "_bind", side_effect=[self.wire, self.camera]))
-        self.enterContext(patch("target.aigp.client.select.select", side_effect=
+        self.enterContext(patch("target.aigp.aigp.select.select", side_effect=
                                 lambda sockets, *args: ([s for s in sockets if s.packets], [], [])))
-        self.enterContext(patch("target.aigp.client.time.monotonic", return_value=10.0))
+        self.enterContext(patch("target.aigp.aigp.time.monotonic", return_value=10.0))
         self.sim.connect()
         self.addCleanup(self.sim.disconnect)
 
@@ -136,7 +136,7 @@ class ClientTest(unittest.TestCase):
                 state = self.sim.read(timeout=0)
                 self.assertAlmostEqual(state.time, .1)
                 self.assertEqual(state.dt, 0.0)
-                self.assertEqual(self.sim.race.sim_boot_time_ms, 100)
+                self.assertEqual(self.sim.race_status.sim_boot_time_ms, 100)
                 self.feed(imu(120000))
                 self.assertAlmostEqual(self.sim.read(timeout=0).dt, .02)
 
@@ -150,7 +150,7 @@ class ClientTest(unittest.TestCase):
         self.feed(imu(100000))
         with self.assertRaisesRegex(TimeoutError, "fresh IMU"):
             self.sim.read(timeout=0)
-        self.assertEqual(self.sim.race.sim_boot_time_ms, 100)
+        self.assertEqual(self.sim.race_status.sim_boot_time_ms, 100)
 
     def test_read_requires_fresh_data(self):
         self.feed(imu())
@@ -164,26 +164,26 @@ class ClientTest(unittest.TestCase):
         self.feed(mavlink.MAVLink_collision_message(0, 1001, 0, 2, 0, 0, 8))
         self.feed(imu())
         state = self.sim.read()
-        self.assertEqual(self.sim.race.active_gate_index, 3)
-        self.assertEqual(self.sim.race.race_start_boot_time_ms, -1)
-        self.assertEqual(self.sim.race.received_at, 10.0)
+        self.assertEqual(self.sim.race_status.active_gate_index, 3)
+        self.assertEqual(self.sim.race_status.race_start_boot_time_ms, -1)
+        self.assertEqual(self.sim.race_status.received_at, 10.0)
         self.assertIn("COLLISION", [m.get_type() for m in self.sim.messages])
         self.assertFalse(hasattr(state, "messages"))
 
     def test_race_finish_is_available_without_imu(self):
-        self.assertIsNone(self.sim.race)
+        self.assertIsNone(self.sim.race_status)
         payload = struct.pack("<BQqqIq", 1, 2000, 500, 123, 6, 0).ljust(253, b"\0")
         self.feed(mavlink.MAVLink_encapsulated_data_message(0, payload))
         with self.assertRaisesRegex(TimeoutError, "fresh IMU"):
             self.sim.read(timeout=0)
-        self.assertEqual(self.sim.race.race_finish_time_ns, 123)
-        self.assertEqual(self.sim.race.active_gate_index, 6)
-        self.assertEqual(self.sim.race.received_at, 10.0)
+        self.assertEqual(self.sim.race_status.race_finish_time_ns, 123)
+        self.assertEqual(self.sim.race_status.active_gate_index, 6)
+        self.assertEqual(self.sim.race_status.received_at, 10.0)
         # Other packet types must not refresh the race packet's own age.
-        with patch("target.aigp.client.time.monotonic", return_value=10.5):
+        with patch("target.aigp.aigp.time.monotonic", return_value=10.5):
             self.feed(heartbeat())
             self.sim.poll()
-        self.assertEqual(self.sim.race.received_at, 10.0)
+        self.assertEqual(self.sim.race_status.received_at, 10.0)
 
     def test_body_rates_use_radians_extension_and_discovered_target(self):
         self.sim.send(BodyRates(.1, -.2, .3, .4))
@@ -262,7 +262,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(first.motors.active, 0b0101)
         self.assertEqual(len(first.motors.outputs), 32)
         self.assertAlmostEqual(first.motors.outputs[1], .2)
-        with patch("target.aigp.client.time.monotonic", return_value=10.5):
+        with patch("target.aigp.aigp.time.monotonic", return_value=10.5):
             self.feed(imu(1020000))
             second = self.sim.read()
         self.assertEqual(second.received_at, 10.5)
@@ -305,7 +305,7 @@ class ConnectionFailureTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "already open"):
                 sim.open()
             sock.packets.append((packet(heartbeat()), PEER))
-            with patch("target.aigp.client.select.select", side_effect=
+            with patch("target.aigp.aigp.select.select", side_effect=
                        lambda *args: ([sock] if sock.packets else [], [], [])):
                 sim.connect()
             self.assertTrue(sim.connected)

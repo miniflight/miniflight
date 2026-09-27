@@ -2,7 +2,7 @@ import time
 
 from pymavlink import mavutil
 
-from target.aigp import SimulatorClient
+from target.aigp.aigp import SimulatorClient
 
 
 ARMED = mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED

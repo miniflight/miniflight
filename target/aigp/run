@@ -17,4 +17,4 @@ repo=$(CDPATH= cd -- "$base/../.." && pwd)
 export UV_CACHE_DIR="$base/.runtime/uv-cache"
 export UV_PYTHON_INSTALL_DIR="$base/.runtime/uv-python"
 exec uv run --no-project --python 3.11 --with-editable "$repo[aigp]" \
-  python -m target.aigp.runner "$@"
+  python -m target.aigp.aigp "$@"

@@ -1,6 +1,7 @@
 from contextlib import redirect_stdout
 import hashlib
 import io
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -10,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from target.aigp import install as runtime
+from target.aigp import aigp as runtime
 
 
 class VQ2PackageTest(unittest.TestCase):
@@ -80,10 +81,11 @@ class VQ2PackageTest(unittest.TestCase):
     def test_direct_execution_reuses_installed_package(self):
         self.archive()
         runtime.prepare("vq2", self.base)
-        shutil.copyfile(runtime.__file__, self.base / "install.py")
+        shutil.copyfile(runtime.__file__, self.base / "aigp.py")
         self.part.unlink()
-        result = subprocess.run([sys.executable, str(self.base / "install.py"), "vq2"],
-                                cwd=self.base, capture_output=True, text=True, timeout=10)
+        env = dict(os.environ, PYTHONPATH=str(Path(runtime.__file__).resolve().parents[2]))
+        result = subprocess.run([sys.executable, str(self.base / "aigp.py"), "--prepare", "vq2"],
+                                cwd=self.base, env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
 
 

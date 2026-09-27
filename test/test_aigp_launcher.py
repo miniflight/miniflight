@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from target.aigp import install, runner
+from target.aigp import aigp
 
 
 class WineDiscoveryTest(unittest.TestCase):
@@ -19,8 +19,8 @@ class WineDiscoveryTest(unittest.TestCase):
 
     def resolve(self, platform, available):
         with patch.object(sys, "platform", platform), \
-                patch.object(runner.shutil, "which", side_effect=available.get):
-            return runner.wine_commands()
+                patch.object(aigp.shutil, "which", side_effect=available.get):
+            return aigp.wine_commands()
 
     def test_macos_uses_game_porting_toolkit(self):
         directory = "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/"
@@ -54,11 +54,11 @@ class WineDiscoveryTest(unittest.TestCase):
             self.resolve("win32", {})
 
     def test_busy_udp_port_prevents_setup_or_prefix_cleanup(self):
-        with patch.object(runner.socket, "socket") as socket, \
-                patch.object(runner, "wine_commands") as wine, patch.object(runner, "prepare") as prepare:
+        with patch.object(aigp.socket, "socket") as socket, \
+                patch.object(aigp, "wine_commands") as wine, patch.object(aigp, "prepare") as prepare:
             socket.return_value.__enter__.return_value.bind.side_effect = OSError("busy")
             with self.assertRaisesRegex(OSError, "UDP 14560"):
-                with runner.launch("vq1.r1"):
+                with aigp.launch("vq1.r1"):
                     self.fail("launched over an existing simulator")
             wine.assert_not_called()
             prepare.assert_not_called()
@@ -73,15 +73,15 @@ class LauncherTest(unittest.TestCase):
         self.base = Path(temporary.name).resolve() / "path with spaces"
         self.base.mkdir()
         (self.base / "archives").mkdir()
-        (self.base / "archives/SHA256SUMS").write_text("\n".join(f"{'0' * 64}  {name}.tar.xz" for name in install.VERSIONS))
-        for version, profile in install.VERSIONS.items():
+        (self.base / "archives/SHA256SUMS").write_text("\n".join(f"{'0' * 64}  {name}.tar.xz" for name in aigp.VERSIONS))
+        for version, profile in aigp.VERSIONS.items():
             sim = self.base / ".runtime" / version
-            for relative in install.REQUIRED:
+            for relative in aigp.REQUIRED:
                 path = sim / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"test payload")
             (sim / ".installed").write_text(profile["legacy"])
-            for name in install.configuration(version):
+            for name in aigp.configuration(version):
                 source = self.base / "config" / version / name
                 source.parent.mkdir(parents=True, exist_ok=True)
                 source.write_text(f"test config {version} {name}")
@@ -124,11 +124,11 @@ if kind == "wineserver":
             self.env.pop(name, None)
 
     def launch(self, target="vq1.r1", *args, platform=sys.platform, **env):
-        code = ("from target.aigp import runner; import sys; from pathlib import Path; "
-                "runner.BASE = Path(sys.argv[1]); runner.sys.platform = sys.argv[2]; "
-                "runner._check_simulator_ports = lambda: None; sys.exit(runner.main(sys.argv[3:]))")
+        code = ("from target.aigp import aigp; import sys; from pathlib import Path; "
+                "aigp.BASE = Path(sys.argv[1]); aigp.sys.platform = sys.argv[2]; "
+                "aigp._check_simulator_ports = lambda: None; sys.exit(aigp.main(sys.argv[3:]))")
         process = subprocess.Popen([sys.executable, "-c", code, str(self.base), platform, target, *args],
-                                   cwd=Path(runner.__file__).resolve().parents[2], env=dict(self.env, **env),
+                                   cwd=Path(aigp.__file__).resolve().parents[2], env=dict(self.env, **env),
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
         self.addCleanup(self.cleanup, process)
         return process
@@ -167,7 +167,7 @@ if kind == "wineserver":
 
     def test_all_targets_on_both_launch_paths(self):
         for platform in ("darwin", "linux"):
-            for target, (version, mode, level) in runner.TARGETS.items():
+            for target, (version, mode, level) in aigp.TARGETS.items():
                 with self.subTest(platform=platform, target=target):
                     before = len(self.read_events())
                     self.finish(self.launch(target, "-test", "value with spaces", platform=platform))
@@ -176,7 +176,7 @@ if kind == "wineserver":
                     sim = self.base / ".runtime" / version
                     wine = events[1]
                     self.assertEqual(wine["cwd"], str(sim))
-                    self.assertEqual(wine["args"], [str(sim / install.SHIPPING),
+                    self.assertEqual(wine["args"], [str(sim / aigp.SHIPPING),
                         f"/Game/levelsMaster/{level}?game=/Script/DCGame.GameModeRaceBase",
                         "-windowed", "-ResX=1280", "-ResY=720", "-nosound", "-NoSplash", "-test", "value with spaces"])
                     self.assertEqual(wine["mode"], mode if version == "vq2" else None)
@@ -193,7 +193,7 @@ if kind == "wineserver":
         old_python.write_text("existing python environment")
         self.finish(self.launch())
         self.assertEqual(old_python.read_text(), "existing python environment")
-        self.assertEqual((self.base / ".runtime/vq1" / install.SHIPPING).read_bytes(), b"test payload")
+        self.assertEqual((self.base / ".runtime/vq1" / aigp.SHIPPING).read_bytes(), b"test payload")
 
     def test_prepare_failure_never_starts_wine(self):
         (self.base / "archives/SHA256SUMS").unlink()

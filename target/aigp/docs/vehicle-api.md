@@ -4,7 +4,7 @@
 
 ```python
 from miniflight import Vehicle
-from target.aigp import SimulatorClient
+from target.aigp.aigp import SimulatorClient
 
 vehicle = Vehicle(SimulatorClient())
 vehicle.connect()
@@ -34,7 +34,7 @@ an unsupported command raises `NotImplementedError` without emulation
 
 the corresponding convenience methods are `position_ned` `velocity_ned` and `body_rates`
 they each send one command and do not run background loops
-the aigp harness owns race timing heartbeats command cadence and process lifetime
+AIGPSimulator owns race timing heartbeats command cadence and process lifetime
 
 ## source boundary
 
@@ -87,4 +87,8 @@ standard message fields are defined by [MAVLink](https://mavlink.io/en/messages/
 
 `r1_gates` consumes `State.motion.position` and returns `PositionNed`
 `zero` returns `BodyRates`
-both use `Vehicle.read` and `Vehicle.send` through the same race controlled loop
+`AIGPSimulator` owns the connection and uses `Vehicle.read` and `Vehicle.send` for both
+controllers implement `BaseController.update(state, gate_index)`
+native `RaceStatus` packets stay inside the AI-GP simulator and client
+optional observations older than the simulator timeout are `None` at controller update
+the client and generic vehicle API retain the original timestamped observations

@@ -1,4 +1,4 @@
-from target.aigp import SimulatorClient
+from target.aigp.aigp import SimulatorClient
 from miniflight.vehicle import Vehicle
 
 
