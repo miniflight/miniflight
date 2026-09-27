@@ -19,7 +19,8 @@ class BaseController:
         """Return one vehicle command, or None while waiting for required observations.
 
         state: Current vehicle observations. Unavailable or stale optional samples are None.
-        gate_index: The zero-based active gate reported by the simulator.
+        gate_index: The zero-based active gate; len(gates) means all gates were passed.
+                    The simulator checks its bounds when track geometry is available.
         gates: The complete track geometry, or None when it is unavailable.
         """
         raise NotImplementedError

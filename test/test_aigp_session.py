@@ -7,9 +7,10 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
 
+from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as Gates
 from target.aigp.controllers.zero import Controller as Zero
-from miniflight import BodyRates, State
+from miniflight import BodyRates, Ned, State
 from target.aigp.simulator import RaceStatus, SimulatorClient
 from target.aigp.simulator import AIGPSimulator, _stop_process
 
@@ -84,6 +85,7 @@ class RaceLoopTest(unittest.TestCase):
         self.sim = Mock(spec=SimulatorClient)
         self.sim.commands = SimulatorClient.commands
         self.sim.gates = None
+        self.gates = tuple(Gate(i, Ned(-20 * (i + 1), 0, -2), (1, 0, 0, 0), 2, 2) for i in range(6))
         self.simulator = AIGPSimulator(self.controller, client=self.sim)
         self.controller.update = Mock(return_value=BodyRates(thrust=.3))
 
@@ -98,8 +100,8 @@ class RaceLoopTest(unittest.TestCase):
     def sleep(self, seconds):
         self.now += seconds
 
-    def state(self, boot=1000, start=-1, finish=-1):
-        return SimpleNamespace(race=RaceStatus(boot, start, finish, 0, 0, self.now),
+    def state(self, boot=1000, start=-1, finish=-1, gate=0):
+        return SimpleNamespace(race=RaceStatus(boot, start, finish, gate, 0, self.now),
                                state=State(boot * .001, .02, (0, 0, 0), (0, 0, 0), self.now))
 
     def reading(self, samples):
@@ -178,6 +180,44 @@ class RaceLoopTest(unittest.TestCase):
         self.sim.arm.assert_called_once()
         self.sim.disarm.assert_called_once()
         self.assertEqual(self.sim.send.call_args, call(BodyRates()))
+
+    def test_gate_progress_times_out_in_simulator_seconds_and_disarms(self):
+        self.sim.gates = self.gates
+        self.reading([self.state(1000, 500), self.state(46000, 500), self.state(47000, 500)])
+        with self.assertRaisesRegex(TimeoutError, "gate 1.*45 simulator seconds"):
+            self.execute()
+        self.assertEqual(self.sim.send.call_args_list, [call(BodyRates(thrust=.3)),
+                                                       call(BodyRates(thrust=.3)), call(BodyRates())])
+        self.sim.arm.assert_called_once()
+        self.sim.disarm.assert_called_once()
+        self.sim.disconnect.assert_called_once()
+
+    def test_gate_timeout_is_configurable(self):
+        self.sim.gates = self.gates
+        self.simulator = AIGPSimulator(self.controller, client=self.sim, gate_timeout=2)
+        self.reading([self.state(1000, 500), self.state(4000, 500)])
+        with self.assertRaisesRegex(TimeoutError, "gate 1.*2 simulator seconds"):
+            self.execute()
+        self.sim.disarm.assert_called_once()
+
+    def test_each_reported_gate_pass_gets_a_new_deadline(self):
+        self.sim.gates = self.gates
+        self.reading([self.state(1000, 500), self.state(45000, 500, gate=1),
+                      self.state(88000, 500, gate=1), self.state(99000, 500, finish=123, gate=6)])
+        self.assertEqual(self.execute().race_finish_time_ns, 123)
+        self.assertEqual(self.controller.update.call_count, 3)
+
+    def test_last_gate_waits_for_native_finish_without_a_gate_deadline(self):
+        self.sim.gates = self.gates
+        self.reading([self.state(1000, 500, gate=5), self.state(47000, 500, gate=6),
+                      self.state(100000, 500, finish=123, gate=6)])
+        self.assertEqual(self.execute().race_finish_time_ns, 123)
+        self.assertEqual(self.controller.update.call_count, 2)
+
+    def test_unavailable_track_does_not_impose_a_gate_deadline(self):
+        self.reading([self.state(1000, 500), self.state(47000, 500), self.state(100000, 500, finish=123)])
+        self.assertEqual(self.execute().race_finish_time_ns, 123)
+        self.assertEqual(self.controller.update.call_count, 2)
 
     def test_stale_race_never_arms_despite_fresh_imu(self):
         state = self.state(start=0)

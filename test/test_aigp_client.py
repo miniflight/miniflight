@@ -108,6 +108,21 @@ class ClientTest(unittest.TestCase):
         self.feed(imu(), component=8)
         self.assertEqual(self.sim.read().time, 1.0)
 
+    def test_nonfinite_motion_is_unavailable_until_a_valid_sample_arrives(self):
+        self.feed(mavlink.MAVLink_local_position_ned_message(1, 1, 2, 3, 4, 5, 6))
+        self.feed(imu())
+        self.assertIsNotNone(self.sim.read().motion)
+        for index, value in enumerate((math.nan, math.inf, -math.inf, math.nan, math.inf, -math.inf)):
+            with self.subTest(component=index):
+                values = [1, 2, 3, 4, 5, 6]
+                values[index] = value
+                self.feed(mavlink.MAVLink_local_position_ned_message(2 + index, *values))
+                self.feed(imu(1020000 + index * 20000))
+                self.assertIsNone(self.sim.read().motion)
+        self.feed(mavlink.MAVLink_local_position_ned_message(8, 1, 2, 3, 4, 5, 6))
+        self.feed(imu(1140000))
+        self.assertEqual(self.sim.read().motion.position, Ned(1, 2, 3))
+
     def test_unrelated_system_and_peer_are_ignored(self):
         self.feed(imu(2000000), system=99)
         self.wire.packets.append((packet(imu(3000000)), ("127.0.0.1", 20000)))

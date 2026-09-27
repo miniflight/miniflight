@@ -24,31 +24,23 @@ class Controller(BaseController):
     def __init__(self):
         self.gate = None
         self.target = None
-        self.gate_started_at = None
 
     def update(self, state: State, gate_index: int, gates) -> PositionNed | None:
+        time = state.time
+        dt = state.dt
+        acceleration = state.acceleration
+        gyro = state.gyro
+        received_at = state.received_at
+        frame = state.frame
         motion = state.motion
+        attitude = state.attitude
+        motors = state.motors
+
         if motion is None or not gates:
-            if self.gate is not None:
-                raise ValueError("r1_gates needs fresh VQ1 position and track geometry")
-            return None  # Wait for startup telemetry without arming.
+            return None
 
-        position = motion.position
-        if not all(math.isfinite(v) for v in position):
-            raise ValueError("R1 position telemetry must be finite")
+        if gate_index < len(gates) and gate_index != self.gate:
+            self.target = gate_target(motion.position, gate_index, gates)
+            self.gate = gate_index
 
-        index = gate_index
-        if not 0 <= index <= len(gates):
-            raise ValueError(f"gate index {index} does not belong to the published track")
-        if self.gate is not None and index < self.gate:
-            raise ValueError("race reset during control; start a new run")
-        if index == len(gates):
-            return self.target  # Hold the final target until the native finish signal.
-
-        if index != self.gate:
-            # Hold this target until the simulator reports the gate was passed.
-            self.target = gate_target(position, index, gates)
-            self.gate, self.gate_started_at = index, state.time
-        if state.time - self.gate_started_at > 45:
-            raise TimeoutError(f"gate {index + 1} was not passed within 45 simulator seconds")
         return self.target

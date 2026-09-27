@@ -85,13 +85,15 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller: BaseController, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, gate_timeout=45.0):
         if not math.isfinite(hz) or hz <= 0:
             raise ValueError("hz must be positive and finite")
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("timeout must be positive and finite")
         if not math.isfinite(startup_timeout) or startup_timeout <= 0:
             raise ValueError("startup timeout must be positive and finite")
+        if not math.isfinite(gate_timeout) or gate_timeout <= 0:
+            raise ValueError("gate timeout must be positive and finite")
         if target not in TARGETS:
             raise ValueError(f"unsupported simulator: {target}")
         if target not in getattr(controller, "targets", TARGETS):
@@ -101,6 +103,7 @@ class AIGPSimulator:
         self.hz = hz
         self.timeout = timeout
         self.startup_timeout = startup_timeout
+        self.gate_timeout = gate_timeout
         self.client = SimulatorClient() if client is None else client
         self.vehicle = Vehicle(self.client)
         self.status = None
@@ -120,6 +123,7 @@ class AIGPSimulator:
                 self._next_tick = self._next_heartbeat = self._last_imu_at = now
                 self._startup_deadline = now + self.startup_timeout
                 self._controller_deadline = None
+                self._gate_index = self._gate_started_at = None
                 self.status, self.phase = None, "waiting"
                 try:
                     while self.step():
@@ -164,6 +168,11 @@ class AIGPSimulator:
             if now >= self._controller_deadline:
                 raise TimeoutError("controller did not receive its required startup telemetry")
             return True
+        gate_index, gates = self.status.active_gate_index, self.client.gates
+        if gate_index != self._gate_index:
+            self._gate_index, self._gate_started_at = gate_index, state.time
+        if gates and gate_index < len(gates) and state.time - self._gate_started_at > self.gate_timeout:
+            raise TimeoutError(f"gate {gate_index + 1} was not passed within {self.gate_timeout:g} simulator seconds")
         self.vehicle.validate(command)
         if not self.armed:
             self.armed = True
@@ -173,6 +182,9 @@ class AIGPSimulator:
         return True
 
     def control_step(self, state: State, gate_index: int):
+        gates = self.client.gates
+        if gate_index < 0 or (gates is not None and gate_index > len(gates)):
+            raise ValueError(f"gate index {gate_index} does not belong to the published track")
         now = time.monotonic()
 
         def fresh(sample):
@@ -180,7 +192,7 @@ class AIGPSimulator:
 
         observations = replace(state, motion=fresh(state.motion), attitude=fresh(state.attitude),
                                motors=fresh(state.motors), frame=fresh(state.frame))
-        return self.controller.update(observations, gate_index, self.client.gates)
+        return self.controller.update(observations, gate_index, gates)
 
     def stop(self):
         if not self.armed:
@@ -446,6 +458,9 @@ class SimulatorClient(Target):
     def _motion(self):
         message = self._telemetry.get("LOCAL_POSITION_NED")
         if message is None:
+            return None
+        values = (message.x, message.y, message.z, message.vx, message.vy, message.vz)
+        if not all(math.isfinite(value) for value in values):
             return None
         return Motion(message.time_boot_ms * 1e-3, self._received_at["LOCAL_POSITION_NED"],
                       Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz))

@@ -44,6 +44,7 @@ class GateControllerTest(unittest.TestCase):
         self.assertEqual(self.update(position=self.gates[0].center, stamp=20), first)
         beyond = (first.north, first.east, first.down)
         self.assertEqual(self.update(position=beyond, stamp=25), first)
+        self.assertEqual(self.update(position=beyond, stamp=100), first)
         self.assertEqual(self.controller.gate, 0)
 
     def test_reported_gate_pass_advances_the_target(self):
@@ -58,10 +59,9 @@ class GateControllerTest(unittest.TestCase):
         self.assertIsNone(self.controller.update(state, 0, self.gates))
         self.assertIsNone(self.controller.update(replace(state, time=11), 0, self.gates))
 
-    def test_losing_position_after_start_is_rejected(self):
+    def test_losing_position_after_start_returns_no_command(self):
         self.update()
-        with self.assertRaisesRegex(ValueError, "position"):
-            self.controller.update(replace(self.state(stamp=2), motion=None), 0, self.gates)
+        self.assertIsNone(self.controller.update(replace(self.state(stamp=2), motion=None), 0, self.gates))
 
     def test_waits_for_track_without_a_hardcoded_fallback(self):
         self.assertIsNone(self.controller.update(self.state(), 0, None))
@@ -69,10 +69,9 @@ class GateControllerTest(unittest.TestCase):
         self.assertIsNone(self.controller.target)
         self.assertIsInstance(self.controller.update(self.state(), 0, self.gates), PositionNed)
 
-    def test_losing_geometry_after_start_is_rejected(self):
+    def test_losing_geometry_after_start_returns_no_command(self):
         self.update()
-        with self.assertRaisesRegex(ValueError, "track geometry"):
-            self.controller.update(self.state(stamp=2), 0, None)
+        self.assertIsNone(self.controller.update(self.state(stamp=2), 0, None))
 
     def test_unchanged_gate_index_holds_the_target(self):
         first = self.update()
@@ -84,19 +83,6 @@ class GateControllerTest(unittest.TestCase):
     def test_nonfinite_pose_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "finite"):
             self.update(position=(math.nan, 0, 0))
-
-    def test_no_gate_pass_times_out(self):
-        self.update()
-        with self.assertRaisesRegex(TimeoutError, "gate 1"):
-            self.update(stamp=47)
-
-    def test_reset_and_wrong_course_index_are_rejected(self):
-        self.update(index=2)
-        with self.assertRaisesRegex(ValueError, "reset"):
-            self.update(index=0)
-        for index in (-1, 7, 0xffffffff):
-            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "published track"):
-                self.update(index=index, controller=Controller())
 
     def test_last_gate_keeps_the_target_until_native_finish(self):
         target = self.update(index=len(self.gates) - 1)

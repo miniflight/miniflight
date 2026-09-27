@@ -62,10 +62,28 @@ class ControllerTest(unittest.TestCase):
         state = replace(self.state, motion=motion)
         self.sim.gates = (Gate(0, Ned(-10, 0, -2), (1, 0, 0, 0), 2, 2),)
         simulator = AIGPSimulator(Gates(), client=self.sim)
-        self.assertIsInstance(simulator.control_step(state, 0), PositionNed)
-        self.now += 2
-        with self.assertRaisesRegex(ValueError, "fresh VQ1 position"):
-            simulator.control_step(replace(state, received_at=self.now), 0)
+
+        def read(**kwargs):
+            if self.sim.read.call_count > 1:
+                self.now += 2
+            return replace(state, received_at=self.now)
+
+        self.sim.read.side_effect = read
+        with self.assertRaisesRegex(ValueError, "no command"):
+            simulator.rollout(attach=True)
+        self.assertIsInstance(self.sim.send.call_args_list[0].args[0], PositionNed)
+        self.assertEqual(self.sim.send.call_args_list[-1], call(BodyRates()))
+        self.sim.arm.assert_called_once()
+        self.sim.disarm.assert_called_once()
+        self.sim.disconnect.assert_called_once()
+
+    def test_gate_index_is_checked_before_calling_the_controller(self):
+        self.sim.gates = (Gate(0, Ned(-10, 0, -2), (1, 0, 0, 0), 2, 2),)
+        simulator = AIGPSimulator(self.controller, client=self.sim)
+        for index in (-1, 2, 0xffffffff):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "published track"):
+                simulator.control_step(self.state, index)
+        self.controller.update.assert_not_called()
 
     def test_runner_creates_its_client_when_none_is_supplied(self):
         with patch("target.aigp.simulator.SimulatorClient", return_value=self.sim) as create:
@@ -229,6 +247,12 @@ class ControllerTest(unittest.TestCase):
         for hz in (0, -1, math.inf, math.nan):
             with self.subTest(hz=hz), self.assertRaises(ValueError):
                 AIGPSimulator(self.controller, hz=hz, client=self.sim).rollout(attach=True)
+        self.sim.connect.assert_not_called()
+
+    def test_invalid_gate_timeout_does_not_connect(self):
+        for timeout in (0, -1, math.inf, math.nan):
+            with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                AIGPSimulator(self.controller, client=self.sim, gate_timeout=timeout).rollout(attach=True)
         self.sim.connect.assert_not_called()
 
 

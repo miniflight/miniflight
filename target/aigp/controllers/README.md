@@ -30,6 +30,11 @@ It calls `update` only after native GO and stops on native finish. Returning `No
 waits for required observations before arming; returning `None` after starting
 stops the run. Raise `StopIteration` to stop early.
 
+The simulator rejects race resets and gate indices outside the published track.
+With track geometry available, each gate must be passed within 45 simulator seconds
+of the first command for that gate. Set `AIGPSimulator(..., gate_timeout=90)` to allow
+more time. After the last gate, control continues until native finish.
+
 ## observations
 
 `state.acceleration` and `state.gyro` are body-frame IMU samples in m/s² and rad/s.
@@ -40,7 +45,8 @@ Every update has a new IMU sample.
 roll, pitch, and yaw in radians. VQ2 does not publish these observations.
 `state.frame` holds the latest camera image as `bgr`, with its ID and timestamp.
 `state.motors` contains reported output channels and an active mask, not measured RPM.
-Unavailable or stale optional observations are `None`. Each sample keeps its own
+Unavailable or stale optional observations are `None`; motion with nonfinite
+position or velocity is also unavailable. Each sample keeps its own
 timestamp; the simulator removes samples older than its configured timeout before
 calling the controller. The underlying client retains the original telemetry.
 
