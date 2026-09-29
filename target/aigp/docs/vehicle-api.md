@@ -36,6 +36,12 @@ the corresponding convenience methods are `position_ned` `velocity_ned` and `bod
 they each send one command and do not run background loops
 AIGPSimulator owns race timing heartbeats command cadence and process lifetime
 
+`PositionNed` and `VelocityNed` express separate physical requests but share the
+adapter's `SET_POSITION_TARGET_LOCAL_NED` encoder. The command type selects the
+active fields and mask; zero-valued coordinates remain active requests.
+`BodyRates` uses the attitude-target encoder. Masks and frame conversions stay
+inside the adapter; `BaseController.update` returns the original command values.
+
 ## source boundary
 
 the local betaflight snapshot is release `2026.6.2` at `e0b7bb01b17b21351057e9ead2d1ab39dd44fa16`
@@ -84,6 +90,15 @@ the bundled [specification](VQ1-Technical-Specification-00.02.pdf) defines the N
 the [vendor controller](reference/PyAIPilotExample-v4/controller.py) defines the build 3390 radian extension
 the adapter preserves that bit and the existing NED masks
 standard message fields are defined by [MAVLink](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET)
+
+Live VQ1 build-3391 pulses exposed angular sign differences on the wire.
+The adapter negates all three transmitted body rates and received gyro components.
+It preserves reported roll and negates reported pitch and yaw for `State.attitude`.
+Position, velocity, and reported acceleration keep their wire signs.
+Raw `SimulatorClient.telemetry` retains the original messages.
+The [measurements and captured regressions](body-rates.md) establish this conversion
+against attitude changes, NED motion, and the camera heading; VQ2 has not received
+the same physical-response validation.
 
 `r1_gates` consumes `State.motion.position` and returns `PositionNed`
 `zero` returns `BodyRates`

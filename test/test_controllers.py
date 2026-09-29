@@ -244,7 +244,7 @@ class ControllerTest(unittest.TestCase):
         self.sim.disconnect.assert_called_once()
 
     def test_invalid_rate_does_not_connect(self):
-        for hz in (0, -1, math.inf, math.nan):
+        for hz in (0, -1, 100, 250, math.inf, math.nan):
             with self.subTest(hz=hz), self.assertRaises(ValueError):
                 AIGPSimulator(self.controller, hz=hz, client=self.sim).rollout(attach=True)
         self.sim.connect.assert_not_called()

@@ -86,8 +86,8 @@ class AIGPSimulator:
 
     def __init__(self, controller: BaseController, target="vq1.r1", hz=50.0,
                  timeout=1.0, startup_timeout=120.0, client=None, gate_timeout=45.0):
-        if not math.isfinite(hz) or hz <= 0:
-            raise ValueError("hz must be positive and finite")
+        if not math.isfinite(hz) or not 0 < hz < 100:
+            raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("timeout must be positive and finite")
         if not math.isfinite(startup_timeout) or startup_timeout <= 0:
@@ -446,8 +446,9 @@ class SimulatorClient(Target):
         stamp = imu.time_usec * 1e-6
         dt = 0.0 if self._last_imu is None else stamp - self._last_imu.time_usec * 1e-6
         self._last_imu = imu
+        # Angular rates on the AIGP wire have the opposite signs to body FRD.
         state = State(
-            stamp, dt, (imu.xacc, imu.yacc, imu.zacc), (imu.xgyro, imu.ygyro, imu.zgyro),
+            stamp, dt, (imu.xacc, imu.yacc, imu.zacc), (-imu.xgyro, -imu.ygyro, -imu.zgyro),
             self._received_at["HIGHRES_IMU"], self._camera.latest,
             self._motion(), self._attitude(), self._motors(),
         )
@@ -469,8 +470,11 @@ class SimulatorClient(Target):
         message = self._telemetry.get("ATTITUDE")
         if message is None:
             return None
+        if not all(math.isfinite(value) for value in (message.roll, message.pitch, message.yaw)):
+            return None
+        # Build 3391 reports pitch/yaw with the opposite signs to local NED.
         return Attitude(message.time_boot_ms * 1e-3, self._received_at["ATTITUDE"],
-                        message.roll, message.pitch, message.yaw)
+                        message.roll, -message.pitch, -message.yaw)
 
     def _motors(self):
         message = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
@@ -480,19 +484,43 @@ class SimulatorClient(Target):
                             tuple(message.actuator), message.active)
 
     def send(self, control: Command):
-        if isinstance(control, PositionNed):
-            self._ned(control.north, control.east, control.down, velocity=False)
-            return
-        if isinstance(control, VelocityNed):
-            self._ned(control.north, control.east, control.down, velocity=True)
-            return
-        if not isinstance(control, BodyRates):
+        if isinstance(control, (PositionNed, VelocityNed)):
+            self._send_ned(control)
+        elif isinstance(control, BodyRates):
+            self._send_body_rates(control)
+        else:
             raise TypeError("expected BodyRates, PositionNed or VelocityNed")
+
+    def _send_body_rates(self, control: BodyRates):
         self._mav.set_attitude_target_send(
             self._time_ms(), *self._target,
             mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
             [1.0, 0.0, 0.0, 0.0],
-            control.roll_rate, control.pitch_rate, control.yaw_rate, control.thrust,
+            # The simulator's angular-rate wire axes are opposite to FRD.
+            -control.roll_rate, -control.pitch_rate, -control.yaw_rate, control.thrust,
+        )
+
+    def _send_ned(self, control: PositionNed | VelocityNed):
+        vector = (control.north, control.east, control.down)
+        position = velocity = (0, 0, 0)
+        mask = (mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
+                | mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
+                | mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
+                | mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
+                | mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE)
+        if isinstance(control, PositionNed):
+            position = vector
+            mask |= (mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
+                     | mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
+                     | mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE)
+        else:
+            velocity = vector
+            mask |= (mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
+                     | mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
+                     | mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE)
+        self._mav.set_position_target_local_ned_send(
+            self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
+            mask, *position, *velocity, 0, 0, 0, 0, 0,
         )
 
     def heartbeat(self):
@@ -511,29 +539,6 @@ class SimulatorClient(Target):
 
     def _time_ms(self):
         return int((time.monotonic() - self._boot) * 1000) & 0xffffffff
-
-    def _ned(self, north, east, down, velocity):
-        if not all(math.isfinite(v) for v in (north, east, down)):
-            raise ValueError("NED setpoints must be finite")
-        mask = (mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE)
-        if velocity:
-            mask |= (mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE)
-        else:
-            mask |= (mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE)
-        position = (0, 0, 0) if velocity else (north, east, down)
-        speed = (north, east, down) if velocity else (0, 0, 0)
-        self._mav.set_position_target_local_ned_send(
-            self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
-            mask, *position, *speed, 0, 0, 0, 0, 0,
-        )
 
 
 class _Track:

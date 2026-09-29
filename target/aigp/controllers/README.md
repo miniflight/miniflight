@@ -46,7 +46,7 @@ roll, pitch, and yaw in radians. VQ2 does not publish these observations.
 `state.frame` holds the latest camera image as `bgr`, with its ID and timestamp.
 `state.motors` contains reported output channels and an active mask, not measured RPM.
 Unavailable or stale optional observations are `None`; motion with nonfinite
-position or velocity is also unavailable. Each sample keeps its own
+position or velocity and attitude with nonfinite angles are also unavailable. Each sample keeps its own
 timestamp; the simulator removes samples older than its configured timeout before
 calling the controller. The underlying client retains the original telemetry.
 
@@ -72,9 +72,13 @@ The pure `gate_target(position, index, gates)` function is reusable by a lower-p
 controller. A fresh controller can replay `(state, gate_index, gates)` samples
 without a connection or clock.
 
-The default command rate is 50 Hz. Missed ticks are skipped. Loss of fresh IMU
+The default command rate is 50 Hz; configured rates must be positive and below
+100 Hz, as required by the bundled specification. Missed ticks are skipped. Loss of fresh IMU
 stops control and disarms; the simulator can wait five seconds for a delayed
 native finish, without resuming control or rearming.
+
+The adapter converts AIGP's angular wire signs into the API's FRD/NED convention.
+See the [body-rate measurements](../docs/body-rates.md) before writing a lower-level controller.
 
 The controller/simulator boundary follows
 [comma's controls_challenge](https://github.com/commaai/controls_challenge/tree/be8edfa849acdccfa2cb0092151ab28590d63c03).

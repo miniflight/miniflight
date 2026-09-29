@@ -1,4 +1,6 @@
+import json
 import math
+from pathlib import Path
 import struct
 import unittest
 from unittest.mock import patch
@@ -8,6 +10,7 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates, Ned, PositionNed, Vehicle, VelocityNed
+from common.math import Quaternion
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
 from test.test_aigp_track import course, handshake, packets
@@ -76,7 +79,7 @@ class ClientTest(unittest.TestCase):
         state = self.sim.read()
         self.assertEqual((state.time, state.dt), (1.0, 0.0))
         self.assertEqual(state.acceleration, (1, 2, 3))
-        self.assertEqual(state.gyro, (4, 5, 6))
+        self.assertEqual(state.gyro, (-4, -5, -6))
         self.assertIsNone(state.frame)
         self.assertIsNone(state.motion)
         self.assertIsNone(state.attitude)
@@ -102,7 +105,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(state.motion.time, .001)
         self.assertEqual(state.motion.received_at, 10.0)
         self.assertEqual(self.sim.telemetry["LOCAL_POSITION_NED"].vx, 4)
-        self.assertEqual(state.gyro, (4, 5, 6))
+        self.assertEqual(state.gyro, (-4, -5, -6))
 
     def test_sensor_component_can_differ_from_heartbeat(self):
         self.feed(imu(), component=8)
@@ -122,6 +125,67 @@ class ClientTest(unittest.TestCase):
         self.feed(mavlink.MAVLink_local_position_ned_message(8, 1, 2, 3, 4, 5, 6))
         self.feed(imu(1140000))
         self.assertEqual(self.sim.read().motion.position, Ned(1, 2, 3))
+
+    def test_nonfinite_attitude_is_unavailable_until_a_valid_sample_arrives(self):
+        self.feed(mavlink.MAVLink_attitude_message(1, .1, .2, .3, 0, 0, 0))
+        self.feed(imu())
+        self.assertIsNotNone(self.sim.read().attitude)
+        for index, value in enumerate((math.nan, math.inf, -math.inf)):
+            with self.subTest(component=index):
+                angles = [.1, .2, .3]
+                angles[index] = value
+                self.feed(mavlink.MAVLink_attitude_message(2 + index, *angles, 0, 0, 0))
+                self.feed(imu(1020000 + index * 20000))
+                self.assertIsNone(self.sim.read().attitude)
+        self.feed(mavlink.MAVLink_attitude_message(5, .1, .2, .3, 0, 0, 0))
+        self.feed(imu(1080000))
+        self.assertAlmostEqual(self.sim.read().attitude.pitch, -.2)
+
+    def test_captured_rate_pulses_agree_with_attitude_and_ned_motion(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/vq1_body_rates_frames.json").read_text())
+        for axis, pulse in enumerate(fixture["pulses"]):
+            with self.subTest(axis=pulse["wire_axis"]):
+                states = []
+                for sample in pulse["samples"]:
+                    attitude, motion = sample["wire_attitude"], sample["motion"]
+                    self.feed(mavlink.MAVLink_attitude_message(
+                        round(attitude["time"] * 1000), attitude["roll"], attitude["pitch"], attitude["yaw"], 0, 0, 0))
+                    self.feed(mavlink.MAVLink_local_position_ned_message(
+                        round(motion["time"] * 1000), *motion["position"], *motion["velocity"]))
+                    self.feed(mavlink.MAVLink_highres_imu_message(
+                        round(sample["time"] * 1e6), *sample["acceleration"], *sample["wire_gyro"],
+                        0, 0, 0, 0, 0, 0, 0, 0xffff))
+                    states.append(self.sim.read())
+                first, middle, last = states
+                name = pulse["wire_axis"]
+                angle = getattr(last.attitude, name) - getattr(first.attitude, name)
+                angle = (angle + math.pi) % (2 * math.pi) - math.pi
+                angle_rate = angle / (last.attitude.time - first.attitude.time)
+                measured_rate = np.mean([state.gyro[axis] for state in states])
+                self.assertAlmostEqual(angle_rate, measured_rate, delta=.02)
+                if axis < 2:
+                    attitude = middle.attitude
+                    rotation = Quaternion.from_euler(attitude.roll, attitude.pitch, attitude.yaw).as_rotation_matrix()
+                    acceleration = rotation @ np.array(middle.acceleration) + np.array((0, 0, 9.81))
+                    change = np.array(last.motion.velocity) - np.array(first.motion.velocity)
+                    alignment = np.dot(acceleration[:2], change[:2]) / (np.linalg.norm(acceleration[:2]) * np.linalg.norm(change[:2]))
+                    self.assertGreater(alignment, .9)
+
+    def test_captured_camera_heading_uses_ned_yaw(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/vq1_body_rates_frames.json").read_text())
+        sample = fixture["camera_heading"]
+        wire = sample["wire_attitude"]
+        self.feed(mavlink.MAVLink_attitude_message(
+            round(wire["time"] * 1000), wire["roll"], wire["pitch"], wire["yaw"], 0, 0, 0))
+        self.feed(imu())
+        attitude = self.sim.read().attitude
+        rotation = Quaternion.from_euler(attitude.roll, attitude.pitch, attitude.yaw).as_rotation_matrix()
+        relative = np.array(sample["gate_center_ned"]) - np.array(sample["position_ned"])
+        body = rotation.T @ relative
+        tilt = math.radians(sample["camera_pitch_up_degrees"])
+        depth = body[0] * math.cos(tilt) - body[2] * math.sin(tilt)
+        horizontal = sample["principal_point"][0] + sample["focal_length"][0] * body[1] / depth
+        self.assertAlmostEqual(horizontal, sample["observed_gate_center_pixels"][0], delta=5)
 
     def test_unrelated_system_and_peer_are_ignored(self):
         self.feed(imu(2000000), system=99)
@@ -230,7 +294,9 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(message.get_type(), "SET_ATTITUDE_TARGET")
         self.assertEqual((message.target_system, message.target_component), (42, 7))
         self.assertEqual(message.type_mask, 144)
-        self.assertAlmostEqual(message.body_pitch_rate, -.2)
+        self.assertAlmostEqual(message.body_roll_rate, -.1)
+        self.assertAlmostEqual(message.body_pitch_rate, .2)
+        self.assertAlmostEqual(message.body_yaw_rate, -.3)
         self.assertAlmostEqual(message.thrust, .4)
         self.assertEqual(self.wire.sent[0][1], PEER)
 
@@ -242,14 +308,16 @@ class ClientTest(unittest.TestCase):
             self.assertEqual(message.param1, armed)
 
     def test_position_command_uses_builtin_position_control(self):
-        self.sim.send(PositionNed(-23, 2, -1.5))
-        message, = self.output()
-        self.assertEqual(message.get_type(), "SET_POSITION_TARGET_LOCAL_NED")
-        self.assertEqual(message.coordinate_frame, mavlink.MAV_FRAME_LOCAL_NED)
-        self.assertEqual(message.type_mask, 3576)
-        self.assertEqual((message.target_system, message.target_component), (42, 7))
-        self.assertEqual((message.x, message.y, message.z), (-23, 2, -1.5))
-        self.assertEqual((message.vx, message.vy, message.vz), (0, 0, 0))
+        for position in ((-23, 2, -1.5), (0, 0, 0)):
+            with self.subTest(position=position):
+                self.sim.send(PositionNed(*position))
+                message = self.output()[-1]
+                self.assertEqual(message.get_type(), "SET_POSITION_TARGET_LOCAL_NED")
+                self.assertEqual(message.coordinate_frame, mavlink.MAV_FRAME_LOCAL_NED)
+                self.assertEqual(message.type_mask, 3576)
+                self.assertEqual((message.target_system, message.target_component), (42, 7))
+                self.assertEqual((message.x, message.y, message.z), position)
+                self.assertEqual((message.vx, message.vy, message.vz), (0, 0, 0))
 
     def test_invalid_position_command_is_rejected(self):
         for values in ((math.nan, 0, 0), (0, math.inf, 0), (0, 0, -math.inf)):
@@ -296,7 +364,7 @@ class ClientTest(unittest.TestCase):
         first = self.sim.read()
         self.assertEqual(first.motion.time, .5)
         self.assertEqual(first.attitude.time, .6)
-        self.assertAlmostEqual(first.attitude.pitch, .2)
+        self.assertAlmostEqual(first.attitude.pitch, -.2)
         self.assertAlmostEqual(first.motors.time, .7)
         self.assertEqual(first.motors.active, 0b0101)
         self.assertEqual(len(first.motors.outputs), 32)
@@ -310,11 +378,16 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(first.received_at, 10.0)
 
     def test_velocity_command_is_not_encoded_as_position(self):
-        self.sim.send(VelocityNed(1, 2, -3))
-        message, = self.output()
-        self.assertEqual(message.type_mask, 3527)
-        self.assertEqual((message.x, message.y, message.z), (0, 0, 0))
-        self.assertEqual((message.vx, message.vy, message.vz), (1, 2, -3))
+        self.sim.send(PositionNed(7, 8, -9))
+        for velocity in ((1, 2, -3), (0, 0, 0)):
+            with self.subTest(velocity=velocity):
+                self.sim.send(VelocityNed(*velocity))
+                message = self.output()[-1]
+                self.assertEqual(message.get_type(), "SET_POSITION_TARGET_LOCAL_NED")
+                self.assertEqual(message.coordinate_frame, mavlink.MAV_FRAME_LOCAL_NED)
+                self.assertEqual(message.type_mask, 3527)
+                self.assertEqual((message.x, message.y, message.z), (0, 0, 0))
+                self.assertEqual((message.vx, message.vy, message.vz), velocity)
 
     def test_disconnect_closes_both_sockets_and_is_idempotent(self):
         self.sim.disconnect()
