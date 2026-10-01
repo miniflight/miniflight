@@ -1,3 +1,5 @@
+"""Host connection adapters; separate from numerical flight routines."""
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

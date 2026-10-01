@@ -9,8 +9,9 @@ from unittest.mock import Mock, call, patch
 from target.aigp.simulator import AIGPSimulator, main
 from target.aigp.controllers import BaseController, Gate
 from target.aigp.controllers.r1_gates import Controller as Gates
+from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.zero import Controller
-from miniflight import BodyRates, Motion, Ned, PositionNed, State, VelocityNed
+from miniflight import Attitude, BodyRates, Motion, Ned, PositionNed, State, VelocityNed
 from target.aigp.simulator import RaceStatus, SimulatorClient
 
 
@@ -23,6 +24,7 @@ class ControllerConstructionTest(unittest.TestCase):
         with patch.object(SimulatorClient, "__init__", side_effect=AssertionError("controller created a client")):
             Controller()
             Gates()
+            BodyRateGates()
 
 
 class ControllerTest(unittest.TestCase):
@@ -74,6 +76,25 @@ class ControllerTest(unittest.TestCase):
         self.assertIsInstance(self.sim.send.call_args_list[0].args[0], PositionNed)
         self.assertEqual(self.sim.send.call_args_list[-1], call(BodyRates()))
         self.sim.arm.assert_called_once()
+        self.sim.disarm.assert_called_once()
+        self.sim.disconnect.assert_called_once()
+
+    def test_body_rate_gate_controller_is_rejected_on_vq2_before_connecting(self):
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            AIGPSimulator(BodyRateGates(), "vq2.r1", client=self.sim)
+        self.sim.connect.assert_not_called()
+
+    def test_body_rate_controller_uses_a_rate_only_target_and_stops_on_lost_attitude(self):
+        self.sim.commands = frozenset((BodyRates,))
+        self.sim.gates = (Gate(0, Ned(-10, 0, -2), (1, 0, 0, 0), 2, 2),)
+        state = replace(self.state, motion=Motion(1, self.now, Ned(0, 0, 0), Ned(0, 0, 0)),
+                        attitude=Attitude(1, self.now, 0, 0, 0))
+        self.sim.read.side_effect = [state, replace(state, attitude=None)]
+        with self.assertRaisesRegex(ValueError, "no command"):
+            AIGPSimulator(BodyRateGates(), client=self.sim).rollout(attach=True)
+        self.assertEqual(len(self.sim.send.call_args_list), 2)
+        self.assertTrue(all(isinstance(sent.args[0], BodyRates) for sent in self.sim.send.call_args_list))
+        self.assertEqual(self.sim.send.call_args, call(BodyRates()))
         self.sim.disarm.assert_called_once()
         self.sim.disconnect.assert_called_once()
 
@@ -258,7 +279,7 @@ class ControllerTest(unittest.TestCase):
 
 class ControllerSelectionTest(unittest.TestCase):
     def test_loads_aigp_controllers_by_short_name(self):
-        for name, target in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1")):
+        for name, target in (("zero", "vq2.r2"), ("r1_gates", "vq1.r1"), ("r1_body_rates", "vq1.r1")):
             with self.subTest(name=name), patch("target.aigp.simulator.signal.signal"), \
                     patch("target.aigp.simulator.AIGPSimulator") as simulator:
                 main([target, "--controller", name])

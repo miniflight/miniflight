@@ -4,8 +4,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from examples.aigp.probe_body_rates import Probe, RecordedProbe, replay
+from examples.aigp.probe_body_rates import Probe, replay
 from miniflight import Attitude, BodyRates, Motion, Ned, PositionNed, State
+from target.aigp.recording import RecordedController, recording
 
 
 def state(stamp, down=-3, speed=0):
@@ -73,17 +74,17 @@ class ProbeTest(unittest.TestCase):
 
     def test_recorded_updates_replay_and_detect_changed_commands(self):
         command = BodyRates(pitch_rate=-.25, thrust=.2)
-        rows = [{"event": "config", "commands": [asdict(command)], "duration": .6}]
-        probe = RecordedProbe([command], .6, lambda **row: rows.append(row))
-        for sample in (state(0, down=0), state(1), state(1.7), state(2.4), state(3.1)):
-            try:
-                probe.update(sample, 0, None)
-            except StopIteration:
-                pass
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "trace.jsonl"
-            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with recording(path, {"commands": [asdict(command)], "duration": .6}) as record:
+                probe = RecordedController(Probe([command]), record)
+                for sample in (state(0, down=0), state(1), state(1.7), state(2.4), state(3.1)):
+                    try:
+                        probe.update(sample, 0, None)
+                    except StopIteration:
+                        pass
             self.assertEqual(replay(path), {"updates": 5, "completed": True})
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
             rows[3]["command"]["thrust"] = .9
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             with self.assertRaisesRegex(AssertionError, "replay differs"):

@@ -1,74 +1,11 @@
-from dataclasses import dataclass
-from typing import NamedTuple
-
-import numpy as np
-
-from target import Target
 from miniflight.control import BodyRates, Command, PositionNed, VelocityNed
-
-
-class Ned(NamedTuple):
-    """North, east, down components; units belong to the containing field."""
-
-    north: float
-    east: float
-    down: float
-
-
-@dataclass(frozen=True)
-class Motion:
-    time: float  # device seconds
-    received_at: float  # host monotonic seconds
-    position: Ned  # metres in the target's local NED frame
-    velocity: Ned  # m/s in the same frame
-
-
-@dataclass(frozen=True)
-class Attitude:
-    time: float
-    received_at: float
-    roll: float  # radians, FRD body relative to local NED
-    pitch: float
-    yaw: float
-
-
-@dataclass(frozen=True)
-class MotorOutputs:
-    """Reported output channels in target-defined units, not measured RPM."""
-
-    time: float
-    received_at: float
-    outputs: tuple[float, ...]
-    active: int  # channel bitmask
-
-
-@dataclass(frozen=True)
-class Frame:
-    id: int
-    time_ns: int  # device timestamp
-    received_at: float
-    bgr: np.ndarray
-
-
-@dataclass(frozen=True)
-class State:
-    """Latest observations at an IMU update, not a synchronized ground truth."""
-
-    time: float  # device IMU timestamp in seconds
-    dt: float  # device seconds since the previous read; first read is zero
-    acceleration: tuple[float, float, float]  # reported FRD body acceleration, m/s²
-    gyro: tuple[float, float, float]  # FRD body angular velocity, rad/s
-    received_at: float  # IMU receipt time, host monotonic seconds
-    frame: Frame | None = None
-    motion: Motion | None = None
-    attitude: Attitude | None = None
-    motors: MotorOutputs | None = None
+from miniflight.state import Attitude, Frame, Motion, MotorOutputs, Ned, State  # preserve existing imports
 
 
 class Vehicle:
     """Read observations and send commands through one target connection."""
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target) -> None:
         self._target = target
         self._state = None
 

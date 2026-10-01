@@ -11,22 +11,18 @@ import json
 import math
 from pathlib import Path
 import signal
-import time
 
-from miniflight import Attitude, BodyRates, Motion, MotorOutputs, Ned, PositionNed, State
+from miniflight import BodyRates, PositionNed
 from target.aigp.controllers import BaseController
-from target.aigp.simulator import AIGPSimulator, BASE, SHIPPING, SimulatorClient, sha256
-
-
-def command_data(command):
-    return None if command is None else {"kind": type(command).__name__, **asdict(command)}
+from target.aigp.recording import RecordedClient, RecordedController, read_metadata, recording, replay as replay_controller
+from target.aigp.simulator import AIGPSimulator, BASE, SHIPPING, sha256
 
 
 def angular_rates(command):
     return command.roll_rate, command.pitch_rate, command.yaw_rate
 
 
-class Probe(BaseController):
+class Probe(BaseController[BodyRates | PositionNed]):
     targets = ("vq1.r1",)
 
     def __init__(self, commands, duration=.6):
@@ -41,7 +37,7 @@ class Probe(BaseController):
         self.phase = "settle"
         self.started_at = self.steady_at = None
 
-    def update(self, state, gate_index, gates):
+    def update(self, state, gate_index, gates) -> BodyRates | PositionNed | None:
         stamp, motion, attitude = state.time, state.motion, state.attitude
         if motion is None or attitude is None:
             return None
@@ -83,97 +79,26 @@ class Probe(BaseController):
         return self.target
 
 
-class RecordedProbe(Probe):
-    def __init__(self, commands, duration, record):
-        super().__init__(commands, duration)
-        self.record = record
-
-    def update(self, state, gate_index, gates):
-        row = dict(event="update", state=asdict(state), gate_index=gate_index)
-        try:
-            command = super().update(state, gate_index, gates)
-        except Exception as error:
-            self.record(**row, phase=self.phase, trial=self.trial, error=type(error).__name__)
-            raise
-        self.record(**row, phase=self.phase, trial=self.trial, command=command_data(command))
-        return command
-
-
-class RecordedClient(SimulatorClient):
-    def __init__(self, record):
-        super().__init__(camera_port=None)
-        self.record = record
-
-    def send(self, command):
-        super().send(command)
-        self.record(event="sent", command=command_data(command))
-
-    def _set_armed(self, armed):
-        super()._set_armed(armed)
-        self.record(event="arm_request", armed=armed)
-
-    def _receive(self, message, peer, now):
-        super()._receive(message, peer, now)
-        if message.get_type() in ("COMMAND_ACK", "COLLISION", "HEARTBEAT"):
-            self.record(event="telemetry", message=message.to_dict())
-
-
-def read_state(data):
-    data = dict(data)
-    data["acceleration"], data["gyro"] = tuple(data["acceleration"]), tuple(data["gyro"])
-    if data["motion"] is not None:
-        motion = dict(data["motion"])
-        motion["position"], motion["velocity"] = Ned(*motion["position"]), Ned(*motion["velocity"])
-        data["motion"] = Motion(**motion)
-    if data["attitude"] is not None:
-        data["attitude"] = Attitude(**data["attitude"])
-    if data["motors"] is not None:
-        motors = dict(data["motors"])
-        motors["outputs"] = tuple(motors["outputs"])
-        data["motors"] = MotorOutputs(**motors)
-    if data["frame"] is not None:
-        raise ValueError("this probe records without camera frames")
-    return State(**data)
-
-
 def replay(path):
-    with path.open() as source:
-        config = json.loads(next(source))
-        probe = Probe([BodyRates(**command) for command in config["commands"]], config["duration"])
-        updates = 0
-        for line in source:
-            row = json.loads(line)
-            if row["event"] != "update":
-                continue
-            actual = {}
-            try:
-                actual["command"] = command_data(probe.update(read_state(row["state"]), row["gate_index"], None))
-            except Exception as error:
-                actual["error"] = type(error).__name__
-            expected = {key: row[key] for key in ("command", "error") if key in row}
-            if actual != expected or (probe.phase, probe.trial) != (row["phase"], row["trial"]):
-                raise AssertionError(f"replay differs at update {updates}")
-            updates += 1
+    config = read_metadata(path)
+    probe = Probe([BodyRates(**command) for command in config["commands"]], config["duration"])
+    updates = replay_controller(probe, path)
     return {"updates": updates, "completed": probe.phase == "done"}
 
 
 def run(path, commands, duration):
     commands = tuple(commands)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", buffering=1) as output:
-        def record(**row):
-            output.write(json.dumps(dict(host_time=time.monotonic(), **row), allow_nan=False) + "\n")
-
-        root = BASE.parents[1]
-        sources = ("target/aigp/simulator.py", "miniflight/vehicle.py", "miniflight/control.py",
-                   "examples/aigp/probe_body_rates.py")
-        record(event="config", target="vq1.r1", hz=50, timeout=.3, duration=duration,
-               angular_convention="FRD/NED after AIGP build-3391 wire conversion",
-               commands=[asdict(command) for command in commands],
-               sources={name: sha256(root / name) for name in sources})
-        probe = RecordedProbe(commands, duration, record)
-        client = RecordedClient(record)
-        sim = AIGPSimulator(probe, client=client, timeout=.3, gate_timeout=180)
+    probe = Probe(commands, duration)
+    root = BASE.parents[1]
+    sources = ("target/aigp/simulator.py", "target/aigp/recording.py", "miniflight/vehicle.py",
+               "miniflight/control.py", "examples/aigp/probe_body_rates.py")
+    metadata = dict(target="vq1.r1", hz=50, timeout=.3, duration=duration,
+                    angular_convention="FRD/NED after AIGP build-3391 wire conversion",
+                    commands=[asdict(command) for command in commands],
+                    sources={name: sha256(root / name) for name in sources})
+    with recording(path, metadata) as record:
+        client = RecordedClient(record, camera_port=None)
+        sim = AIGPSimulator(RecordedController(probe, record), client=client, timeout=.3, gate_timeout=180)
         try:
             sim.rollout()
             if probe.phase != "done":

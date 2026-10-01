@@ -84,7 +84,7 @@ class RaceStatus:
 class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
-    def __init__(self, controller: BaseController, target="vq1.r1", hz=50.0,
+    def __init__(self, controller: BaseController[Command], target="vq1.r1", hz=50.0,
                  timeout=1.0, startup_timeout=120.0, client=None, gate_timeout=45.0):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
@@ -109,9 +109,13 @@ class AIGPSimulator:
         self.status = None
         self.phase = "waiting"
         self.armed = False
+        self._used = False
 
     def rollout(self, attach=False, simulator_args=()):
         """Own the connection, optional simulator process, and controller loop."""
+        if self._used:
+            raise RuntimeError("create a fresh controller and simulator for each rollout")
+        self._used = True
         try:
             if attach:
                 self.vehicle.connect()

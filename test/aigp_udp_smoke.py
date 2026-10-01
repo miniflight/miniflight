@@ -4,10 +4,12 @@ Run explicitly: python -m unittest test.aigp_udp_smoke -v
 """
 
 from contextlib import contextmanager
+from pathlib import Path
 import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import unittest
 import json
@@ -23,6 +25,7 @@ from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
+from target.aigp.recording import RecordedClient, RecordedController, recording, replay
 from test.test_aigp_client import heartbeat, imu, packet
 
 
@@ -147,28 +150,35 @@ class UDPSmokeTest(unittest.TestCase):
 
     def owned_session(self, *fixture_args, expect_timeout=False):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
-        controller = Gates()
-        client = SimulatorClient(port=0, camera_port=None)
-        children = []
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        path = Path(directory) / "trace.jsonl"
+        with recording(path) as record:
+            controller = RecordedController(Gates(), record)
+            client = RecordedClient(record, port=0, camera_port=None)
+            children = []
 
-        @contextmanager
-        def launch(target, simulator_args=()):
-            self.assertEqual(target, "vq1.r1")
-            port = client._socket.getsockname()[1]
-            child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
-            children.append(child)
-            try:
-                yield child
-            finally:
-                _stop_process(child)
+            @contextmanager
+            def launch(target, simulator_args=()):
+                self.assertEqual(target, "vq1.r1")
+                port = client._socket.getsockname()[1]
+                child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+                children.append(child)
+                try:
+                    yield child
+                finally:
+                    _stop_process(child)
 
-        with patch("target.aigp.simulator.launch", side_effect=launch):
-            if expect_timeout:
-                with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
+            with patch("target.aigp.simulator.launch", side_effect=launch):
+                if expect_timeout:
+                    with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
+                        AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
+                else:
                     AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
-            else:
-                AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
+        self.assertGreater(replay(Gates(), path), 6)
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], [True, False])
+        self.assertTrue(any(row["event"] == "update" and row["gates"] for row in rows))
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)

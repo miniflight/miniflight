@@ -67,17 +67,20 @@ The rate probe therefore explicitly sends zero body rates, at the same collectiv
 thrust, before returning to position mode. Zero rates stop rotation; position
 control subsequently levels the vehicle and removes translation.
 
-Every controller input and returned command is recorded. Separate `sent` records
+The shared `target.aigp.recording` wrapper records every controller input, including
+gate geometry, and returned command. Separate `sent` records
 identify commands actually sent through the client. The log also contains arm
 requests, received heartbeats/acknowledgements/collisions, source-file hashes,
 the executable hash, and completion/connection-close status. Camera recording is
 disabled. These are the observations consumed by the controller, not a lossless
 recording of every native sensor packet.
 
-Replay reconstructs the controller's inputs and checks every command, phase, trial,
-and terminal exception without connecting to the simulator. A changed controller
-can intentionally fail replay. Choose unused trace names: existing files are never
-overwritten.
+Replay takes a fresh controller and checks its returned commands and exceptions
+without connecting to the simulator or inspecting private phase/trial fields.
+The probe's CLI supplies a fresh `Probe` and reports whether its sequence completed.
+Existing probe traces remain readable, including those written before geometry was
+recorded. A changed controller can intentionally fail replay. Choose unused trace
+names: existing files are never overwritten.
 
 ## Measured response
 
@@ -124,10 +127,63 @@ The local experiment bundle is under `.runtime/measurements/body-rates/`:
 `summary.json`, `analyze.py`, and the response plots retain the analysis.
 Earlier traces document the wire-frame and mode-switching investigation.
 
-## Next controller
+## Python position control
 
-Start with a fixed-point hold using VQ1 motion and attitude. Keep the computation
-explicit: position/velocity error → desired acceleration → attitude/thrust target
-→ body rates. The simulator continues to own rate stabilization and motor mixing.
-After the hold works, reuse the gate-selection policy and move through one gate,
-then the complete course. No additional command plane is needed for that step.
+`miniflight.position.position_control` now closes position and attitude feedback
+using VQ1 motion and attitude. It is stateless PD: position error becomes a bounded
+velocity target, velocity error becomes acceleration, and the thrust direction
+becomes roll/pitch targets. Euler feedback is converted to body rates, including
+the cross-axis terms needed when tilted. Collective thrust compensates for the
+current tilt. The simulator continues to own rate stabilization and motor mixing.
+
+The AIGP controller supplies hover thrust 0.266 and an approximate local thrust
+slope of 53.5 m/s² per unit normalized thrust, based on the pulse measurements
+above. These are vehicle configuration, not generic control constants or a model
+of the full thrust curve. Default limits are 4 m/s speed, 3 m/s² horizontal and
+vertical acceleration, 0.35 rad desired tilt, and 0.75 rad/s body-rate magnitude.
+
+Run the gate routine with:
+
+```sh
+python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
+```
+
+`r1_body_rates` reuses the published-gate target policy, holds the initial heading,
+and outputs only `BodyRates`. It requires motion, attitude, and course geometry.
+The existing runner handles missing observations, native GO/finish, and cleanup.
+`BaseController[BodyRates]` declares its output type; deliberately mixed routines
+can declare a union. The target still validates every actual returned command.
+
+Native validation on build 3391 used the same executable hash stated above and
+the 50 Hz runner with a 0.3 s observation timeout:
+
+- A body-rate-only takeoff and fixed-point hold completed in 13.04 simulator
+  seconds. Over the final ten seconds, maximum position error was 0.0508 m and
+  maximum speed was 0.1756 m/s; final position error was 0.0077 m. All 601
+  controller updates, including the terminal `StopIteration`, replayed exactly.
+- The R1 routine completed all six gates with 2,260 body-rate commands. The
+  native finish packet reported `active_gate_index=6` and
+  `race_finish_time_ns=52349807739`. The recorded controller interval was
+  52.20 simulator seconds. All 2,260 updates replayed exactly.
+
+Neither run reported a collision. Both disarmed through the runner and closed
+their owned simulator connections. These are VQ1 results, not VQ2 or physical
+hardware validation. Camera input was disabled for these motion/attitude runs.
+
+The local experiment harness, source hashes, traces, and summary are under
+`.runtime/measurements/r1-body-rates/`: `validate.py`, `hold-01.jsonl`,
+`race-01.jsonl`, and `summary.json`. The hold harness requires ten continuous
+seconds below 0.25 m position error and 0.2 m/s speed, and bounds its total run.
+
+`test/fixtures/position_control.json` retains 25 numerical input/output cases
+from those native traces, with configuration, units, and source/trace hashes.
+The expected commands were captured during flight. The core test replays the
+calculation directly without importing AIGP, OpenCV, NumPy, or a target adapter.
+Its 1e-12 relative/absolute comparison tolerance is for the Python reference;
+no reduced-precision or compiled backend has been validated by that check.
+
+After separating the core observation records from the host adapter layer, a
+second native R1 run (`race-02.jsonl`) again completed all six gates using only
+body-rate commands. All 2,397 updates replayed exactly and the owned connection
+closed. The refactored package passed 226 unit tests and seven UDP integration
+checks; 24 core checks also passed with site packages disabled (`python -S`).

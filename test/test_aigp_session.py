@@ -493,6 +493,41 @@ class SessionTest(unittest.TestCase):
         self.sim.disconnect.assert_called_once()
         self.owned.__exit__.assert_called_once_with(None, None, None)
 
+    def test_a_finished_runner_cannot_reuse_its_controller_or_connection(self):
+        simulator = AIGPSimulator(self.controller, client=self.sim)
+        simulator.rollout()
+        calls = list(self.sim.mock_calls)
+        with self.assertRaisesRegex(RuntimeError, "fresh controller and simulator"):
+            simulator.rollout()
+        self.assertEqual(self.sim.mock_calls, calls)
+        self.launch.assert_called_once()
+
+    def test_a_failed_runner_is_also_single_use(self):
+        self.owned.__enter__.side_effect = OSError("launch failed")
+        simulator = AIGPSimulator(self.controller, client=self.sim)
+        with self.assertRaises(OSError):
+            simulator.rollout()
+        calls = list(self.sim.mock_calls)
+        with self.assertRaisesRegex(RuntimeError, "fresh controller and simulator"):
+            simulator.rollout()
+        self.assertEqual(self.sim.mock_calls, calls)
+        self.launch.assert_called_once()
+
+    def test_reentrant_rollout_does_not_close_the_active_connection(self):
+        simulator = AIGPSimulator(self.controller, client=self.sim)
+
+        def update(state, gate_index, gates):
+            with self.assertRaisesRegex(RuntimeError, "fresh controller and simulator"):
+                simulator.rollout()
+            self.sim.disconnect.assert_not_called()
+            return BodyRates(thrust=.3)
+
+        self.controller.update.side_effect = update
+        simulator.rollout()
+        self.sim.arm.assert_called_once()
+        self.sim.disarm.assert_called_once()
+        self.sim.disconnect.assert_called_once()
+
     def test_invalid_target_or_incompatible_controller_does_not_launch(self):
         for target, controller in (("vq1.r2", Zero()), ("vq2.r1", Gates()), ("vq2.r2", Gates())):
             with self.subTest(target=target), self.assertRaises(ValueError):

@@ -1,3 +1,5 @@
+"""Historical raw-actuator experiment; not a supported controller example."""
+
 import struct
 import time
 

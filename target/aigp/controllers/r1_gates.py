@@ -18,7 +18,7 @@ def gate_target(position, index: int, gates) -> PositionNed:
     return PositionNed(*(c + d / distance for c, d in zip(center, direction)))
 
 
-class Controller(BaseController):
+class Controller(BaseController[PositionNed]):
     targets = ("vq1.r1",)
 
     def __init__(self):

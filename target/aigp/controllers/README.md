@@ -6,7 +6,7 @@ A controller inherits `BaseController` and implements one method:
 from miniflight import BodyRates
 from target.aigp.controllers import BaseController
 
-class Controller(BaseController):
+class Controller(BaseController[BodyRates]):
     def update(self, state, gate_index, gates):
         return BodyRates(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
 ```
@@ -24,7 +24,19 @@ in metres, a wxyz `orientation`, and reported `width` and `height` in metres.
 Return one `BodyRates`, `PositionNed`, or `VelocityNed` command. `BodyRates` uses rad/s and thrust from 0 to 1. NED position and velocity
 use metres and metres per second. Zero thrust does not hover.
 
+The type parameter declares the controller's output plane. Use
+`BaseController[PositionNed]`, `BaseController[VelocityNed]`, or
+`BaseController[BodyRates]` for a single plane. A routine that intentionally
+switches planes can use a union, such as
+`BaseController[BodyRates | PositionNed]` in the body-rate probe. This is a typing
+contract; `Vehicle.validate()` checks the actual returned command against the
+target's supported commands before arming or sending. All planes use the same
+`update` method and runner. The target owns wire encoding and coordinate conversion;
+the controller owns any deliberate transition between command planes.
+
 A constructor initializes the controller's own memory, such as PID integrals.
+Create a fresh controller for each flight. Each `AIGPSimulator` instance is single-use;
+reusing one raises before touching its connection, even after a failed run.
 The simulator owns sockets, clocks, process lifetime, arming, and disarming.
 It calls `update` only after native GO and stops on native finish. Returning `None`
 waits for required observations before arming; returning `None` after starting
@@ -71,6 +83,33 @@ for geometry without arming.
 The pure `gate_target(position, index, gates)` function is reusable by a lower-plane
 controller. A fresh controller can replay `(state, gate_index, gates)` samples
 without a connection or clock.
+The shared [recording and replay helpers](../README.md#recording-and-replay) capture
+these inputs and compare returned commands, including for controllers other than
+the body-rate probe.
+
+## r1 body rates
+
+`r1_body_rates` uses the same gate-target policy and closes position and attitude
+feedback in Python. It requires VQ1 motion, attitude, and the published course;
+missing required observations return `None`. Every flight command is `BodyRates`.
+The heading is held at its initial value, the target changes only when the native
+gate index advances, and the final target is held until native finish.
+
+```sh
+python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
+```
+
+The numerical function is `miniflight.position.position_control`: position error
+becomes a bounded velocity target, velocity error becomes a bounded acceleration,
+and the desired thrust direction becomes attitude feedback and body-rate commands.
+It is stateless PD, so it needs no integral, timestep, or hidden numerical memory.
+Its inputs are fixed-size numerical values; it does not receive a `Vehicle`, race
+state, camera pixels, or transport. `PositionConfig` carries gains, limits, and
+the vehicle's local hover/thrust calibration. The VQ1 values live in the AIGP
+controller, not in the generic numerical function.
+
+The simulator still owns angular-rate stabilization and motor mixing. This
+controller is not a VQ2 estimator or a hardware-validated flight stack.
 
 The default command rate is 50 Hz; configured rates must be positive and below
 100 Hz, as required by the bundled specification. Missed ticks are skipped. Loss of fresh IMU

@@ -1,3 +1,5 @@
+"""Historical arm probe using the removed SimulatorClient._message interface."""
+
 import time
 
 from pymavlink import mavutil

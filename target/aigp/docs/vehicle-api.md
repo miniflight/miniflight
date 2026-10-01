@@ -2,6 +2,16 @@
 
 `Vehicle` is a connection to a vehicle, not a controller or a simulator runner
 
+Observation records are defined in `miniflight.state`; AIGP depends on those core
+records. Public imports from `miniflight` and the previous `miniflight.vehicle`
+observation imports remain valid. The host connection interface `Target` stays
+in the adapter layer under `target/`; the core does not import it. `Vehicle`
+delegates to the supplied connection without requiring a target base class.
+The core imports no NumPy runtime; camera adapters own pixel storage. `State`
+is an observation snapshot with independent sample clocks, not an estimator
+result or controller memory. Gate data, race status, launch/cleanup, and AIGP
+recording remain under `target/aigp`.
+
 ```python
 from miniflight import Vehicle
 from target.aigp.simulator import SimulatorClient
@@ -101,9 +111,12 @@ against attitude changes, NED motion, and the camera heading; VQ2 has not receiv
 the same physical-response validation.
 
 `r1_gates` consumes `State.motion.position` and returns `PositionNed`
+`r1_body_rates` consumes VQ1 motion and attitude and returns `BodyRates`
 `zero` returns `BodyRates`
 `AIGPSimulator` owns the connection and uses `Vehicle.read` and `Vehicle.send` for both
 controllers implement `BaseController.update(state, gate_index, gates)`
+the `BaseController` type parameter declares one output plane or an explicit union
+the target validates each actual returned command independently of that annotation
 native `RaceStatus` packets stay inside the AI-GP simulator and client
 optional observations older than the simulator timeout are `None` at controller update
 the client and generic vehicle API retain the original timestamped observations

@@ -6,19 +6,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "miniflight"
 version = "0.1.0"
-description = "Companion-computer flight stack"
+description = "Python flight control routines and vehicle interfaces"
 requires-python = ">=3.10"
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+aigp = [
+    "numpy>=1.24",
+    "pymavlink==2.4.49",
+    "opencv-python-headless>=4.8",
+]
+examples = [
     "numpy>=1.24",
     "matplotlib",
     "hidapi",
     "gymnasium",
-]
-
-[project.optional-dependencies]
-aigp = [
-    "pymavlink==2.4.49",
-    "opencv-python-headless>=4.8",
 ]
 test = [
     "pytest>=7.0",

@@ -1,50 +1,26 @@
-import time
+"""Request -1 m/s on the NED north axis for two seconds, then zero velocity."""
 
-from miniflight import Vehicle
-from target.aigp.simulator import SimulatorClient
-
-
-RATE_HZ = 250.0
-MOVE_SECONDS = 2.0
-STOP_SECONDS = 1.0
+from miniflight import VelocityNed
+from target.aigp.controllers import BaseController
+from target.aigp.simulator import AIGPSimulator
 
 
-vehicle = Vehicle(SimulatorClient())
-vehicle.connect()
+class Controller(BaseController[VelocityNed]):
+    targets = ("vq1.r1",)
 
-try:
-    vehicle.arm()
-    time.sleep(1.0)
+    def __init__(self):
+        self.started_at = None
 
-    vehicle.read()
-    print("start", vehicle.position)
+    def update(self, state, gate_index, gates) -> VelocityNed:
+        if self.started_at is None:
+            self.started_at = state.time
+        elapsed = state.time - self.started_at
+        if elapsed < 2:
+            return VelocityNed(-1, 0, 0)
+        if elapsed < 3:
+            return VelocityNed(0, 0, 0)
+        raise StopIteration
 
-    start = time.monotonic()
-    deadline = start + MOVE_SECONDS
-    commands = 0
 
-    while time.monotonic() < deadline:
-        vehicle.velocity_ned(-1.0, 0.0, 0.0)
-        commands += 1
-        time.sleep(1.0 / RATE_HZ)
-
-    elapsed = time.monotonic() - start
-    print("command rate", commands / elapsed)
-    vehicle.read()
-    print("after move", vehicle.position)
-
-    deadline = time.monotonic() + STOP_SECONDS
-
-    while time.monotonic() < deadline:
-        vehicle.velocity_ned(0.0, 0.0, 0.0)
-        time.sleep(1.0 / RATE_HZ)
-
-    vehicle.read()
-    print("after stop", vehicle.position)
-    print("velocity", vehicle.velocity)
-finally:
-    try:
-        vehicle.velocity_ned(0.0, 0.0, 0.0)
-        vehicle.disarm()
-    finally:
-        vehicle.disconnect()
+if __name__ == "__main__":
+    AIGPSimulator(Controller(), "vq1.r1").rollout()
