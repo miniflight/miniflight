@@ -108,6 +108,12 @@ state, camera pixels, or transport. `PositionConfig` carries gains, limits, and
 the vehicle's local hover/thrust calibration. The VQ1 values live in the AIGP
 controller, not in the generic numerical function.
 
+The AIGP wrapper also applies bounded gyro feedback to correct the measured VQ1
+yaw-rate deficit. Its state is local to each controller. `yaw_feedback=False`
+selects the raw baseline, including for replay of older R1 traces. The packet
+encoder and core position calculation remain unchanged. See the
+[yaw tracking measurements](../docs/yaw-tracking.md) for limits and reproduction.
+
 The simulator still owns angular-rate stabilization and motor mixing. This
 controller is not a VQ2 estimator or a hardware-validated flight stack.
 

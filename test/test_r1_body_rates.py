@@ -56,6 +56,23 @@ class BodyRateGateControllerTest(unittest.TestCase):
         self.assertEqual(self.controller.yaw, math.pi)
         self.assertLess(command.yaw_rate, 0)
 
+    def test_yaw_feedback_uses_gyro_and_can_be_disabled_for_baseline_replay(self):
+        raw = Controller(yaw_feedback=False)
+        raw.update(self.state, 0, self.gates)
+        self.controller.update(self.state, 0, self.gates)
+        turned = replace(self.state, attitude=replace(self.state.attitude, yaw=math.pi + .1))
+        baseline = raw.update(turned, 0, self.gates)
+        compensated = self.controller.update(turned, 0, self.gates)
+        self.assertEqual(compensated, baseline)
+        for tick in range(1, 11):
+            compensated = self.controller.update(replace(turned, time=turned.time + tick * turned.dt), 0, self.gates)
+        self.assertLess(compensated.yaw_rate, baseline.yaw_rate)
+        self.assertEqual(compensated.roll_rate, baseline.roll_rate)
+        self.assertEqual(compensated.pitch_rate, baseline.pitch_rate)
+        self.assertEqual(compensated.thrust, baseline.thrust)
+        self.controller.update(replace(turned, attitude=None), 0, self.gates)
+        self.assertEqual(self.controller.yaw_feedback.correction, 0)
+
     def test_recorded_observations_and_commands_replay(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "r1.jsonl"

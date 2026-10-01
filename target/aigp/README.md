@@ -43,7 +43,11 @@ python -m examples.aigp.velocity_ned
 ```
 
 It requests -1 m/s north for two simulator seconds, then zero velocity for one
-second before stopping. Historical raw-protocol probes are under `experiments/aigp/`.
+second before stopping. Historical raw-protocol probes are under `target/aigp/experiments/`.
+
+Body-rate measurement machinery lives in `target/aigp/probe.py`; its runnable
+entrypoint is `python -m examples.aigp.probe_body_rates`. The
+[yaw tracking study](docs/yaw-tracking.md) explains the raw and feedback modes.
 
 ## recording and replay
 

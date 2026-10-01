@@ -105,6 +105,10 @@ native response scales across the tested range; the maximum rate and saturation
 boundary have not been established. The adapter does not compensate for tracking
 error by rescaling requested rates.
 
+The later [yaw tracking study](yaw-tracking.md) confirms the steady deficit with
+longer steps and raw-wire capture. It adds explicit gyro feedback in the AIGP
+controller layer while preserving this raw transport behavior.
+
 Vertical acceleration was estimated by fitting NED down velocity against its own
 device timestamps, again excluding the first 0.15 seconds:
 
@@ -150,6 +154,9 @@ python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
 
 `r1_body_rates` reuses the published-gate target policy, holds the initial heading,
 and outputs only `BodyRates`. It requires motion, attitude, and course geometry.
+It now applies the bounded VQ1 yaw feedback described in the tracking study.
+Pass `yaw_feedback=False` to its constructor to reproduce the original raw R1
+measurements below; the generic numerical position controller is unchanged.
 The existing runner handles missing observations, native GO/finish, and cleanup.
 `BaseController[BodyRates]` declares its output type; deliberately mixed routines
 can declare a union. The target still validates every actual returned command.
