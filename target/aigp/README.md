@@ -3,17 +3,20 @@
 A simulator arena for Python controllers. `simulator.py` is the implementation
 entrypoint; controller code lives in `controllers/`.
 
-```sh
-python target/aigp/simulator.py vq1.r1 --controller r1_gates
-python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
-python target/aigp/simulator.py vq2.r1 --controller zero
-python target/aigp/simulator.py vq2.r2 --controller zero
-```
-
 Use Python 3.11 or newer and install dependencies once from the repository root:
 
 ```sh
 python -m pip install -e ".[aigp]"
+```
+
+Then enter the arena directory. The commands below run from here:
+
+```sh
+cd target/aigp
+python simulator.py vq1.r1 --controller r1_gates
+python simulator.py vq1.r1 --controller r1_body_rates
+python simulator.py vq2.r1 --controller zero
+python simulator.py vq2.r2 --controller zero
 ```
 
 Both R1 controllers aim through the same six gates. `r1_gates` returns

@@ -11,10 +11,10 @@ class Controller(BaseController[BodyRates]):
         return BodyRates(roll_rate=0, pitch_rate=0, yaw_rate=0, thrust=0)
 ```
 
-Save it as `target/aigp/controllers/mine.py`, then run:
+Save it as `target/aigp/controllers/mine.py`, then run from `target/aigp`:
 
 ```sh
-python target/aigp/simulator.py vq1.r1 --controller mine
+python simulator.py vq1.r1 --controller mine
 ```
 
 `state` contains vehicle observations. `gate_index` is the zero-based active gate
@@ -102,7 +102,7 @@ the course. The position target changes only when the native gate index advances
 and the final target is held until native finish.
 
 ```sh
-python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
+python simulator.py vq1.r1 --controller r1_body_rates
 ```
 
 The numerical function is `miniflight.position.position_control`: position error

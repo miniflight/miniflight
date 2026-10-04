@@ -22,15 +22,6 @@ class PositionConfig:
     max_tilt: float = .35  # radians from vertical
     max_rate: float = .75  # rad/s, body-rate vector magnitude
 
-    def __post_init__(self):
-        values = (self.hover_thrust, self.thrust_acceleration, self.position_gain,
-                  self.velocity_gain, self.attitude_gain, self.max_speed,
-                  self.max_acceleration, self.max_tilt, self.max_rate)
-        if not all(math.isfinite(value) and value > 0 for value in values):
-            raise ValueError("position control parameters must be finite and positive")
-        if self.hover_thrust >= 1 or self.max_acceleration >= GRAVITY or self.max_tilt >= math.pi / 2:
-            raise ValueError("hover thrust, acceleration, or tilt exceeds the upright control range")
-
 
 def _limit(vector, magnitude):
     scale = min(1.0, magnitude / max(math.hypot(*vector), 1e-12))
@@ -45,6 +36,14 @@ def position_control(config: PositionConfig, position: Vector3, velocity: Vector
     the supplied local calibration around hover. The caller owns sample timing,
     freshness, target selection, and any persistent state. No I/O occurs here.
     """
+    parameters = (config.hover_thrust, config.thrust_acceleration, config.position_gain,
+                  config.velocity_gain, config.attitude_gain, config.max_speed,
+                  config.max_acceleration, config.max_tilt, config.max_rate)
+    if not all(math.isfinite(value) and value > 0 for value in parameters):
+        raise ValueError("position control parameters must be finite and positive")
+    if config.hover_thrust >= 1 or config.max_acceleration >= GRAVITY or config.max_tilt >= math.pi / 2:
+        raise ValueError("hover thrust, acceleration, or tilt exceeds the upright control range")
+
     vectors = (position, velocity, attitude, target_position)
     if any(len(vector) != 3 for vector in vectors):
         raise ValueError("position control requires three-component vectors")

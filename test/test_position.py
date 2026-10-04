@@ -80,8 +80,10 @@ class PositionControlTest(unittest.TestCase):
         for values in (dict(hover_thrust=0), dict(hover_thrust=1), dict(thrust_acceleration=-1),
                        dict(position_gain=math.nan), dict(max_rate=math.inf),
                        dict(max_acceleration=10), dict(max_tilt=math.pi / 2)):
-            with self.subTest(values=values), self.assertRaises(ValueError):
-                replace(self.config, **values)
+            with self.subTest(values=values):
+                config = replace(self.config, **values)
+                with self.assertRaises(ValueError):
+                    self.control(config=config)
 
     def test_captured_native_control_steps_replay_without_the_simulator(self):
         fixture = json.loads((Path(__file__).parent / "fixtures/position_control.json").read_text())
