@@ -1,4 +1,4 @@
-"""Compensate VQ1's measured steady yaw-rate error using its gyro feedback."""
+"""Experimental gyro correction for the sustained VQ1 yaw-rate probe."""
 
 import math
 

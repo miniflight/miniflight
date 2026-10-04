@@ -9,9 +9,9 @@ from unittest.mock import Mock, patch
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.probe import DiagnosticClient, Probe, replay
+from target.aigp.experiments.probe import DiagnosticClient, Probe, replay
 from miniflight import Attitude, BodyRates, Motion, Ned, PositionNed, State
-from target.aigp.recording import RecordedController, recording
+from target.aigp.experiments.recording import RecordedController, recording
 
 
 def state(stamp, down=-3, speed=0):

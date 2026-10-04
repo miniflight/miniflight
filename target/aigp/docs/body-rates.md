@@ -67,7 +67,7 @@ The rate probe therefore explicitly sends zero body rates, at the same collectiv
 thrust, before returning to position mode. Zero rates stop rotation; position
 control subsequently levels the vehicle and removes translation.
 
-The shared `target.aigp.recording` wrapper records every controller input, including
+The optional `target.aigp.experiments.recording` wrapper records every controller input, including
 gate geometry, and returned command. Separate `sent` records
 identify commands actually sent through the client. The log also contains arm
 requests, received heartbeats/acknowledgements/collisions, source-file hashes,
@@ -106,8 +106,8 @@ boundary have not been established. The adapter does not compensate for tracking
 error by rescaling requested rates.
 
 The later [yaw tracking study](yaw-tracking.md) confirms the steady deficit with
-longer steps and raw-wire capture. It adds explicit gyro feedback in the AIGP
-controller layer while preserving this raw transport behavior.
+longer steps and raw-wire capture. Its experimental gyro feedback can be selected
+in the rate probe; the gate routine uses the position controller's output directly.
 
 Vertical acceleration was estimated by fitting NED down velocity against its own
 device timestamps, again excluding the first 0.15 seconds:
@@ -154,9 +154,9 @@ python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
 
 `r1_body_rates` reuses the published-gate target policy, holds the initial heading,
 and outputs only `BodyRates`. It requires motion, attitude, and course geometry.
-It now applies the bounded VQ1 yaw feedback described in the tracking study.
-Pass `yaw_feedback=False` to its constructor to reproduce the original raw R1
-measurements below; the generic numerical position controller is unchanged.
+Its `target_position` and `target_yaw` are the desired position and heading;
+current observations remain in `state`. It sends the numerical position
+controller's output directly, without the separate yaw-rate probe correction.
 The existing runner handles missing observations, native GO/finish, and cleanup.
 `BaseController[BodyRates]` declares its output type; deliberately mixed routines
 can declare a union. The target still validates every actual returned command.
@@ -194,3 +194,10 @@ second native R1 run (`race-02.jsonl`) again completed all six gates using only
 body-rate commands. All 2,397 updates replayed exactly and the owned connection
 closed. The refactored package passed 226 unit tests and seven UDP integration
 checks; 24 core checks also passed with site packages disabled (`python -S`).
+
+The earlier `race-ownership-01.jsonl` completed all six native R1 gates without
+the experimental yaw correction, and all 2,342 updates replayed exactly.
+After moving the optional tools into `experiments/`, `race-arena-01.jsonl` again
+completed all six native gates. All 2,312 updates replayed exactly and the owned
+connection closed. Both R1 controllers use `r1_gates.gate_target` to choose the
+same position targets; only their outgoing command planes differ.

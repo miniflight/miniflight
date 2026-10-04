@@ -11,7 +11,7 @@ import numpy as np
 from miniflight import Attitude, BodyRates, Frame, Motion, MotorOutputs, Ned, State
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as Gates
-from target.aigp.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay
+from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay
 from target.aigp.simulator import AIGPSimulator, SimulatorClient
 
 

@@ -7,7 +7,8 @@ import unittest
 from miniflight import Attitude, BodyRates, Motion, Ned, State
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_body_rates import Controller
-from target.aigp.recording import RecordedController, recording, replay
+from target.aigp.controllers.r1_gates import Controller as PositionController
+from target.aigp.experiments.recording import RecordedController, recording, replay
 
 
 class BodyRateGateControllerTest(unittest.TestCase):
@@ -21,15 +22,15 @@ class BodyRateGateControllerTest(unittest.TestCase):
 
     def test_only_body_rates_are_returned_while_following_native_gate_progress(self):
         first = self.controller.update(self.state, 0, self.gates)
-        target = self.controller.target
+        target = self.controller.target_position
         self.assertIsInstance(first, BodyRates)
         self.assertAlmostEqual(math.dist(target, self.gates[0].center), 1)
         moved = replace(self.state, time=20, motion=replace(self.state.motion, position=self.gates[0].center))
         self.assertIsInstance(self.controller.update(moved, 0, self.gates), BodyRates)
-        self.assertEqual(self.controller.target, target)
+        self.assertEqual(self.controller.target_position, target)
         self.assertIsInstance(self.controller.update(moved, 1, self.gates), BodyRates)
-        self.assertNotEqual(self.controller.target, target)
-        self.assertEqual(self.controller.gate, 1)
+        self.assertNotEqual(self.controller.target_position, target)
+        self.assertEqual(self.controller.gate_index, 1)
 
     def test_missing_motion_attitude_or_geometry_returns_no_command(self):
         for state, gates in ((replace(self.state, motion=None), self.gates),
@@ -41,37 +42,42 @@ class BodyRateGateControllerTest(unittest.TestCase):
                 controller.update(self.state, 0, self.gates)
                 self.assertIsNone(controller.update(state, 0, gates))
 
+    def test_uses_the_same_targets_as_the_position_controller_through_six_gates(self):
+        position_controller = PositionController()
+        gates = tuple(Gate(i, Ned(-20 * (i + 1), -i, -2 - .5 * i), (1, 0, 0, 0), 2, 2) for i in range(6))
+        state = self.state
+        for index in range(len(gates) + 1):
+            for position in (state.motion.position, gates[min(index, len(gates) - 1)].center):
+                state = replace(state, motion=replace(state.motion, position=position))
+                expected = position_controller.update(state, index, gates)
+                actual = self.controller.update(state, index, gates)
+                self.assertIsInstance(actual, BodyRates)
+                self.assertEqual(self.controller.target_position, (expected.north, expected.east, expected.down))
+
     def test_last_gate_keeps_commanding_until_native_finish(self):
         self.controller.update(self.state, 1, self.gates)
-        target = self.controller.target
+        target = self.controller.target_position
         command = self.controller.update(self.state, 2, self.gates)
         self.assertIsInstance(command, BodyRates)
-        self.assertEqual(self.controller.target, target)
+        self.assertEqual(self.controller.target_position, target)
         self.assertIsNone(Controller().update(self.state, 2, self.gates))
 
     def test_heading_is_held_from_initial_observation(self):
         self.controller.update(self.state, 0, self.gates)
         turned = replace(self.state, attitude=replace(self.state.attitude, yaw=math.pi + .1))
         command = self.controller.update(turned, 0, self.gates)
-        self.assertEqual(self.controller.yaw, math.pi)
+        self.assertEqual(self.controller.target_yaw, math.pi)
         self.assertLess(command.yaw_rate, 0)
+        self.controller.update(turned, 1, self.gates)
+        self.assertEqual(self.controller.target_yaw, math.pi)
 
-    def test_yaw_feedback_uses_gyro_and_can_be_disabled_for_baseline_replay(self):
-        raw = Controller(yaw_feedback=False)
-        raw.update(self.state, 0, self.gates)
+    def test_body_rate_limit_holds_during_persistent_heading_error(self):
         self.controller.update(self.state, 0, self.gates)
-        turned = replace(self.state, attitude=replace(self.state.attitude, yaw=math.pi + .1))
-        baseline = raw.update(turned, 0, self.gates)
-        compensated = self.controller.update(turned, 0, self.gates)
-        self.assertEqual(compensated, baseline)
-        for tick in range(1, 11):
-            compensated = self.controller.update(replace(turned, time=turned.time + tick * turned.dt), 0, self.gates)
-        self.assertLess(compensated.yaw_rate, baseline.yaw_rate)
-        self.assertEqual(compensated.roll_rate, baseline.roll_rate)
-        self.assertEqual(compensated.pitch_rate, baseline.pitch_rate)
-        self.assertEqual(compensated.thrust, baseline.thrust)
-        self.controller.update(replace(turned, attitude=None), 0, self.gates)
-        self.assertEqual(self.controller.yaw_feedback.correction, 0)
+        turned = replace(self.state, attitude=replace(self.state.attitude, yaw=math.pi + 1))
+        for tick in range(25):
+            command = self.controller.update(replace(turned, time=turned.time + tick * turned.dt), 0, self.gates)
+            rates = (command.roll_rate, command.pitch_rate, command.yaw_rate)
+            self.assertLessEqual(math.hypot(*rates), self.controller.config.max_rate + 1e-12)
 
     def test_recorded_observations_and_commands_replay(self):
         with tempfile.TemporaryDirectory() as directory:

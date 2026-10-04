@@ -2,12 +2,12 @@
 
 import math
 
-from miniflight import PositionNed, State
-from target.aigp.controllers import BaseController
+from miniflight import Ned, PositionNed, State
+from target.aigp.controllers import BaseController, Gate
 
 
-def gate_target(position, index: int, gates) -> PositionNed:
-    """Aim one metre beyond the gate center along the approach from position."""
+def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
+    """Choose a point one metre beyond the gate center along the approach."""
     center = gates[index].center
     direction = tuple(c - p for c, p in zip(center, position))
     distance = math.hypot(*direction)
@@ -15,7 +15,7 @@ def gate_target(position, index: int, gates) -> PositionNed:
         previous = gates[index - 1].center if index else (0.0, 0.0, 0.0)
         direction = tuple(c - p for c, p in zip(center, previous))
         distance = math.hypot(*direction)
-    return PositionNed(*(c + d / distance for c, d in zip(center, direction)))
+    return Ned(*(c + d / distance for c, d in zip(center, direction)))
 
 
 class Controller(BaseController[PositionNed]):
@@ -40,7 +40,7 @@ class Controller(BaseController[PositionNed]):
             return None
 
         if gate_index < len(gates) and gate_index != self.gate:
-            self.target = gate_target(motion.position, gate_index, gates)
+            self.target = PositionNed(*gate_target(motion.position, gate_index, gates))
             self.gate = gate_index
 
         return self.target

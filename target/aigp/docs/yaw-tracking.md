@@ -38,12 +38,13 @@ radians or silently change the packet encoder. The study does not identify a
 unique native PID coefficient as the cause; native controller state and tuning
 were not instrumented. No simulator binary, physics, or PID settings were changed.
 
-## Controller correction
+## Experimental rate correction
 
-`target/aigp/yaw_tracking.py` supplies `YawRateFeedback`, used by the VQ1
-`r1_body_rates` routine. It learns a bounded yaw correction from the difference
-between the requested rate and the measured gyro rate. It contains no fixed
-inverse-gain multiplier and does not modify roll, pitch, or thrust.
+`target/aigp/experiments/yaw_tracking.py` supplies `YawRateFeedback`, selected
+by the rate probe's `--yaw-feedback` option. It learns a bounded yaw correction
+from the difference between the requested rate and the measured gyro rate.
+It contains no fixed inverse-gain multiplier and does not modify roll, pitch,
+or thrust.
 
 The defaults are an integral gain of 2/s, correction limited to ±0.15 rad/s, and
 the resulting yaw request limited to ±1 rad/s. Error is integrated against the
@@ -54,11 +55,11 @@ missing required observations, and invalid/gapped sample intervals reset state.
 This preserves the explicit neutral request needed before returning to a NED
 command. The existing runner still owns arming, freshness checks, and cleanup.
 
-`position_control()` in the generic core remains unchanged. `SimulatorClient`
-also retains its original encoding. Raw body-rate requests remain available for
-measurement. Use `Controller(yaw_feedback=False)` when replaying the older raw
-R1 traces or comparing against the baseline. The new default is VQ1-only through
-the controller's existing target restriction.
+`position_control()` in the generic core and `SimulatorClient` retain their
+original calculation and encoding. The R1 gate routine sends the position
+controller's output directly. Sustained rate tracking in these probes does not
+establish a need for another yaw-rate loop in a routine that already controls
+heading. The correction remains an explicit VQ1 experiment.
 
 ## Validation
 
@@ -79,10 +80,13 @@ response into an integral correction. Four two-second ±0.5 trials ended with
 checked without retuning the correction. Every completed final probe replayed
 its controller outputs exactly.
 
-The final `r1_body_rates` controller completed all six native R1 gates with
-2,241 controller updates replayed exactly and no reported collisions. The owned
-simulator and connection closed. Validation also passed 240 unit tests, seven
-UDP integration checks, and 24 core checks with site packages disabled.
+The version of `r1_body_rates` at commit `30c073a`, which included the correction,
+completed all six native R1 gates with 2,241 controller updates replayed exactly
+and no reported collisions. The owned simulator and connection closed.
+Validation also passed 240 unit tests, seven
+UDP integration checks, and 24 core checks with site packages disabled. That
+historical flight trace requires that controller version to replay; the current
+gate routine uses the original position feedback without this extra loop.
 
 ![Matched native yaw-rate responses](yaw-response.png)
 

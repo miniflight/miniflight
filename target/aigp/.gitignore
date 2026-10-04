@@ -1,6 +1,7 @@
 /.runtime
 /AI-GP*/
 /*.zip
+/archives/*.zip
 .DS_Store
 *.log
 *.dmp

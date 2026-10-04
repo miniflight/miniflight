@@ -10,9 +10,9 @@ from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates, PositionNed
 from target.aigp.controllers import BaseController
-from target.aigp.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay as replay_controller
+from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay as replay_controller
 from target.aigp.simulator import AIGPSimulator, BASE, SHIPPING, sha256
-from target.aigp.yaw_tracking import YawRateFeedback
+from target.aigp.experiments.yaw_tracking import YawRateFeedback
 
 
 def angular_rates(command):
@@ -141,9 +141,9 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
                         for key in ("gain", "max_correction", "max_rate", "settle_time", "step_threshold")}
                        if yaw_feedback else None)
     root = BASE.parents[1]
-    sources = ("target/aigp/simulator.py", "target/aigp/recording.py", "miniflight/vehicle.py",
-               "miniflight/control.py", "miniflight/state.py", "target/aigp/probe.py",
-               "target/aigp/yaw_tracking.py", "examples/aigp/probe_body_rates.py")
+    sources = ("target/aigp/simulator.py", "target/aigp/experiments/recording.py", "miniflight/vehicle.py",
+               "miniflight/control.py", "miniflight/state.py", "target/aigp/experiments/probe.py",
+               "target/aigp/experiments/yaw_tracking.py", "examples/aigp/probe_body_rates.py")
     metadata = dict(target="vq1.r1", hz=hz, timeout=.3, duration=duration, yaw_feedback=feedback_config,
                     angular_convention="FRD/NED after AIGP build-3391 wire conversion",
                     commands=[asdict(command) for command in probe.commands],

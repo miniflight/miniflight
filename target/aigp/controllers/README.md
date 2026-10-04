@@ -80,20 +80,26 @@ Start R1 through the simulator so the receiver is listening when track data is
 published. A late attach can miss that transfer and leave the controller waiting
 for geometry without arming.
 
-The pure `gate_target(position, index, gates)` function is reusable by a lower-plane
-controller. A fresh controller can replay `(state, gate_index, gates)` samples
-without a connection or clock.
-The shared [recording and replay helpers](../README.md#recording-and-replay) capture
-these inputs and compare returned commands, including for controllers other than
-the body-rate probe.
+`Gate` is part of the controller input contract in `controllers/__init__.py`.
+The gate-selection rule is `r1_gates.gate_target(position, index, gates)`.
+It returns a `Ned` position. `r1_gates` sends that position as a `PositionNed`
+command. `r1_body_rates` uses the same function, then computes the body rates and
+thrust needed to reach the position. Both routines follow the same gate progress
+and finish conditions; they use different command planes.
+
+A fresh controller can replay `(state, gate_index, gates)` samples without a
+connection or clock. Optional [recording and replay tools](../experiments/README.md#recording-and-replay)
+are kept with the experiments; the simulator and controllers do not import them.
 
 ## r1 body rates
 
 `r1_body_rates` uses the same gate-target policy and closes position and attitude
 feedback in Python. It requires VQ1 motion, attitude, and the published course;
 missing required observations return `None`. Every flight command is `BodyRates`.
-The heading is held at its initial value, the target changes only when the native
-gate index advances, and the final target is held until native finish.
+The routine stores its desired position as `target_position` and its desired
+heading as `target_yaw`. It deliberately holds the initial heading throughout
+the course. The position target changes only when the native gate index advances,
+and the final target is held until native finish.
 
 ```sh
 python target/aigp/simulator.py vq1.r1 --controller r1_body_rates
@@ -108,11 +114,10 @@ state, camera pixels, or transport. `PositionConfig` carries gains, limits, and
 the vehicle's local hover/thrust calibration. The VQ1 values live in the AIGP
 controller, not in the generic numerical function.
 
-The AIGP wrapper also applies bounded gyro feedback to correct the measured VQ1
-yaw-rate deficit. Its state is local to each controller. `yaw_feedback=False`
-selects the raw baseline, including for replay of older R1 traces. The packet
-encoder and core position calculation remain unchanged. See the
-[yaw tracking measurements](../docs/yaw-tracking.md) for limits and reproduction.
+The returned command is the numerical controller's output. The separate
+[yaw tracking experiment](../docs/yaw-tracking.md) tests sustained rate accuracy
+through the probe's `--yaw-feedback` option; its additional gyro correction is
+not part of this gate routine.
 
 The simulator still owns angular-rate stabilization and motor mixing. This
 controller is not a VQ2 estimator or a hardware-validated flight stack.

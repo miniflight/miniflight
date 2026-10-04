@@ -9,7 +9,7 @@ CommandT = TypeVar("CommandT", bound=Command, covariant=True)
 
 @dataclass(frozen=True)
 class Gate:
-    """Track geometry: center in NED metres, orientation as a wxyz quaternion."""
+    """Published opening geometry: NED center in metres and a wxyz orientation."""
 
     id: int
     center: Ned

@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from target.aigp.yaw_tracking import YawRateFeedback
+from target.aigp.experiments.yaw_tracking import YawRateFeedback
 
 
 class YawFeedbackTest(unittest.TestCase):

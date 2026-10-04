@@ -1,6 +1,7 @@
 # aigp
 
-Run AI-GP with one Python controller.
+A simulator arena for Python controllers. `simulator.py` is the implementation
+entrypoint; controller code lives in `controllers/`.
 
 ```sh
 python target/aigp/simulator.py vq1.r1 --controller r1_gates
@@ -9,75 +10,43 @@ python target/aigp/simulator.py vq2.r1 --controller zero
 python target/aigp/simulator.py vq2.r2 --controller zero
 ```
 
-The implementation is [simulator.py](simulator.py). Use Python 3.11 or newer and install
-its dependencies once from the repository root:
+Use Python 3.11 or newer and install dependencies once from the repository root:
 
 ```sh
 python -m pip install -e ".[aigp]"
 ```
 
-The same simulator can be used from Python:
+Both R1 controllers aim through the same six gates. `r1_gates` returns
+`PositionNed` and lets VQ1 control position. `r1_body_rates` uses the same gate
+selection, controls position and attitude in Python, and returns `BodyRates`.
+VQ1 then controls angular rates and motors. Both continue until native finish.
+`zero` sends zero thrust; it does not hover.
+
+The simulator calls `controller.update(state, gate_index, gates)` and sends the
+returned command. It owns observations, timing, arming, native start/finish,
+and cleanup. The controller owns its target choices and control calculations.
+See [the controller interface](controllers/README.md) to add a controller.
+
+The same arena can be used from Python:
 
 ```python
 from target.aigp.simulator import AIGPSimulator
-from target.aigp.controllers.r1_gates import Controller
+from target.aigp.controllers.r1_body_rates import Controller
 
 sim = AIGPSimulator(Controller(), "vq1.r1")
 result = sim.rollout()
 ```
 
-Create a fresh controller and simulator for each run. A simulator instance accepts
+Create a fresh controller and simulator for each run. Each simulator accepts
 one `rollout()` attempt, including attempts that fail or are interrupted.
 
-The simulator calls `controller.update(state, gate_index, gates)` and sends its returned
-command. It owns the connection, timing, arming, native start/finish, and cleanup.
-`r1_gates` uses the simulator's position controller. `r1_body_rates` runs Python
-position and attitude feedback and sends only body-rate/thrust commands.
-`zero` sends zero thrust; it does not hover.
-[Write a controller](controllers/README.md).
+Runnable examples remain under `examples/aigp/`: `thread_gates` runs the position
+baseline and `velocity_ned` sends a short velocity request. The body-rate
+counterpart is `controllers/r1_body_rates.py`, run with the command above.
 
-The velocity example uses the same lifecycle and 50 Hz runner:
-
-```sh
-python -m examples.aigp.velocity_ned
-```
-
-It requests -1 m/s north for two simulator seconds, then zero velocity for one
-second before stopping. Historical raw-protocol probes are under `target/aigp/experiments/`.
-
-Body-rate measurement machinery lives in `target/aigp/probe.py`; its runnable
-entrypoint is `python -m examples.aigp.probe_body_rates`. The
-[yaw tracking study](docs/yaw-tracking.md) explains the raw and feedback modes.
-
-## recording and replay
-
-Recording wraps a supplied controller. Gates and optional camera pixels are included
-with the observations, so replay can reproduce the controller's inputs:
-
-```python
-from target.aigp.recording import RecordedClient, RecordedController, recording, replay
-from target.aigp.simulator import AIGPSimulator
-from target.aigp.controllers.r1_gates import Controller
-
-with recording("r1.jsonl", {"target": "vq1.r1"}) as record:
-    sim = AIGPSimulator(RecordedController(Controller(), record),
-                       client=RecordedClient(record, camera_port=None))
-    result = sim.rollout()
-    record(event="result", race_finished=result is not None and result.finished,
-           connection_closed=not sim.client.connected)
-
-updates = replay(Controller(), "r1.jsonl")
-```
-
-This example disables camera input because the gate controller does not use it.
-Omit `camera_port=None` to record images as lossless PNG data. Recording is optional;
-the controller still implements only `update(state, gate_index, gates)`.
-
-Replay takes a fresh controller and returns the number of matching updates. It
-checks returned commands and exceptions, without depending on a controller's
-private fields. A matching replay is not evidence of a native race finish. Older
-body-rate probe traces remain readable; they omitted geometry and replay with
-`gates=None`.
+Optional probes, recording, replay, and yaw diagnostics are grouped under
+[experiments](experiments/README.md). The simulator and gate controllers do not
+import these tools.
 
 ## setup
 

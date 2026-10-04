@@ -6,7 +6,7 @@ import unittest
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.probe import analyze_yaw
+from target.aigp.experiments.probe import analyze_yaw
 
 
 class YawAnalysisTest(unittest.TestCase):

@@ -14,7 +14,7 @@ from pathlib import Path
 import signal
 
 from miniflight import BodyRates
-from target.aigp.probe import Probe, analyze_yaw, replay, run
+from target.aigp.experiments.probe import Probe, analyze_yaw, replay, run
 
 
 def main(argv=None):

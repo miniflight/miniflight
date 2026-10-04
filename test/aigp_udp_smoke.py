@@ -25,7 +25,7 @@ from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
-from target.aigp.recording import RecordedClient, RecordedController, recording, replay
+from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
 from test.test_aigp_client import heartbeat, imu, packet
 
 
