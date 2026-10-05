@@ -1,11 +1,11 @@
 """R1 TRPY controller, starting with position feedback in NED."""
 
 from common.math import Vector3D
-from miniflight import BodyRates, State
+from miniflight import State
 from target.aigp.controllers import BaseController
 
 
-class Controller(BaseController[BodyRates]):
+class Controller(BaseController):
     targets = ("vq1.r1",)
 
     def __init__(self, kp=2.0, kd=2.0):
@@ -17,5 +17,5 @@ class Controller(BaseController[BodyRates]):
         """Position in metres and velocity in m/s produce acceleration in m/s²."""
         return self.kp * (target - position) - self.kd * velocity
 
-    def update(self, state: State, gate_index, gates) -> BodyRates | None:
+    def update(self, state: State, gate_index, gates):
         raise NotImplementedError("acceleration to TRPY conversion is not implemented yet")
