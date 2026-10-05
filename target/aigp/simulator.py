@@ -219,17 +219,10 @@ class SimulatorClient(Target):
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
         self.camera_port = camera_port
-        self._socket = None
-        self._vision = None
-        self._peer = None
-        self._target = None
+        self._socket = self._vision = self._peer = self._target = None
         self._telemetry = {}
-        self._imu_received_at = 0.0
-        self._motion = self._attitude = self._motors = None
-        self._camera = _Camera()
         self._track = _Track()
         self._race_status = None
-        self._last_imu = None
 
     @property
     def connected(self):
@@ -264,9 +257,14 @@ class SimulatorClient(Target):
         self._mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
         self._mav.robust_parsing = True
         try:
-            self._socket = self._bind(self.port)
+            # Exclusive binds: a second client must not steal these packets.
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._socket.bind(("127.0.0.1", self.port))
+            self._socket.setblocking(False)
             if self.camera_port is not None:
-                self._vision = self._bind(self.camera_port)
+                self._vision = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._vision.bind(("127.0.0.1", self.camera_port))
+                self._vision.setblocking(False)
         except BaseException:
             self.disconnect()
             raise
@@ -282,18 +280,6 @@ class SimulatorClient(Target):
                 self._wait(deadline, "simulator heartbeat")
         except BaseException:
             self.disconnect()
-            raise
-
-    @staticmethod
-    def _bind(port):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            # No SO_REUSEADDR: a second client must not steal the first one's packets.
-            sock.bind(("127.0.0.1", port))
-            sock.setblocking(False)
-            return sock
-        except BaseException:
-            sock.close()
             raise
 
     def disconnect(self):
