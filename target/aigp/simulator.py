@@ -147,7 +147,8 @@ class AIGPSimulator:
                                 print("race: running", flush=True)
                             if running and (not was_running or status.active_gate_index != previous.active_gate_index):
                                 print(f"race: gate_index={status.active_gate_index}", flush=True)
-                        _check_process(process)
+                        if process is not None and (exit_code := process.poll()) is not None:
+                            raise RuntimeError(f"simulator exited with status {exit_code}")
                         if finish_deadline is not None:
                             if now >= finish_deadline:
                                 raise TimeoutError(f"timed out waiting for fresh IMU telemetry; "
@@ -622,7 +623,13 @@ def launch(target, simulator_args=()):
     """Own one Wine prefix and process group, from preparation through shutdown."""
     if target not in TARGETS:
         raise ValueError(f"unsupported simulator: {target}")
-    _check_simulator_ports()
+    # Refuse an existing simulator before touching its Wine prefix.
+    for port in (14560, 5601):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError as error:
+                raise OSError(f"UDP {port} is in use; stop the existing simulator first") from error
     wine, server = wine_commands()
     version, mode, level = TARGETS[target]
     prefix = BASE / ".runtime" / f"{version}-wine"
@@ -657,22 +664,6 @@ def launch(target, simulator_args=()):
             _stop_process(process)
             if process is not None:
                 print(f"{target}: stopped", flush=True)
-
-
-def _check_process(process):
-    if process is not None and (status := process.poll()) is not None:
-        raise RuntimeError(f"simulator exited with status {status}")
-
-
-def _check_simulator_ports():
-    # The client reserves the controller ports separately.
-    # Refuse an existing simulator before the Wine launcher can touch its prefix.
-    for port in (14560, 5601):
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            try:
-                sock.bind(("127.0.0.1", port))
-            except OSError as error:
-                raise OSError(f"UDP {port} is in use; stop the existing simulator first") from error
 
 
 def _stop_process(process):

@@ -138,7 +138,7 @@ the same physical-response validation.
 `r1_gates` consumes `State.motion.position` and returns `PositionNed`
 `r1_body_rates` consumes VQ1 motion and attitude and returns `BodyRates`
 `zero` returns `BodyRates`
-`AIGPSimulator` owns the connection and uses `Vehicle.read` and `Vehicle.send` for both
+`AIGPSimulator` owns the connection and calls `client.read`, `controller.update`, then `client.send`
 controllers implement `BaseController.update(state, gate_index, gates)`
 the `BaseController` type parameter declares one output plane or an explicit union
 the target validates each actual returned command independently of that annotation
