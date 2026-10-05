@@ -424,44 +424,26 @@ class SimulatorClient(Target):
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""
-        if isinstance(command, (PositionNed, VelocityNed)):
-            self._send_ned(command)
-        elif isinstance(command, BodyRates):
-            self._send_body_rates(command)
+        if isinstance(command, BodyRates):
+            self._mav.set_attitude_target_send(
+                self._time_ms(), *self._target,
+                mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
+                [1.0, 0.0, 0.0, 0.0],
+                # The simulator's angular-rate wire axes are opposite to FRD.
+                -command.roll_rate, -command.pitch_rate, -command.yaw_rate, command.thrust,
+            )
+        elif isinstance(command, (PositionNed, VelocityNed)):
+            vector = (command.north, command.east, command.down)
+            position = vector if isinstance(command, PositionNed) else (0, 0, 0)
+            velocity = vector if isinstance(command, VelocityNed) else (0, 0, 0)
+            # 1 ignores a field: xyz bits 0..2, velocity 3..5, acceleration 6..8, yaw 10..11.
+            mask = 0b110111111000 if isinstance(command, PositionNed) else 0b110111000111
+            self._mav.set_position_target_local_ned_send(
+                self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
+                mask, *position, *velocity, 0, 0, 0, 0, 0,
+            )
         else:
             raise TypeError("expected BodyRates, PositionNed or VelocityNed")
-
-    def _send_body_rates(self, control: BodyRates):
-        self._mav.set_attitude_target_send(
-            self._time_ms(), *self._target,
-            mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
-            [1.0, 0.0, 0.0, 0.0],
-            # The simulator's angular-rate wire axes are opposite to FRD.
-            -control.roll_rate, -control.pitch_rate, -control.yaw_rate, control.thrust,
-        )
-
-    def _send_ned(self, control: PositionNed | VelocityNed):
-        vector = (control.north, control.east, control.down)
-        position = velocity = (0, 0, 0)
-        mask = (mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
-                | mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE)
-        if isinstance(control, PositionNed):
-            position = vector
-            mask |= (mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE)
-        else:
-            velocity = vector
-            mask |= (mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE
-                     | mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE)
-        self._mav.set_position_target_local_ned_send(
-            self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
-            mask, *position, *velocity, 0, 0, 0, 0, 0,
-        )
 
     def heartbeat(self):
         self._mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,

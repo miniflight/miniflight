@@ -22,7 +22,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from target.aigp.simulator import AIGPSimulator, _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
-from miniflight import BodyRates, State
+from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
@@ -47,7 +47,10 @@ class UDPSmokeTest(unittest.TestCase):
             with self.subTest(with_pose=with_pose):
                 self.round_trip(with_pose)
 
-    def round_trip(self, with_pose):
+    def test_velocity_command_round_trip(self):
+        self.round_trip(True, VelocityNed(-1, 0, 0))
+
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4)):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -104,7 +107,7 @@ class UDPSmokeTest(unittest.TestCase):
                 states.append(state)
                 if len(states) == 5:
                     raise KeyboardInterrupt
-                return BodyRates(.1, -.2, .3, .4)
+                return command
 
         controller = Controller()
         client = SimulatorClient(port=0, camera_port=0)
@@ -129,9 +132,17 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(states[-1].motion is not None, with_pose)
         self.assertTrue(all(not hasattr(s, "telemetry") and not hasattr(s, "race") for s in states))
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]
-        self.assertEqual(len(rates), 5)
         self.assertTrue(all(m.type_mask == 144 and m.target_system == 42 for m in rates))
-        self.assertAlmostEqual(rates[0].thrust, .4)
+        if isinstance(command, BodyRates):
+            self.assertEqual(len(rates), 5)
+            self.assertAlmostEqual(rates[0].thrust, .4)
+        else:
+            self.assertEqual(len(rates), 1)
+            velocities = [m for m in received if m.get_type() == "SET_POSITION_TARGET_LOCAL_NED"]
+            self.assertEqual(len(velocities), 4)
+            self.assertTrue(all(m.type_mask == 3527 and m.coordinate_frame == 1 and m.target_system == 42
+                                and (m.x, m.y, m.z) == (0, 0, 0) and (m.vx, m.vy, m.vz) == (-1, 0, 0)
+                                for m in velocities))
         self.assertEqual(rates[-1].thrust, 0)
         arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"]
         self.assertEqual(arms, [1, 0])
