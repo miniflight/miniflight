@@ -648,7 +648,8 @@ def _stop_process(process):
 def main(argv=None):
     names = sorted(p.stem for p in (BASE / "controllers").glob("*.py")
                    if not p.name.startswith("_"))
-    parser = argparse.ArgumentParser(prog="simulator.py", description="Run an AI-GP simulator and a Python controller.")
+    parser = argparse.ArgumentParser(prog="simulator.py", allow_abbrev=False,
+                                     description="Run an AI-GP simulator and a Python controller.")
     parser.add_argument("target", nargs="?", choices=(*TARGETS, "vq1"))
     parser.add_argument("--controller", choices=names)
     parser.add_argument("--prepare", choices=VERSIONS, help="extract and configure a simulator without launching it")
@@ -657,8 +658,8 @@ def main(argv=None):
     parser.add_argument("--startup-timeout", type=float)
     argv = list(sys.argv[1:] if argv is None else argv)
     boundary = argv.index("--") if "--" in argv else len(argv)
-    args, simulator_args = parser.parse_known_args(argv[:boundary])
-    simulator_args.extend(argv[boundary + 1:])
+    args = parser.parse_args(argv[:boundary])
+    simulator_args = argv[boundary + 1:]
     if args.prepare:
         if args.target or args.controller or args.attach or simulator_args or args.hz is not None or args.startup_timeout is not None:
             parser.error("--prepare cannot be combined with run options")

@@ -80,5 +80,7 @@ Omit `--controller` to open just the simulator. Use `--attach --controller zero`
 with the same Python command to connect to an existing simulator without taking
 ownership of its process.
 `WINE` and `WINESERVER` select a different Wine installation.
+Pass Unreal command-line options after `--`. Options before `--` belong to
+this Python runner and must use their full names.
 
 [Vehicle API](docs/vehicle-api.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf)
