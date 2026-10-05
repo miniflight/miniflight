@@ -455,7 +455,7 @@ class _Track:
             return
         payload = bytes(message.data)
         transfer_id, size, packets = self.transfer
-        if payload[0] != 2 or struct.unpack_from("<H", payload, 1)[0] != transfer_id:
+        if struct.unpack_from("<H", payload, 1)[0] != transfer_id:
             return
         index = message.seqnr
         if not 0 <= index < packets:
@@ -466,8 +466,6 @@ class _Track:
             return
         data = b"".join(self.chunks[i] for i in range(packets))
         self.transfer, self.chunks = None, {}
-        if len(data) < 2:
-            return
         count, = struct.unpack_from("<H", data)
         if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
