@@ -27,6 +27,11 @@ reported by the simulator. `gates` is an immutable tuple of `Gate` values, or
 - `orientation`: the published quaternion in wxyz order, normalized to unit length.
 - `width`, `height`: reported overall bounds in metres, not opening clearance.
 
+Each update gets a new IMU sample and the cached whole track. Motion, attitude,
+motors and camera images can come from slower streams; each keeps its own
+timestamp. The gate tuple stays available between transfers. An incomplete
+replacement does not replace the current track.
+
 Captured VQ1 packets report about 2.72 m bounds. Section 3.7 of the
 [VQ1 specification](../docs/VQ1-Technical-Specification-00.02.pdf) gives a separate
 1.5 m inner opening; that opening size is not a field in the track packet.
@@ -150,7 +155,9 @@ The controller/simulator boundary follows
 ## r1 trpy
 
 `r1_trpy` is being built one step at a time. It currently computes desired NED
-acceleration from position error and velocity. Its `update` method raises
+acceleration from position error and velocity. TRPY means thrust and roll, pitch,
+yaw angles; it is a different output plane from `BodyRates`. The attitude-and-thrust
+command is not exposed yet. Its `update` method raises
 `NotImplementedError`; acceleration-to-command conversion is not implemented yet.
 
 [Setup](../README.md) · [Vehicle API](../docs/vehicle-api.md)

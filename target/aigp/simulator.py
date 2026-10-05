@@ -305,7 +305,7 @@ class SimulatorClient(Target):
 
     @property
     def gates(self):
-        """The last complete track; partial transfers never replace it."""
+        """Cached tuple of all gates, or None. Replaced only by a complete track transfer."""
         return self._track.gates
 
     @property
@@ -439,7 +439,11 @@ class SimulatorClient(Target):
         self.poll(min(remaining, 0.1))
 
     def read(self, timeout=1.0):
-        """Return a snapshot with a new IMU sample, or time out. Never invent telemetry."""
+        """Read one fresh IMU sample plus the latest optional motion, attitude, motors and image.
+
+        time and dt are IMU seconds; acceleration is body m/s² and gyro is body rad/s.
+        Each optional sample keeps its own timestamp. Gate geometry is a separate cache.
+        """
         deadline = time.monotonic() + timeout
         self.poll()
         while self._telemetry.get("HIGHRES_IMU") is self._last_imu:
@@ -452,9 +456,15 @@ class SimulatorClient(Target):
         self._last_imu = imu
         # Angular rates on the AIGP wire have the opposite signs to body FRD.
         state = State(
-            stamp, dt, (imu.xacc, imu.yacc, imu.zacc), (-imu.xgyro, -imu.ygyro, -imu.zgyro),
-            self._received_at["HIGHRES_IMU"], self._camera.latest,
-            self._motion(), self._attitude(), self._motors(),
+            time=stamp,
+            dt=dt,
+            acceleration=(imu.xacc, imu.yacc, imu.zacc),
+            gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro),
+            received_at=self._received_at["HIGHRES_IMU"],
+            frame=self._camera.latest,
+            motion=self._motion(),
+            attitude=self._attitude(),
+            motors=self._motors(),
         )
         self.messages = tuple(self._messages)
         self._messages.clear()
@@ -487,11 +497,12 @@ class SimulatorClient(Target):
         return MotorOutputs(message.time_usec * 1e-6, self._received_at["ACTUATOR_OUTPUT_STATUS"],
                             tuple(message.actuator), message.active)
 
-    def send(self, control: Command):
-        if isinstance(control, (PositionNed, VelocityNed)):
-            self._send_ned(control)
-        elif isinstance(control, BodyRates):
-            self._send_body_rates(control)
+    def send(self, command: Command):
+        """Write one NED position, NED velocity, or body-rate-and-thrust command."""
+        if isinstance(command, (PositionNed, VelocityNed)):
+            self._send_ned(command)
+        elif isinstance(command, BodyRates):
+            self._send_body_rates(command)
         else:
             raise TypeError("expected BodyRates, PositionNed or VelocityNed")
 

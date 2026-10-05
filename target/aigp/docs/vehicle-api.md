@@ -36,6 +36,11 @@ each slower observation keeps its own timestamp and receipt time
 `commands` lists the target's supported command types
 an unsupported command raises `NotImplementedError` without emulation
 
+The PDF names two command messages. Their MAVLink definitions describe five
+basic request forms: position, velocity, acceleration/force, attitude plus thrust,
+and body rates plus thrust. Masks select the active fields; these are not five
+separate messages. The adapter currently exposes three forms:
+
 | command | units | loop closed by the target |
 | --- | --- | --- |
 | `PositionNed` | metres in local NED | position and lower loops |
@@ -45,6 +50,26 @@ an unsupported command raises `NotImplementedError` without emulation
 the corresponding convenience methods are `position_ned` `velocity_ned` and `body_rates`
 they each send one command and do not run background loops
 AIGPSimulator owns race timing heartbeats command cadence and process lifetime
+
+`SET_ATTITUDE_TARGET` can carry desired attitude as a wxyz quaternion and
+collective thrust, or desired body rates and thrust. TRPY uses the attitude form:
+roll, pitch and yaw are angles, converted to a quaternion on the wire. It is not
+the `BodyRates` form, whose three rotational fields are rad/s.
+The native receiver has an attitude branch, but that form is not exposed or
+flight-verified by this adapter yet.
+See the [attitude message](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET).
+
+`SET_POSITION_TARGET_LOCAL_NED` carries position, velocity, acceleration/force,
+and optional heading fields. Our two NED command types select position or
+velocity and ignore the other fields. The acceleration/force form is not exposed
+or flight-verified here. See the [NED message](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED).
+
+Hovering belongs to the selected plane. A fixed `PositionNed` target lets VQ1
+hold position. A zero `VelocityNed` target asks it to hold zero velocity, without
+specifying a fixed location. With TRPY, the simulator would stabilize the requested
+attitude; our controller must still choose thrust and tilt to hold position.
+With `BodyRates`, our controller also chooses the rates needed to reach that
+attitude. Zero rates alone do not level a tilted drone, and zero thrust does not hover.
 
 `PositionNed` and `VelocityNed` express separate physical requests but share the
 adapter's `SET_POSITION_TARGET_LOCAL_NED` encoder. The command type selects the
@@ -129,6 +154,8 @@ the client and generic vehicle API retain the original timestamped observations
 each gate retains its published NED base as `origin` and normalized wxyz `orientation`
 the adapter derives `center` from that origin using orientation and half-height
 reported `width` and `height` are overall bounds, not opening clearance
+the whole track is cached between transfers; it is not a fresh per-cycle observation
+an incomplete replacement keeps the last complete track available
 `AIGPSimulator` passes the gates separately from `State` to the controller
 missing or withheld geometry stays `None`; no course coordinates are synthesized
 
