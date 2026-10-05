@@ -57,13 +57,12 @@ Create a fresh controller for each flight. Each `AIGPSimulator` instance is sing
 reusing one raises before touching its connection, even after a failed run.
 The simulator owns sockets, clocks, process lifetime, arming, and disarming.
 It calls `update` only after native GO and stops on native finish. Returning `None`
-waits for required observations before arming; returning `None` after starting
+waits for required observations until the startup deadline before arming; returning `None` after starting
 stops the run. Raise `StopIteration` to stop early.
 
 The simulator rejects race resets and gate indices outside the published track.
-With track geometry available, each gate must be passed within 45 simulator seconds
-of the first command for that gate. Set `AIGPSimulator(..., gate_timeout=90)` to allow
-more time. After the last gate, control continues until native finish.
+Gate progress and finish come from native race events. After the last gate,
+control continues until native finish.
 
 ## observations
 

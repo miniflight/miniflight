@@ -207,7 +207,7 @@ class UDPSmokeTest(unittest.TestCase):
 
             with patch("target.aigp.simulator.launch", side_effect=launch):
                 if expect_timeout:
-                    with self.assertRaisesRegex(TimeoutError, "fresh IMU.*gate_index=6.*finish_ns=-1"):
+                    with self.assertRaisesRegex(TimeoutError, "fresh IMU.*race_finish_time_ns=-1.*active_gate_index=6"):
                         AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
                 else:
                     AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()

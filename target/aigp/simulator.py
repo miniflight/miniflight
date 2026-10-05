@@ -83,15 +83,11 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller: BaseController[Command], target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, gate_timeout=45.0):
+                 timeout=1.0, startup_timeout=120.0, client=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
-        if not math.isfinite(timeout) or timeout <= 0:
-            raise ValueError("timeout must be positive and finite")
-        if not math.isfinite(startup_timeout) or startup_timeout <= 0:
-            raise ValueError("startup timeout must be positive and finite")
-        if not math.isfinite(gate_timeout) or gate_timeout <= 0:
-            raise ValueError("gate timeout must be positive and finite")
+        if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
+            raise ValueError("timeouts must be positive and finite")
         if target not in TARGETS:
             raise ValueError(f"unsupported simulator: {target}")
         if target not in getattr(controller, "targets", TARGETS):
@@ -101,7 +97,6 @@ class AIGPSimulator:
         self.hz = hz
         self.timeout = timeout
         self.startup_timeout = startup_timeout
-        self.gate_timeout = gate_timeout
         self.client = SimulatorClient() if client is None else client
         self.status = None
         self.armed = False
@@ -122,8 +117,7 @@ class AIGPSimulator:
                 now = time.monotonic()
                 next_tick = next_heartbeat = last_imu_at = now
                 startup_deadline = now + self.startup_timeout
-                controller_deadline = finish_deadline = None
-                gate_index = gate_started_at = None
+                finish_deadline = None
                 running = False
                 try:
                     while True:
@@ -156,10 +150,8 @@ class AIGPSimulator:
                         _check_process(process)
                         if finish_deadline is not None:
                             if now >= finish_deadline:
-                                raise TimeoutError(f"timed out waiting for fresh IMU telemetry; last race: "
-                                                   f"gate_index={status.active_gate_index}, boot_ms={status.sim_boot_time_ms}, "
-                                                   f"start_ms={status.race_start_boot_time_ms}, finish_ns={status.race_finish_time_ns}; "
-                                                   f"no native finish within {FINISH_WAIT_SECONDS:g}s")
+                                raise TimeoutError(f"timed out waiting for fresh IMU telemetry; "
+                                                   f"no native finish within {FINISH_WAIT_SECONDS:g}s; last race: {status}")
                         elif not running:
                             if now >= startup_deadline:
                                 raise TimeoutError("race never reported GO before the startup deadline")
@@ -168,8 +160,6 @@ class AIGPSimulator:
                             finish_deadline = now + FINISH_WAIT_SECONDS
                             print("controller: IMU lost; waiting for native finish", flush=True)
                         elif state is not None:
-                            if controller_deadline is None:
-                                controller_deadline = now + 10
                             gates = self.client.gates
                             index = status.active_gate_index
                             if index < 0 or (gates is not None and index > len(gates)):
@@ -190,13 +180,9 @@ class AIGPSimulator:
                             if command is None:
                                 if self.armed:
                                     raise ValueError("controller returned no command after starting")
-                                if now >= controller_deadline:
+                                if now >= startup_deadline:
                                     raise TimeoutError("controller did not receive its required startup telemetry")
                             else:
-                                if index != gate_index:
-                                    gate_index, gate_started_at = index, state.time
-                                if gates and index < len(gates) and state.time - gate_started_at > self.gate_timeout:
-                                    raise TimeoutError(f"gate {index + 1} was not passed within {self.gate_timeout:g} simulator seconds")
                                 if type(command) not in self.client.commands:
                                     raise TypeError("expected BodyRates, PositionNed or VelocityNed")
                                 if not self.armed:

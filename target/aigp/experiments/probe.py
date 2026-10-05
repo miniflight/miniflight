@@ -152,7 +152,7 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
         client = DiagnosticClient(record)
         if yaw_feedback:
             controller.record = record
-        sim = AIGPSimulator(RecordedController(controller, record), client=client, hz=hz, timeout=.3, gate_timeout=180)
+        sim = AIGPSimulator(RecordedController(controller, record), client=client, hz=hz, timeout=.3)
         try:
             sim.rollout()
             if probe.phase != "done":
