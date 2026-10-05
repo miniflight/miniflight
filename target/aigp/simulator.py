@@ -473,32 +473,26 @@ class _Track:
             return
         data = b"".join(self.chunks[i] for i in range(packets))
         self.transfer, self.chunks = None, {}
-        gates = self.decode(data)
-        if gates is not None:
-            self.gates = gates
-
-    @classmethod
-    def decode(cls, data):
         if len(data) < 2:
-            return None
+            return
         count, = struct.unpack_from("<H", data)
-        if not 0 < count <= cls.MAX_GATES or len(data) != 2 + count * cls.GATE.size:
-            return None
+        if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
+            return
         gates = []
-        for index, row in enumerate(cls.GATE.iter_unpack(data[2:])):
+        for index, row in enumerate(self.GATE.iter_unpack(data[2:])):
             gate_id, north, east, down, w, x, y, z, width, height = row
             if gate_id != index or not all(math.isfinite(value) for value in row[1:]) or width <= 0 or height <= 0:
-                return None
+                return
             norm = math.hypot(w, x, y, z)
             if not 0.99 <= norm <= 1.01:
-                return None
+                return
             orientation = tuple(value / norm for value in (w, x, y, z))
             # The published origin is at the gate base; offset to the opening center.
             origin = Ned(north, east, down)
             offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
             center = Ned(*(float(p + d) for p, d in zip(origin, offset)))
             gates.append(Gate(gate_id, center, orientation, width, height, origin=origin))
-        return tuple(gates)
+        self.gates = tuple(gates)
 
 
 class _Camera:
