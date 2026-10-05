@@ -213,6 +213,7 @@ class SimulatorClient(Target):
         self.camera_port = camera_port
         self._socket = self._vision = self._peer = self._target = None
         self._telemetry = {}
+        self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
         self.race_status: RaceStatus | None = None  # Latest packet, independent of the IMU.
 
@@ -224,11 +225,6 @@ class SimulatorClient(Target):
     def gates(self):
         """Cached tuple of all gates, or None. Replaced only by a complete track transfer."""
         return self._track.gates
-
-    @property
-    def telemetry(self):
-        """Raw MAVLink diagnostics, separate from the vehicle state."""
-        return MappingProxyType(self._telemetry.copy())
 
     def open(self):
         """Reserve the UDP ports without waiting for or commanding the simulator."""

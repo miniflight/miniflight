@@ -130,7 +130,8 @@ Live VQ1 build-3391 pulses exposed angular sign differences on the wire.
 The adapter negates all three transmitted body rates and received gyro components.
 It preserves reported roll and negates reported pitch and yaw for `State.attitude`.
 Position, velocity, and reported acceleration keep their wire signs.
-Raw `SimulatorClient.telemetry` retains the original messages.
+`SimulatorClient.telemetry` is a read-only view of the latest original MAVLink
+messages, keyed by message name. A held view follows later packets.
 The [measurements and captured regressions](body-rates.md) establish this conversion
 against attitude changes, NED motion, and the camera heading; VQ2 has not received
 the same physical-response validation.
