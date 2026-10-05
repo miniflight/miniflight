@@ -2,7 +2,7 @@
 
 import argparse
 from collections import deque
-from contextlib import ExitStack, contextmanager, nullcontext, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import dataclass, replace
 import fcntl
 import hashlib
@@ -21,7 +21,6 @@ import tarfile
 import tempfile
 import time
 from types import MappingProxyType
-import zipfile
 
 import cv2
 import numpy as np
@@ -703,13 +702,38 @@ def configuration(version):
 
 
 def prepare(version, base=BASE):
+    """Verify and extract the selected tar archive once, then copy its three config files."""
     profile = VERSIONS[version]
     parts = [line.split() for line in (base / "archives/SHA256SUMS").read_text().splitlines()
-             if line.strip() and (line.split()[-1] == f"{version}.tar.xz"
-                                  or line.split()[-1].startswith(f"{version}-unlocked.tar.gz.part-"))]
+             if line.strip() and line.split()[-1] == f"{version}.tar.xz"]
+    expected, filename = parts[0]
+    stamp = hashlib.sha256(repr(parts).encode()).hexdigest()
+    runtime = base / ".runtime"
+    sim = runtime / version
+    marker = sim / ".installed"
     config = {Path("config") / version / name: path for name, path in configuration(version).items()}
-    return install(base, version, parts, profile["root"], REQUIRED, config, profile["hashes"],
-                   archive_dir=base / "archives", cache_versions=(profile["legacy"],))
+    installed = (marker.is_file() and marker.read_text() in (stamp, profile["legacy"])
+                 and all((sim / path).is_file() for path in REQUIRED))
+    if not installed:
+        if sim.exists():
+            raise FileExistsError(f"Incomplete {sim}; move it aside before preparing again")
+        archive = base / "archives" / filename
+        if sha256(archive) != expected:
+            raise ValueError(f"Checksum mismatch: {filename}")
+        runtime.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=f"{version}-install-", dir=runtime) as temporary:
+            with tarfile.open(archive, "r:xz") as source:
+                source.extractall(temporary, filter="data")
+            extracted = Path(temporary) / profile["root"]
+            if not all((extracted / path).is_file() for path in REQUIRED):
+                raise ValueError(f"{filename} is missing required simulator files")
+            for path, digest in profile["hashes"].items():
+                if sha256(extracted / path) != digest:
+                    raise ValueError(f"{filename} contains the wrong {path}")
+            (extracted / ".installed").write_text(stamp)
+            extracted.rename(sim)
+    configure(base, sim, config)
+    return sim
 
 
 def configure(base, sim, files):
@@ -725,84 +749,6 @@ def sha256(path):
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def install(base, name, parts, archive_root, required, config=None, payload_sha256=None,
-            archive_dir=None, cache_versions=()):
-    if not hasattr(tarfile, "data_filter"):
-        raise SystemExit("Use a current Python 3.11 or newer to prepare the simulator.")
-    if not parts:
-        raise SystemExit(f"No archive parts listed for {name}.")
-    config = config or {}
-    archive_dir = base if archive_dir is None else archive_dir
-    version = hashlib.sha256(repr(parts).encode()).hexdigest()
-    runtime = base / ".runtime"
-    sim = runtime / name
-    marker = sim / ".installed"
-
-    try:
-        installed = (marker.is_file() and marker.read_text() in (version, *cache_versions)
-                     and all((sim / path).is_file() for path in required))
-    except (OSError, UnicodeError):
-        installed = False
-    if installed:
-        configure(base, sim, config)
-        return sim
-
-    runtime.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=f"{name}-install-", dir=runtime) as temporary:
-        staging = Path(temporary)
-        with ExitStack() as files:
-            combined = (files.enter_context(tempfile.TemporaryFile(dir=staging))
-                        if len(parts) > 1 else None)
-            for expected, filename in parts:
-                path = archive_dir / filename
-                if not path.is_file():
-                    raise SystemExit(f"Missing {filename}. Supply the archive before installing {name}.")
-                digest = hashlib.sha256()
-                source = files.enter_context(path.open("rb"))
-                for block in iter(lambda: source.read(1024 * 1024), b""):
-                    digest.update(block)
-                    if combined is not None:
-                        combined.write(block)
-                if digest.hexdigest() != expected:
-                    raise SystemExit(f"Checksum mismatch: {filename}. Download the expected archive and retry.")
-                print(f"Verified {filename}", flush=True)
-            if combined is None:
-                combined = source
-            combined.seek(0)
-            if zipfile.is_zipfile(combined):
-                with zipfile.ZipFile(combined) as archive:
-                    archive.extractall(staging)
-            else:
-                combined.seek(0)
-                with tarfile.open(fileobj=combined, mode="r:*") as archive:
-                    archive.extractall(staging, filter="data")
-
-        extracted = staging / archive_root
-        if not all((extracted / path).is_file() for path in required):
-            raise SystemExit(f"{name} archive is missing required simulator files.")
-        for relative, expected in (payload_sha256 or {}).items():
-            if sha256(extracted / relative) != expected:
-                raise SystemExit(f"{name} archive contains the wrong {relative} build.")
-        configure(base, extracted, config)
-        (extracted / ".installed").write_text(version)
-        backup = None
-        try:
-            if sim.exists() or sim.is_symlink():
-                backup = Path(tempfile.mkdtemp(prefix=f"{name}-backup-", dir=runtime)) / name
-                sim.rename(backup)
-            extracted.rename(sim)
-        except BaseException:
-            if backup is not None:
-                if backup.exists() or backup.is_symlink():
-                    backup.rename(sim)
-                backup.parent.rmdir()
-            raise
-        if backup is not None:
-            print(f"Preserved previous {name} installation at {backup}", flush=True)
-    print(f"Prepared {name} at {sim}", flush=True)
-    return sim
 
 
 def wine_commands():
