@@ -561,14 +561,6 @@ class _Camera:
             self.latest = Frame(frame_id, timestamp, now, bgr)
 
 
-def configuration(version):
-    return {
-        "main.lua": BINARIES / f"Mods/Direct{version.upper()}/Scripts/main.lua",
-        "mods.txt": BINARIES / "Mods/mods.txt",
-        "UE4SS-settings.ini": BINARIES / "UE4SS-settings.ini",
-    }
-
-
 def prepare(version, base=BASE):
     """Verify and extract the selected tar archive once, then copy its three config files."""
     profile = VERSIONS[version]
@@ -579,7 +571,6 @@ def prepare(version, base=BASE):
     runtime = base / ".runtime"
     sim = runtime / version
     marker = sim / ".installed"
-    config = {Path("config") / version / name: path for name, path in configuration(version).items()}
     installed = (marker.is_file() and marker.read_text() in (stamp, profile["legacy"])
                  and all((sim / path).is_file() for path in REQUIRED))
     if not installed:
@@ -600,15 +591,15 @@ def prepare(version, base=BASE):
                     raise ValueError(f"{filename} contains the wrong {path}")
             (extracted / ".installed").write_text(stamp)
             extracted.rename(sim)
-    configure(base, sim, config)
-    return sim
-
-
-def configure(base, sim, files):
-    for source, relative in files.items():
+    for name, relative in {
+        "main.lua": BINARIES / f"Mods/Direct{version.upper()}/Scripts/main.lua",
+        "mods.txt": BINARIES / "Mods/mods.txt",
+        "UE4SS-settings.ini": BINARIES / "UE4SS-settings.ini",
+    }.items():
         destination = sim / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(base / source, destination)
+        shutil.copyfile(base / "config" / version / name, destination)
+    return sim
 
 
 def sha256(path):
