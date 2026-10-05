@@ -1,7 +1,6 @@
 """Run an AI-GP simulator with one Python controller."""
 
 import argparse
-from collections import deque
 from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import dataclass, replace
 import fcntl
@@ -239,9 +238,8 @@ class SimulatorClient(Target):
         self._peer = None
         self._target = None
         self._telemetry = {}
-        self._received_at = {}
-        self._messages = deque(maxlen=2048)
-        self.messages = ()
+        self._imu_received_at = 0.0
+        self._motion = self._attitude = self._motors = None
         self._camera = _Camera()
         self._track = _Track()
         self._race_status = None
@@ -266,18 +264,13 @@ class SimulatorClient(Target):
         """Raw MAVLink diagnostics, separate from the vehicle state."""
         return MappingProxyType(self._telemetry.copy())
 
-    @property
-    def received_at(self):
-        return MappingProxyType(self._received_at.copy())
-
     def open(self):
         """Reserve the UDP ports without waiting for or commanding the simulator."""
         if self._socket is not None:
             raise RuntimeError("client is already open")
         self._telemetry.clear()
-        self._received_at.clear()
-        self._messages.clear()
-        self.messages = ()
+        self._imu_received_at = 0.0
+        self._motion = self._attitude = self._motors = None
         self._camera = _Camera()
         self._track = _Track()
         self._race_status = self._last_imu = None
@@ -368,10 +361,20 @@ class SimulatorClient(Target):
             previous = self._telemetry.get(kind)
             if previous is not None and message.time_usec <= previous.time_usec:
                 return
+            self._imu_received_at = now
         self._telemetry[kind] = message
-        self._received_at[kind] = now
-        self._messages.append(message)
-        if kind == "DATA_TRANSMISSION_HANDSHAKE":
+        if kind == "LOCAL_POSITION_NED":
+            values = (message.x, message.y, message.z, message.vx, message.vy, message.vz)
+            self._motion = (Motion(message.time_boot_ms * 1e-3, now, Ned(*values[:3]), Ned(*values[3:]))
+                            if all(math.isfinite(value) for value in values) else None)
+        elif kind == "ATTITUDE":
+            # Build 3391 reports pitch/yaw with the opposite signs to local NED.
+            self._attitude = (Attitude(message.time_boot_ms * 1e-3, now,
+                                      message.roll, -message.pitch, -message.yaw)
+                              if all(math.isfinite(value) for value in (message.roll, message.pitch, message.yaw)) else None)
+        elif kind == "ACTUATOR_OUTPUT_STATUS":
+            self._motors = MotorOutputs(message.time_usec * 1e-6, now, tuple(message.actuator), message.active)
+        elif kind == "DATA_TRANSMISSION_HANDSHAKE":
             self._track.start(message, now)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
             self._track.receive(message, now)
@@ -381,7 +384,6 @@ class SimulatorClient(Target):
                     and not self._race_status.started and not race.started):
                 # The native sensor clock can restart before GO.
                 self._telemetry.pop("HIGHRES_IMU", None)
-                self._received_at.pop("HIGHRES_IMU", None)
                 self._last_imu = None
             self._race_status = race
 
@@ -402,53 +404,23 @@ class SimulatorClient(Target):
         while self._telemetry.get("HIGHRES_IMU") is self._last_imu:
             self._wait(deadline, "fresh IMU telemetry")
         imu = self._telemetry["HIGHRES_IMU"]
-        if time.monotonic() - self._received_at["HIGHRES_IMU"] > timeout:
+        if time.monotonic() - self._imu_received_at > timeout:
             raise TimeoutError("IMU telemetry is stale")
         stamp = imu.time_usec * 1e-6
         dt = 0.0 if self._last_imu is None else stamp - self._last_imu.time_usec * 1e-6
         self._last_imu = imu
         # Angular rates on the AIGP wire have the opposite signs to body FRD.
-        state = State(
+        return State(
             time=stamp,
             dt=dt,
             acceleration=(imu.xacc, imu.yacc, imu.zacc),
             gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro),
-            received_at=self._received_at["HIGHRES_IMU"],
+            received_at=self._imu_received_at,
             frame=self._camera.latest,
-            motion=self._motion(),
-            attitude=self._attitude(),
-            motors=self._motors(),
+            motion=self._motion,
+            attitude=self._attitude,
+            motors=self._motors,
         )
-        self.messages = tuple(self._messages)
-        self._messages.clear()
-        return state
-
-    def _motion(self):
-        message = self._telemetry.get("LOCAL_POSITION_NED")
-        if message is None:
-            return None
-        values = (message.x, message.y, message.z, message.vx, message.vy, message.vz)
-        if not all(math.isfinite(value) for value in values):
-            return None
-        return Motion(message.time_boot_ms * 1e-3, self._received_at["LOCAL_POSITION_NED"],
-                      Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz))
-
-    def _attitude(self):
-        message = self._telemetry.get("ATTITUDE")
-        if message is None:
-            return None
-        if not all(math.isfinite(value) for value in (message.roll, message.pitch, message.yaw)):
-            return None
-        # Build 3391 reports pitch/yaw with the opposite signs to local NED.
-        return Attitude(message.time_boot_ms * 1e-3, self._received_at["ATTITUDE"],
-                        message.roll, -message.pitch, -message.yaw)
-
-    def _motors(self):
-        message = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
-        if message is None:
-            return None
-        return MotorOutputs(message.time_usec * 1e-6, self._received_at["ACTUATOR_OUTPUT_STATUS"],
-                            tuple(message.actuator), message.active)
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""
