@@ -28,7 +28,7 @@ from pymavlink.dialects.v20 import common as mavlink
 
 from common.math import Quaternion, Vector3D
 from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutputs,
-                       Ned, PositionNed, State, Vehicle, VelocityNed)
+                       Ned, PositionNed, State, VelocityNed)
 from target import Target
 from target.aigp.controllers import BaseController, Gate
 
@@ -104,9 +104,7 @@ class AIGPSimulator:
         self.startup_timeout = startup_timeout
         self.gate_timeout = gate_timeout
         self.client = SimulatorClient() if client is None else client
-        self.vehicle = Vehicle(self.client)
         self.status = None
-        self.phase = "waiting"
         self.armed = False
         self._used = False
 
@@ -117,85 +115,104 @@ class AIGPSimulator:
         self._used = True
         try:
             if attach:
-                self.vehicle.connect()
+                self.client.connect()
             else:
                 self.client.open()
             session = nullcontext(None) if attach else launch(self.target, simulator_args)
-            with session as self._process:
+            with session as process:
                 now = time.monotonic()
-                self._next_tick = self._next_heartbeat = self._last_imu_at = now
-                self._startup_deadline = now + self.startup_timeout
-                self._controller_deadline = None
-                self._gate_index = self._gate_started_at = None
-                self.status, self.phase = None, "waiting"
+                next_tick = next_heartbeat = last_imu_at = now
+                startup_deadline = now + self.startup_timeout
+                controller_deadline = finish_deadline = None
+                gate_index = gate_started_at = None
+                running = False
                 try:
-                    while self.step():
-                        self._tick()
-                    return self.status if self.phase == "finished" else None
+                    while True:
+                        now = time.monotonic()
+                        if self.client.connected and now >= next_heartbeat:
+                            self.client.heartbeat()
+                            next_heartbeat = now + 0.5
+                        try:
+                            state = self.client.read(timeout=min(self.timeout, 0.1))
+                            last_imu_at = state.received_at
+                        except TimeoutError:
+                            state = None
+                        now = time.monotonic()
+                        previous, status = self.status, self.client.race_status
+                        if status is not None:
+                            if running and (status.race_start_boot_time_ms != previous.race_start_boot_time_ms
+                                            or status.sim_boot_time_ms < previous.sim_boot_time_ms
+                                            or status.active_gate_index < previous.active_gate_index):
+                                raise RuntimeError("race reset during control; start a new run")
+                            self.status = status
+                            if status.finished:
+                                print("race: finished", flush=True)
+                                return status
+                            was_running = running
+                            if not running and status.started and now - status.received_at <= 1.0:
+                                running = True
+                                print("race: running", flush=True)
+                            if running and (not was_running or status.active_gate_index != previous.active_gate_index):
+                                print(f"race: gate_index={status.active_gate_index}", flush=True)
+                        _check_process(process)
+                        if finish_deadline is not None:
+                            if now >= finish_deadline:
+                                raise TimeoutError(f"timed out waiting for fresh IMU telemetry; last race: "
+                                                   f"gate_index={status.active_gate_index}, boot_ms={status.sim_boot_time_ms}, "
+                                                   f"start_ms={status.race_start_boot_time_ms}, finish_ns={status.race_finish_time_ns}; "
+                                                   f"no native finish within {FINISH_WAIT_SECONDS:g}s")
+                        elif not running:
+                            if now >= startup_deadline:
+                                raise TimeoutError("race never reported GO before the startup deadline")
+                        elif now - last_imu_at >= self.timeout:
+                            self.stop()
+                            finish_deadline = now + FINISH_WAIT_SECONDS
+                            print("controller: IMU lost; waiting for native finish", flush=True)
+                        elif state is not None:
+                            if controller_deadline is None:
+                                controller_deadline = now + 10
+                            gates = self.client.gates
+                            index = status.active_gate_index
+                            if index < 0 or (gates is not None and index > len(gates)):
+                                raise ValueError(f"gate index {index} does not belong to the published track")
+
+                            def fresh(sample):
+                                return sample if sample is not None and now - sample.received_at <= self.timeout else None
+
+                            state = replace(state, motion=fresh(state.motion), attitude=fresh(state.attitude),
+                                            motors=fresh(state.motors), frame=fresh(state.frame))
+                            try:
+                                command = self.controller.update(state, index, gates)
+                            except StopIteration:
+                                return None
+                            now = time.monotonic()
+                            if now - state.received_at > self.timeout:
+                                raise TimeoutError("controller returned a command for stale IMU telemetry")
+                            if command is None:
+                                if self.armed:
+                                    raise ValueError("controller returned no command after starting")
+                                if now >= controller_deadline:
+                                    raise TimeoutError("controller did not receive its required startup telemetry")
+                            else:
+                                if index != gate_index:
+                                    gate_index, gate_started_at = index, state.time
+                                if gates and index < len(gates) and state.time - gate_started_at > self.gate_timeout:
+                                    raise TimeoutError(f"gate {index + 1} was not passed within {self.gate_timeout:g} simulator seconds")
+                                if type(command) not in self.client.commands:
+                                    raise TypeError("expected BodyRates, PositionNed or VelocityNed")
+                                if not self.armed:
+                                    self.armed = True
+                                    self.client.arm()
+                                    print(f"controller: running at {self.hz:g} Hz", flush=True)
+                                self.client.send(command)
+                        next_tick += 1.0 / self.hz
+                        if next_tick <= now:
+                            next_tick = now + 1.0 / self.hz
+                        time.sleep(max(0.0, next_tick - time.monotonic()))
                 finally:
                     self.stop()
         finally:
-            self.vehicle.disconnect()
-
-    def step(self):
-        """Receive and control once; return whether the active rollout should continue."""
-        state = self._receive()
-        now = time.monotonic()
-        if self.phase == "finished":
-            return False
-        if self.phase != "running":
-            if now >= self._startup_deadline:
-                raise TimeoutError("race never reported GO before the startup deadline")
-            return True
-        if now - self._last_imu_at >= self.timeout:
-            self._wait_for_finish()
-            return False
-        if state is None:
-            return True
-
-        if self._controller_deadline is None:
-            self._controller_deadline = now + 10
-        try:
-            command = self.control_step(state, self.status.active_gate_index)
-        except StopIteration:
-            return False
-        now = time.monotonic()
-        self._update_status(self.client.race_status, now)
-        if self.phase == "finished":
-            return False
-        if now - state.received_at > self.timeout:
-            raise TimeoutError("controller returned a command for stale IMU telemetry")
-        if command is None:
-            if self.armed:
-                raise ValueError("controller returned no command after starting")
-            if now >= self._controller_deadline:
-                raise TimeoutError("controller did not receive its required startup telemetry")
-            return True
-        gate_index, gates = self.status.active_gate_index, self.client.gates
-        if gate_index != self._gate_index:
-            self._gate_index, self._gate_started_at = gate_index, state.time
-        if gates and gate_index < len(gates) and state.time - self._gate_started_at > self.gate_timeout:
-            raise TimeoutError(f"gate {gate_index + 1} was not passed within {self.gate_timeout:g} simulator seconds")
-        self.vehicle.validate(command)
-        if not self.armed:
-            self.armed = True
-            self.vehicle.arm()
-            print(f"controller: running at {self.hz:g} Hz", flush=True)
-        self.vehicle.send(command)
-        return True
-
-    def control_step(self, state: State, gate_index: int):
-        gates = self.client.gates
-        if gate_index < 0 or (gates is not None and gate_index > len(gates)):
-            raise ValueError(f"gate index {gate_index} does not belong to the published track")
-        now = time.monotonic()
-
-        def fresh(sample):
-            return sample if sample is not None and now - sample.received_at <= self.timeout else None
-
-        observations = replace(state, motion=fresh(state.motion), attitude=fresh(state.attitude),
-                               motors=fresh(state.motors), frame=fresh(state.frame))
-        return self.controller.update(observations, gate_index, gates)
+            self.client.disconnect()
 
     def stop(self):
         if not self.armed:
@@ -203,73 +220,10 @@ class AIGPSimulator:
         self.armed = False
         try:
             with suppress(OSError):
-                self.vehicle.send(BodyRates())
+                self.client.send(BodyRates())
         finally:
             with suppress(OSError):
-                self.vehicle.disarm()
-
-    def _receive(self):
-        try:
-            state = self.vehicle.read(timeout=min(self.timeout, 0.1))
-            self._last_imu_at = state.received_at
-        except TimeoutError:
-            state = None
-        self._update_status(self.client.race_status, time.monotonic())
-        # The receive above may contain the final packet from an exited simulator.
-        if self.phase != "finished":
-            _check_process(self._process)
-        return state
-
-    def _update_status(self, status, now):
-        if self.phase == "finished" or status is None:
-            return
-        previous, phase = self.status, self.phase
-        if phase == "running" and (status.race_start_boot_time_ms != previous.race_start_boot_time_ms
-                                   or status.sim_boot_time_ms < previous.sim_boot_time_ms
-                                   or status.active_gate_index < previous.active_gate_index):
-            raise RuntimeError("race reset during control; start a new run")
-        self.status = status
-        if status.finished:
-            self.phase = "finished"
-        elif phase != "running":
-            if status.race_start_boot_time_ms < 0:
-                self.phase = "waiting"
-            elif not status.started:
-                self.phase = "countdown"
-            elif now - status.received_at <= 1.0:
-                self.phase = "running"
-            else:
-                self.phase = "waiting"
-        if self.phase != phase:
-            print(f"race: {self.phase}", flush=True)
-        if self.phase == "running" and (phase != "running" or status.active_gate_index != previous.active_gate_index):
-            print(f"race: gate_index={status.active_gate_index}", flush=True)
-
-    def _tick(self):
-        now = time.monotonic()
-        if self.client.connected and now >= self._next_heartbeat:
-            self.client.heartbeat()
-            self._next_heartbeat = now + 0.5
-        self._next_tick += 1.0 / self.hz
-        if self._next_tick <= now:
-            self._next_tick = now + 1.0 / self.hz
-        time.sleep(max(0.0, self._next_tick - time.monotonic()))
-
-    def _wait_for_finish(self):
-        """After IMU loss, disarm and receive only; recovery cannot resume control."""
-        self.stop()
-        print("controller: IMU lost; waiting for native finish", flush=True)
-        status = self.status
-        error = TimeoutError(f"timed out waiting for fresh IMU telemetry; last race: "
-                             f"gate_index={status.active_gate_index}, boot_ms={status.sim_boot_time_ms}, "
-                             f"start_ms={status.race_start_boot_time_ms}, finish_ns={status.race_finish_time_ns}; "
-                             f"no native finish within {FINISH_WAIT_SECONDS:g}s")
-        deadline = time.monotonic() + FINISH_WAIT_SECONDS
-        while self.phase != "finished":
-            self._tick()
-            self._receive()
-            if self.phase != "finished" and time.monotonic() >= deadline:
-                raise error
+                self.client.disarm()
 
 
 class SimulatorClient(Target):

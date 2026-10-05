@@ -74,9 +74,8 @@ The bundled [receiver](reference/PyAIPilotExample-v4/mavlink_rx.py) supplies the
 wire layout. The [specification](VQ1-Technical-Specification-00.02.pdf), page 8,
 specifies the heartbeat minimum. No binary or Lua changes are needed for this fix.
 
-Unit tests cover pending start, future start, fresh GO, race packet gaps, finish,
-reset, process exit, and bounded shutdown after IMU loss. The loopback child-process
-tests check that no arm or position command is sent before GO, then exercise six
+The UDP child-process regressions check that no arm or position command is sent
+before GO, then exercise six
 gate transitions and shutdown, including a three-second race packet gap.
 Those tests validate sequencing and transport, not Unreal flight dynamics.
 The finish tests cover continued IMU, a finish packet with no final IMU sample,
