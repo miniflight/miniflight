@@ -20,6 +20,7 @@ End-to-end regressions run with the simulator dependencies installed:
 ```sh
 python -m test.aigp_udp_smoke
 python -m test.aigp_regression r1_gates
+python -m test.aigp_regression r1_gates --camera
 python -m test.aigp_regression r1_body_rates
 ```
 

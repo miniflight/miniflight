@@ -18,19 +18,19 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates}
 ROOT = BASE.parents[1]
 
 
-def run(name, trace):
+def run(name, trace, camera=False):
     make = CONTROLLERS[name]
     sources = ("miniflight/position.py", "miniflight/state.py", "miniflight/control.py",
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
                "target/aigp/experiments/recording.py", "test/aigp_regression.py")
-    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0,
+    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera,
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
     result = None
     with recording(trace, metadata) as record:
-        client = RecordedClient(record, camera_port=None)
+        client = RecordedClient(record, camera_port=5600 if camera else None)
         simulator = AIGPSimulator(RecordedController(make(), record), "vq1.r1", client=client)
         try:
             result = simulator.rollout()
@@ -43,6 +43,9 @@ def run(name, trace):
         raise AssertionError("native R1 did not finish all six gates")
     if client.connected or client.gates is None or len(client.gates) != 6:
         raise AssertionError("native R1 did not expose six gates and close its connection")
+    frame = client._camera.latest
+    if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"):
+        raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
     updates = replay(make(), trace)
     with trace.open() as source:
         rows = [json.loads(line) for line in source]
@@ -50,7 +53,8 @@ def run(name, trace):
         raise AssertionError("native R1 did not arm and disarm once")
     if any(row["event"] == "telemetry" and row["message"]["mavpackettype"] == "COLLISION" for row in rows):
         raise AssertionError("native R1 reported a collision")
-    print(json.dumps(dict(controller=name, gates=6, replayed_updates=updates, trace=str(trace))), flush=True)
+    print(json.dumps(dict(controller=name, gates=6, replayed_updates=updates,
+                          frame_shape=None if frame is None else frame.bgr.shape, trace=str(trace))), flush=True)
 
 
 def stop(signum, frame):
@@ -61,13 +65,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("controller", choices=CONTROLLERS)
     parser.add_argument("trace", type=Path, nargs="?")
+    parser.add_argument("--camera", action="store_true", help="include native camera frames in the recording and replay")
     args = parser.parse_args()
     trace = args.trace or BASE / ".runtime/regressions" / f"{args.controller}-{time.time_ns()}.jsonl"
     for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGALRM):
         signal.signal(signum, stop)
     signal.alarm(210)
     try:
-        run(args.controller, trace)
+        run(args.controller, trace, args.camera)
     finally:
         signal.alarm(0)
 

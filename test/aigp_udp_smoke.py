@@ -85,8 +85,14 @@ class UDPSmokeTest(unittest.TestCase):
                         pose = mavlink.MAVLink_local_position_ned_message(stamp // 1000, 1, 2, 3, 4, 5, 6)
                         server.sendto(packet(pose), address)
                     server.sendto(packet(imu(stamp)), address)
-                    header = Camera.HEADER.pack(sequence, 0, 1, len(jpeg), len(jpeg), stamp * 1000)
-                    server.sendto(header + jpeg, camera_address)
+                    chunks = [jpeg[i:i + 200] for i in range(0, len(jpeg), 200)]
+                    incomplete = Camera.HEADER.pack(sequence * 2, 0, len(chunks), len(jpeg), len(chunks[0]), stamp * 1000 - 1)
+                    server.sendto(incomplete + chunks[0], camera_address)
+                    for i in reversed(range(len(chunks))):
+                        header = Camera.HEADER.pack(sequence * 2 + 1, i, len(chunks), len(jpeg), len(chunks[i]), stamp * 1000)
+                        server.sendto(header + chunks[i], camera_address)
+                        server.sendto(header + chunks[i], camera_address)
+                    server.sendto(incomplete + chunks[0], camera_address)
                     drain()
             except BaseException as error:
                 failures.append(error)
@@ -118,6 +124,8 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(states[0].dt, 0)
         self.assertTrue(all(s.dt > 0 for s in states[1:]))
         self.assertTrue(any(s.frame is not None for s in states))
+        self.assertTrue(all(s.frame.bgr.shape == (12, 16, 3) and s.frame.bgr.dtype == np.uint8
+                            and not s.frame.bgr.flags.writeable for s in states if s.frame is not None))
         self.assertEqual(states[-1].motion is not None, with_pose)
         self.assertTrue(all(not hasattr(s, "telemetry") and not hasattr(s, "race") for s in states))
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]

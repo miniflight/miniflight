@@ -551,18 +551,15 @@ class _Camera:
 
     HEADER = struct.Struct("<IHHIIQ")
     MAX_BYTES = 8 * 1024 * 1024
-    MAX_FRAMES = 3
     MAX_AGE = 0.5
 
     def __init__(self):
-        self.pending = {}
+        self.frame = None
+        self.started_at = 0.0
+        self.chunks = {}
         self.latest = None
 
     def receive(self, packet: bytes, now: float):
-        self.pending = {
-            key: value for key, value in self.pending.items()
-            if now - value[0] < self.MAX_AGE
-        }
         if len(packet) < self.HEADER.size:
             return
         frame_id, index, count, size, payload_size, timestamp = self.HEADER.unpack_from(packet)
@@ -572,23 +569,19 @@ class _Camera:
             return
         if self.latest is not None and timestamp <= self.latest.time_ns:
             return
-        metadata = (count, size, timestamp)
-        if frame_id not in self.pending:
-            if len(self.pending) == self.MAX_FRAMES:
-                del self.pending[next(iter(self.pending))]
-            self.pending[frame_id] = (now, metadata, {})
-        _, expected, chunks = self.pending[frame_id]
-        if metadata != expected:
-            del self.pending[frame_id]
+        frame = (frame_id, count, size, timestamp)
+        if self.frame is None or timestamp > self.frame[3] or now - self.started_at > self.MAX_AGE:
+            self.frame, self.started_at, self.chunks = frame, now, {}
+        if frame != self.frame:
             return
-        chunks.setdefault(index, payload)
-        if sum(map(len, chunks.values())) > size:
-            del self.pending[frame_id]
+        self.chunks[index] = payload
+        if sum(map(len, self.chunks.values())) > size:
+            self.frame, self.chunks = None, {}
             return
-        if len(chunks) != count:
+        if len(self.chunks) != count:
             return
-        del self.pending[frame_id]
-        jpeg = b"".join(chunks[i] for i in range(count))
+        jpeg = b"".join(self.chunks[i] for i in range(count))
+        self.frame, self.chunks = None, {}
         if len(jpeg) != size:
             return
         try:
