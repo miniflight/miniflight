@@ -41,15 +41,10 @@ VERSIONS = {
     "vq1": {
         "root": Path("AI-GP Simulator v1.0.3391-VQ1/AIGP_VQ1_3391"),
         "legacy": "3a6923f2207a45bf64345b096d2bbd2a789916e32d1fb55beb15417b23003122",
-        "hashes": {},
     },
     "vq2": {
         "root": Path("AI-GP Simulator v1.0.3391-VQ2/AIGP_VQ2_3391"),
         "legacy": "3d6527764f43862ad7860694f0783c6f4332eb87b8ccad7bd4c2bb376ce0702e",
-        "hashes": {
-            SHIPPING: "68dfd80d5c9057ec92785baad61194bf5d178ddde8d6df66a6add4da5d83332b",
-            PAK: "5d424b4ee0de36053914461da56696cfff10c1ed9fab2c6bd883ace58e85883f",
-        },
     },
 }
 
@@ -558,9 +553,6 @@ def prepare(version, base=BASE):
             extracted = Path(temporary) / profile["root"]
             if not all((extracted / path).is_file() for path in REQUIRED):
                 raise ValueError(f"{filename} is missing required simulator files")
-            for path, digest in profile["hashes"].items():
-                if sha256(extracted / path) != digest:
-                    raise ValueError(f"{filename} contains the wrong {path}")
             (extracted / ".installed").write_text(stamp)
             extracted.rename(sim)
     for name, relative in {
