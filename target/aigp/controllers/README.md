@@ -47,7 +47,7 @@ The type parameter declares the controller's output plane. Use
 `BaseController[BodyRates]` for a single plane. A routine that intentionally
 switches planes can use a union, such as
 `BaseController[BodyRates | PositionNed]` in the body-rate probe. This is a typing
-contract; `Vehicle.validate()` checks the actual returned command against the
+contract; the runner checks the actual returned command against the
 target's supported commands before arming or sending. All planes use the same
 `update` method and runner. The target owns wire encoding and coordinate conversion;
 the controller owns any deliberate transition between command planes.

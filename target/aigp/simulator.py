@@ -375,9 +375,9 @@ class SimulatorClient(Target):
         elif kind == "ACTUATOR_OUTPUT_STATUS":
             self._motors = MotorOutputs(message.time_usec * 1e-6, now, tuple(message.actuator), message.active)
         elif kind == "DATA_TRANSMISSION_HANDSHAKE":
-            self._track.start(message, now)
+            self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
-            self._track.receive(message, now)
+            self._track.receive(message)
         if kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
             if (self._race_status is not None and race.sim_boot_time_ms < self._race_status.sim_boot_time_ms
@@ -487,58 +487,39 @@ class _Track:
     GATE = struct.Struct("<H9f")
     CHUNK_BYTES = 250  # ENCAPSULATED_DATA minus its type and transfer ID.
     MAX_GATES = 1024
-    MAX_TRANSFERS = 2
-    MAX_AGE = 5.0
 
     def __init__(self):
-        self.pending = {}
+        self.transfer = None
+        self.chunks = {}
         self.gates = None
 
-    def _expire(self, now):
-        self.pending = {key: value for key, value in self.pending.items() if now - value[0] < self.MAX_AGE}
-
-    def start(self, message, now):
-        self._expire(now)
+    def start(self, message):
         size, packets = message.size, message.packets
-        if not 2 <= size <= 2 + self.MAX_GATES * self.GATE.size:
+        if (not 2 <= size <= 2 + self.MAX_GATES * self.GATE.size
+                or packets != (size + self.CHUNK_BYTES - 1) // self.CHUNK_BYTES):
             return
-        if packets != (size + self.CHUNK_BYTES - 1) // self.CHUNK_BYTES:
-            return
-        transfer_id = message.width
-        previous = self.pending.get(transfer_id)
-        if previous is not None and previous[1:3] == (size, packets):
-            return  # A repeated handshake must not discard received chunks.
-        if transfer_id not in self.pending and len(self.pending) == self.MAX_TRANSFERS:
-            del self.pending[next(iter(self.pending))]
-        self.pending[transfer_id] = (now, size, packets, {})
+        transfer = (message.width, size, packets)  # width carries the vendor's transfer ID.
+        if transfer != self.transfer:
+            self.transfer, self.chunks = transfer, {}
 
-    def receive(self, message, now):
-        self._expire(now)
+    def receive(self, message):
+        if self.transfer is None:
+            return
         payload = bytes(message.data)
-        if len(payload) < 3 or payload[0] != 2:
+        transfer_id, size, packets = self.transfer
+        if payload[0] != 2 or struct.unpack_from("<H", payload, 1)[0] != transfer_id:
             return
-        transfer_id, = struct.unpack_from("<H", payload, 1)
-        transfer = self.pending.get(transfer_id)
-        if transfer is None:
-            return
-        _, size, packets, chunks = transfer
         index = message.seqnr
         if not 0 <= index < packets:
             return
         length = min(self.CHUNK_BYTES, size - index * self.CHUNK_BYTES)
-        chunk = payload[3:3 + length]
-        if len(chunk) != length:
+        self.chunks[index] = payload[3:3 + length]
+        if len(self.chunks) != packets:
             return
-        if index in chunks and chunks[index] != chunk:
-            del self.pending[transfer_id]
-            return
-        chunks[index] = chunk
-        if len(chunks) != packets:
-            return
-        del self.pending[transfer_id]
-        data = b"".join(chunks[i] for i in range(packets))
+        data = b"".join(self.chunks[i] for i in range(packets))
+        self.transfer, self.chunks = None, {}
         gates = self.decode(data)
-        if gates != self.gates:
+        if gates is not None:
             self.gates = gates
 
     @classmethod

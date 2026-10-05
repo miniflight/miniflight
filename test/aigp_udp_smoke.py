@@ -138,6 +138,11 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(result["track_sent"])
         self.assertTrue(result["finish_sent"])
 
+    def test_track_fragments_and_rejected_replacements_during_flight(self):
+        result = self.owned_session("--fragmented-track")
+        self.assertTrue(result["track_replaced"])
+        self.assertTrue(result["finish_sent"])
+
     def test_owned_process_finish_without_final_imu(self):
         result = self.owned_session("--finish-without-imu")
         self.assertTrue(result["finish_sent"])
@@ -189,6 +194,8 @@ class UDPSmokeTest(unittest.TestCase):
                     AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
         self.assertGreater(replay(Gates(), path), 6)
         rows = [json.loads(line) for line in path.read_text().splitlines()]
+        count = 10 if "--fragmented-track" in fixture_args else 6
+        self.assertTrue(all(len(row["gates"]) == count for row in rows if row["event"] == "update" and row["gates"]))
         self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], [True, False])
         self.assertTrue(any(row["event"] == "update" and row["gates"] for row in rows))
         child, = children
@@ -196,7 +203,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(child.returncode, 0, error)
         result = json.loads(output)
         self.assertEqual(result["too_soon"], [])
-        self.assertEqual(result["gates"], [1, 2, 3, 4, 5, 6])
+        self.assertEqual(result["gates"], list(range(1, count + 1)))
         self.assertEqual(result["arms"], [1, 0])
         self.assertGreater(result["positions"], 6)
         self.assertEqual(result["position_masks"], [3576])

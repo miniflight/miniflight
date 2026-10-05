@@ -21,10 +21,12 @@ def main():
     race_gap = "--race-gap" in sys.argv[2:]
     track_after_go = "--track-after-go" in sys.argv[2:]
     delayed_finish = "--delayed-finish" in sys.argv[2:]
+    fragmented_track = "--fragmented-track" in sys.argv[2:]
+    gates = GATES + tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6, 10)) if fragmented_track else GATES
     result = {"too_soon": [], "gates": [], "arms": [], "positions": 0,
               "position_masks": [], "stopped_by_parent": False,
               "track_sent": False, "finish_sent": False, "imu_after_last_gate": 0,
-              "disarmed_before_finish": False, "race_packets_skipped": 0}
+              "disarmed_before_finish": False, "race_packets_skipped": 0, "track_replaced": False}
 
     def stop(signum, frame):
         result["stopped_by_parent"] = True
@@ -43,6 +45,17 @@ def main():
         def send(message):
             sock.sendto(message.pack(encoder), peer)
 
+        def track(data, transfer_id, partial=False):
+            chunks = [data[i:i + 250] for i in range(0, len(data), 250)]
+            handshake = mavlink.MAVLink_data_transmission_handshake_message(0, len(data), transfer_id, 0, len(chunks), 253, 1)
+            send(handshake)
+            for i in (range(1) if partial else reversed(range(len(chunks)))):
+                payload = (struct.pack("<BH", 2, transfer_id) + chunks[i]).ljust(253, b"\0")
+                send(mavlink.MAVLink_encapsulated_data_message(i, payload))
+                if fragmented_track:
+                    send(handshake)
+                    send(mavlink.MAVLink_encapsulated_data_message(i, payload))
+
         def receive():
             nonlocal target, armed
             while True:
@@ -55,7 +68,7 @@ def main():
                     if kind == "COMMAND_LONG" and message.command == mavlink.MAV_CMD_COMPONENT_ARM_DISARM:
                         armed = bool(message.param1)
                         result["arms"].append(int(armed))
-                        if not armed and index == len(GATES) and not result["finish_sent"]:
+                        if not armed and index == len(gates) and not result["finish_sent"]:
                             result["disarmed_before_finish"] = True
                         if armed and not result["track_sent"]:
                             result["too_soon"].append("arm_without_track")
@@ -73,11 +86,11 @@ def main():
             boot = int((time.monotonic() - started) * 1000)
             start = -1 if boot < 100 else 500
             receive()
-            if target is not None and armed and index < len(GATES):
+            if target is not None and armed and index < len(gates):
                 distance = math.dist(position, target)
                 scale = min(1, .5 / distance) if distance else 0
                 next_position = tuple(p + (t - p) * scale for p, t in zip(position, target))
-                center = GATES[index]
+                center = gates[index]
                 if position[0] >= center[0] > next_position[0]:
                     fraction = (center[0] - position[0]) / (next_position[0] - position[0])
                     crossing = tuple(p + (n - p) * fraction for p, n in zip(position, next_position))
@@ -88,13 +101,16 @@ def main():
             count += 1
             send(mavlink.MAVLink_heartbeat_message(2, 0, 0, 0, 4, 3))
             if not result["track_sent"] and (not track_after_go or boot >= 800):
-                data = struct.pack("<H", len(GATES))
-                for i, (north, east, down) in enumerate(GATES):
-                    data += struct.pack("<H9f", i, north, east, down + 1, 1, 0, 0, 0, 2, 2)
-                send(mavlink.MAVLink_data_transmission_handshake_message(0, len(data), 7, 0, 1, 253, 1))
-                send(mavlink.MAVLink_encapsulated_data_message(0, (struct.pack("<BH", 2, 7) + data).ljust(253, b"\0")))
+                track_data = struct.pack("<H", len(gates))
+                for i, (north, east, down) in enumerate(gates):
+                    track_data += struct.pack("<H9f", i, north, east, down + 1, 1, 0, 0, 0, 2, 2)
+                track(track_data, 7)
                 result["track_sent"] = True
-            at_end = index == len(GATES)
+            if fragmented_track and index >= 1 and not result["track_replaced"]:
+                track(track_data[:16] + struct.pack("<f", float("nan")) + track_data[20:], 8)
+                track(track_data, 9, partial=True)
+                result["track_replaced"] = True
+            at_end = index == len(gates)
             now = time.monotonic()
             if at_end and ended_at is None:
                 ended_at = now
