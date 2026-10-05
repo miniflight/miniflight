@@ -223,16 +223,11 @@ class SimulatorClient(Target):
         self._socket = self._vision = self._peer = self._target = None
         self._telemetry = {}
         self._track = _Track()
-        self._race_status = None
+        self.race_status: RaceStatus | None = None  # Latest packet, independent of the IMU.
 
     @property
     def connected(self):
         return self._peer is not None
-
-    @property
-    def race_status(self):
-        """Latest race packet, even when read() is waiting for a new IMU sample."""
-        return self._race_status
 
     @property
     def gates(self):
@@ -253,7 +248,7 @@ class SimulatorClient(Target):
         self._motion = self._attitude = self._motors = None
         self._camera = _Camera()
         self._track = _Track()
-        self._race_status = self._last_imu = None
+        self.race_status = self._last_imu = None
         self._boot = time.monotonic()
         self._mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
         self._mav.robust_parsing = True
@@ -353,12 +348,12 @@ class SimulatorClient(Target):
             self._track.receive(message)
         if kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
-            if (self._race_status is not None and race.sim_boot_time_ms < self._race_status.sim_boot_time_ms
-                    and not self._race_status.started and not race.started):
+            if (self.race_status is not None and race.sim_boot_time_ms < self.race_status.sim_boot_time_ms
+                    and not self.race_status.started and not race.started):
                 # The native sensor clock can restart before GO.
                 self._telemetry.pop("HIGHRES_IMU", None)
                 self._last_imu = None
-            self._race_status = race
+            self.race_status = race
 
     def _wait(self, deadline, description):
         remaining = deadline - time.monotonic()
