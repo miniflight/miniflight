@@ -38,14 +38,10 @@ SHIPPING = BINARIES / "DCGame-Win64-Shipping.exe"
 PAK = Path("FlightSim/Content/Paks/FlightSim-WindowsNoEditor.pak")
 REQUIRED = (SHIPPING, BINARIES / "dwmapi.dll", BINARIES / "UE4SS.dll", PAK)
 VERSIONS = {
-    "vq1": {
-        "root": Path("AI-GP Simulator v1.0.3391-VQ1/AIGP_VQ1_3391"),
-        "legacy": "3a6923f2207a45bf64345b096d2bbd2a789916e32d1fb55beb15417b23003122",
-    },
-    "vq2": {
-        "root": Path("AI-GP Simulator v1.0.3391-VQ2/AIGP_VQ2_3391"),
-        "legacy": "3d6527764f43862ad7860694f0783c6f4332eb87b8ccad7bd4c2bb376ce0702e",
-    },
+    "vq1": (Path("AI-GP Simulator v1.0.3391-VQ1/AIGP_VQ1_3391"),
+            "3a6923f2207a45bf64345b096d2bbd2a789916e32d1fb55beb15417b23003122"),
+    "vq2": (Path("AI-GP Simulator v1.0.3391-VQ2/AIGP_VQ2_3391"),
+            "3d6527764f43862ad7860694f0783c6f4332eb87b8ccad7bd4c2bb376ce0702e"),
 }
 
 FINISH_WAIT_SECONDS = 5.0
@@ -530,7 +526,7 @@ class _Camera:
 
 def prepare(version, base=BASE):
     """Verify and extract the selected tar archive once, then copy its three config files."""
-    profile = VERSIONS[version]
+    root, legacy_stamp = VERSIONS[version]
     parts = [line.split() for line in (base / "archives/SHA256SUMS").read_text().splitlines()
              if line.strip() and line.split()[-1] == f"{version}.tar.xz"]
     expected, filename = parts[0]
@@ -538,7 +534,7 @@ def prepare(version, base=BASE):
     runtime = base / ".runtime"
     sim = runtime / version
     marker = sim / ".installed"
-    installed = (marker.is_file() and marker.read_text() in (stamp, profile["legacy"])
+    installed = (marker.is_file() and marker.read_text() in (stamp, legacy_stamp)
                  and all((sim / path).is_file() for path in REQUIRED))
     if not installed:
         if sim.exists():
@@ -550,7 +546,7 @@ def prepare(version, base=BASE):
         with tempfile.TemporaryDirectory(prefix=f"{version}-install-", dir=runtime) as temporary:
             with tarfile.open(archive, "r:xz") as source:
                 source.extractall(temporary, filter="data")
-            extracted = Path(temporary) / profile["root"]
+            extracted = Path(temporary) / root
             if not all((extracted / path).is_file() for path in REQUIRED):
                 raise ValueError(f"{filename} is missing required simulator files")
             (extracted / ".installed").write_text(stamp)
