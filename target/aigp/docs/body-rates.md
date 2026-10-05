@@ -182,12 +182,11 @@ The local experiment harness, source hashes, traces, and summary are under
 `race-01.jsonl`, and `summary.json`. The hold harness requires ten continuous
 seconds below 0.25 m position error and 0.2 m/s speed, and bounds its total run.
 
-`test/fixtures/position_control.json` retains 25 numerical input/output cases
-from those native traces, with configuration, units, and source/trace hashes.
-The expected commands were captured during flight. The core test replays the
-calculation directly without importing AIGP, OpenCV, NumPy, or a target adapter.
-Its 1e-12 relative/absolute comparison tolerance is for the Python reference;
-no reduced-precision or compiled backend has been validated by that check.
+Current end-to-end flight regression runs through
+`python -m test.aigp_regression r1_body_rates` from the repository root.
+It requires all six native R1 gates,
+native finish, disarm and connection cleanup, then replays every recorded update.
+Each run saves its trace under `.runtime/regressions/`.
 
 After separating the core observation records from the host adapter layer, a
 second native R1 run (`race-02.jsonl`) again completed all six gates using only

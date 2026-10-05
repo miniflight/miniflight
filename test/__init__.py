@@ -1,1 +1,1 @@
-# Make tests a package for unittest discovery 
+"""End-to-end simulator regressions."""

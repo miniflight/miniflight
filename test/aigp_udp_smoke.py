@@ -1,6 +1,6 @@
 """Real UDP round-trip using ephemeral loopback ports, never the simulator ports.
 
-Run explicitly: python -m unittest test.aigp_udp_smoke -v
+Run explicitly: python -m test.aigp_udp_smoke
 """
 
 from contextlib import contextmanager
@@ -26,7 +26,19 @@ from miniflight import BodyRates, State
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
-from test.test_aigp_client import heartbeat, imu, packet
+
+
+def packet(message, system=42, component=7):
+    return message.pack(mavlink.MAVLink(None, srcSystem=system, srcComponent=component))
+
+
+def heartbeat():
+    return mavlink.MAVLink_heartbeat_message(2, 0, 0, 0, 4, 3)
+
+
+def imu(stamp=1000000):
+    return mavlink.MAVLink_highres_imu_message(
+        stamp, 1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0xffff)
 
 
 class UDPSmokeTest(unittest.TestCase):

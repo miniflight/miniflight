@@ -22,11 +22,6 @@ examples = [
     "hidapi",
     "gymnasium",
 ]
-test = [
-    "pytest>=7.0",
-    "scipy>=1.10 ; extra == 'test'",
-]
-
 [tool.setuptools.packages.find]
 include = ["miniflight*", "common*", "target*"]
 namespaces = false

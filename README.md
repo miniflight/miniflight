@@ -15,9 +15,15 @@ Plotting, joystick, and Gym dependencies are available with `pip install -e ".[e
 
 [Write and run a controller](target/aigp/controllers/README.md)
 
-Core checks, including numerical replay of recorded native flight inputs, run
-without third-party packages:
+End-to-end regressions run with the simulator dependencies installed:
 
 ```sh
-python -S -m unittest test.test_core test.test_position test.test_vehicle
+python -m test.aigp_udp_smoke
+python -m test.aigp_regression r1_gates
+python -m test.aigp_regression r1_body_rates
 ```
+
+The UDP checks use a child simulator fixture to exercise the complete protocol,
+runner, gate progression, recording and shutdown path. The native checks launch
+VQ1 R1 and require all six gates, native finish, disarm, connection cleanup and
+exact replay. Native traces are saved under `target/aigp/.runtime/regressions/`.
