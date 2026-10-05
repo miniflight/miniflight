@@ -397,26 +397,27 @@ class SimulatorClient(Target):
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""
+        if not isinstance(command, Command):
+            raise TypeError("expected BodyRates, PositionNed or VelocityNed")
+        time_ms = int((time.monotonic() - self._boot) * 1000) & 0xffffffff
         if isinstance(command, BodyRates):
             self._mav.set_attitude_target_send(
-                self._time_ms(), *self._target,
+                time_ms, *self._target,
                 mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
                 [1.0, 0.0, 0.0, 0.0],
                 # The simulator's angular-rate wire axes are opposite to FRD.
                 -command.roll_rate, -command.pitch_rate, -command.yaw_rate, command.thrust,
             )
-        elif isinstance(command, (PositionNed, VelocityNed)):
+        else:
             vector = (command.north, command.east, command.down)
             position = vector if isinstance(command, PositionNed) else (0, 0, 0)
             velocity = vector if isinstance(command, VelocityNed) else (0, 0, 0)
             # 1 ignores a field: xyz bits 0..2, velocity 3..5, acceleration 6..8, yaw 10..11.
             mask = 0b110111111000 if isinstance(command, PositionNed) else 0b110111000111
             self._mav.set_position_target_local_ned_send(
-                self._time_ms(), *self._target, mavlink.MAV_FRAME_LOCAL_NED,
+                time_ms, *self._target, mavlink.MAV_FRAME_LOCAL_NED,
                 mask, *position, *velocity, 0, 0, 0, 0, 0,
             )
-        else:
-            raise TypeError("expected BodyRates, PositionNed or VelocityNed")
 
     def heartbeat(self):
         self._mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
@@ -431,9 +432,6 @@ class SimulatorClient(Target):
     def _set_armed(self, armed):
         self._mav.command_long_send(*self._target, mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
-
-    def _time_ms(self):
-        return int((time.monotonic() - self._boot) * 1000) & 0xffffffff
 
 
 class _Track:
