@@ -622,9 +622,10 @@ class _Track:
                 return None
             orientation = tuple(value / norm for value in (w, x, y, z))
             # The published origin is at the gate base; offset to the opening center.
+            origin = Ned(north, east, down)
             offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
-            center = Ned(*(float(p + d) for p, d in zip((north, east, down), offset)))
-            gates.append(Gate(gate_id, center, orientation, width, height))
+            center = Ned(*(float(p + d) for p, d in zip(origin, offset)))
+            gates.append(Gate(gate_id, center, orientation, width, height, origin=origin))
         return tuple(gates)
 
 

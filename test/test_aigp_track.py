@@ -7,6 +7,7 @@ import unittest
 
 from pymavlink.dialects.v20 import common as mavlink
 
+from miniflight import Ned
 from target.aigp.simulator import _Track
 
 
@@ -48,16 +49,27 @@ class TrackTest(unittest.TestCase):
         for index, (gate, expected) in enumerate(zip(self.track.gates, fixture["expected_centers"])):
             self.assertEqual(gate.id, index)
             self.assertLess(math.dist(gate.center, expected), 1e-10)
+            self.assertIsInstance(gate.origin, Ned)
+            self.assertAlmostEqual(math.hypot(*gate.orientation), 1, places=14)
+            self.assertLess(math.dist(gate.orientation, (
+                .7071067513842201, 0, -8.657316443846768e-8, .7071068109888684)), 1e-14)
             self.assertAlmostEqual(gate.width, 2.72, places=6)
             self.assertAlmostEqual(gate.height, 2.72, places=6)
+        self.assertEqual(self.track.gates[0].origin,
+                         Ned(-23.2979679107666, -.39990234375, -.03195800632238388))
         with self.assertRaises(FrozenInstanceError):
             self.track.gates[0].center = (0, 0, 0)
+        with self.assertRaises(FrozenInstanceError):
+            self.track.gates[0].origin = Ned(0, 0, 0)
 
-    def test_rotated_gate_center_uses_local_up(self):
-        q = math.sqrt(.5)
+    def test_rotated_gate_preserves_origin_and_normalizes_orientation(self):
+        q = .995 * math.sqrt(.5)
         data = struct.pack("<H", 1) + struct.pack("<H9f", 0, 10, 20, 30, q, 0, q, 0, 2, 4)
         self.deliver(data)
-        self.assertLess(math.dist(self.track.gates[0].center, (8, 20, 30)), 1e-6)
+        gate = self.track.gates[0]
+        self.assertEqual(gate.origin, Ned(10, 20, 30))
+        self.assertLess(math.dist(gate.orientation, (math.sqrt(.5), 0, math.sqrt(.5), 0)), 1e-14)
+        self.assertLess(math.dist(gate.center, (8, 20, 30)), 1e-6)
 
     def test_chunks_can_arrive_out_of_order_with_duplicates(self):
         data = course()

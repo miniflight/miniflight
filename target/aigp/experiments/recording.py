@@ -57,6 +57,15 @@ def read_state(data):
     return State(**data)
 
 
+def read_gate(data):
+    data = dict(data)
+    data["center"] = Ned(*data["center"])
+    data["orientation"] = tuple(data["orientation"])
+    origin = data.get("origin")
+    data["origin"] = None if origin is None else Ned(*origin)
+    return Gate(**data)
+
+
 def _json_default(value):
     if isinstance(value, np.generic):
         return value.item()
@@ -146,8 +155,7 @@ def replay(controller, path):
             state = read_state(row["state"])
             # Older probe traces did not record geometry; their controller did not use it.
             data = row["gates"] if header.get("format") == 1 else row.get("gates")
-            gates = None if data is None else tuple(Gate(**dict(gate, center=Ned(*gate["center"]),
-                                                              orientation=tuple(gate["orientation"]))) for gate in data)
+            gates = None if data is None else tuple(read_gate(gate) for gate in data)
             try:
                 command = controller.update(state, row["gate_index"], gates)
             except BaseException as error:

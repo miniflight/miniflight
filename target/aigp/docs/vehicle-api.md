@@ -126,7 +126,9 @@ the client and generic vehicle API retain the original timestamped observations
 `SimulatorClient.gates` exposes the last complete usable track as immutable gate values
 `DATA_TRANSMISSION_HANDSHAKE` announces its byte count and chunks
 `ENCAPSULATED_DATA` type 2 supplies those chunks, grouped by transfer ID
-the adapter converts gate origins to opening centers using orientation and half-height
+each gate retains its published NED base as `origin` and normalized wxyz `orientation`
+the adapter derives `center` from that origin using orientation and half-height
+reported `width` and `height` are overall bounds, not opening clearance
 `AIGPSimulator` passes the gates separately from `State` to the controller
 missing or withheld geometry stays `None`; no course coordinates are synthesized
 

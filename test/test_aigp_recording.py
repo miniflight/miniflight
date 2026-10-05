@@ -23,11 +23,11 @@ class RecordingTest(unittest.TestCase):
                            motion=Motion(.9, 9.9, Ned(0, 0, 0), Ned(1, 2, 3)),
                            attitude=Attitude(.95, 9.95, .1, .2, .3),
                            motors=MotorOutputs(.8, 9.8, (.1, .2, .3, .4), 15))
-        self.gates = (Gate(0, Ned(-10, 1, -2), (1, 0, 0, 0), 2, 3),
-                      Gate(1, Ned(-20, -1, -3), (1, 0, 0, 0), 4, 5))
+        self.gates = (Gate(0, Ned(-10, 1, -2), (1, 0, 0, 0), 2, 3, origin=Ned(-10, 1, -.5)),
+                      Gate(1, Ned(-20, -1, -3), (1, 0, 0, 0), 4, 5, origin=Ned(-20, -1, -.5)))
 
     def test_gate_controller_replays_missing_and_changing_course_inputs(self):
-        replacement = (self.gates[0], replace(self.gates[1], center=Ned(-30, 2, -4)))
+        replacement = (self.gates[0], replace(self.gates[1], center=Ned(-30, 2, -4), origin=Ned(-30, 2, -1.5)))
         with recording(self.path, {"target": "vq1.r1"}) as record:
             controller = RecordedController(Gates(), record)
             self.assertIsNone(controller.update(self.state, 0, None))
@@ -59,6 +59,21 @@ class RecordingTest(unittest.TestCase):
 
         with recording(self.path) as record:
             RecordedController(SimpleNamespace(update=update), record).update(state, 0, self.gates)
+        self.assertEqual(replay(SimpleNamespace(update=update), self.path), 1)
+
+    def test_older_gate_recordings_replay_without_a_published_origin(self):
+        with recording(self.path) as record:
+            RecordedController(Gates(), record).update(self.state, 0, self.gates)
+        rows = [json.loads(line) for line in self.path.read_text().splitlines()]
+        for gate in rows[1]["gates"]:
+            del gate["origin"]
+        self.path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        expected = tuple(replace(gate, origin=None) for gate in self.gates)
+
+        def update(state, gate_index, gates):
+            self.assertEqual(gates, expected)
+            return Gates().update(state, gate_index, gates)
+
         self.assertEqual(replay(SimpleNamespace(update=update), self.path), 1)
 
     def test_exceptions_are_recorded_and_compared_without_controller_internals(self):

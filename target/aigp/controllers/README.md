@@ -19,10 +19,23 @@ python simulator.py vq1.r1 --controller mine
 
 `state` contains vehicle observations. `gate_index` is the zero-based active gate
 reported by the simulator. `gates` is an immutable tuple of `Gate` values, or
-`None` until a complete usable track arrives. Each gate has an `id`, a NED `center`
-in metres, a wxyz `orientation`, and reported `width` and `height` in metres.
-Return one `BodyRates`, `PositionNed`, or `VelocityNed` command. `BodyRates` uses rad/s and thrust from 0 to 1. NED position and velocity
-use metres and metres per second. Zero thrust does not hover.
+`None` until a complete usable track arrives. Each gate exposes:
+
+- `id`: the published gate index.
+- `origin`: the published gate base in NED metres. Older recordings omit it.
+- `center`: the derived opening center in NED metres.
+- `orientation`: the published quaternion in wxyz order, normalized to unit length.
+- `width`, `height`: reported overall bounds in metres, not opening clearance.
+
+Captured VQ1 packets report about 2.72 m bounds. Section 3.7 of the
+[VQ1 specification](../docs/VQ1-Technical-Specification-00.02.pdf) gives a separate
+1.5 m inner opening; that opening size is not a field in the track packet.
+The gate-local axis normal to the opening still needs verification. A gate's
+orientation is not directly a desired drone attitude or a crossing direction.
+
+Return one `BodyRates`, `PositionNed`, or `VelocityNed` command. `BodyRates` uses
+rad/s and thrust from 0 to 1. NED position and velocity use metres and metres per
+second. Zero thrust does not hover.
 
 The type parameter declares the controller's output plane. Use
 `BaseController[PositionNed]`, `BaseController[VelocityNed]`, or
@@ -69,8 +82,8 @@ one metre beyond each gate. It keeps that point until the reported gate index
 advances, then chooses the next. After the last gate it holds the final point until
 native finish. The controller has no stored course coordinates or fixed gate count.
 
-The simulator assembles track packets and converts each gate's published origin
-to its opening center with `position + rotate(orientation, (0, 0, -height / 2))`.
+The simulator assembles track packets and retains each gate's published origin.
+It derives the opening center with `origin + rotate(orientation, (0, 0, -height / 2))`.
 It publishes only a complete track, retaining the last one during an incomplete
 replacement. Missing or nulled geometry remains unavailable; there is no fallback
 map. Course data is separate from generic vehicle state and does not expire on an
@@ -96,6 +109,7 @@ are kept with the experiments; the simulator and controllers do not import them.
 `r1_body_rates` uses the same gate-target policy and closes position and attitude
 feedback in Python. It requires VQ1 motion, attitude, and the published course;
 missing required observations return `None`. Every flight command is `BodyRates`.
+
 The routine stores its desired position as `target_position` and its desired
 heading as `target_yaw`. It deliberately holds the initial heading throughout
 the course. The position target changes only when the native gate index advances,
@@ -132,5 +146,11 @@ See the [body-rate measurements](../docs/body-rates.md) before writing a lower-l
 
 The controller/simulator boundary follows
 [comma's controls_challenge](https://github.com/commaai/controls_challenge/tree/be8edfa849acdccfa2cb0092151ab28590d63c03).
+
+## r1 trpy
+
+`r1_trpy` is being built one step at a time. It currently computes desired NED
+acceleration from position error and velocity. Its `update` method raises
+`NotImplementedError`; acceleration-to-command conversion is not implemented yet.
 
 [Setup](../README.md) · [Vehicle API](../docs/vehicle-api.md)

@@ -9,13 +9,19 @@ CommandT = TypeVar("CommandT", bound=Command, covariant=True)
 
 @dataclass(frozen=True)
 class Gate:
-    """Published opening geometry: NED center in metres and a wxyz orientation."""
+    """Gate geometry in metres, with a normalized wxyz orientation in NED.
+
+    center is the derived opening center; origin is the published gate base.
+    width and height are reported overall bounds, not opening clearance.
+    Older recordings omit origin.
+    """
 
     id: int
     center: Ned
     orientation: tuple[float, float, float, float]
-    width: float
-    height: float
+    width: float  # reported overall width in metres
+    height: float  # reported overall height in metres
+    origin: Ned | None = None
 
 
 class BaseController(Generic[CommandT]):
