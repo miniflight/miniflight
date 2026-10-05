@@ -99,10 +99,7 @@ class AIGPSimulator:
             raise RuntimeError("create a fresh controller and simulator for each rollout")
         self._used = True
         try:
-            if attach:
-                self.client.connect()
-            else:
-                self.client.open()
+            self.client.open()
             session = nullcontext(None) if attach else launch(self.target, simulator_args)
             with session as process:
                 now = time.monotonic()
