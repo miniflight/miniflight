@@ -542,23 +542,19 @@ def prepare(version, base=BASE):
 
 
 def sha256(path):
-    digest = hashlib.sha256()
     with path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+        return hashlib.file_digest(source, "sha256").hexdigest()
 
 
 def wine_commands():
     if sys.platform not in ("darwin", "linux"):
         raise RuntimeError("the runner requires macOS or Linux")
     configured = os.environ.get("WINE")
-    if configured:
-        wine = shutil.which(configured)
-    elif sys.platform == "darwin":
-        wine = shutil.which("/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64")
-    else:
-        wine = shutil.which("wine64") or shutil.which("wine")
+    default = ("/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64"
+               if sys.platform == "darwin" else "wine64")
+    wine = shutil.which(configured or default)
+    if wine is None and not configured and sys.platform == "linux":
+        wine = shutil.which("wine")
     if wine is None:
         raise FileNotFoundError("Wine not found; install it or set WINE to its executable")
     server = os.environ.get("WINESERVER", str(Path(wine).with_name("wineserver")))
