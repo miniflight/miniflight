@@ -13,6 +13,7 @@ import tempfile
 import threading
 import unittest
 import json
+import math
 from unittest.mock import patch
 
 import cv2
@@ -43,14 +44,14 @@ def imu(stamp=1000000):
 
 class UDPSmokeTest(unittest.TestCase):
     def test_shared_runner_with_and_without_pose_telemetry(self):
-        for with_pose in (True, False):
-            with self.subTest(with_pose=with_pose):
-                self.round_trip(with_pose)
+        for with_pose, invalid_optional in ((True, False), (False, False), (True, True)):
+            with self.subTest(with_pose=with_pose, invalid_optional=invalid_optional):
+                self.round_trip(with_pose, invalid_optional=invalid_optional)
 
     def test_velocity_command_round_trip(self):
         self.round_trip(True, VelocityNed(-1, 0, 0))
 
-    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4)):
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -85,8 +86,12 @@ class UDPSmokeTest(unittest.TestCase):
                     race = struct.pack("<BQqqIq", 1, stamp // 1000, 0, -1, 0, 0).ljust(253, b"\0")
                     server.sendto(packet(mavlink.MAVLink_encapsulated_data_message(0, race)), address)
                     if with_pose:
-                        pose = mavlink.MAVLink_local_position_ned_message(stamp // 1000, 1, 2, 3, 4, 5, 6)
-                        server.sendto(packet(pose), address)
+                        invalid = invalid_optional and bool(states)
+                        pose = mavlink.MAVLink_local_position_ned_message(stamp // 1000, math.nan if invalid else 1, 2, 3, 4, 5, 6)
+                        attitude = mavlink.MAVLink_attitude_message(stamp // 1000, math.nan if invalid else .1, .2, .3, 0, 0, 0)
+                        motors = mavlink.MAVLink_actuator_output_status_message(stamp, 15, [.1, .2, .3, .4] + [0] * 28)
+                        for observation in (pose, attitude, motors):
+                            server.sendto(packet(observation), address)
                     server.sendto(packet(imu(stamp)), address)
                     chunks = [jpeg[i:i + 200] for i in range(0, len(jpeg), 200)]
                     incomplete = Camera.HEADER.pack(sequence * 2, 0, len(chunks), len(jpeg), len(chunks[0]), stamp * 1000 - 1)
@@ -129,7 +134,30 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(any(s.frame is not None for s in states))
         self.assertTrue(all(s.frame.bgr.shape == (12, 16, 3) and s.frame.bgr.dtype == np.uint8
                             and not s.frame.bgr.flags.writeable for s in states if s.frame is not None))
-        self.assertEqual(states[-1].motion is not None, with_pose)
+        self.assertEqual(states[-1].motion is not None, with_pose and not invalid_optional)
+        self.assertEqual(states[-1].attitude is not None, with_pose and not invalid_optional)
+        self.assertEqual(states[-1].motors is not None, with_pose)
+        self.assertEqual(states[-1].acceleration, (1, 2, 3))
+        self.assertEqual(states[-1].gyro, (-4, -5, -6))
+        if with_pose:
+            first = states[0]
+            self.assertEqual(first.motion.position, (1, 2, 3))
+            self.assertEqual(first.motion.velocity, (4, 5, 6))
+            for value, expected in zip((first.attitude.roll, first.attitude.pitch, first.attitude.yaw), (.1, -.2, -.3)):
+                self.assertAlmostEqual(value, expected)
+            self.assertEqual(first.motors.active, 15)
+            self.assertEqual(len(first.motors.outputs), 32)
+            for value, expected in zip(first.motors.outputs[:4], (.1, .2, .3, .4)):
+                self.assertAlmostEqual(value, expected)
+            for sample in (first.motion, first.attitude, first.motors):
+                self.assertAlmostEqual(sample.time, first.time)
+                self.assertLessEqual(sample.received_at, first.received_at)
+            if invalid_optional:
+                self.assertTrue(math.isnan(client.telemetry["LOCAL_POSITION_NED"].x))
+                self.assertTrue(math.isnan(client.telemetry["ATTITUDE"].roll))
+        raw = client.telemetry["HIGHRES_IMU"]
+        self.assertEqual(bytes(raw.get_msgbuf()), packet(imu(raw.time_usec)))
+        self.assertNotIn("_host_received_at", raw.to_dict())
         self.assertTrue(all(not hasattr(s, "telemetry") and not hasattr(s, "race") for s in states))
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]
         self.assertTrue(all(m.type_mask == 144 and m.target_system == 42 for m in rates))

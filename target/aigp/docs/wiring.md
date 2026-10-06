@@ -52,6 +52,9 @@ command = controller.update(state, gate_index, gates)
 client.send(command)
 ```
 
+`poll` keeps one cache of accepted MAVLink packets, annotated with host receipt
+time. `read` builds the observation records directly from those packets.
+
 `read` returns one new `HIGHRES_IMU` sample. `State.time` and `dt` are device
 seconds; acceleration and gyro are three body components in m/s² and rad/s.
 The latest motion, attitude, motor report, and frame each retain their own device
@@ -63,7 +66,7 @@ update, optional samples older than the session timeout become `None`.
 | `HIGHRES_IMU` | Body acceleration unchanged; all three gyro signs reversed to FRD |
 | `LOCAL_POSITION_NED` | `Motion(position=Ned(x,y,z), velocity=Ned(vx,vy,vz))`, metres and m/s |
 | `ATTITUDE` | Radians: roll unchanged, pitch and yaw reversed to FRD/NED |
-| `ACTUATOR_OUTPUT_STATUS` | Original channel values and active mask; no RPM conversion |
+| `ACTUATOR_OUTPUT_STATUS` | 32 original channel values and uint32 active mask; no RPM conversion |
 | Camera `<IHHIIQ>` + JPEG bytes | Frame ID, chunk index/count, JPEG/payload lengths, device ns; completed readonly BGR image |
 
 Race packets are `ENCAPSULATED_DATA` type 1, `<BQqqIq>`: type, boot ms, scheduled

@@ -220,8 +220,6 @@ class SimulatorClient(Target):
         if self._socket is not None:
             raise RuntimeError("client is already open")
         self._telemetry.clear()
-        self._imu_received_at = 0.0
-        self._motion = self._attitude = self._motors = None
         self._camera = _Camera()
         self._track = _Track()
         self.race_status = self._last_imu = None
@@ -305,20 +303,9 @@ class SimulatorClient(Target):
             previous = self._telemetry.get(kind)
             if previous is not None and message.time_usec <= previous.time_usec:
                 return
-            self._imu_received_at = now
+        message._host_received_at = now  # Host metadata; MAVLink fields and packet bytes are unchanged.
         self._telemetry[kind] = message
-        if kind == "LOCAL_POSITION_NED":
-            values = (message.x, message.y, message.z, message.vx, message.vy, message.vz)
-            self._motion = (Motion(message.time_boot_ms * 1e-3, now, Ned(*values[:3]), Ned(*values[3:]))
-                            if all(math.isfinite(value) for value in values) else None)
-        elif kind == "ATTITUDE":
-            # Build 3391 reports pitch/yaw with the opposite signs to local NED.
-            self._attitude = (Attitude(message.time_boot_ms * 1e-3, now,
-                                      message.roll, -message.pitch, -message.yaw)
-                              if all(math.isfinite(value) for value in (message.roll, message.pitch, message.yaw)) else None)
-        elif kind == "ACTUATOR_OUTPUT_STATUS":
-            self._motors = MotorOutputs(message.time_usec * 1e-6, now, tuple(message.actuator), message.active)
-        elif kind == "DATA_TRANSMISSION_HANDSHAKE":
+        if kind == "DATA_TRANSMISSION_HANDSHAKE":
             self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
             self._track.receive(message)
@@ -348,23 +335,29 @@ class SimulatorClient(Target):
         while self._telemetry.get("HIGHRES_IMU") is self._last_imu:
             self._wait(deadline, "fresh IMU telemetry")
         imu = self._telemetry["HIGHRES_IMU"]
-        if time.monotonic() - self._imu_received_at > timeout:
+        if time.monotonic() - imu._host_received_at > timeout:
             raise TimeoutError("IMU telemetry is stale")
         stamp = imu.time_usec * 1e-6
         dt = 0.0 if self._last_imu is None else stamp - self._last_imu.time_usec * 1e-6
         self._last_imu = imu
+        motion = self._telemetry.get("LOCAL_POSITION_NED")
+        if motion is not None:
+            values = (motion.x, motion.y, motion.z, motion.vx, motion.vy, motion.vz)
+            motion = (Motion(motion.time_boot_ms * 1e-3, motion._host_received_at, Ned(*values[:3]), Ned(*values[3:]))
+                      if all(math.isfinite(value) for value in values) else None)
+        attitude = self._telemetry.get("ATTITUDE")
+        if attitude is not None:
+            # Build 3391 reports pitch/yaw with the opposite signs to local NED.
+            attitude = (Attitude(attitude.time_boot_ms * 1e-3, attitude._host_received_at,
+                                 attitude.roll, -attitude.pitch, -attitude.yaw)
+                        if all(math.isfinite(value) for value in (attitude.roll, attitude.pitch, attitude.yaw)) else None)
+        motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
+        if motors is not None:
+            motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
         # Angular rates on the AIGP wire have the opposite signs to body FRD.
-        return State(
-            time=stamp,
-            dt=dt,
-            acceleration=(imu.xacc, imu.yacc, imu.zacc),
-            gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro),
-            received_at=self._imu_received_at,
-            frame=self._camera.latest,
-            motion=self._motion,
-            attitude=self._attitude,
-            motors=self._motors,
-        )
+        return State(time=stamp, dt=dt, received_at=imu._host_received_at,
+                     acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro),
+                     motion=motion, attitude=attitude, motors=motors, frame=self._camera.latest)
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""
