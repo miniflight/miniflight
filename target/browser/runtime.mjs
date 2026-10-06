@@ -37,7 +37,7 @@ export async function startRuntime(archive,url,log,status) {
       }).catch(error=>{status(String(error));log(String(error));});
     }]};
   const script=document.createElement('script');
-  script.src=new URL('procmem-boxedwine64.js',base).href;
+  script.src=new URL('cpu-fixed-boxedwine64.js',base).href;
   await new Promise((resolve,reject)=>{script.onload=resolve;script.onerror=()=>reject(Error('Cannot load browser runtime'));
     document.body.append(script);});
   return globalThis.Module;

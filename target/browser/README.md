@@ -19,6 +19,11 @@ file mount, MAVLink, and controller execute inside the tab. Preparation links
 the nine existing runtime assets without copying the game. Those generated
 runtime files are not included in Git.
 
+This remains an isolated experiment, not the default simulator setup. Maintaining
+the x86 interpreter, guest kernel, Windows API layer, and graphics translation is
+more work than maintaining the current native AI-GP target. Usable browser
+performance and a complete native race remain unproven.
+
 The adapters here move asset access, MAVLink, camera assembly, and controller I/O
 into the tab. They contain no replacement physics.
 
@@ -85,3 +90,16 @@ the browser-backed ZIP mount, reported the exact 4,574,387,295-byte PAK size, an
 matched original bytes at offsets 0, 2^32 + 17, and end - 64. It exited with status
 0, with no game-file HTTP requests. This check used the retained ELF probe rather
 than starting a second game instance.
+
+The retained full-game run failed at original `idiv ecx` instruction
+`0x141942e3c`, with integer divide-by-zero `0xc0000094`. Its initializer had set a
+64-byte cache-line size, then overwritten it with zero from the emulator's
+unimplemented CPUID leaf `0x80000006`. The patch in `patches/` reports that cache
+metadata and includes low fixed memory mappings in the guest-memory reader.
+Intel documents the low ECX byte as the cache-line size in
+[its architecture manual](https://cdrdv2-public.intel.com/774475/252046-sdm-change-document.pdf).
+
+Native browser fixtures pass the original ceil/prefetch instruction sequence and
+low/high memory reads, partial holes, PID/TID aliases, read-only access, and child
+lifecycle checks. The original executable and physics were not edited. The full
+game has not been rerun with these final fixes.
