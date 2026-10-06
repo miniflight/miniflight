@@ -29,6 +29,8 @@ The simulator calls `controller.update(state, gate_index, gates)` and sends the
 returned command. It owns observations, timing, arming, native start/finish,
 and cleanup. The controller owns its target choices and control calculations.
 See [the controller interface](controllers/README.md) to add a controller.
+Read [the simulator wiring](docs/wiring.md) for the launch, packet, native control,
+and sensor paths.
 
 The same arena can be used from Python:
 

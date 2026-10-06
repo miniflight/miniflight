@@ -105,9 +105,8 @@ class AIGPSimulator:
             session.callback(self.stop)
             now = time.monotonic()
             next_tick = next_heartbeat = last_imu_at = now
-            startup_deadline = now + self.startup_timeout
-            finish_deadline = None
-            running = False
+            deadline = now + self.startup_timeout
+            phase = "startup"
             while True:
                 now = time.monotonic()
                 if self.client.connected and now >= next_heartbeat:
@@ -121,7 +120,7 @@ class AIGPSimulator:
                 now = time.monotonic()
                 previous, status = self.status, self.client.race_status
                 if status is not None:
-                    if running and (status.race_start_boot_time_ms != previous.race_start_boot_time_ms
+                    if phase != "startup" and (status.race_start_boot_time_ms != previous.race_start_boot_time_ms
                                     or status.sim_boot_time_ms < previous.sim_boot_time_ms
                                     or status.active_gate_index < previous.active_gate_index):
                         raise RuntimeError("race reset during control; start a new run")
@@ -129,26 +128,23 @@ class AIGPSimulator:
                     if status.finished:
                         print("race: finished", flush=True)
                         return status
-                    was_running = running
-                    if not running and status.started and now - status.received_at <= 1.0:
-                        running = True
+                    previous_phase = phase
+                    if phase == "startup" and status.started and now - status.received_at <= 1.0:
+                        phase = "control"
                         print("race: running", flush=True)
-                    if running and (not was_running or status.active_gate_index != previous.active_gate_index):
+                    if phase != "startup" and (previous_phase == "startup" or status.active_gate_index != previous.active_gate_index):
                         print(f"race: gate_index={status.active_gate_index}", flush=True)
                 if process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
-                if finish_deadline is not None:
-                    if now >= finish_deadline:
-                        raise TimeoutError(f"timed out waiting for fresh IMU telemetry; "
-                                           f"no native finish within {FINISH_WAIT_SECONDS:g}s; last race: {status}")
-                elif not running:
-                    if now >= startup_deadline:
-                        raise TimeoutError("race never reported GO before the startup deadline")
-                elif now - last_imu_at >= self.timeout:
+                if phase != "control" and now >= deadline:
+                    raise TimeoutError("race never reported GO before the startup deadline" if phase == "startup" else
+                                       f"timed out waiting for fresh IMU telemetry; "
+                                       f"no native finish within {FINISH_WAIT_SECONDS:g}s; last race: {status}")
+                if phase == "control" and now - last_imu_at >= self.timeout:
                     self.stop()
-                    finish_deadline = now + FINISH_WAIT_SECONDS
+                    phase, deadline = "finish", now + FINISH_WAIT_SECONDS
                     print("controller: IMU lost; waiting for native finish", flush=True)
-                elif state is not None:
+                elif phase == "control" and state is not None:
                     gates = self.client.gates
                     index = status.active_gate_index
                     if index < 0 or (gates is not None and index > len(gates)):
@@ -169,7 +165,7 @@ class AIGPSimulator:
                     if command is None:
                         if self.armed:
                             raise ValueError("controller returned no command after starting")
-                        if now >= startup_deadline:
+                        if now >= deadline:
                             raise TimeoutError("controller did not receive its required startup telemetry")
                     else:
                         if type(command) not in self.client.commands:
