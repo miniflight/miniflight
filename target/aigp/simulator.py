@@ -602,22 +602,22 @@ def launch(target, simulator_args=(), attach=False):
             env["WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER"] = "1"
         command = [wine, str(sim / SHIPPING), f"/Game/levelsMaster/{level}?game=/Script/DCGame.GameModeRaceBase",
                    "-windowed", "-ResX=1280", "-ResY=720", "-nosound", "-NoSplash", *simulator_args]
-        process = None
-        try:
+        def stop_wine():
             stopped = subprocess.run([server, "-k"], env=env, stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL, timeout=10)
             if stopped.returncode not in (0, 1):  # Wine returns 1 when no server is running.
                 stopped.check_returncode()
+
+        process = None
+        try:
+            stop_wine()
             print(f"{target}: starting", flush=True)
             process = subprocess.Popen(command, cwd=sim, env=env, start_new_session=True)
             yield process
         finally:
             # Also clean up when Wine starts children but its launcher exits.
             try:
-                stopped = subprocess.run([server, "-k"], env=env, stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL, timeout=10)
-                if stopped.returncode not in (0, 1):
-                    stopped.check_returncode()
+                stop_wine()
             finally:
                 _stop_process(process)
                 if process is not None:
