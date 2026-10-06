@@ -26,7 +26,7 @@ from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.simulator import _Camera as Camera
-from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
+from target.aigp.experiments.recording import RecordedClient, RecordedController, read_state, recording, replay
 
 
 def packet(message, system=42, component=7):
@@ -51,13 +51,18 @@ class UDPSmokeTest(unittest.TestCase):
     def test_raw_mavlink_inputs_and_outputs_round_trip(self):
         self.round_trip(True, wire_io=True)
 
+    def test_camera_capture_policy_round_trip(self):
+        for frames in (False, True):
+            with self.subTest(frames=frames):
+                self.round_trip(True, record_frames=frames)
+
     def test_velocity_command_round_trip(self):
         self.round_trip(True, VelocityNed(-1, 0, 0))
 
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
 
-    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False):
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False, record_frames=None):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -140,7 +145,14 @@ class UDPSmokeTest(unittest.TestCase):
                 return command
 
         controller = Controller()
-        client = SimulatorClient(port=0, camera_port=0)
+        if record_frames is None:
+            client = SimulatorClient(port=0, camera_port=0)
+        else:
+            directory = self.enterContext(tempfile.TemporaryDirectory())
+            trace = Path(directory) / "camera.jsonl"
+            record = self.enterContext(recording(trace, dict(recorded_frames=record_frames)))
+            controller = RecordedController(controller, record, frames=record_frames)
+            client = RecordedClient(record, port=0, camera_port=0)
         worker = threading.Thread(target=serve)
         worker.start()
         try:
@@ -154,6 +166,23 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(failures, [])
         drain()
         self.assertEqual(len(states), 5)
+        if record_frames is not None:
+            updates = [json.loads(line) for line in trace.read_text().splitlines()
+                       if json.loads(line)["event"] == "update"]
+            self.assertEqual(len(updates), len(states))
+            for actual, row in zip(states, updates):
+                restored = read_state(row["state"])
+                self.assertEqual(restored.gyro, actual.gyro)
+                if actual.frame is None:
+                    continue
+                if record_frames:
+                    np.testing.assert_array_equal(restored.frame.bgr, actual.frame.bgr)
+                    self.assertFalse(restored.frame.bgr.flags.writeable)
+                else:
+                    self.assertIsNone(restored.frame)
+                    self.assertEqual(row["frame_info"]["id"], actual.frame.id)
+                    self.assertEqual(row["frame_info"]["shape"], [12, 16, 3])
+                    self.assertNotIn('"png":', json.dumps(row))
         self.assertEqual(states[0].dt, 0)
         self.assertTrue(all(s.dt > 0 for s in states[1:]))
         self.assertTrue(any(s.frame is not None for s in states))

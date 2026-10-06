@@ -187,6 +187,11 @@ Current end-to-end flight regression runs through
 It requires all six native R1 gates,
 native finish, disarm and connection cleanup, then replays every recorded update.
 Each run saves its trace under `.runtime/regressions/`.
+`--camera` checks image delivery and records frame IDs, times, shape, and dtype.
+The two race controllers use numerical observations, so their regression traces
+omit image pixels. `--record-frames` enables full pixel capture for replay.
+The general `RecordedController` wrapper still includes pixels by default;
+callers can select `frames=False` when their controller does not use images.
 
 After separating the core observation records from the host adapter layer, a
 second native R1 run (`race-02.jsonl`) again completed all six gates using only

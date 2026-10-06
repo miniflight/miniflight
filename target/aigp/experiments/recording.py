@@ -19,9 +19,9 @@ def command_data(command):
     return None if command is None else {"kind": type(command).__name__, **asdict(command)}
 
 
-def state_data(state):
+def state_data(state, frames=True):
     data = asdict(replace(state, frame=None))
-    if state.frame is not None:
+    if frames and state.frame is not None:
         frame = state.frame
         if frame.bgr.dtype != np.uint8 or frame.bgr.ndim != 3 or frame.bgr.shape[2] != 3:
             raise ValueError("recorded frames must be uint8 BGR images")
@@ -102,16 +102,20 @@ def read_metadata(path):
 
 
 class RecordedController(BaseController[CommandT]):
-    def __init__(self, controller: BaseController[CommandT], record):
-        self.controller, self.record = controller, record
+    def __init__(self, controller: BaseController[CommandT], record, frames=True):
+        self.controller, self.record, self.frames = controller, record, frames
 
     @property
     def targets(self):
         return getattr(self.controller, "targets", TARGETS)
 
     def update(self, state, gate_index, gates) -> CommandT | None:
-        row = dict(event="update", state=state_data(state), gate_index=gate_index,
+        row = dict(event="update", state=state_data(state, self.frames), gate_index=gate_index,
                    gates=None if gates is None else [asdict(gate) for gate in gates])
+        if not self.frames and state.frame is not None:
+            frame = state.frame
+            row["frame_info"] = dict(id=frame.id, time_ns=frame.time_ns, received_at=frame.received_at,
+                                     shape=frame.bgr.shape, dtype=frame.bgr.dtype.name)
         try:
             command = self.controller.update(state, gate_index, gates)
         except BaseException as error:
