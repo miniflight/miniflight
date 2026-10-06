@@ -28,7 +28,15 @@ class Controller(BaseController[PositionNed]):
         self.target = None
 
     def update(self, state: State, gate_index: int, gates) -> PositionNed | None:
+        time = state.time
+        dt = state.dt
+        acceleration = state.acceleration
+        gyro = state.gyro
+        received_at = state.received_at
+        frame = state.frame
         motion = state.motion
+        attitude = state.attitude
+        motors = state.motors
 
         if motion is None or not gates:
             return None
