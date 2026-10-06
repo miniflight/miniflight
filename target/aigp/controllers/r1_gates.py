@@ -15,6 +15,8 @@ def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
         previous = gates[index - 1].center if index else (0.0, 0.0, 0.0)
         direction = tuple(c - p for c, p in zip(center, previous))
         distance = math.hypot(*direction)
+    if distance == 0:
+        raise ValueError(f"gate {index} has no approach direction")
     return Ned(*(c + d / distance for c, d in zip(center, direction)))
 
 
