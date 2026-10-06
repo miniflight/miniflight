@@ -133,3 +133,9 @@ Heartbeat is 2 Hz and control defaults to 50 Hz; the PDF requires commands below
 30 Hz camera stream. Cleanup sends zero body rates/thrust and disarm when armed,
 stops the owned Wine process, then closes the sockets. Attached runs own the
 connection and commands but leave process lifetime with the external launcher.
+
+The cleanup order is an explicit `try/finally` tree. A failed neutral command still
+attempts disarm; a failed Wine shutdown still attempts process cleanup; the client
+sockets close last. Cleanup failures are reported instead of being suppressed.
+The one `contextmanager` shares Wine lifetime handling with the launcher-only run;
+attached runs yield no owned process.

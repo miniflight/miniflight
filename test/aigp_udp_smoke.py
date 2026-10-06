@@ -51,7 +51,10 @@ class UDPSmokeTest(unittest.TestCase):
     def test_velocity_command_round_trip(self):
         self.round_trip(True, VelocityNed(-1, 0, 0))
 
-    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False):
+    def test_closed_transport_reports_cleanup_failure(self):
+        self.round_trip(False, closed_on_exit=True)
+
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -111,6 +114,9 @@ class UDPSmokeTest(unittest.TestCase):
                     raise AssertionError("controller did not receive the observations and active gate index")
                 states.append(state)
                 if len(states) == 5:
+                    if closed_on_exit:
+                        client._socket.close()
+                        raise StopIteration
                     raise KeyboardInterrupt
                 return command
 
@@ -119,7 +125,7 @@ class UDPSmokeTest(unittest.TestCase):
         worker = threading.Thread(target=serve)
         worker.start()
         try:
-            with self.assertRaises(KeyboardInterrupt):
+            with self.assertRaises(OSError if closed_on_exit else KeyboardInterrupt):
                 AIGPSimulator(controller, client=client).rollout(attach=True)
         finally:
             stop.set()
@@ -162,7 +168,7 @@ class UDPSmokeTest(unittest.TestCase):
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]
         self.assertTrue(all(m.type_mask == 144 and m.target_system == 42 for m in rates))
         if isinstance(command, BodyRates):
-            self.assertEqual(len(rates), 5)
+            self.assertEqual(len(rates), 4 if closed_on_exit else 5)
             self.assertAlmostEqual(rates[0].thrust, .4)
         else:
             self.assertEqual(len(rates), 1)
@@ -171,9 +177,13 @@ class UDPSmokeTest(unittest.TestCase):
             self.assertTrue(all(m.type_mask == 3527 and m.coordinate_frame == 1 and m.target_system == 42
                                 and (m.x, m.y, m.z) == (0, 0, 0) and (m.vx, m.vy, m.vz) == (-1, 0, 0)
                                 for m in velocities))
-        self.assertEqual(rates[-1].thrust, 0)
+        if not closed_on_exit:
+            self.assertEqual(rates[-1].thrust, 0)
         arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"]
-        self.assertEqual(arms, [1, 0])
+        self.assertEqual(arms, [1] if closed_on_exit else [1, 0])
+        self.assertFalse(client.connected)
+        self.assertIsNone(client._socket)
+        self.assertIsNone(client._vision)
 
     def test_owned_process_countdown_six_gates_finish_and_cleanup(self):
         result = self.owned_session()
@@ -222,7 +232,8 @@ class UDPSmokeTest(unittest.TestCase):
             children = []
 
             @contextmanager
-            def launch(target, simulator_args=()):
+            def launch(target, simulator_args=(), attach=False):
+                self.assertFalse(attach)
                 self.assertEqual(target, "vq1.r1")
                 port = client._socket.getsockname()[1]
                 child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
