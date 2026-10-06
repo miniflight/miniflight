@@ -41,8 +41,8 @@ class Controller(BaseController[PositionNed]):
         if motion is None or not gates:
             return None
 
-        if gate_index < len(gates) and gate_index != self.gate:
+        if gate_index < len(gates) and gates[gate_index] != self.gate:
             self.target = PositionNed(*gate_target(motion.position, gate_index, gates))
-            self.gate = gate_index
+            self.gate = gates[gate_index]
 
         return self.target

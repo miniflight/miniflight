@@ -82,9 +82,11 @@ calling the controller. The underlying client retains the original telemetry.
 ## r1 baseline
 
 `r1_gates` uses the published track and VQ1 position telemetry to choose a point
-one metre beyond each gate. It keeps that point until the reported gate index
-advances, then chooses the next. After the last gate it holds the final point until
-native finish. The controller has no stored course coordinates or fixed gate count.
+one metre beyond each gate. It keeps that point while the active gate geometry
+stays unchanged. A gate advance or replacement of the active gate chooses a new
+point. After the last gate it holds the final point until native finish. The
+controller has no stored course coordinates or fixed gate count. An undefined
+approach direction is rejected instead of choosing an arbitrary crossing direction.
 
 The simulator assembles track packets and retains each gate's published origin.
 It derives the opening center with `origin + rotate(orientation, (0, 0, -height / 2))`.
@@ -116,8 +118,9 @@ missing required observations return `None`. Every flight command is `BodyRates`
 
 The routine stores its desired position as `target_position` and its desired
 heading as `target_yaw`. It deliberately holds the initial heading throughout
-the course. The position target changes only when the native gate index advances,
-and the final target is held until native finish.
+the course. The position target changes when the active gate changes, including
+replacement geometry at the same native index. The final target is held until
+native finish.
 
 ```sh
 python simulator.py vq1.r1 --controller r1_body_rates

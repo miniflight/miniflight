@@ -15,7 +15,7 @@ class Controller(BaseController[BodyRates]):
 
     def __init__(self, config: PositionConfig = CONFIG):
         self.config = config
-        self.gate_index = None
+        self.gate = None
         self.target_position = None
         self.target_yaw = None
 
@@ -24,9 +24,9 @@ class Controller(BaseController[BodyRates]):
         if motion is None or attitude is None or not gates:
             return None
 
-        if gate_index < len(gates) and gate_index != self.gate_index:
+        if gate_index < len(gates) and gates[gate_index] != self.gate:
             self.target_position = gate_target(motion.position, gate_index, gates)
-            self.gate_index = gate_index
+            self.gate = gates[gate_index]
         if self.target_position is None:
             return None
 
