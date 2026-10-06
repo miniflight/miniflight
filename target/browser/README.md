@@ -4,6 +4,21 @@ This target keeps the AI-GP executable and its native simulation behavior. The
 browser runtime is still under development. A complete native race, rendered
 scene, and native camera stream have not been demonstrated in the browser.
 
+The experimental page runs a startup check with the original engine and
+`-nullrhi`. It keeps the gate controller disabled until native GO, fresh IMU,
+pose, and track packets arrive. To use the retained runtime in this checkout:
+
+```sh
+python3 -B target/browser/prepare.py
+python3 -B target/browser/serve.py
+```
+
+Open the printed browser URL, select the prepared AI-GP folder, and start the
+original simulator. The Python process serves static runtime files; the game,
+file mount, MAVLink, and controller execute inside the tab. Preparation links
+the nine existing runtime assets without copying the game. Those generated
+runtime files are not included in Git.
+
 The adapters here move asset access, MAVLink, camera assembly, and controller I/O
 into the tab. They contain no replacement physics.
 
@@ -64,3 +79,9 @@ sizes and offsets without allocating a large payload. An actual Chrome check
 verified all 163 prepared files and compared 491 ZIP ranges against the existing
 package, including offsets above 4 GB. These are adapter checks, not evidence of
 a completed native simulation tick.
+
+The new frontend also passed a native read-only PAK probe: its interpreter opened
+the browser-backed ZIP mount, reported the exact 4,574,387,295-byte PAK size, and
+matched original bytes at offsets 0, 2^32 + 17, and end - 64. It exited with status
+0, with no game-file HTTP requests. This check used the retained ELF probe rather
+than starting a second game instance.

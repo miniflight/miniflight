@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI-GP in the browser</title>
+<style>
+  body{font:16px system-ui,sans-serif;background:#171a1c;color:#eef0f2;max-width:960px;margin:40px auto;padding:0 20px}
+  h1{font-size:25px}p{line-height:1.5;color:#bec6cc}button,input{font:inherit;margin:8px 8px 8px 0}
+  button{padding:8px 14px}pre{padding:16px;background:#0c1013;white-space:pre-wrap;max-height:260px;overflow:auto}
+  canvas{display:none}#camera{max-width:100%;background:#0c1013}#status{color:#e8eff5}
+</style>
+<h1>AI-GP in the browser</h1>
+<p>This runs the original simulator. Browser support is in development. This startup check uses the native engine with rendering disabled.</p>
+<label>Prepared AI-GP folder <input id="folder" type="file" webkitdirectory></label>
+<div><button id="start" disabled>Start original simulator</button><button id="fly" disabled>Run gate controller</button><button id="stop" disabled>Stop controller</button></div>
+<p id="status" role="status">Select the original AI-GP folder.</p>
+<pre id="telemetry">Waiting for native telemetry.</pre>
+<canvas id="camera" width="640" height="360" aria-label="Native simulator camera"></canvas>
+<canvas id="canvas" width="800" height="600"></canvas><canvas id="gl64canvas" width="1024" height="1024"></canvas>
+<details><summary>Native runtime log</summary><pre id="log"></pre></details>
+<script type="module" src="app.mjs"></script>
+</html>
