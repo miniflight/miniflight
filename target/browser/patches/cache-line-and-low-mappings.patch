@@ -39,7 +39,7 @@
          rangeInsertLocked(pageStart, pageCount, prot, (U8)MMAP_ANON);
      }
 @@ -416,12 +416,11 @@
- 
+
  // Record a reservation in the ordered `ranges` map. Caller holds mmapMutex.
  // Splits/clamps any pre-existing ranges that the new one overwrites so the map
 -// stays a non-overlapping cover of the live mmap-region reservations (wine
@@ -60,7 +60,7 @@
 @@ -265,7 +265,7 @@
      BOXEDWINE_MUTEX mmapMutex;
      U64 mmapNext = 0;
- 
+
 -    // Reserved address-space ranges drawn from the mmap region (>= K64_MMAP_BASE).
 +    // Live address-space ranges, including fixed maps below K64_MMAP_BASE.
      // Keyed by start PAGE number, ordered, so a gap search is O(log n + ranges
