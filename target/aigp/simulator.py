@@ -194,14 +194,18 @@ class AIGPSimulator:
 
 
 class SimulatorClient(Target):
-    """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets."""
+    """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets.
+
+    mav and target_ids expose the wire; send converts the three flight commands.
+    telemetry retains every accepted MAVLink message, including optional packets.
+    """
 
     commands = frozenset((BodyRates, PositionNed, VelocityNed))
 
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
         self.camera_port = camera_port
-        self._socket = self._vision = self._peer = self._target = None
+        self._socket = self._vision = self._peer = self.mav = self.target_ids = None
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
@@ -225,8 +229,8 @@ class SimulatorClient(Target):
         self._track = _Track()
         self.race_status = self._last_imu = None
         self._boot = time.monotonic()
-        self._mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
-        self._mav.robust_parsing = True
+        self.mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
+        self.mav.robust_parsing = True
         try:
             # Exclusive binds: a second client must not steal these packets.
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -257,7 +261,7 @@ class SimulatorClient(Target):
         for sock in (self._socket, self._vision):
             if sock is not None:
                 sock.close()
-        self._socket = self._vision = self._peer = self._target = None
+        self._socket = self._vision = self._peer = self.mav = self.target_ids = None
 
     def write(self, packet):
         if self._socket is None or self._peer is None:
@@ -282,7 +286,7 @@ class SimulatorClient(Target):
                     continue
                 if self._peer is not None and peer != self._peer:
                     continue
-                for message in self._mav.parse_buffer(packet) or ():
+                for message in self.mav.parse_buffer(packet) or ():
                     self._receive(message, peer, now)
 
     def _receive(self, message, peer, now):
@@ -293,8 +297,8 @@ class SimulatorClient(Target):
         if self._peer is None:
             if kind != "HEARTBEAT":
                 return
-            self._peer, self._target = peer, source
-        if source[0] != self._target[0]:
+            self._peer, self.target_ids = peer, source
+        if source[0] != self.target_ids[0]:
             return
         if kind == "HIGHRES_IMU":
             values = (message.xacc, message.yacc, message.zacc,
@@ -366,8 +370,8 @@ class SimulatorClient(Target):
             raise TypeError("expected BodyRates, PositionNed or VelocityNed")
         time_ms = int((time.monotonic() - self._boot) * 1000) & 0xffffffff
         if isinstance(command, BodyRates):
-            self._mav.set_attitude_target_send(
-                time_ms, *self._target,
+            self.mav.set_attitude_target_send(
+                time_ms, *self.target_ids,
                 mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
                 [1.0, 0.0, 0.0, 0.0],
                 # The simulator's angular-rate wire axes are opposite to FRD.
@@ -379,13 +383,13 @@ class SimulatorClient(Target):
             velocity = vector if isinstance(command, VelocityNed) else (0, 0, 0)
             # 1 ignores a field: xyz bits 0..2, velocity 3..5, acceleration 6..8, yaw 10..11.
             mask = 0b110111111000 if isinstance(command, PositionNed) else 0b110111000111
-            self._mav.set_position_target_local_ned_send(
-                time_ms, *self._target, mavlink.MAV_FRAME_LOCAL_NED,
+            self.mav.set_position_target_local_ned_send(
+                time_ms, *self.target_ids, mavlink.MAV_FRAME_LOCAL_NED,
                 mask, *position, *velocity, 0, 0, 0, 0, 0,
             )
 
     def heartbeat(self):
-        self._mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
+        self.mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
                                  0, 0, mavlink.MAV_STATE_ACTIVE)
 
     def arm(self):
@@ -395,7 +399,7 @@ class SimulatorClient(Target):
         self._set_armed(False)
 
     def _set_armed(self, armed):
-        self._mav.command_long_send(*self._target, mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+        self.mav.command_long_send(*self.target_ids, mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
 
 

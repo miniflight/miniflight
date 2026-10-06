@@ -89,6 +89,41 @@ in an active vector remains a request. The command timestamp is host monotonic
 milliseconds since the connection opened, wrapped to uint32. It is not IMU or
 race time. `COMMAND_LONG` arm/disarm is separate from the setpoint message.
 
+## the remaining wire interface
+
+`client.telemetry` retains every accepted MAVLink packet by message name, including
+`HEARTBEAT`, `TIMESYNC`, `ODOMETRY`, `COMMAND_ACK`, and `COLLISION`. Their original
+fields remain available even when they are not part of `State`. A packet appears
+only if the executable emits it; the cache does not request extra sensors.
+
+`client.mav` is the same pymavlink encoder/parser used by the adapter.
+`client.target_ids` is the `(system, component)` tuple from the first heartbeat.
+After `connect`, the vendor time-sync request can be sent directly:
+
+```python
+import time
+
+client.mav.timesync_send(time.time_ns(), 0)
+reply = client.telemetry.get("TIMESYNC")  # poll or read to receive a reply
+```
+
+A native VQ1 build-3391 check received replies to all 97 requests during a complete
+six-gate run. Each reply echoed the client request timestamp in `ts1` and returned
+the simulator timestamp in `tc1`. The adapter makes no clock adjustment.
+
+The [vendor controller](reference/PyAIPilotExample-v4/controller.py) also writes
+`SET_ACTUATOR_CONTROL_TARGET` with eight controls, group 0, and the target IDs,
+and `COMMAND_LONG` with command 31000 to reset the simulator. Both are available
+through `client.mav`, as are the quaternion, acceleration/force, and heading
+fields of the two flight messages. These are raw wire requests: `send` alone
+applies the documented frame conversions for the three flight command types.
+
+The UDP fixture checks outgoing time-sync, actuator, and reset requests, incoming
+time-sync replies, and retained odometry, acknowledgement, and collision fields.
+It establishes the wire interface; it does not establish native flight behavior
+for the broader control forms. The six-gate native regressions exercise position
+and body-rate commands; the UDP fixture also checks velocity commands.
+
 ## inside the executable
 
 The native rate path was inspected in VQ1 executable SHA-256

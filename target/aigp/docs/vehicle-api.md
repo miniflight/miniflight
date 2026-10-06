@@ -55,14 +55,14 @@ AIGPSimulator owns race timing heartbeats command cadence and process lifetime
 collective thrust, or desired body rates and thrust. TRPY uses the attitude form:
 roll, pitch and yaw are angles, converted to a quaternion on the wire. It is not
 the `BodyRates` form, whose three rotational fields are rad/s.
-The native receiver has an attitude branch, but that form is not exposed or
-flight-verified by this adapter yet.
+The native receiver has an attitude branch. Raw requests can be written through
+`client.mav`; this form has no typed command or native flight verification here.
 See the [attitude message](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET).
 
 `SET_POSITION_TARGET_LOCAL_NED` carries position, velocity, acceleration/force,
 and optional heading fields. Our two NED command types select position or
-velocity and ignore the other fields. The acceleration/force form is not exposed
-or flight-verified here. See the [NED message](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED).
+velocity and ignore the other fields. Raw acceleration/force requests are available
+through `client.mav`; this form has no typed command or native flight verification. See the [NED message](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED).
 
 Hovering belongs to the selected plane. A fixed `PositionNed` target lets VQ1
 hold position. A zero `VelocityNed` target asks it to hold zero velocity, without
@@ -117,7 +117,8 @@ its attitude local position and odometry output workers are stubs in both R1 and
 the vehicle adapter exposes the three existing position velocity and body rate command paths
 it converts received telemetry without adding a pose estimator or new telemetry requests
 
-the broader attitude acceleration and direct actuator input paths are not part of this seed
+the broader attitude acceleration and direct actuator inputs have no typed commands here
+the [raw wire interface](wiring.md#the-remaining-wire-interface) exposes their packet fields
 their presence in the parser is not a tested control contract
 reported motor output channels are retained with the wire active mask and values without claiming RPM units
 

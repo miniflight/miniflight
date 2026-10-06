@@ -48,13 +48,16 @@ class UDPSmokeTest(unittest.TestCase):
             with self.subTest(with_pose=with_pose, invalid_optional=invalid_optional):
                 self.round_trip(with_pose, invalid_optional=invalid_optional)
 
+    def test_raw_mavlink_inputs_and_outputs_round_trip(self):
+        self.round_trip(True, wire_io=True)
+
     def test_velocity_command_round_trip(self):
         self.round_trip(True, VelocityNed(-1, 0, 0))
 
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
 
-    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False):
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -95,6 +98,16 @@ class UDPSmokeTest(unittest.TestCase):
                         motors = mavlink.MAVLink_actuator_output_status_message(stamp, 15, [.1, .2, .3, .4] + [0] * 28)
                         for observation in (pose, attitude, motors):
                             server.sendto(packet(observation), address)
+                    if wire_io:
+                        for observation in (
+                            mavlink.MAVLink_timesync_message(234567890, 123456789),
+                            mavlink.MAVLink_command_ack_message(400, 0, 100),
+                            mavlink.MAVLink_collision_message(0, 1001, 0, 2, 0, 0, 3),
+                            mavlink.MAVLink_odometry_message(stamp, 1, 8, 1, 2, 3, [1, 0, 0, 0],
+                                                            4, 5, 6, 0, 0, 0, [0] * 21, [0] * 21),
+                        ):
+                            server.sendto(packet(observation), address)
+                        server.sendto(packet(mavlink.MAVLink_timesync_message(0, 0), system=43), address)
                     server.sendto(packet(imu(stamp)), address)
                     chunks = [jpeg[i:i + 200] for i in range(0, len(jpeg), 200)]
                     incomplete = Camera.HEADER.pack(sequence * 2, 0, len(chunks), len(jpeg), len(chunks[0]), stamp * 1000 - 1)
@@ -113,6 +126,12 @@ class UDPSmokeTest(unittest.TestCase):
                 if not isinstance(state, State) or gate_index != 0 or gates is not None:
                     raise AssertionError("controller did not receive the observations and active gate index")
                 states.append(state)
+                if wire_io and len(states) == 1:
+                    assert client.target_ids == (42, 7)
+                    client.mav.timesync_send(123456789, 0)
+                    client.mav.set_actuator_control_target_send(1234567, 0, *client.target_ids,
+                                                                 [.1, .2, .3, .4, 0, 0, 0, 0])
+                    client.mav.command_long_send(*client.target_ids, 31000, 0, 0, 0, 0, 0, 0, 0, 0)
                 if len(states) == 5:
                     if closed_on_exit:
                         client._socket.close()
@@ -179,7 +198,25 @@ class UDPSmokeTest(unittest.TestCase):
                                 for m in velocities))
         if not closed_on_exit:
             self.assertEqual(rates[-1].thrust, 0)
-        arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"]
+        if wire_io:
+            requests = [m for m in received if m.get_type() == "TIMESYNC"]
+            self.assertEqual([(m.tc1, m.ts1) for m in requests], [(123456789, 0)])
+            outputs = [m for m in received if m.get_type() == "SET_ACTUATOR_CONTROL_TARGET"]
+            self.assertEqual(len(outputs), 1)
+            output, = outputs
+            self.assertEqual((output.time_usec, output.group_mlx, output.target_system, output.target_component),
+                             (1234567, 0, 42, 7))
+            for value, expected in zip(output.controls, (.1, .2, .3, .4, 0, 0, 0, 0)):
+                self.assertAlmostEqual(value, expected)
+            resets = [m for m in received if m.get_type() == "COMMAND_LONG" and m.command == 31000]
+            self.assertEqual([(m.target_system, m.target_component) for m in resets], [(42, 7)])
+            reply = client.telemetry["TIMESYNC"]
+            self.assertEqual((reply.tc1, reply.ts1), (234567890, 123456789))
+            self.assertEqual(client.telemetry["COMMAND_ACK"].command, 400)
+            self.assertEqual(client.telemetry["COLLISION"].id, 1001)
+            self.assertEqual(client.telemetry["ODOMETRY"].x, 1)
+        arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"
+                and m.command == mavlink.MAV_CMD_COMPONENT_ARM_DISARM]
         self.assertEqual(arms, [1] if closed_on_exit else [1, 0])
         self.assertFalse(client.connected)
         self.assertIsNone(client._socket)
