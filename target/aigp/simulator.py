@@ -639,10 +639,11 @@ def main(argv=None):
                    if not p.name.startswith("_"))
     parser = argparse.ArgumentParser(prog="simulator.py", allow_abbrev=False,
                                      description="Run an AI-GP simulator and a Python controller.")
-    parser.add_argument("target", nargs="?", choices=(*TARGETS, "vq1"))
+    operation = parser.add_mutually_exclusive_group(required=True)
+    operation.add_argument("target", nargs="?", choices=(*TARGETS, "vq1"))
     parser.add_argument("--controller", choices=names)
-    parser.add_argument("--prepare", choices=VERSIONS, help="extract and configure a simulator without launching it")
-    parser.add_argument("--attach", action="store_true", help="control an already running simulator")
+    operation.add_argument("--prepare", choices=VERSIONS, help="extract and configure a simulator without launching it")
+    operation.add_argument("--attach", action="store_true", help="control an already running simulator")
     parser.add_argument("--hz", type=float)
     parser.add_argument("--startup-timeout", type=float)
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -650,17 +651,14 @@ def main(argv=None):
     args = parser.parse_args(argv[:boundary])
     simulator_args = argv[boundary + 1:]
     if args.prepare:
-        if args.target or args.controller or args.attach or simulator_args or args.hz is not None or args.startup_timeout is not None:
+        if args.controller or simulator_args or args.hz is not None or args.startup_timeout is not None:
             parser.error("--prepare cannot be combined with run options")
         prepare(args.prepare)
         return 0
     if args.target == "vq1":
         args.target = "vq1.r1"
-    if args.attach:
-        if args.target or simulator_args or args.startup_timeout is not None or not args.controller:
-            parser.error("--attach requires --controller and no simulator arguments")
-    elif args.target is None:
-        parser.error("choose vq1.r1 vq2.r1 or vq2.r2")
+    if args.attach and (simulator_args or args.startup_timeout is not None or not args.controller):
+        parser.error("--attach requires --controller and no simulator arguments")
     if not args.controller and (args.hz is not None or args.startup_timeout is not None):
         parser.error("--hz and --startup-timeout require --controller")
     hz = 50.0 if args.hz is None else args.hz
