@@ -85,4 +85,4 @@ ownership of its process.
 Pass Unreal command-line options after `--`. Options before `--` belong to
 this Python runner and must use their full names.
 
-[Vehicle API](docs/vehicle-api.md) · [Specification](docs/VQ1-Technical-Specification-00.02.pdf)
+[Vehicle API](docs/vehicle-api.md) · [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) · [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)
