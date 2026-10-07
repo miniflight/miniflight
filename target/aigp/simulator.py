@@ -88,19 +88,17 @@ class AIGPSimulator:
                         self.status = status
                 if process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
-                if finish_deadline is not None:
-                    if now >= finish_deadline:
-                        raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {status}")
-                    continue
                 if self.status is None:
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
                     continue
-                if now - last_imu_at >= self.timeout:
+                # IMU loss ends control permanently; only native finish can end the wait.
+                if finish_deadline is None and now - last_imu_at >= self.timeout:
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
-                    continue
-                if state is None:
+                if finish_deadline is not None and now >= finish_deadline:
+                    raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {status}")
+                if finish_deadline is not None or state is None:
                     continue
 
                 gates, index = self.client.gates, self.status.active_gate_index
