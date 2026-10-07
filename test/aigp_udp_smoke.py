@@ -102,7 +102,7 @@ class UDPSmokeTest(unittest.TestCase):
             payload = (struct.pack("<BH", 2, transfer) + track).ljust(253, b"\0")
             send(mavlink.MAVLink_encapsulated_data_message(0, payload))
 
-        track = struct.pack("<HH9f", 1, 0, 1, 2, 3, 1, 0, 0, 0, 2, 2)
+        track = struct.pack("<HH9f", 1, 0, 1, 2, 3, .9999, 0, 0, 0, 2, 2)
         send(heartbeat())
         announce(7, track)
         client.poll(.1)
@@ -111,9 +111,9 @@ class UDPSmokeTest(unittest.TestCase):
         fragment(7, track)
         client.poll(.1)
         gates, received_at = client.gates, client.gates_received_at
-        self.assertEqual(gates[0].origin, (1, 2, 3))
-        self.assertEqual(gates[0].center, (1, 2, 2))
-        self.assertEqual(gates[0].orientation, (1, 0, 0, 0))
+        self.assertEqual(gates[0].position, (1, 2, 3))
+        self.assertEqual(gates[0].orientation, struct.unpack_from("<4f", track, 16))
+        self.assertFalse(hasattr(gates[0], "center"))
         self.assertLessEqual(received_at, time.monotonic())
 
         # A missing or arriving IMU changes neither course nor its receipt time.

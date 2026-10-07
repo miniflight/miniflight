@@ -29,8 +29,8 @@ class ControllerSmokeTest(unittest.TestCase):
         for make in (PositionController, RatesController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make, replace_geometry=True)
-                before = [row for row in updates if row["gates"][0]["center"] == [-2, 0, 0]]
-                after = [row for row in updates if row["gates"][0]["center"] == [0, -2, 0]]
+                before = [row for row in updates if row["gates"][0]["position"] == [-2, 0, 1]]
+                after = [row for row in updates if row["gates"][0]["position"] == [0, -2, 1]]
                 self.assertGreaterEqual(len(before), 3)
                 self.assertGreater(len(after), 1)
                 self.assertTrue(all(row["gate_index"] == 0 for row in updates))

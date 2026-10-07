@@ -12,7 +12,6 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from common.math import Quaternion, Vector3D
 from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutputs,
                        Ned, PositionNed, State, VelocityNed)
 from target import Target
@@ -328,12 +327,7 @@ class _Track(MAVLinkRX):
             norm = math.hypot(w, x, y, z)
             if not 0.99 <= norm <= 1.01:
                 return
-            orientation = tuple(value / norm for value in (w, x, y, z))
-            # The published origin is at the gate base; offset to the opening center.
-            origin = Ned(north, east, down)
-            offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
-            center = Ned(*(float(p + d) for p, d in zip(origin, offset)))
-            gates.append(Gate(gate_id, center, orientation, width, height, origin=origin))
+            gates.append(Gate(gate_id, Ned(north, east, down), (w, x, y, z), width, height))
         self.gates, self.received_at = tuple(gates), self._arrival_at
 
 

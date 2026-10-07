@@ -2,17 +2,26 @@
 
 import math
 
+from common.math import Quaternion, Vector3D
 from miniflight import Ned, PositionNed, State
 from target.aigp.controllers import BaseController, Gate
 
 
+def gate_center(gate: Gate) -> Ned:
+    """Offset the published gate base to its opening center."""
+    norm = math.hypot(*gate.orientation)
+    rotation = Quaternion(*(value / norm for value in gate.orientation))
+    offset = rotation.rotate(Vector3D(0, 0, -gate.height / 2)).v
+    return Ned(*(float(p + d) for p, d in zip(gate.position, offset)))
+
+
 def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
     """Choose a point one metre beyond the gate center along the approach."""
-    center = gates[index].center
+    center = gate_center(gates[index])
     direction = tuple(c - p for c, p in zip(center, position))
     distance = math.hypot(*direction)
     if distance < 0.1:
-        previous = gates[index - 1].center if index else (0.0, 0.0, 0.0)
+        previous = gate_center(gates[index - 1]) if index else (0.0, 0.0, 0.0)
         direction = tuple(c - p for c, p in zip(center, previous))
         distance = math.hypot(*direction)
     if distance == 0:
@@ -28,15 +37,7 @@ class Controller(BaseController[PositionNed]):
         self.target = None
 
     def update(self, state: State, gate_index: int, gates) -> PositionNed | None:
-        time = state.time
-        dt = state.dt
-        acceleration = state.acceleration
-        gyro = state.gyro
-        received_at = state.received_at
-        frame = state.frame
         motion = state.motion
-        attitude = state.attitude
-        motors = state.motors
 
         if motion is None or not gates:
             return None

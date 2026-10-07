@@ -12,6 +12,7 @@ import numpy as np
 
 from miniflight import Attitude, Frame, Motion, MotorOutputs, Ned, State
 from target.aigp.controllers import BaseController, CommandT, Gate
+from target.aigp.controllers.r1_gates import gate_center
 from target.aigp.simulator import SimulatorClient, TARGETS
 
 
@@ -59,10 +60,14 @@ def read_state(data):
 
 def read_gate(data):
     data = dict(data)
-    data["center"] = Ned(*data["center"])
     data["orientation"] = tuple(data["orientation"])
-    origin = data.get("origin")
-    data["origin"] = None if origin is None else Ned(*origin)
+    if "position" not in data:
+        # Snapshot recordings stored a derived center, sometimes also the native base.
+        origin = data.pop("origin", None)
+        center = data.pop("center")
+        offset = gate_center(Gate(data["id"], Ned(0, 0, 0), data["orientation"], data["width"], data["height"]))
+        data["position"] = origin if origin is not None else tuple(c - d for c, d in zip(center, offset))
+    data["position"] = Ned(*data["position"])
     return Gate(**data)
 
 
