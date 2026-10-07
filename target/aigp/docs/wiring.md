@@ -42,15 +42,51 @@ requires selecting the corresponding event block in the native interface.
 
 ## the two UDP connections
 
-| Connection | Simulator endpoint | Python endpoint | Data |
+| Stream | Native socket | Controller socket | Data |
 | --- | --- | --- | --- |
 | MAVLink 2 | The heartbeat's sender, normally `127.0.0.1:14560` | `127.0.0.1:14550` | Commands, IMU, optional pose/motors, race, track |
 | Camera | Normally `127.0.0.1:5601` | `127.0.0.1:5600` | A separate JPEG fragment stream |
+
+Each row is a direct UDP stream between two programs. The controller socket is
+where the pilot receives packets; it is not a proxy or a second simulator API.
+MAVLink commands and heartbeats go back from that socket to the native sender.
+The camera is a separate one-way stream. These addresses are transport details
+under one CLI command.
 
 `SimulatorClient.open` binds exclusively. `poll` receives both streams; the first
 MAVLink heartbeat pins the peer and target IDs. `write` sends commands to that
 peer. MAVLink from other peers or system IDs is discarded. Camera packets are
 assembled separately. Connecting does not launch or arm a simulator.
+
+A passive VQ1 build-3391 probe sent heartbeats and time-sync requests from an
+ephemeral socket to native UDP 14560. That initiating socket received no packets.
+The fixed listener on 14550 received 67 heartbeats, 247 IMU samples, and 16
+time-sync messages, as well as race, course and privileged state packets. With
+these native defaults, merely connecting an arbitrary socket to 14560 does not
+redirect the telemetry stream; the pilot must listen on the native destination.
+
+## how the vendor starts a controller
+
+Both original build-3391 packages contain a native simulator zip and a separate
+`PyAIPilotExample-v4.zip`. Their README tells the user to launch `FlightSim.exe`,
+log in inside the simulator, and run `python main.py` separately. All seven SDK
+files in both Downloads packages match [our vendor reference](reference/PyAIPilotExample-v4/)
+byte for byte.
+
+The SDK [setup.py](reference/PyAIPilotExample-v4/setup.py) imports `Controller`
+from `controller.py`, opens `udpin:127.0.0.1:14550`, waits for the native heartbeat,
+then creates the controller in the Python process. [main.py](reference/PyAIPilotExample-v4/main.py)
+arms and calls its `update` loop. The supplied integration does not load that
+Python class into Unreal. Our CLI likewise imports the chosen controller in the
+pilot process and exchanges native MAVLink packets.
+
+Controller startup and native event startup are separate jobs. The SDK sample
+arms after the heartbeat; our direct arena waits for GO before arming. Automating
+the official menu flow must preserve its actual readiness and race-verification
+sequence, rather than treating the direct arena sequence as the official one.
+The packages document no command-line option for selecting an official event.
+The intended CLI work is to drive that native event path and start the external
+pilot together.
 
 ## observation to command
 
