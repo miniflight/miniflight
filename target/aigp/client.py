@@ -17,6 +17,7 @@ from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutput
                        Ned, PositionNed, State, VelocityNed)
 from target import Target
 from target.aigp.controllers import Gate
+from target.aigp.sdk.mavlink_rx import MAVLinkRX
 
 
 @dataclass(frozen=True)
@@ -275,7 +276,7 @@ class SimulatorClient(Target):
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
 
 
-class _Track:
+class _Track(MAVLinkRX):
     """Handshake → indexed fragments → complete course; never expire it per tick."""
 
     GATE = struct.Struct("<H9f")
@@ -283,8 +284,8 @@ class _Track:
     MAX_GATES = 1024
 
     def __init__(self):
+        super().__init__(None, None)
         self.transfer = None
-        self.chunks = {}
         self.gates = None
         self.received_at = None
 
@@ -295,24 +296,27 @@ class _Track:
             return
         transfer = (message.width, size, packets)  # width carries the vendor's transfer ID.
         if transfer != self.transfer:
-            self.transfer, self.chunks = transfer, {}
+            self.transfer = transfer
+            self.track_chunks = {message.width: {}}
+            self.expected_num_track_chunks = {message.width: packets}
 
     def receive(self, message, now):
         if self.transfer is None:
             return
         payload = bytes(message.data)
-        transfer_id, size, packets = self.transfer
+        transfer_id, _, packets = self.transfer
         if struct.unpack_from("<H", payload, 1)[0] != transfer_id:
             return
         index = message.seqnr
         if not 0 <= index < packets:
             return
-        length = min(self.CHUNK_BYTES, size - index * self.CHUNK_BYTES)
-        self.chunks[index] = payload[3:3 + length]
-        if len(self.chunks) != packets:
-            return
-        data = b"".join(self.chunks[i] for i in range(packets))
-        self.transfer, self.chunks = None, {}
+        self._arrival_at = now
+        super().on_track_data_packet(message)
+
+    def on_track_data(self, payload):
+        # The native assembler includes the final fragment's padding.
+        data = payload[:self.transfer[1]]
+        self.transfer = None
         count, = struct.unpack_from("<H", data)
         if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
@@ -330,7 +334,7 @@ class _Track:
             offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
             center = Ned(*(float(p + d) for p, d in zip(origin, offset)))
             gates.append(Gate(gate_id, center, orientation, width, height, origin=origin))
-        self.gates, self.received_at = tuple(gates), now
+        self.gates, self.received_at = tuple(gates), self._arrival_at
 
 
 class _Camera:
