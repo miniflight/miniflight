@@ -126,11 +126,12 @@ class DiagnosticClient(RecordedClient):
         return result
 
     def _receive(self, message, peer, now):
-        super()._receive(message, peer, now)
+        decoded = super()._receive(message, peer, now)
         if (message.get_type() in ("HIGHRES_IMU", "ATTITUDE", "LOCAL_POSITION_NED", "ACTUATOR_OUTPUT_STATUS")
                 and self._telemetry.get(message.get_type()) is message):
             # Bytes preserve unsupported/NaN fields without inventing JSON values.
             self.record(event="wire_received", received_at=now, packet_hex=bytes(message.get_msgbuf()).hex())
+        return decoded
 
 
 def run(path, commands, duration, hz=50, yaw_feedback=False):

@@ -44,6 +44,7 @@ class Packet:
 
     data: mavlink.MAVLink_message | bytes
     received_at: float  # host monotonic receipt; device timestamps remain in data
+    decoded: RaceStatus | tuple[Gate, ...] | Frame | None = None
 
 
 class SimulatorClient(Target):
@@ -143,16 +144,15 @@ class SimulatorClient(Target):
                 packet, peer = sock.recvfrom(65536)
                 now = time.monotonic()
                 if sock is self._vision:
-                    arrivals.append(Packet(packet, now))
-                    self._camera.receive(packet, now)
+                    arrivals.append(Packet(packet, now, self._camera.receive(packet, now)))
                     continue
                 if self._peer is not None and peer != self._peer:
                     continue
                 for message in self.mav.parse_buffer(packet) or ():
-                    self._receive(message, peer, now)
+                    decoded = self._receive(message, peer, now)
                     if (peer == self._peer and message.get_type() != "BAD_DATA"
                             and message.get_srcSystem() == self.target_ids[0]):
-                        arrivals.append(Packet(message, now))
+                        arrivals.append(Packet(message, now, decoded))
         return tuple(arrivals)
 
     def _receive(self, message, peer, now):
@@ -181,7 +181,7 @@ class SimulatorClient(Target):
             self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
             # Fragment arrival may complete a track; an IMU read never does.
-            self._track.receive(message, now)
+            return self._track.receive(message, now)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             # Native boot/start/finish/gate values, not an IMU or host tick.
             race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
@@ -191,6 +191,7 @@ class SimulatorClient(Target):
                 self._telemetry.pop("HIGHRES_IMU", None)
                 self._last_imu = None
             self.race_status = race
+            return race
 
     def _wait(self, deadline, description):
         remaining = deadline - time.monotonic()
@@ -315,16 +316,19 @@ class _Track:
         count, = struct.unpack_from("<H", data)
         if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
-        gates = []
+        gates, usable = [], True
         for index, row in enumerate(self.GATE.iter_unpack(data[2:])):
             gate_id, north, east, down, w, x, y, z, width, height = row
             if gate_id != index or not all(math.isfinite(value) for value in row[1:]) or width <= 0 or height <= 0:
-                return
+                usable = False
             norm = math.hypot(w, x, y, z)
             if not 0.99 <= norm <= 1.01:
-                return
+                usable = False
             gates.append(Gate(gate_id, Ned(north, east, down), (w, x, y, z), width, height))
-        self.gates, self.received_at = tuple(gates), now
+        gates = tuple(gates)
+        if usable:
+            self.gates, self.received_at = gates, now
+        return gates
 
 
 class _Camera:
@@ -372,3 +376,4 @@ class _Camera:
         if bgr is not None:
             bgr.flags.writeable = False
             self.latest = Frame(frame_id, timestamp, now, bgr)
+            return self.latest

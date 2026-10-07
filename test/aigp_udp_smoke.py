@@ -24,6 +24,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
+from target.aigp.client import RaceStatus
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
@@ -71,6 +72,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(all(item.received_at <= time.monotonic() for item in arrivals))
         self.assertEqual(client.telemetry["HIGHRES_IMU"].time_usec, 1000001)
         self.assertEqual(struct.unpack_from("<H9f", bytes(arrivals[2].data.data), 5)[1:4], (1, 2, 3))
+        self.assertEqual(arrivals[2].decoded, client.gates)
         self.assertEqual(client.poll(), ())
 
         # Incomplete, repeated and old camera packets remain visible byte for byte.
@@ -82,6 +84,21 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual([item.data for item in camera_arrivals], camera_packets)
         self.assertTrue(all(item.received_at >= arrivals[-1].received_at for item in camera_arrivals))
         self.assertIsNone(client._camera.latest)
+        self.assertEqual(client.poll(), ())
+
+        race = struct.pack("<BQqqIq", 1, 5000, 4500, -1, 2, -1).ljust(253, b"\0")
+        server.sendto(packet(mavlink.MAVLink_encapsulated_data_message(0, race)), address)
+        _, jpeg = cv2.imencode(".jpg", np.zeros((2, 3, 3), dtype=np.uint8))
+        camera = Camera.HEADER.pack(9, 0, 1, len(jpeg), len(jpeg), 123456900) + jpeg.tobytes()
+        server.sendto(camera, camera_address)
+        arrivals = client.poll(.1)
+        status = next(item.decoded for item in arrivals if isinstance(item.decoded, RaceStatus))
+        self.assertEqual((status.sim_boot_time_ms, status.active_gate_index), (5000, 2))
+        frame_packet = next(item for item in arrivals if isinstance(item.data, bytes))
+        self.assertEqual(frame_packet.data, camera)
+        self.assertEqual((frame_packet.decoded.id, frame_packet.decoded.time_ns), (9, 123456900))
+        self.assertEqual(frame_packet.decoded.bgr.shape, (2, 3, 3))
+        self.assertEqual(frame_packet.decoded.received_at, frame_packet.received_at)
         self.assertEqual(client.poll(), ())
 
     def test_track_arrival_is_independent_of_imu_reads(self):
@@ -140,7 +157,9 @@ class UDPSmokeTest(unittest.TestCase):
         announce(9, redacted)
         fragment(9, redacted)
         retained_at = client.gates_received_at
-        client.poll(.1)
+        arrivals = client.poll(.1)
+        self.assertEqual(arrivals[-1].decoded[0].orientation, (0, 0, 0, 0))
+        self.assertEqual(arrivals[-1].decoded[0].width, 0)
         self.assertEqual(client.gates, gates)
         self.assertEqual(client.gates_received_at, retained_at)
 

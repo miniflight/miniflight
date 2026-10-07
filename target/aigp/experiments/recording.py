@@ -144,10 +144,11 @@ class RecordedClient(SimulatorClient):
         self.record(event="arm_request", armed=armed)
 
     def _receive(self, message, peer, now):
-        super()._receive(message, peer, now)
+        decoded = super()._receive(message, peer, now)
         if (message.get_type() in ("COMMAND_ACK", "COLLISION", "HEARTBEAT")
                 and self._telemetry.get(message.get_type()) is message):
             self.record(event="telemetry", message=message.to_dict())
+        return decoded
 
 
 def replay(controller, path):
