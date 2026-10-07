@@ -16,7 +16,6 @@ from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutput
                        Ned, PositionNed, State, VelocityNed)
 from target import Target
 from target.aigp.controllers import Gate
-from target.aigp.sdk.mavlink_rx import MAVLinkRX
 
 
 @dataclass(frozen=True)
@@ -275,7 +274,7 @@ class SimulatorClient(Target):
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
 
 
-class _Track(MAVLinkRX):
+class _Track:
     """Handshake → indexed fragments → complete course; never expire it per tick."""
 
     GATE = struct.Struct("<H9f")
@@ -283,8 +282,8 @@ class _Track(MAVLinkRX):
     MAX_GATES = 1024
 
     def __init__(self):
-        super().__init__(None, None)
         self.transfer = None
+        self.chunks = {}
         self.gates = None
         self.received_at = None
 
@@ -296,26 +295,23 @@ class _Track(MAVLinkRX):
         transfer = (message.width, size, packets)  # width carries the vendor's transfer ID.
         if transfer != self.transfer:
             self.transfer = transfer
-            self.track_chunks = {message.width: {}}
-            self.expected_num_track_chunks = {message.width: packets}
+            self.chunks = {}
 
     def receive(self, message, now):
         if self.transfer is None:
             return
         payload = bytes(message.data)
-        transfer_id, _, packets = self.transfer
+        transfer_id, size, packets = self.transfer
         if struct.unpack_from("<H", payload, 1)[0] != transfer_id:
             return
         index = message.seqnr
         if not 0 <= index < packets:
             return
-        self._arrival_at = now
-        super().on_track_data_packet(message)
-
-    def on_track_data(self, payload):
-        # The native assembler includes the final fragment's padding.
-        data = payload[:self.transfer[1]]
-        self.transfer = None
+        self.chunks[index] = payload[3:]
+        if len(self.chunks) != packets:
+            return
+        data = b"".join(self.chunks[i] for i in range(packets))[:size]
+        self.transfer, self.chunks = None, {}
         count, = struct.unpack_from("<H", data)
         if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
@@ -328,7 +324,7 @@ class _Track(MAVLinkRX):
             if not 0.99 <= norm <= 1.01:
                 return
             gates.append(Gate(gate_id, Ned(north, east, down), (w, x, y, z), width, height))
-        self.gates, self.received_at = tuple(gates), self._arrival_at
+        self.gates, self.received_at = tuple(gates), now
 
 
 class _Camera:

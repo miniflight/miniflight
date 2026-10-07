@@ -96,11 +96,11 @@ class UDPSmokeTest(unittest.TestCase):
             server.sendto(packet(message), address)
 
         def announce(transfer, track):
-            send(mavlink.MAVLink_data_transmission_handshake_message(0, len(track), transfer, 0, 1, 253, 1))
+            send(mavlink.MAVLink_data_transmission_handshake_message(0, len(track), transfer, 0, (len(track) + 249) // 250, 253, 1))
 
-        def fragment(transfer, track):
-            payload = (struct.pack("<BH", 2, transfer) + track).ljust(253, b"\0")
-            send(mavlink.MAVLink_encapsulated_data_message(0, payload))
+        def fragment(transfer, track, index=0):
+            payload = (struct.pack("<BH", 2, transfer) + track[index * 250:(index + 1) * 250]).ljust(253, b"\0")
+            send(mavlink.MAVLink_encapsulated_data_message(index, payload))
 
         track = struct.pack("<HH9f", 1, 0, 1, 2, 3, .9999, 0, 0, 0, 2, 2)
         send(heartbeat())
@@ -143,6 +143,22 @@ class UDPSmokeTest(unittest.TestCase):
         client.poll(.1)
         self.assertEqual(client.gates, gates)
         self.assertEqual(client.gates_received_at, retained_at)
+
+        # Indexed fragments can arrive twice or backwards, with a repeated announcement.
+        track = struct.pack("<H", 7) + b"".join(struct.pack("<H9f", i, i, 2, 3, 1, 0, 0, 0, 2, 2) for i in range(7))
+        announce(10, track)
+        fragment(10, track, 1)
+        announce(10, track)
+        fragment(11, track)
+        fragment(10, track, 2)
+        fragment(10, track, 1)
+        client.poll(.1)
+        self.assertEqual(client.gates, gates)
+        self.assertEqual(client.gates_received_at, retained_at)
+        fragment(10, track)
+        client.poll(.1)
+        self.assertEqual([gate.position for gate in client.gates], [(i, 2, 3) for i in range(7)])
+        self.assertGreater(client.gates_received_at, retained_at)
 
     def test_shared_runner_with_and_without_pose_telemetry(self):
         for with_pose, invalid_optional in ((True, False), (False, False), (True, True)):
