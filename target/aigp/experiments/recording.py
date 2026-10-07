@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from dataclasses import asdict
 import json
 from pathlib import Path
+from threading import Lock
 import time
 
 import cv2
@@ -48,8 +49,11 @@ def recording(path, metadata=None):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", buffering=1) as output:
+        lock = Lock()
         def record(**row):
-            output.write(json.dumps(dict(host_time=time.monotonic(), **row)) + "\n")
+            line = json.dumps(dict(host_time=time.monotonic(), **row)) + "\n"
+            with lock:
+                output.write(line)
 
         record(event="config", format=2, metadata={} if metadata is None else metadata)
         yield record

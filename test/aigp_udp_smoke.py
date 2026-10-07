@@ -200,6 +200,66 @@ class UDPSmokeTest(unittest.TestCase):
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
 
+    def test_receiver_and_heartbeat_continue_during_controller_work(self):
+        server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        server.bind(("127.0.0.1", 0))
+        server.setblocking(False)
+        client = SimulatorClient(port=0, camera_port=None)
+        stop = threading.Event()
+        heartbeats, observed, failures = [], [], []
+        decoder = mavlink.MAVLink(None)
+
+        def serve():
+            sequence = 0
+            try:
+                while not stop.wait(.01):
+                    sock = client._socket
+                    if sock is None:
+                        continue
+                    try:
+                        address = sock.getsockname()
+                    except OSError:
+                        continue
+                    sequence += 1
+                    race = struct.pack("<BQqqIq", 1, sequence * 10, 0, -1, 0, -1).ljust(253, b"\0")
+                    for message in (heartbeat(), mavlink.MAVLink_encapsulated_data_message(0, race), imu(sequence * 10000)):
+                        server.sendto(packet(message), address)
+                    while True:
+                        try:
+                            wire, _ = server.recvfrom(65536)
+                        except BlockingIOError:
+                            break
+                        if any(message.get_type() == "HEARTBEAT" for message in decoder.parse_buffer(wire) or ()):
+                            heartbeats.append(time.monotonic())
+            except BaseException as error:
+                failures.append(error)
+
+        class Controller(BaseController):
+            def update(self, telemetry, frames):
+                current = client.telemetry.get("HIGHRES_IMU")
+                if current is None:
+                    return None
+                if observed:
+                    raise StopIteration
+                begin = time.monotonic()
+                time.sleep(.65)
+                observed.append((begin, time.monotonic(), current.time_usec, client.telemetry["HIGHRES_IMU"].time_usec))
+                return BodyRates()
+
+        worker = threading.Thread(target=serve)
+        worker.start()
+        try:
+            AIGPSimulator(Controller, client=client).rollout(attach=True)
+        finally:
+            stop.set()
+            worker.join(timeout=2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(failures, [])
+        begin, end, before, after = observed[0]
+        self.assertGreater(after, before)
+        self.assertTrue(any(begin < stamp < end for stamp in heartbeats))
+        self.assertFalse(any(thread.name == "aigp-rx" for thread in threading.enumerate()))
+
     def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False, record_frames=None):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
