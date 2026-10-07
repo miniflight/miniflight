@@ -21,6 +21,8 @@ from target.aigp.controllers import Gate
 
 @dataclass(frozen=True)
 class RaceStatus:
+    """Latest native race packet, received independently of sensor packets."""
+
     sim_boot_time_ms: int
     race_start_boot_time_ms: int
     race_finish_time_ns: int
@@ -41,7 +43,9 @@ class SimulatorClient(Target):
     """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets.
 
     mav and target_ids expose the wire; send converts the three flight commands.
-    telemetry retains every accepted MAVLink message, including optional packets.
+    poll receives packets; properties only inspect caches. read waits for a new
+    IMU sample and joins the latest optional samples, each with its own clock.
+    telemetry holds the latest raw packet per message name, not packet history.
     """
 
     commands = frozenset((BodyRates, PositionNed, VelocityNed))
@@ -61,8 +65,13 @@ class SimulatorClient(Target):
 
     @property
     def gates(self):
-        """Cached tuple of all gates, or None. Replaced only by a complete track transfer."""
+        """Cached course geometry; replaced only by a complete usable transfer."""
         return self._track.gates
+
+    @property
+    def gates_received_at(self):
+        """Host monotonic receipt of that complete transfer, or None. Does not poll."""
+        return self._track.received_at
 
     def open(self):
         """Reserve the UDP ports without waiting for or commanding the simulator."""
@@ -155,10 +164,13 @@ class SimulatorClient(Target):
         message._host_received_at = now  # Host metadata; MAVLink fields and packet bytes are unchanged.
         self._telemetry[kind] = message
         if kind == "DATA_TRANSMISSION_HANDSHAKE":
+            # Announcement only: transfer ID, byte count, fragment count.
             self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
-            self._track.receive(message)
-        if kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
+            # Fragment arrival may complete a track; an IMU read never does.
+            self._track.receive(message, now)
+        elif kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
+            # Native boot/start/finish/gate values, not an IMU or host tick.
             race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
             if (self.race_status is not None and race.sim_boot_time_ms < self.race_status.sim_boot_time_ms
                     and not self.race_status.started and not race.started):
@@ -174,10 +186,12 @@ class SimulatorClient(Target):
         self.poll(min(remaining, 0.1))
 
     def read(self, timeout=1.0):
-        """Read one fresh IMU sample plus the latest optional motion, attitude, motors and image.
+        """Read the newest unread IMU plus cached motion, attitude, motors and image.
 
         time and dt are IMU seconds; acceleration is body m/s² and gyro is body rad/s.
-        Each optional sample keeps its own timestamp. Gate geometry is a separate cache.
+        Intermediate IMU samples may be skipped. Optional packets arrive separately
+        and keep their own timestamps; this is not a synchronized physics step.
+        Race status and gate geometry stay in their separate caches.
         """
         deadline = time.monotonic() + timeout
         self.poll()
@@ -248,7 +262,7 @@ class SimulatorClient(Target):
 
 
 class _Track:
-    """Assemble the advertised track before publishing immutable gate geometry."""
+    """Handshake → indexed fragments → complete course; never expire it per tick."""
 
     GATE = struct.Struct("<H9f")
     CHUNK_BYTES = 250  # ENCAPSULATED_DATA minus its type and transfer ID.
@@ -258,6 +272,7 @@ class _Track:
         self.transfer = None
         self.chunks = {}
         self.gates = None
+        self.received_at = None
 
     def start(self, message):
         size, packets = message.size, message.packets
@@ -268,7 +283,7 @@ class _Track:
         if transfer != self.transfer:
             self.transfer, self.chunks = transfer, {}
 
-    def receive(self, message):
+    def receive(self, message, now):
         if self.transfer is None:
             return
         payload = bytes(message.data)
@@ -301,7 +316,7 @@ class _Track:
             offset = Quaternion(*orientation).rotate(Vector3D(0, 0, -height / 2)).v
             center = Ned(*(float(p + d) for p, d in zip(origin, offset)))
             gates.append(Gate(gate_id, center, orientation, width, height, origin=origin))
-        self.gates = tuple(gates)
+        self.gates, self.received_at = tuple(gates), now
 
 
 class _Camera:

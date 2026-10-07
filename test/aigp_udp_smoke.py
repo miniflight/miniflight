@@ -14,6 +14,7 @@ import threading
 import unittest
 import json
 import math
+import time
 from unittest.mock import patch
 
 import cv2
@@ -44,6 +45,66 @@ def imu(stamp=1000000):
 
 
 class UDPSmokeTest(unittest.TestCase):
+    def test_track_arrival_is_independent_of_imu_reads(self):
+        server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        server.bind(("127.0.0.1", 0))
+        client = SimulatorClient(port=0, camera_port=None)
+        self.addCleanup(client.disconnect)
+        client.open()
+        address = client._socket.getsockname()
+
+        def send(message):
+            server.sendto(packet(message), address)
+
+        def announce(transfer, track):
+            send(mavlink.MAVLink_data_transmission_handshake_message(0, len(track), transfer, 0, 1, 253, 1))
+
+        def fragment(transfer, track):
+            payload = (struct.pack("<BH", 2, transfer) + track).ljust(253, b"\0")
+            send(mavlink.MAVLink_encapsulated_data_message(0, payload))
+
+        track = struct.pack("<HH9f", 1, 0, 1, 2, 3, 1, 0, 0, 0, 2, 2)
+        send(heartbeat())
+        announce(7, track)
+        client.poll(.1)
+        self.assertIsNone(client.gates)
+        self.assertIsNone(client.gates_received_at)
+        fragment(7, track)
+        client.poll(.1)
+        gates, received_at = client.gates, client.gates_received_at
+        self.assertEqual(gates[0].origin, (1, 2, 3))
+        self.assertEqual(gates[0].center, (1, 2, 2))
+        self.assertEqual(gates[0].orientation, (1, 0, 0, 0))
+        self.assertLessEqual(received_at, time.monotonic())
+
+        # A missing or arriving IMU changes neither course nor its receipt time.
+        with self.assertRaises(TimeoutError):
+            client.read(.02)
+        send(imu())
+        state = client.read(.1)
+        self.assertIsNone(state.motion)
+        self.assertIs(client.gates, gates)
+        self.assertEqual(client.gates_received_at, received_at)
+
+        # An announcement alone retains the previous complete course.
+        announce(8, track)
+        client.poll(.1)
+        self.assertIs(client.gates, gates)
+        self.assertEqual(client.gates_received_at, received_at)
+        fragment(8, track)
+        client.poll(.1)
+        self.assertEqual(client.gates, gates)
+        self.assertGreater(client.gates_received_at, received_at)
+
+        # Redacted geometry cannot replace the usable course or its timestamp.
+        redacted = struct.pack("<HH9f", 1, 0, *([0] * 9))
+        announce(9, redacted)
+        fragment(9, redacted)
+        retained_at = client.gates_received_at
+        client.poll(.1)
+        self.assertEqual(client.gates, gates)
+        self.assertEqual(client.gates_received_at, retained_at)
+
     def test_shared_runner_with_and_without_pose_telemetry(self):
         for with_pose, invalid_optional in ((True, False), (False, False), (True, True)):
             with self.subTest(with_pose=with_pose, invalid_optional=invalid_optional):

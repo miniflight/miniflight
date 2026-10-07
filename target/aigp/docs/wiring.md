@@ -1,6 +1,8 @@
 # simulator wiring
 
-The entrypoint is [simulator.py](../simulator.py). The [specification](VQ1-Technical-Specification-00.02.pdf),
+The entrypoint is [simulator.py](../simulator.py). [client.py](../client.py) owns
+packet receipt and encoding; [native.py](../native.py) owns the executable.
+The [VQ1 specification](VQ1-Technical-Specification-00.02.pdf),
 sections 3 and 4, defines the physical frames, command messages, timing, and camera
 packet. The [vendor example](reference/PyAIPilotExample-v4/) supplies the race and
 track payloads and the body-rate extension. This note maps those interfaces to the
@@ -55,7 +57,8 @@ client.send(command)
 `poll` keeps one cache of accepted MAVLink packets, annotated with host receipt
 time. `read` builds the observation records directly from those packets.
 
-`read` returns one new `HIGHRES_IMU` sample. `State.time` and `dt` are device
+`read` returns the newest unread `HIGHRES_IMU` sample; intermediate IMU packets
+may be skipped. It does not advance native physics. `State.time` and `dt` are device
 seconds; acceleration and gyro are three body components in m/s² and rad/s.
 The latest motion, attitude, motor report, and frame each retain their own device
 and host receipt timestamps. These samples are not synchronized. At controller
@@ -76,6 +79,57 @@ passed separately from `State`. Type 2 carries track fragments after
 width, height. A complete track replaces the cached tuple. It is not republished
 as a fresh observation on each controller cycle. See [track input](vehicle-api.md#track-input).
 
+The receive path makes these different arrivals explicit:
+
+```text
+DATA_TRANSMISSION_HANDSHAKE       -> _track.start: announce ID, size, fragment count
+ENCAPSULATED_DATA, data[0] == 2    -> _track.receive: assemble, validate, publish gates
+ENCAPSULATED_DATA, data[0] == 1    -> race_status: native start, finish and gate progress
+HIGHRES_IMU / optional telemetry  -> telemetry[message name]: latest independent packet
+Camera UDP fragments             -> _camera.receive: publish only a complete JPEG
+```
+
+An announcement or incomplete transfer leaves the previous gates available.
+Only a complete usable transfer changes `client.gates` and
+`client.gates_received_at` (host monotonic seconds). Both properties inspect the
+cache without receiving packets. The gates do not expire when an IMU sample does.
+`Gate.origin` retains the published NED base; `Gate.orientation` is its normalized
+wxyz quaternion. `Gate.center` is derived from those values and the published height.
+
+| Input | Arrival and availability at `update` |
+| --- | --- |
+| IMU | Required new sample on each call; device `dt` spans the returned samples. |
+| Motion and attitude | Latest separate packet; reused across calls, or `None` if missing, nonfinite or older than the session timeout. |
+| Motors | Latest reported channels and active mask; reused, or `None` if missing or stale. No RPM estimate. |
+| Camera | Latest complete decoded JPEG; reused, or `None` if missing or stale. An incomplete image does not replace it. |
+| Gate geometry | Cached complete course, or `None`; no per-call freshness rule. |
+| Active gate index | Last native race packet; retained through packet gaps after GO. |
+| Command | One return value per update; checked, then armed/sent; no native-step acknowledgement. |
+
+A passive native VQ1 R1 check on 2026-10-07 opened the receiver before launch and
+sent only 2 Hz GCS heartbeats. It used build 3391, executable SHA-256
+`d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9`.
+All gate packets arrived between 9.468855 and 9.478258 host seconds after opening:
+two transfer IDs (0 and 1), each announcing 230 bytes in one fragment, with each
+announcement and fragment duplicated. Each decoded payload contained six gates.
+Native GO was observed at 13.455426 seconds. No further gate packets arrived during
+40 seconds after GO. This run establishes startup delivery, not a guaranteed
+periodic publication rate. Starting the receiver late can miss the course.
+
+The same run received privileged `LOCAL_POSITION_NED`, `ATTITUDE`, and `ODOMETRY`
+as separate packets, beginning around 9.75 seconds. Motion and attitude become
+optional `State` fields; odometry remains raw in `client.telemetry["ODOMETRY"]`,
+including its quaternion, frame IDs and covariance fields. No synthetic pose is
+filled in when a stream is absent. VQ2 [section 9.3](VQ2-Technical-Specification-00.03.pdf)
+blocks these three privileged messages and `GATE_INFO`; VQ1 availability must not
+be assumed for VQ2.
+
+After this refactor, the native `r1_gates` regression completed all six gates,
+checked a 640×360 camera image, and replayed all 1,859 controller updates exactly.
+The UDP regression separately checks announcement without geometry, completion
+without an IMU, repeated reads without a new transfer, replacement receipt time,
+and rejection of redacted geometry without losing the previous course.
+
 | Returned command | Active fields written to the executable | Native responsibility |
 | --- | --- | --- |
 | `PositionNed(n,e,d)` | `SET_POSITION_TARGET_LOCAL_NED`, frame 1, mask `3576`; position metres | Position and lower control loops |
@@ -91,10 +145,13 @@ race time. `COMMAND_LONG` arm/disarm is separate from the setpoint message.
 
 ## the remaining wire interface
 
-`client.telemetry` retains every accepted MAVLink packet by message name, including
+`client.telemetry` retains the latest accepted MAVLink packet per message name, including
 `HEARTBEAT`, `TIMESYNC`, `ODOMETRY`, `COMMAND_ACK`, and `COLLISION`. Their original
 fields remain available even when they are not part of `State`. A packet appears
 only if the executable emits it; the cache does not request extra sensors.
+It is not event history: a later `COLLISION` or `COMMAND_ACK` replaces the previous
+one. Record arrivals through `_receive`, as the optional recording client does,
+when every event matters.
 
 `client.mav` is the same pymavlink encoder/parser used by the adapter.
 `client.target_ids` is the `(system, component)` tuple from the first heartbeat.

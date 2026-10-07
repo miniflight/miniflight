@@ -95,6 +95,13 @@ replacement. Missing or nulled geometry remains unavailable; there is no fallbac
 map. Course data is separate from generic vehicle state and does not expire on an
 IMU timeout.
 
+VQ1 delivers the complete course through a handshake and track fragments during
+startup; it is not a new gate-position packet on each controller call. The same
+tuple may be supplied across many updates. `client.gates_received_at` identifies
+the last complete usable transfer; reading it does not poll. See
+[packet arrival](../docs/wiring.md#observation-to-command) for the native capture
+and the separate sensor, race and course caches.
+
 Start R1 through the simulator so the receiver is listening when track data is
 published. A late attach can miss that transfer and leave the controller waiting
 for geometry without arming.
