@@ -73,7 +73,7 @@ class SimulatorClient(Target):
 
     @property
     def gates(self):
-        """Cached course geometry; replaced only by a complete usable transfer."""
+        """Latest complete native course, including redacted or unusable fields."""
         return self._track.gates
 
     @property
@@ -314,20 +314,14 @@ class _Track:
         data = b"".join(self.chunks[i] for i in range(packets))[:size]
         self.transfer, self.chunks = None, {}
         count, = struct.unpack_from("<H", data)
-        if not 0 < count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
+        if not 0 <= count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
-        gates, usable = [], True
-        for index, row in enumerate(self.GATE.iter_unpack(data[2:])):
+        gates = []
+        for row in self.GATE.iter_unpack(data[2:]):
             gate_id, north, east, down, w, x, y, z, width, height = row
-            if gate_id != index or not all(math.isfinite(value) for value in row[1:]) or width <= 0 or height <= 0:
-                usable = False
-            norm = math.hypot(w, x, y, z)
-            if not 0.99 <= norm <= 1.01:
-                usable = False
             gates.append(Gate(gate_id, Ned(north, east, down), (w, x, y, z), width, height))
         gates = tuple(gates)
-        if usable:
-            self.gates, self.received_at = gates, now
+        self.gates, self.received_at = gates, now
         return gates
 
 

@@ -13,6 +13,7 @@ import tempfile
 import threading
 import unittest
 import json
+import base64
 import math
 import time
 from unittest.mock import patch
@@ -25,11 +26,11 @@ from target.aigp.simulator import AIGPSimulator
 from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.client import RaceStatus
-from target.aigp.controllers.r1_gates import Controller as Gates
+from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
 from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.client import _Camera as Camera
-from target.aigp.experiments.recording import RecordedClient, RecordedController, read_state, recording, replay
+from target.aigp.experiments.recording import RecordedClient, RecordedController, read_frame, recording, replay
 
 
 def packet(message, system=42, component=7):
@@ -152,7 +153,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(client.gates, gates)
         self.assertGreater(client.gates_received_at, received_at)
 
-        # Redacted geometry cannot replace the usable course or its timestamp.
+        # Complete redacted geometry remains visible; usability is controller policy.
         redacted = struct.pack("<HH9f", 1, 0, *([0] * 9))
         announce(9, redacted)
         fragment(9, redacted)
@@ -160,8 +161,9 @@ class UDPSmokeTest(unittest.TestCase):
         arrivals = client.poll(.1)
         self.assertEqual(arrivals[-1].decoded[0].orientation, (0, 0, 0, 0))
         self.assertEqual(arrivals[-1].decoded[0].width, 0)
-        self.assertEqual(client.gates, gates)
-        self.assertEqual(client.gates_received_at, retained_at)
+        self.assertIs(client.gates, arrivals[-1].decoded)
+        self.assertGreater(client.gates_received_at, retained_at)
+        gates, retained_at = client.gates, client.gates_received_at
 
         # Indexed fragments can arrive twice or backwards, with a repeated announcement.
         track = struct.pack("<H", 7) + b"".join(struct.pack("<H9f", i, i, 2, 3, 1, 0, 0, 0, 2, 2) for i in range(7))
@@ -204,7 +206,7 @@ class UDPSmokeTest(unittest.TestCase):
         server.bind(("127.0.0.1", 0))
         server.setblocking(False)
         stop = threading.Event()
-        received, failures, states = [], [], []
+        received, failures, observations = [], [], []
         _, encoded = cv2.imencode(".jpg", np.zeros((12, 16, 3), dtype=np.uint8))
         jpeg = encoded.tobytes()
 
@@ -233,7 +235,7 @@ class UDPSmokeTest(unittest.TestCase):
                     race = struct.pack("<BQqqIq", 1, stamp // 1000, 0, -1, 0, 0).ljust(253, b"\0")
                     server.sendto(packet(mavlink.MAVLink_encapsulated_data_message(0, race)), address)
                     if with_pose:
-                        invalid = invalid_optional and bool(states)
+                        invalid = invalid_optional and bool(observations)
                         pose = mavlink.MAVLink_local_position_ned_message(stamp // 1000, math.nan if invalid else 1, 2, 3, 4, 5, 6)
                         attitude = mavlink.MAVLink_attitude_message(stamp // 1000, math.nan if invalid else .1, .2, .3, 0, 0, 0)
                         motors = mavlink.MAVLink_actuator_output_status_message(stamp, 15, [.1, .2, .3, .4] + [0] * 28)
@@ -263,24 +265,22 @@ class UDPSmokeTest(unittest.TestCase):
                 failures.append(error)
 
         class Controller(BaseController):
-            def update(self, state, gate_index, gates):
-                if not isinstance(state, State) or gate_index != 0 or gates is not None:
-                    raise AssertionError("controller did not receive the observations and active gate index")
-                states.append(state)
-                if wire_io and len(states) == 1:
+            def update(self, telemetry, frames):
+                observations.append((telemetry, frames))
+                if wire_io and len(observations) == 1:
                     assert client.target_ids == (42, 7)
                     client.mav.timesync_send(123456789, 0)
                     client.mav.set_actuator_control_target_send(1234567, 0, *client.target_ids,
                                                                  [.1, .2, .3, .4, 0, 0, 0, 0])
                     client.mav.command_long_send(*client.target_ids, 31000, 0, 0, 0, 0, 0, 0, 0, 0)
-                if len(states) == 5:
+                if len(observations) == 5:
                     if closed_on_exit:
                         client._socket.close()
                         raise StopIteration
                     raise KeyboardInterrupt
                 return command
 
-        controller = Controller()
+        controller = Controller
         if record_frames is None:
             client = SimulatorClient(port=0, camera_port=0)
         else:
@@ -301,54 +301,51 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertFalse(worker.is_alive())
         self.assertEqual(failures, [])
         drain()
-        self.assertEqual(len(states), 5)
+        self.assertEqual(len(observations), 5)
         if record_frames is not None:
             updates = [json.loads(line) for line in trace.read_text().splitlines()
                        if json.loads(line)["event"] == "update"]
-            self.assertEqual(len(updates), len(states))
-            for actual, row in zip(states, updates):
-                restored = read_state(row["state"])
-                self.assertEqual(restored.gyro, actual.gyro)
-                if actual.frame is None:
-                    continue
-                if record_frames:
-                    np.testing.assert_array_equal(restored.frame.bgr, actual.frame.bgr)
-                    self.assertFalse(restored.frame.bgr.flags.writeable)
-                else:
-                    self.assertIsNone(restored.frame)
-                    self.assertEqual(row["frame_info"]["id"], actual.frame.id)
-                    self.assertEqual(row["frame_info"]["shape"], [12, 16, 3])
-                    self.assertNotIn('"png":', json.dumps(row))
-        self.assertEqual(states[0].dt, 0)
-        self.assertTrue(all(s.dt > 0 for s in states[1:]))
-        self.assertTrue(any(s.frame is not None for s in states))
-        self.assertTrue(all(s.frame.bgr.shape == (12, 16, 3) and s.frame.bgr.dtype == np.uint8
-                            and not s.frame.bgr.flags.writeable for s in states if s.frame is not None))
-        self.assertEqual(states[-1].motion is not None, with_pose and not invalid_optional)
-        self.assertEqual(states[-1].attitude is not None, with_pose and not invalid_optional)
-        self.assertEqual(states[-1].motors is not None, with_pose)
-        self.assertEqual(states[-1].acceleration, (1, 2, 3))
-        self.assertEqual(states[-1].gyro, (-4, -5, -6))
-        if with_pose:
-            first = states[0]
-            self.assertEqual(first.motion.position, (1, 2, 3))
-            self.assertEqual(first.motion.velocity, (4, 5, 6))
-            for value, expected in zip((first.attitude.roll, first.attitude.pitch, first.attitude.yaw), (.1, -.2, -.3)):
-                self.assertAlmostEqual(value, expected)
-            self.assertEqual(first.motors.active, 15)
-            self.assertEqual(len(first.motors.outputs), 32)
-            for value, expected in zip(first.motors.outputs[:4], (.1, .2, .3, .4)):
-                self.assertAlmostEqual(value, expected)
-            for sample in (first.motion, first.attitude, first.motors):
-                self.assertAlmostEqual(sample.time, first.time)
-                self.assertLessEqual(sample.received_at, first.received_at)
-            if invalid_optional:
-                self.assertTrue(math.isnan(client.telemetry["LOCAL_POSITION_NED"].x))
-                self.assertTrue(math.isnan(client.telemetry["ATTITUDE"].roll))
-        raw = client.telemetry["HIGHRES_IMU"]
+            self.assertEqual(len(updates), len(observations))
+            for (packets, frames), row in zip(observations, updates):
+                for actual, saved in zip(packets, row["telemetry"]):
+                    self.assertEqual(base64.b64decode(saved["wire"]), bytes(actual.data.get_msgbuf()))
+                    self.assertEqual(saved["received_at"], actual.received_at)
+                for actual, saved in zip(frames, row["frames"]):
+                    restored = read_frame(saved)
+                    self.assertEqual(saved["id"], actual.id)
+                    self.assertEqual(saved["shape"], [12, 16, 3])
+                    if record_frames:
+                        np.testing.assert_array_equal(restored.bgr, actual.bgr)
+                        self.assertFalse(restored.bgr.flags.writeable)
+                    else:
+                        self.assertIsNone(restored)
+                        self.assertNotIn('"png":', json.dumps(saved))
+        frames = [frame for _, frames in observations for frame in frames]
+        self.assertTrue(frames)
+        self.assertEqual(len({frame.id for frame in frames}), len(frames))
+        self.assertTrue(all(frame.bgr.shape == (12, 16, 3) and frame.bgr.dtype == np.uint8
+                            and not frame.bgr.flags.writeable for frame in frames))
+        latest = {}
+        for packets, _ in observations:
+            for arrival in packets:
+                latest[arrival.data.get_type()] = arrival.data
+        self.assertEqual("LOCAL_POSITION_NED" in latest, with_pose)
+        self.assertEqual("ATTITUDE" in latest, with_pose)
+        self.assertEqual("ACTUATOR_OUTPUT_STATUS" in latest, with_pose)
+        raw = latest["HIGHRES_IMU"]
+        self.assertEqual((raw.xacc, raw.yacc, raw.zacc), (1, 2, 3))
+        self.assertEqual((raw.xgyro, raw.ygyro, raw.zgyro), (4, 5, 6))
         self.assertEqual(bytes(raw.get_msgbuf()), packet(imu(raw.time_usec)))
-        self.assertNotIn("_host_received_at", raw.to_dict())
-        self.assertTrue(all(not hasattr(s, "telemetry") and not hasattr(s, "race") for s in states))
+        if with_pose:
+            pose, attitude, motors = (latest[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE", "ACTUATOR_OUTPUT_STATUS"))
+            self.assertEqual(math.isnan(pose.x), invalid_optional)
+            self.assertEqual(math.isnan(attitude.roll), invalid_optional)
+            self.assertEqual((pose.y, pose.z, pose.vx, pose.vy, pose.vz), (2, 3, 4, 5, 6))
+            self.assertAlmostEqual(attitude.pitch, .2)
+            self.assertAlmostEqual(attitude.yaw, .3)
+            self.assertEqual((motors.active, len(motors.actuator)), (15, 32))
+            for value, expected in zip(motors.actuator[:4], (.1, .2, .3, .4)):
+                self.assertAlmostEqual(value, expected)
         rates = [m for m in received if m.get_type() == "SET_ATTITUDE_TARGET"]
         self.assertTrue(all(m.type_mask == 144 and m.target_system == 42 for m in rates))
         if isinstance(command, BodyRates):
@@ -436,7 +433,7 @@ class UDPSmokeTest(unittest.TestCase):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "trace.jsonl"
         with recording(path) as record:
-            controller = RecordedController(Gates(), record)
+            controller = RecordedController(Gates, record)
             client = RecordedClient(record, port=0, camera_port=None)
             children = []
 
@@ -459,12 +456,20 @@ class UDPSmokeTest(unittest.TestCase):
                         AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
                 else:
                     AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
-        self.assertGreater(replay(Gates(), path), 6)
+        self.assertGreater(replay(Gates, path), 6)
         rows = [json.loads(line) for line in path.read_text().splitlines()]
         count = 10 if "--fragmented-track" in fixture_args else 6
-        self.assertTrue(all(len(row["gates"]) == count for row in rows if row["event"] == "update" and row["gates"]))
+        decoder, observed = mavlink.MAVLink(None), SimulatorClient(camera_port=None)
+        tracks = [row["track"] for row in rows if row["event"] == "init" and row["track"]]
+        for row in rows:
+            for saved in row.get("telemetry", ()):
+                message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
+                decoded = observed._receive(message, ("test", 0), saved["received_at"])
+                if isinstance(decoded, tuple) and usable_track(decoded):
+                    tracks.append(decoded)
+        self.assertTrue(tracks)
+        self.assertTrue(all(len(track) == count for track in tracks))
         self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], [True, False])
-        self.assertTrue(any(row["event"] == "update" and row["gates"] for row in rows))
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)

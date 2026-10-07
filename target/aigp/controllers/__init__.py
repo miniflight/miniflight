@@ -1,7 +1,10 @@
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, TYPE_CHECKING
 
-from miniflight import Command, Ned, State
+from miniflight import Command, Frame, Ned
+
+if TYPE_CHECKING:
+    from target.aigp.client import Packet
 
 
 CommandT = TypeVar("CommandT", bound=Command, covariant=True)
@@ -19,18 +22,16 @@ class Gate:
 
 
 class BaseController(Generic[CommandT]):
-    def update(self, state: State, gate_index: int, gates: tuple[Gate, ...] | None) -> CommandT | None:
-        """Return one vehicle command, or None while waiting for required observations.
+    def __init__(self, track: tuple[Gate, ...] | None = None):
+        self.track = track  # Course already received at construction; never required.
 
-        CommandT is the output plane, or a union for a routine that switches planes.
-        The target validates each returned command before it is sent.
+    def update(self, telemetry: tuple["Packet", ...], frames: tuple[Frame, ...]) -> CommandT | None:
+        """Return a command from new arrivals since the previous call.
 
-        state: A fresh IMU sample plus the latest optional observations, each with its
-               own timestamp. Unavailable or stale optional samples are None.
-        gate_index: The zero-based active gate; len(gates) means all gates were passed.
-                    The simulator checks its bounds when track geometry is available.
-        gates: Cached geometry for the whole track, not a per-cycle sensor sample.
-               None until a usable complete transfer arrives. Partial replacements
-               leave the previous track available.
+        telemetry retains ordered MAVLink packets, full fields and source clocks.
+        Packet.decoded exposes native race status or a newly completed course.
+        frames contains newly completed BGR images, each with its own timestamp.
+        Empty tuples mean no new arrivals. The controller owns retained history.
+        Inputs arrive before GO and at finish; the runner gates command sending.
         """
         raise NotImplementedError

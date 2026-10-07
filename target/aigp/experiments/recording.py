@@ -1,80 +1,46 @@
-"""Record controller inputs and outputs; replay them without a simulator."""
+"""Record native arrivals and commands; replay the same controller calls."""
 
 import base64
 from contextlib import contextmanager
-from dataclasses import asdict, replace
+from dataclasses import asdict
 import json
 from pathlib import Path
 import time
 
 import cv2
 import numpy as np
+from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import Attitude, Frame, Motion, MotorOutputs, Ned, State
+from miniflight import Frame, Ned
+from target.aigp.client import Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT, Gate
-from target.aigp.controllers.r1_gates import gate_center
-from target.aigp.simulator import SimulatorClient, TARGETS
+from target.aigp.native import TARGETS
 
 
 def command_data(command):
     return None if command is None else {"kind": type(command).__name__, **asdict(command)}
 
 
-def state_data(state, frames=True):
-    data = asdict(replace(state, frame=None))
-    if frames and state.frame is not None:
-        frame = state.frame
-        if frame.bgr.dtype != np.uint8 or frame.bgr.ndim != 3 or frame.bgr.shape[2] != 3:
-            raise ValueError("recorded frames must be uint8 BGR images")
+def frame_data(frame, pixels=False):
+    data = dict(id=frame.id, time_ns=frame.time_ns, received_at=frame.received_at, shape=frame.bgr.shape)
+    if pixels:
         success, png = cv2.imencode(".png", frame.bgr)
         if not success:
             raise ValueError("could not encode the recorded frame")
-        data["frame"] = dict(id=frame.id, time_ns=frame.time_ns, received_at=frame.received_at,
-                             png=base64.b64encode(png).decode("ascii"))
+        data["png"] = base64.b64encode(png).decode("ascii")
     return data
 
 
-def read_state(data):
-    data = dict(data)
-    data["acceleration"], data["gyro"] = tuple(data["acceleration"]), tuple(data["gyro"])
-    if data["motion"] is not None:
-        motion = dict(data["motion"])
-        motion["position"], motion["velocity"] = Ned(*motion["position"]), Ned(*motion["velocity"])
-        data["motion"] = Motion(**motion)
-    if data["attitude"] is not None:
-        data["attitude"] = Attitude(**data["attitude"])
-    if data["motors"] is not None:
-        motors = dict(data["motors"])
-        motors["outputs"] = tuple(motors["outputs"])
-        data["motors"] = MotorOutputs(**motors)
-    if data["frame"] is not None:
-        frame = dict(data["frame"])
-        png = base64.b64decode(frame.pop("png"), validate=True)
-        bgr = cv2.imdecode(np.frombuffer(png, dtype=np.uint8), cv2.IMREAD_COLOR)
-        if bgr is None:
-            raise ValueError("invalid recorded frame")
-        bgr.flags.writeable = False
-        data["frame"] = Frame(**frame, bgr=bgr)
-    return State(**data)
-
-
-def read_gate(data):
-    data = dict(data)
-    data["orientation"] = tuple(data["orientation"])
-    if "position" not in data:
-        # Snapshot recordings stored a derived center, sometimes also the native base.
-        origin = data.pop("origin", None)
-        center = data.pop("center")
-        offset = gate_center(Gate(data["id"], Ned(0, 0, 0), data["orientation"], data["width"], data["height"]))
-        data["position"] = origin if origin is not None else tuple(c - d for c, d in zip(center, offset))
-    data["position"] = Ned(*data["position"])
-    return Gate(**data)
-
-
-def _json_default(value):
-    if isinstance(value, np.generic):
-        return value.item()
-    raise TypeError(f"cannot record {type(value).__name__}")
+def read_frame(data):
+    """Metadata-only recordings omit pixels; pixel-dependent replay needs PNGs."""
+    if "png" not in data:
+        return None
+    png = base64.b64decode(data["png"], validate=True)
+    bgr = cv2.imdecode(np.frombuffer(png, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise ValueError("invalid recorded frame")
+    bgr.flags.writeable = False
+    return Frame(data["id"], data["time_ns"], data["received_at"], bgr)
 
 
 @contextmanager
@@ -83,19 +49,15 @@ def recording(path, metadata=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", buffering=1) as output:
         def record(**row):
-            output.write(json.dumps(dict(host_time=time.monotonic(), **row),
-                                    default=_json_default, allow_nan=False) + "\n")
+            output.write(json.dumps(dict(host_time=time.monotonic(), **row)) + "\n")
 
-        record(event="config", format=1, metadata={} if metadata is None else metadata)
+        record(event="config", format=2, metadata={} if metadata is None else metadata)
         yield record
 
 
 def _read_header(source):
-    line = next(source, None)
-    if line is None:
-        raise ValueError("empty recording")
-    header = json.loads(line)
-    if not isinstance(header, dict) or header.get("event") != "config" or header.get("format", 0) not in (0, 1):
+    header = json.loads(next(source, "null"))
+    if not isinstance(header, dict) or header.get("event") != "config" or header.get("format", 0) not in (0, 1, 2):
         raise ValueError("unsupported recording format")
     return header
 
@@ -103,26 +65,29 @@ def _read_header(source):
 def read_metadata(path):
     with Path(path).open() as source:
         header = _read_header(source)
-    return header["metadata"] if header.get("format") == 1 else header
+    return header["metadata"] if header.get("format") in (1, 2) else header
 
 
 class RecordedController(BaseController[CommandT]):
-    def __init__(self, controller: BaseController[CommandT], record, frames=True):
-        self.controller, self.record, self.frames = controller, record, frames
+    def __init__(self, create, record, frames=False):
+        self.create, self.record, self.frames = create, record, frames
+        self.controller = None
 
     @property
     def targets(self):
-        return getattr(self.controller, "targets", TARGETS)
+        return getattr(self.create, "targets", TARGETS)
 
-    def update(self, state, gate_index, gates) -> CommandT | None:
-        row = dict(event="update", state=state_data(state, self.frames), gate_index=gate_index,
-                   gates=None if gates is None else [asdict(gate) for gate in gates])
-        if not self.frames and state.frame is not None:
-            frame = state.frame
-            row["frame_info"] = dict(id=frame.id, time_ns=frame.time_ns, received_at=frame.received_at,
-                                     shape=frame.bgr.shape, dtype=frame.bgr.dtype.name)
+    def __call__(self, track=None):
+        self.controller = self.create(track=track)
+        self.record(event="init", track=None if track is None else [asdict(gate) for gate in track])
+        return self
+
+    def update(self, telemetry, frames) -> CommandT | None:
+        row = dict(event="update", telemetry=[dict(received_at=packet.received_at,
+                   wire=base64.b64encode(packet.data.get_msgbuf()).decode("ascii")) for packet in telemetry],
+                   frames=[frame_data(frame, self.frames) for frame in frames])
         try:
-            command = self.controller.update(state, gate_index, gates)
+            command = self.controller.update(telemetry, frames)
         except BaseException as error:
             self.record(**row, error={"type": type(error).__name__, "message": str(error)})
             raise
@@ -151,28 +116,35 @@ class RecordedClient(SimulatorClient):
         return decoded
 
 
-def replay(controller, path):
-    """Return the number of matching updates. The caller supplies a fresh controller."""
-    updates, terminal = 0, False
+def replay(create, path):
+    """Replay native-arrival recordings. Older State snapshots use their old API."""
+    updates, terminal, controller = 0, False, None
+    decoder, client = mavlink.MAVLink(None), SimulatorClient(camera_port=None)
     with Path(path).open() as source:
-        header = _read_header(source)
+        if _read_header(source).get("format") != 2:
+            raise ValueError("snapshot recordings require the previous controller API")
         for line in source:
             row = json.loads(line)
+            if row["event"] == "init":
+                track = row["track"]
+                gates = None if track is None else tuple(Gate(gate["id"], Ned(*gate["position"]), tuple(gate["orientation"]),
+                                                             gate["width"], gate["height"]) for gate in track)
+                controller = create(track=gates)
             if row["event"] != "update":
                 continue
-            if terminal:
-                raise ValueError("recording contains updates after a terminal exception")
-            state = read_state(row["state"])
-            # Older probe traces did not record geometry; their controller did not use it.
-            data = row["gates"] if header.get("format") == 1 else row.get("gates")
-            gates = None if data is None else tuple(read_gate(gate) for gate in data)
+            if terminal or controller is None:
+                raise ValueError("controller updates outside its lifetime")
+            telemetry = []
+            for packet in row["telemetry"]:
+                message, = decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
+                stamp = packet["received_at"]
+                telemetry.append(Packet(message, stamp, client._receive(message, ("replay", 0), stamp)))
+            frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
             try:
-                command = controller.update(state, row["gate_index"], gates)
+                command = controller.update(tuple(telemetry), frames)
             except BaseException as error:
                 terminal = True
                 actual = {"error": {"type": type(error).__name__, "message": str(error)}}
-                if isinstance(row.get("error"), str):
-                    actual = {"error": type(error).__name__}
             else:
                 actual = {"command": command_data(command)}
             expected = {key: row[key] for key in ("command", "error") if key in row}

@@ -33,7 +33,7 @@ def run(name, trace, camera=False, record_frames=False):
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
-        simulator = AIGPSimulator(RecordedController(make(), record, frames=record_frames), "vq1.r1", client=client)
+        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames), "vq1.r1", client=client)
         try:
             result = simulator.rollout()
         finally:
@@ -49,7 +49,7 @@ def run(name, trace, camera=False, record_frames=False):
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
-    updates = replay(make(), trace)
+    updates = replay(make, trace)
     with trace.open() as source:
         rows = [json.loads(line) for line in source]
     if [row["armed"] for row in rows if row["event"] == "arm_request"] != [True, False]:

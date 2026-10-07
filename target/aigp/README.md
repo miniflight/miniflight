@@ -32,8 +32,8 @@ selection, controls position and attitude in Python, and returns `BodyRates`.
 VQ1 then controls angular rates and motors. Both continue until native finish.
 `zero` sends zero thrust; it does not hover.
 
-The simulator calls `controller.update(state, gate_index, gates)` and sends the
-returned command. It owns observations, timing, arming, native start/finish,
+The simulator calls `controller.update(telemetry, frames)` with new native
+arrivals and sends the returned command. It owns timing, arming, native start/finish,
 and cleanup. The controller owns its target choices and control calculations.
 See [the controller interface](controllers/README.md) to add a controller.
 Read [the simulator wiring](docs/wiring.md) for the launch, packet, native control,
@@ -45,11 +45,12 @@ The same arena can be used from Python:
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.controllers.r1_body_rates import Controller
 
-sim = AIGPSimulator(Controller(), "vq1.r1")
+sim = AIGPSimulator(Controller, "vq1.r1")
 result = sim.rollout()
 ```
 
-Create a fresh controller and simulator for each run. Each simulator accepts
+The runner constructs the controller after the heartbeat, passing any received
+course as `track`, or `None`. Each simulator accepts
 one `rollout()` attempt, including attempts that fail or are interrupted.
 
 Runnable examples remain under `examples/aigp/`: `thread_gates` runs the position

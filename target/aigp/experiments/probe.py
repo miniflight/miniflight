@@ -42,17 +42,27 @@ class Probe(BaseController[BodyRates | PositionNed]):
         self.trial = 0
         self.phase = "settle"
         self.started_at = self.steady_at = None
+        self.telemetry = {}
+        self.time = None
+        self.dt = 0
+        self.gyro = (0, 0, 0)
 
-    def update(self, state, gate_index, gates) -> BodyRates | PositionNed | None:
-        stamp, motion, attitude = state.time, state.motion, state.attitude
-        if motion is None or attitude is None:
+    def update(self, telemetry, frames) -> BodyRates | PositionNed | None:
+        for packet in telemetry:
+            self.telemetry[packet.data.get_type()] = packet.data
+        imu, motion, attitude = (self.telemetry.get(kind) for kind in ("HIGHRES_IMU", "LOCAL_POSITION_NED", "ATTITUDE"))
+        if imu is None or motion is None or attitude is None:
             return None
+        stamp = imu.time_usec * 1e-6
+        self.dt = 0 if self.time is None else stamp - self.time
+        self.time, self.gyro = stamp, (-imu.xgyro, -imu.ygyro, -imu.zgyro)
+        position, velocity = (motion.x, motion.y, motion.z), (motion.vx, motion.vy, motion.vz)
         if self.target is None:
-            north, east, down = motion.position
+            north, east, down = position
             self.target = PositionNed(north, east, down - 3)
             self.started_at = stamp
-        distance = math.dist(motion.position, (self.target.north, self.target.east, self.target.down))
-        speed = math.hypot(*motion.velocity)
+        distance = math.dist(position, (self.target.north, self.target.east, self.target.down))
+        speed = math.hypot(*velocity)
         tilt = max(abs(attitude.roll), abs(attitude.pitch))
 
         if self.phase == "pulse":
@@ -71,7 +81,7 @@ class Probe(BaseController[BodyRates | PositionNed]):
 
         if stamp - self.started_at > 20:
             raise TimeoutError("position hold did not settle within 20 simulator seconds")
-        if distance < .15 and speed < .15 and tilt < .04 and math.hypot(*state.gyro) < .03:
+        if distance < .15 and speed < .15 and tilt < .04 and math.hypot(*self.gyro) < .03:
             if self.steady_at is None:
                 self.steady_at = stamp
             if stamp - self.steady_at >= .6:
@@ -92,12 +102,12 @@ class TrackedProbe(BaseController[BodyRates | PositionNed]):
         self.probe, self.record = probe, record
         self.feedback = YawRateFeedback(**(feedback_config or {}))
 
-    def update(self, state, gate_index, gates):
-        requested = self.probe.update(state, gate_index, gates)
+    def update(self, telemetry, frames):
+        requested = self.probe.update(telemetry, frames)
         if self.record is not None:
             self.record(event="requested", command=command_data(requested))
         if isinstance(requested, BodyRates):
-            return replace(requested, yaw_rate=self.feedback.update(requested.yaw_rate, state.gyro[2], state.dt))
+            return replace(requested, yaw_rate=self.feedback.update(requested.yaw_rate, self.probe.gyro[2], self.probe.dt))
         self.feedback.reset()
         return requested
 
@@ -107,7 +117,7 @@ def replay(path):
     probe = Probe([BodyRates(**command) for command in config["commands"]], config["duration"])
     feedback = config.get("yaw_feedback", False)
     controller = TrackedProbe(probe, feedback_config=feedback if isinstance(feedback, dict) else None) if feedback else probe
-    updates = replay_controller(controller, path)
+    updates = replay_controller(lambda track=None: controller, path)
     return {"updates": updates, "completed": probe.phase == "done"}
 
 
@@ -154,7 +164,7 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
         client = DiagnosticClient(record)
         if yaw_feedback:
             controller.record = record
-        sim = AIGPSimulator(RecordedController(controller, record), client=client, hz=hz, timeout=.3)
+        sim = AIGPSimulator(RecordedController(lambda track=None: controller, record), client=client, hz=hz, timeout=.3)
         try:
             sim.rollout()
             if probe.phase != "done":

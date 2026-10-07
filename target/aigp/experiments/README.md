@@ -28,27 +28,15 @@ from target.aigp.simulator import AIGPSimulator
 
 with recording("r1.jsonl", {"target": "vq1.r1"}) as record:
     client = RecordedClient(record, camera_port=None)
-    sim = AIGPSimulator(RecordedController(Controller(), record), client=client)
+    sim = AIGPSimulator(RecordedController(Controller, record), client=client)
     result = sim.rollout()
     record(event="result", race_finished=result is not None and result.finished,
            connection_closed=not client.connected)
 
-updates = replay(Controller(), "r1.jsonl")
+updates = replay(Controller, "r1.jsonl")
 ```
 
 Use a fresh controller for replay. It checks returned commands and exceptions
 against the recorded observations, without connecting to a simulator. A matching
 replay does not prove race completion; the native result records that separately.
 Omit `camera_port=None` to include camera images. Recordings are never overwritten.
-
-## historical probes
-
-`probe_vq1_motor.py` is a historical raw-MAVLink experiment. Its actuator mapping
-has not been validated. It bypasses the shared runner, arms directly, and restores
-idle outputs at the end rather than disarming. It is retained as research material,
-not as a supported flight example or a miniflight control plane.
-
-Use the examples under `examples/aigp/` for the supported runner lifecycle.
-
-`vq1_arm_probe.py` is another historical diagnostic. It uses the removed
-`SimulatorClient._message` method and is retained for reference only.

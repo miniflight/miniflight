@@ -1,6 +1,8 @@
 """Real UDP controller checks on ephemeral ports, without an Unreal process."""
 
 import json
+import base64
+from dataclasses import asdict
 from pathlib import Path
 import socket
 import struct
@@ -14,6 +16,7 @@ from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
 from target.aigp.simulator import AIGPSimulator
+from target.aigp.client import SimulatorClient
 
 
 class ControllerSmokeTest(unittest.TestCase):
@@ -21,7 +24,8 @@ class ControllerSmokeTest(unittest.TestCase):
         for make in (PositionController, RatesController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make)
-                self.assertEqual(len(updates), 1)
+                self.assertTrue(all(row.get("command") is None for row in updates))
+                self.assertEqual(updates[-1]["error"]["type"], "ValueError")
                 self.assertFalse(any(message.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED")
                                      for message in received))
 
@@ -112,7 +116,7 @@ class ControllerSmokeTest(unittest.TestCase):
 
             worker = threading.Thread(target=serve)
             worker.start()
-            simulator = AIGPSimulator(RecordedController(make(), record), startup_timeout=3, client=client)
+            simulator = AIGPSimulator(RecordedController(make, record), startup_timeout=3, client=client)
             try:
                 if replace_geometry:
                     simulator.rollout(attach=True)
@@ -128,8 +132,18 @@ class ControllerSmokeTest(unittest.TestCase):
             drain()
             self.assertIsNone(client._socket)
             self.assertFalse(client.connected)
-        updates = [json.loads(line) for line in path.read_text().splitlines() if json.loads(line)["event"] == "update"]
-        self.assertEqual(replay(make(), path), len(updates))
+        updates, observed, decoder = [], SimulatorClient(camera_port=None), mavlink.MAVLink(None)
+        for line in path.read_text().splitlines():
+            row = json.loads(line)
+            if row["event"] != "update":
+                continue
+            for saved in row["telemetry"]:
+                message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
+                observed._receive(message, ("test", 0), saved["received_at"])
+            row["gates"] = None if observed.gates is None else json.loads(json.dumps([asdict(gate) for gate in observed.gates]))
+            row["gate_index"] = None if observed.race_status is None else observed.race_status.active_gate_index
+            updates.append(row)
+        self.assertEqual(replay(make, path), len(updates))
         return updates, received
 
 

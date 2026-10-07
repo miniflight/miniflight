@@ -5,4 +5,4 @@ from target.aigp.controllers.r1_gates import Controller
 
 
 if __name__ == "__main__":
-    AIGPSimulator(Controller(), "vq1.r1").rollout()
+    AIGPSimulator(Controller, "vq1.r1").rollout()

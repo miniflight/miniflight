@@ -90,102 +90,41 @@ pilot together.
 
 ## observation to command
 
-The controller path is explicit:
+The runner constructs `Controller(track=...)` after the native heartbeat. Track
+is the complete course already received, or `None`; startup never requires it.
 
 ```python
-state = client.read(timeout=...)
-command = controller.update(state, gate_index, gates)
-client.send(command)
+packets = client.poll(timeout=...)
+telemetry = tuple(p for p in packets if not isinstance(p.data, bytes))
+frames = tuple(p.decoded for p in packets if isinstance(p.data, bytes) and p.decoded is not None)
+command = controller.update(telemetry, frames)
 ```
 
-`poll` keeps one cache of accepted MAVLink packets, annotated with host receipt
-time. `read` builds the observation records directly from those packets.
+`telemetry` contains new ordered MAVLink arrivals. `Packet.data` retains every
+native field and flag; `Packet.received_at` is host monotonic receipt time.
+`Packet.decoded` exposes race status (`ENCAPSULATED_DATA` type 1) or a newly
+completed course (handshake plus type-2 indexed fragments). The course is a tuple
+of native `Gate(id, position, orientation, width, height)` records: NED base,
+wxyz quaternion and overall dimensions. Redacted fields remain visible.
 
-`read` returns the newest unread `HIGHRES_IMU` sample; intermediate IMU packets
-may be skipped. It does not advance native physics. `State.time` and `dt` are device
-seconds; acceleration and gyro are three body components in m/s² and rad/s.
-The latest motion, attitude, motor report, and frame each retain their own device
-and host receipt timestamps. These samples are not synchronized. At controller
-update, optional samples older than the session timeout become `None`.
+`frames` contains newly completed JPEGs decoded to readonly BGR images, with
+frame IDs and original device nanosecond timestamps. Empty tuples mean no new
+arrivals. These two ports do not produce synchronized controller steps.
 
-| Wire observation | Controller value |
-| --- | --- |
-| `HIGHRES_IMU` | Body acceleration unchanged; all three gyro signs reversed to FRD |
-| `LOCAL_POSITION_NED` | `Motion(position=Ned(x,y,z), velocity=Ned(vx,vy,vz))`, metres and m/s |
-| `ATTITUDE` | Radians: roll unchanged, pitch and yaw reversed to FRD/NED |
-| `ACTUATOR_OUTPUT_STATUS` | 32 original channel values and uint32 active mask; no RPM conversion |
-| Camera `<IHHIIQ>` + JPEG bytes | Frame ID, chunk index/count, JPEG/payload lengths, device ns; completed readonly BGR image |
+The controller owns retained observations and any coordinate conversion,
+estimation or geometry interpretation. The runner gates commands on native GO,
+valid IMU receipt and native finish. It passes inputs before GO and at finish.
 
-Race packets are `ENCAPSULATED_DATA` type 1, `<BQqqIq>`: type, boot ms, scheduled
-start ms, finish ns, active gate index, last-gate value. The native gate index is
-passed separately from `State`. Type 2 carries track fragments after
-`DATA_TRANSMISSION_HANDSHAKE`; each gate is `<H9f>`: ID, NED base, wxyz orientation,
-width, height. A complete track replaces the cached tuple. It is not republished
-as a fresh observation on each controller cycle. See [track input](vehicle-api.md#track-input).
+A native VQ1 build-3391 capture on 2026-10-07 received course packets around
+9.47 host seconds and GO around 13.46 seconds. No further course packets arrived
+in the following 40 seconds. This establishes startup delivery for that run;
+starting the receiver late can miss the course. The same build publishes
+privileged pose. VQ2 section 9.3 blocks ATTITUDE, LOCAL_POSITION_NED, ODOMETRY
+and GATE_INFO; absent streams are not synthesized.
 
-The receive path makes these different arrivals explicit:
-
-```text
-DATA_TRANSMISSION_HANDSHAKE       -> _track.start: announce ID, size, fragment count
-ENCAPSULATED_DATA, data[0] == 2    -> _track.receive: assemble, validate, publish gates
-ENCAPSULATED_DATA, data[0] == 1    -> race_status: native start, finish and gate progress
-HIGHRES_IMU / optional telemetry  -> telemetry[message name]: latest independent packet
-Camera UDP fragments             -> _camera.receive: publish only a complete JPEG
-```
-
-An announcement or incomplete transfer leaves the previous gates available.
-Only a complete usable transfer changes `client.gates` and
-`client.gates_received_at` (host monotonic seconds). Both properties inspect the
-cache without receiving packets. The gates do not expire when an IMU sample does.
-`Gate.origin` retains the published NED base; `Gate.orientation` is its normalized
-wxyz quaternion. `Gate.center` is derived from those values and the published height.
-
-| Input | Arrival and availability at `update` |
-| --- | --- |
-| IMU | Required new sample on each call; device `dt` spans the returned samples. |
-| Motion and attitude | Latest separate packet; reused across calls, or `None` if missing, nonfinite or older than the session timeout. |
-| Motors | Latest reported channels and active mask; reused, or `None` if missing or stale. No RPM estimate. |
-| Camera | Latest complete decoded JPEG; reused, or `None` if missing or stale. An incomplete image does not replace it. |
-| Gate geometry | Cached complete course, or `None`; no per-call freshness rule. |
-| Active gate index | Last native race packet; retained through packet gaps after GO. |
-| Command | One return value per update; checked, then armed/sent; no native-step acknowledgement. |
-
-A passive native VQ1 R1 check on 2026-10-07 opened the receiver before launch and
-sent only 2 Hz GCS heartbeats. It used build 3391, executable SHA-256
-`d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9`.
-All gate packets arrived between 9.468855 and 9.478258 host seconds after opening:
-two transfer IDs (0 and 1), each announcing 230 bytes in one fragment, with each
-announcement and fragment duplicated. Each decoded payload contained six gates.
-Native GO was observed at 13.455426 seconds. No further gate packets arrived during
-40 seconds after GO. This run establishes startup delivery, not a guaranteed
-periodic publication rate. Starting the receiver late can miss the course.
-
-The same run received privileged `LOCAL_POSITION_NED`, `ATTITUDE`, and `ODOMETRY`
-as separate packets, beginning around 9.75 seconds. Motion and attitude become
-optional `State` fields; odometry remains raw in `client.telemetry["ODOMETRY"]`,
-including its quaternion, frame IDs and covariance fields. No synthetic pose is
-filled in when a stream is absent. VQ2 [section 9.3](VQ2-Technical-Specification-00.03.pdf)
-blocks these three privileged messages and `GATE_INFO`; VQ1 availability must not
-be assumed for VQ2.
-
-After this refactor, the native `r1_gates` regression completed all six gates,
-checked a 640×360 camera image, and replayed all 1,859 controller updates exactly.
-The UDP regression separately checks announcement without geometry, completion
-without an IMU, repeated reads without a new transfer, replacement receipt time,
-and rejection of redacted geometry without losing the previous course.
-
-| Returned command | Active fields written to the executable | Native responsibility |
-| --- | --- | --- |
-| `PositionNed(n,e,d)` | `SET_POSITION_TARGET_LOCAL_NED`, frame 1, mask `3576`; position metres | Position and lower control loops |
-| `VelocityNed(n,e,d)` | Same message/frame, mask `3527`; velocity m/s | Velocity and lower control loops |
-| `BodyRates(r,p,y,thrust)` | `SET_ATTITUDE_TARGET`, mask `144`; negated physical rad/s and thrust 0..1 | Rate feedback and motor output |
-
-A mask bit of 1 ignores its field. The body-rate mask ignores the quaternion
-(bit 7) and selects the vendor's rad/s extension (bit 4). Position and velocity
-ignore acceleration, yaw, and yaw rate. Ignored vectors are zero-filled; a zero
-in an active vector remains a request. The command timestamp is host monotonic
-milliseconds since the connection opened, wrapped to uint32. It is not IMU or
-race time. `COMMAND_LONG` arm/disarm is separate from the setpoint message.
+`SimulatorClient.read()` remains the generic `Vehicle` observation adapter.
+It converts native packets into `State` for that separate API. The BaseController
+runner receives native arrivals directly and does not call it.
 
 ## the remaining wire interface
 

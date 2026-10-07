@@ -2,7 +2,6 @@
 
 import argparse
 from contextlib import ExitStack
-from dataclasses import replace
 import importlib
 import math
 import signal
@@ -23,7 +22,7 @@ FINISH_WAIT_SECONDS = 5.0
 class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
-    def __init__(self, controller: BaseController[Command], target="vq1.r1", hz=50.0,
+    def __init__(self, controller, target="vq1.r1", hz=50.0,
                  timeout=1.0, startup_timeout=120.0, client=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
@@ -33,7 +32,8 @@ class AIGPSimulator:
             raise ValueError(f"unsupported simulator: {target}")
         if target not in getattr(controller, "targets", TARGETS):
             raise ValueError(f"this controller does not support {target}")
-        self.controller = controller
+        self.create_controller = controller
+        self.controller = None
         self.target = target
         self.hz = hz
         self.timeout = timeout
@@ -68,11 +68,14 @@ class AIGPSimulator:
                 if self.client.connected and now >= next_heartbeat:
                     self.client.heartbeat()
                     next_heartbeat = now + 0.5
-                try:
-                    state = self.client.read(timeout=min(self.timeout, 0.1))
-                    last_imu_at = state.received_at
-                except TimeoutError:
-                    state = None
+                packets = self.client.poll(timeout=min(self.timeout, 0.1))
+                imu = self.client.telemetry.get("HIGHRES_IMU")
+                if imu is not None:
+                    last_imu_at = imu._host_received_at
+                if self.controller is None and self.client.connected:
+                    self.controller = self.create_controller(track=self.client.gates)
+                    if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
+                        raise TypeError("create a BaseController that supports the selected target")
                 now = time.monotonic()
                 previous, status = self.status, self.client.race_status
                 if status is not None:
@@ -83,37 +86,33 @@ class AIGPSimulator:
                         raise RuntimeError("race reset during control; start a new run")
                     if status.finished:
                         self.status = status
-                        return status
                     if previous is not None or (status.started and now - status.received_at <= 1.0):
                         self.status = status
-                if process is not None and (exit_code := process.poll()) is not None:
+                if (status is None or not status.finished) and process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
                 if self.status is None:
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
-                    continue
                 # IMU loss ends control permanently; only native finish can end the wait.
-                if finish_deadline is None and now - last_imu_at >= self.timeout:
+                if self.status is not None and not self.status.finished and finish_deadline is None and now - last_imu_at >= self.timeout:
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
-                if finish_deadline is not None and now >= finish_deadline:
+                if finish_deadline is not None and now >= finish_deadline and not self.status.finished:
                     raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {status}")
-                if finish_deadline is not None or state is None:
+                if self.controller is None or (finish_deadline is not None and not self.status.finished):
                     continue
-
-                gates, index = self.client.gates, self.status.active_gate_index
-                if index < 0 or (gates is not None and index > len(gates)):
-                    raise ValueError(f"gate index {index} does not belong to the published track")
-                for name in ("motion", "attitude", "motors", "frame"):
-                    sample = getattr(state, name)
-                    if sample is not None and now - sample.received_at > self.timeout:
-                        state = replace(state, **{name: None})
                 try:
-                    command = self.controller.update(state, index, gates)
+                    command = self.controller.update(
+                        tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
+                        tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None))
                 except StopIteration:
-                    return None
+                    return self.status if self.status is not None and self.status.finished else None
                 now = time.monotonic()
-                if now - state.received_at > self.timeout:
+                if self.status is not None and self.status.finished:
+                    return self.status
+                if self.status is None:
+                    continue
+                if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if command is None:
                     if self.armed:
@@ -175,8 +174,8 @@ def main(argv=None):
     signal.signal(signal.SIGHUP, stop)
     try:
         if args.controller:
-            controller = importlib.import_module(f"target.aigp.controllers.{args.controller}").Controller()
-            if not isinstance(controller, BaseController):
+            controller = importlib.import_module(f"target.aigp.controllers.{args.controller}").Controller
+            if not issubclass(controller, BaseController):
                 parser.error("Controller must inherit BaseController")
             sim = AIGPSimulator(controller, args.target or "vq1.r1", hz, startup_timeout=startup_timeout)
             sim.rollout(attach=args.attach, simulator_args=simulator_args)
