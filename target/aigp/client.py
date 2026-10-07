@@ -39,6 +39,14 @@ class RaceStatus:
         return self.race_finish_time_ns >= 0
 
 
+@dataclass(frozen=True)
+class Packet:
+    """One received MAVLink message or camera datagram; no field or clock conversion."""
+
+    data: mavlink.MAVLink_message | bytes
+    received_at: float  # host monotonic receipt; device timestamps remain in data
+
+
 class SimulatorClient(Target):
     """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets.
 
@@ -121,9 +129,10 @@ class SimulatorClient(Target):
             raise RuntimeError("client is not connected")
         return self._socket.sendto(packet, self._peer)
 
-    def poll(self, timeout=0.0):
+    def poll(self, timeout=0.0) -> tuple[Packet, ...]:
         if self._socket is None:
             raise RuntimeError("client is not connected")
+        arrivals = []
         sockets = [s for s in (self._socket, self._vision) if s is not None]
         # Bound each drain so continuous traffic cannot starve the controller.
         for _ in range(128):
@@ -135,12 +144,17 @@ class SimulatorClient(Target):
                 packet, peer = sock.recvfrom(65536)
                 now = time.monotonic()
                 if sock is self._vision:
+                    arrivals.append(Packet(packet, now))
                     self._camera.receive(packet, now)
                     continue
                 if self._peer is not None and peer != self._peer:
                     continue
                 for message in self.mav.parse_buffer(packet) or ():
                     self._receive(message, peer, now)
+                    if (peer == self._peer and message.get_type() != "BAD_DATA"
+                            and message.get_srcSystem() == self.target_ids[0]):
+                        arrivals.append(Packet(message, now))
+        return tuple(arrivals)
 
     def _receive(self, message, peer, now):
         kind = message.get_type()

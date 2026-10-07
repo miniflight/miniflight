@@ -45,6 +45,45 @@ def imu(stamp=1000000):
 
 
 class UDPSmokeTest(unittest.TestCase):
+    def test_poll_preserves_native_packets_and_receipt_times(self):
+        server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        server.bind(("127.0.0.1", 0))
+        client = SimulatorClient(port=0, camera_port=0)
+        self.addCleanup(client.disconnect)
+        client.open()
+        address, camera_address = client._socket.getsockname(), client._vision.getsockname()
+        invalid = imu(1000002)
+        invalid.xacc = math.nan
+        course = struct.pack("<HH9f", 1, 0, 1, 2, 3, 1, 0, 0, 0, 2, 2)
+        messages = (
+            heartbeat(),
+            mavlink.MAVLink_data_transmission_handshake_message(0, len(course), 7, 0, 1, 253, 1),
+            mavlink.MAVLink_encapsulated_data_message(0, (struct.pack("<BH", 2, 7) + course).ljust(253, b"\0")),
+            imu(1000001), imu(1000001), imu(1000000), invalid,
+        )
+        packets = [packet(message) for message in messages]
+        for data in packets:
+            server.sendto(data, address)
+        arrivals = client.poll(.1)
+        self.assertEqual([bytes(item.data.get_msgbuf()) for item in arrivals], packets)
+        self.assertEqual([item.data.time_usec for item in arrivals[3:]], [1000001, 1000001, 1000000, 1000002])
+        self.assertTrue(math.isnan(arrivals[-1].data.xacc))
+        self.assertTrue(all(item.received_at <= time.monotonic() for item in arrivals))
+        self.assertEqual(client.telemetry["HIGHRES_IMU"].time_usec, 1000001)
+        self.assertEqual(struct.unpack_from("<H9f", bytes(arrivals[2].data.data), 5)[1:4], (1, 2, 3))
+        self.assertEqual(client.poll(), ())
+
+        # Incomplete, repeated and old camera packets remain visible byte for byte.
+        camera_packets = [Camera.HEADER.pack(8, 1, 2, 400, 200, stamp) + b"x" * 200
+                          for stamp in (123456789, 123456789, 123456788)]
+        for data in camera_packets:
+            server.sendto(data, camera_address)
+        camera_arrivals = client.poll(.1)
+        self.assertEqual([item.data for item in camera_arrivals], camera_packets)
+        self.assertTrue(all(item.received_at >= arrivals[-1].received_at for item in camera_arrivals))
+        self.assertIsNone(client._camera.latest)
+        self.assertEqual(client.poll(), ())
+
     def test_track_arrival_is_independent_of_imu_reads(self):
         server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         server.bind(("127.0.0.1", 0))
