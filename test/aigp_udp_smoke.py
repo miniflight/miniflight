@@ -200,6 +200,9 @@ class UDPSmokeTest(unittest.TestCase):
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
 
+    def test_race_reset_is_not_hidden_by_the_next_packet(self):
+        self.round_trip(False, reset_in_batch=True)
+
     def test_receiver_and_heartbeat_continue_during_controller_work(self):
         server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         server.bind(("127.0.0.1", 0))
@@ -260,7 +263,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(any(begin < stamp < end for stamp in heartbeats))
         self.assertFalse(any(thread.name == "aigp-rx" for thread in threading.enumerate()))
 
-    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False, record_frames=None):
+    def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False, record_frames=None, reset_in_batch=False):
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -293,7 +296,11 @@ class UDPSmokeTest(unittest.TestCase):
                     stamp = 1000000 + sequence * 5000
                     server.sendto(packet(heartbeat()), address)
                     race = struct.pack("<BQqqIq", 1, stamp // 1000, 0, -1, 0, 0).ljust(253, b"\0")
-                    server.sendto(packet(mavlink.MAVLink_encapsulated_data_message(0, race)), address)
+                    wire = packet(mavlink.MAVLink_encapsulated_data_message(0, race))
+                    if reset_in_batch and observations:
+                        reset = struct.pack("<BQqqIq", 1, 0, 0, -1, 0, 0).ljust(253, b"\0")
+                        wire = packet(mavlink.MAVLink_encapsulated_data_message(0, reset)) + wire
+                    server.sendto(wire, address)
                     if with_pose:
                         invalid = invalid_optional and bool(observations)
                         pose = mavlink.MAVLink_local_position_ned_message(stamp // 1000, math.nan if invalid else 1, 2, 3, 4, 5, 6)
@@ -352,7 +359,8 @@ class UDPSmokeTest(unittest.TestCase):
         worker = threading.Thread(target=serve)
         worker.start()
         try:
-            with self.assertRaises(OSError if closed_on_exit else KeyboardInterrupt):
+            expected = RuntimeError if reset_in_batch else OSError if closed_on_exit else KeyboardInterrupt
+            with self.assertRaises(expected):
                 AIGPSimulator(controller, client=client).rollout(attach=True)
         finally:
             stop.set()
@@ -361,6 +369,12 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertFalse(worker.is_alive())
         self.assertEqual(failures, [])
         drain()
+        if reset_in_batch:
+            self.assertLess(len(observations), 5)
+            self.assertIsNone(client._socket)
+            arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"]
+            self.assertEqual(arms, [1, 0])
+            return
         self.assertEqual(len(observations), 5)
         if record_frames is not None:
             updates = [json.loads(line) for line in trace.read_text().splitlines()

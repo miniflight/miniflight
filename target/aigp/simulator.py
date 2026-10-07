@@ -61,7 +61,7 @@ class AIGPSimulator:
                 try:
                     while not stopped.is_set():
                         packets = self.client.poll(timeout=min(self.timeout, 0.1))
-                        arrivals.put((packets, self.client.race_status, self.client.telemetry.get("HIGHRES_IMU")))
+                        arrivals.put(packets)
                         now = time.monotonic()
                         if self.client.connected and now >= heartbeat_at:
                             with self._send_lock:
@@ -82,7 +82,7 @@ class AIGPSimulator:
             period = 1.0 / self.hz
             next_tick = now - period
             last_imu_at = now
-            status = imu = None
+            status = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
             while True:
@@ -99,25 +99,25 @@ class AIGPSimulator:
                         break
                     if isinstance(arrival, BaseException):
                         raise arrival
-                    batch, status, imu = arrival
-                    packets.extend(batch)
-                if imu is not None:
-                    last_imu_at = imu._host_received_at
+                    packets.extend(arrival)
                 if self.controller is None and self.client.connected:
                     self.controller = self.create_controller(track=self.client.gates)
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
                 now = time.monotonic()
-                previous = self.status
-                if status is not None:
+                for packet in packets:
+                    if (not isinstance(packet.data, bytes) and packet.data.get_type() == "HIGHRES_IMU"
+                            and getattr(packet.data, "_host_received_at", None) == packet.received_at):
+                        last_imu_at = packet.received_at  # Accepted IMU; duplicates and invalid samples still reach the controller.
+                    if not isinstance(packet.decoded, RaceStatus):
+                        continue
+                    previous, status = self.status, packet.decoded
                     if previous is not None and (
                             status.race_start_boot_time_ms != previous.race_start_boot_time_ms
                             or status.sim_boot_time_ms < previous.sim_boot_time_ms
                             or status.active_gate_index < previous.active_gate_index):
                         raise RuntimeError("race reset during control; start a new run")
-                    if status.finished:
-                        self.status = status
-                    if previous is not None or (status.started and now - status.received_at <= 1.0):
+                    if status.finished or previous is not None or (status.started and now - status.received_at <= 1.0):
                         self.status = status
                 if (status is None or not status.finished) and process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
