@@ -222,7 +222,8 @@ behavioral checks across that boundary.
 
 The session has three phases: `startup` waits for native GO; `control` reads,
 updates, and sends; `finish` receives after stopping actuation on an IMU outage.
-One deadline bounds startup and the later five-second finish window. Control
+`startup_deadline` bounds GO and required inputs before the first command;
+`finish_deadline` starts only on IMU loss and bounds the five-second finish wait. Control
 runs only in `control`; recovering IMU during `finish` does not rearm the vehicle.
 A controller can wait for required observations before its first command.
 The first valid command is checked before arming. Native finish terminates the

@@ -350,6 +350,13 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(result["disarmed_before_finish"])
         self.assertEqual(result["imu_after_last_gate"], 0)
 
+    def test_recovered_imu_does_not_resume_control_during_finish_wait(self):
+        result = self.owned_session("--finish-without-imu", "--delayed-finish", "--recover-imu")
+        self.assertTrue(result["finish_sent"])
+        self.assertTrue(result["disarmed_before_finish"])
+        self.assertGreater(result["recovered_imu"], 0)
+        self.assertEqual(result["positions_after_disarm"], 0)
+
     def owned_session(self, *fixture_args, expect_timeout=False):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
         directory = self.enterContext(tempfile.TemporaryDirectory())

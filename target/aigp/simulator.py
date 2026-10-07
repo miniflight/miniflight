@@ -53,7 +53,8 @@ class AIGPSimulator:
                 try:
                     now = time.monotonic()
                     next_tick = next_heartbeat = last_imu_at = now
-                    deadline = now + self.startup_timeout
+                    startup_deadline = now + self.startup_timeout
+                    finish_deadline = None
                     phase = "startup"
                     while True:
                         now = time.monotonic()
@@ -78,20 +79,22 @@ class AIGPSimulator:
                                 return status
                             if phase == "startup" and status.started and now - status.received_at <= 1.0:
                                 phase = "control"
-                                previous = None
-                                print("race: running", flush=True)
-                            if phase != "startup" and (previous is None or status.active_gate_index != previous.active_gate_index):
+                                print(f"race: running; gate_index={status.active_gate_index}", flush=True)
+                            elif phase != "startup" and status.active_gate_index != previous.active_gate_index:
                                 print(f"race: gate_index={status.active_gate_index}", flush=True)
                             self.status = status
                         if process is not None and (exit_code := process.poll()) is not None:
                             raise RuntimeError(f"simulator exited with status {exit_code}")
-                        if phase != "control" and now >= deadline:
-                            raise TimeoutError("race never reported GO before the startup deadline" if phase == "startup" else
-                                               f"timed out waiting for fresh IMU telemetry; "
-                                               f"no native finish within {FINISH_WAIT_SECONDS:g}s; last race: {status}")
-                        if phase == "control" and now - last_imu_at >= self.timeout:
+                        if phase == "startup":
+                            if now >= startup_deadline:
+                                raise TimeoutError("race never reported GO before the startup deadline")
+                        elif phase == "finish":
+                            if now >= finish_deadline:
+                                raise TimeoutError(f"timed out waiting for fresh IMU telemetry; "
+                                                   f"no native finish within {FINISH_WAIT_SECONDS:g}s; last race: {status}")
+                        elif phase == "control" and now - last_imu_at >= self.timeout:
                             self.stop()
-                            phase, deadline = "finish", now + FINISH_WAIT_SECONDS
+                            phase, finish_deadline = "finish", now + FINISH_WAIT_SECONDS
                             print("controller: IMU lost; waiting for native finish", flush=True)
                         elif phase == "control" and state is not None:
                             gates = self.client.gates
@@ -110,11 +113,12 @@ class AIGPSimulator:
                             now = time.monotonic()
                             if now - state.received_at > self.timeout:
                                 raise TimeoutError("controller returned a command for stale IMU telemetry")
-                            if command is None and self.armed:
-                                raise ValueError("controller returned no command after starting")
-                            if command is None and now >= deadline:
-                                raise TimeoutError("controller did not receive its required startup telemetry")
-                            if command is not None:
+                            if command is None:
+                                if self.armed:
+                                    raise ValueError("controller returned no command after starting")
+                                if now >= startup_deadline:
+                                    raise TimeoutError("controller did not receive its required startup telemetry")
+                            else:
                                 if type(command) not in self.client.commands:
                                     raise TypeError("expected BodyRates, PositionNed or VelocityNed")
                                 if not self.armed:

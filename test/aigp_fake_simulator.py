@@ -17,6 +17,7 @@ GATES = tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6))
 def main():
     peer = ("127.0.0.1", int(sys.argv[1]))
     finish_without_imu = "--finish-without-imu" in sys.argv[2:]
+    recover_imu = "--recover-imu" in sys.argv[2:]
     no_finish = "--no-finish" in sys.argv[2:]
     race_gap = "--race-gap" in sys.argv[2:]
     track_after_go = "--track-after-go" in sys.argv[2:]
@@ -26,7 +27,8 @@ def main():
     result = {"too_soon": [], "gates": [], "arms": [], "positions": 0,
               "position_masks": [], "stopped_by_parent": False,
               "track_sent": False, "finish_sent": False, "imu_after_last_gate": 0,
-              "disarmed_before_finish": False, "race_packets_skipped": 0, "track_replaced": False}
+              "disarmed_before_finish": False, "race_packets_skipped": 0, "track_replaced": False,
+              "recovered_imu": 0, "positions_after_disarm": 0}
 
     def stop(signum, frame):
         result["stopped_by_parent"] = True
@@ -77,6 +79,7 @@ def main():
                     elif kind == "SET_POSITION_TARGET_LOCAL_NED":
                         target = (message.x, message.y, message.z)
                         result["positions"] += 1
+                        result["positions_after_disarm"] += int(result["disarmed_before_finish"])
                         if message.type_mask not in result["position_masks"]:
                             result["position_masks"].append(message.type_mask)
                         if start < 0 or boot < start:
@@ -124,8 +127,10 @@ def main():
                 result["race_packets_skipped"] += 1
             else:
                 send(mavlink.MAVLink_encapsulated_data_message(0, data))
-            if not at_end or not finish_without_imu:
+            recovering = recover_imu and result["disarmed_before_finish"]
+            if not at_end or not finish_without_imu or recovering:
                 result["imu_after_last_gate"] += int(at_end)
+                result["recovered_imu"] += int(recovering)
                 send(mavlink.MAVLink_local_position_ned_message(boot, *position, 0, 0, 0))
                 send(mavlink.MAVLink_highres_imu_message(
                     count * 5000, 0, 0, -9.81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xffff,
