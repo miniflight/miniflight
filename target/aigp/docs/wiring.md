@@ -32,6 +32,14 @@ Lua drives level and race setup. The executable publishes the scheduled start,
 current boot time, gate progress, and finish. Python waits for the native GO packet;
 `physics_ready` alone does not start the controller.
 
+Build/course selection is separate from official event selection. Both Lua
+launchers call `ServerForceStartRaceWithoutRaceVerification` directly; neither
+selects the native Training or Qualification event block. The runner therefore
+labels owned runs as direct arena races. Attached runs have an unverified external
+event context. The race packet contains no event ID or training/qualification
+field, so its GO and finish cannot establish that context. VQ2 section 9.2
+requires selecting the corresponding event block in the native interface.
+
 ## the two UDP connections
 
 | Connection | Simulator endpoint | Python endpoint | Data |

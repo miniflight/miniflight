@@ -98,10 +98,11 @@ def wine_commands():
 
 @contextmanager
 def launch(target, simulator_args=(), attach=False):
-    """Own one Wine prefix and process group, or leave an attached process alone."""
+    """Start a direct arena race; official training/qualification is not selected."""
     if target not in TARGETS:
         raise ValueError(f"unsupported simulator: {target}")
     if attach:
+        print("event: external; training/qualification is unverified", flush=True)
         yield None
         return
     # Refuse an existing simulator before touching its Wine prefix.
@@ -112,7 +113,7 @@ def launch(target, simulator_args=(), attach=False):
             except OSError as error:
                 raise OSError(f"UDP {port} is in use; stop the existing simulator first") from error
     wine, server = wine_commands()
-    version, mode, level = TARGETS[target]
+    version, round_name, level = TARGETS[target]
     prefix = BASE / ".runtime" / f"{version}-wine"
     prefix.mkdir(parents=True, exist_ok=True)
     with (prefix / ".runner.lock").open("a") as lock:
@@ -123,7 +124,7 @@ def launch(target, simulator_args=(), attach=False):
         sim = prepare(version, BASE)
         env = dict(os.environ, WINEPREFIX=str(prefix), WINEDLLOVERRIDES="dwmapi=n,b;winegstreamer=")
         if version == "vq2":
-            env["MINIFLIGHT_VQ2_MODE"] = mode
+            env["MINIFLIGHT_VQ2_MODE"] = round_name  # r1/r2 course, not a flight mode.
         if sys.platform == "darwin":
             env["WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER"] = "1"
         command = [wine, str(sim / SHIPPING), f"/Game/levelsMaster/{level}?game=/Script/DCGame.GameModeRaceBase",
@@ -137,7 +138,7 @@ def launch(target, simulator_args=(), attach=False):
         process = None
         try:
             stop_wine()
-            print(f"{target}: starting", flush=True)
+            print(f"{target}: starting direct arena; no training/qualification event selected", flush=True)
             process = subprocess.Popen(command, cwd=sim, env=env, start_new_session=True)
             yield process
         finally:

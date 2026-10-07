@@ -145,7 +145,7 @@ def main(argv=None):
     names = sorted(p.stem for p in (BASE / "controllers").glob("*.py")
                    if not p.name.startswith("_"))
     parser = argparse.ArgumentParser(prog="simulator.py", allow_abbrev=False,
-                                     description="Run an AI-GP simulator and a Python controller.")
+                                     description="Run a direct AI-GP arena; training/qualification selection is not implemented.")
     operation = parser.add_mutually_exclusive_group(required=True)
     operation.add_argument("target", nargs="?", choices=(*TARGETS, "vq1"))
     parser.add_argument("--controller", choices=names)

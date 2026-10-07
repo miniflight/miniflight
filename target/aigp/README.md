@@ -21,6 +21,11 @@ python simulator.py vq2.r1 --controller zero
 python simulator.py vq2.r2 --controller zero
 ```
 
+These targets select the simulator build and course. The runner starts a direct
+native arena race; it does not select the official Training or Qualification
+event blocks. `--attach` uses an externally started race and does not verify its
+event mode. A native finish proves race completion, not qualification validity.
+
 Both R1 controllers aim through the same six gates. `r1_gates` returns
 `PositionNed` and lets VQ1 control position. `r1_body_rates` uses the same gate
 selection, controls position and attitude in Python, and returns `BodyRates`.
