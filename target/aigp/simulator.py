@@ -123,16 +123,17 @@ class AIGPSimulator:
                                             or status.sim_boot_time_ms < previous.sim_boot_time_ms
                                             or status.active_gate_index < previous.active_gate_index):
                                 raise RuntimeError("race reset during control; start a new run")
-                            self.status = status
                             if status.finished:
+                                self.status = status
                                 print("race: finished", flush=True)
                                 return status
-                            previous_phase = phase
                             if phase == "startup" and status.started and now - status.received_at <= 1.0:
                                 phase = "control"
+                                previous = None
                                 print("race: running", flush=True)
-                            if phase != "startup" and (previous_phase == "startup" or status.active_gate_index != previous.active_gate_index):
+                            if phase != "startup" and (previous is None or status.active_gate_index != previous.active_gate_index):
                                 print(f"race: gate_index={status.active_gate_index}", flush=True)
+                            self.status = status
                         if process is not None and (exit_code := process.poll()) is not None:
                             raise RuntimeError(f"simulator exited with status {exit_code}")
                         if phase != "control" and now >= deadline:
@@ -149,11 +150,10 @@ class AIGPSimulator:
                             if index < 0 or (gates is not None and index > len(gates)):
                                 raise ValueError(f"gate index {index} does not belong to the published track")
 
-                            def fresh(sample):
-                                return sample if sample is not None and now - sample.received_at <= self.timeout else None
-
-                            state = replace(state, motion=fresh(state.motion), attitude=fresh(state.attitude),
-                                            motors=fresh(state.motors), frame=fresh(state.frame))
+                            for name in ("motion", "attitude", "motors", "frame"):
+                                sample = getattr(state, name)
+                                if sample is not None and now - sample.received_at > self.timeout:
+                                    state = replace(state, **{name: None})
                             try:
                                 command = self.controller.update(state, index, gates)
                             except StopIteration:
@@ -161,12 +161,11 @@ class AIGPSimulator:
                             now = time.monotonic()
                             if now - state.received_at > self.timeout:
                                 raise TimeoutError("controller returned a command for stale IMU telemetry")
-                            if command is None:
-                                if self.armed:
-                                    raise ValueError("controller returned no command after starting")
-                                if now >= deadline:
-                                    raise TimeoutError("controller did not receive its required startup telemetry")
-                            else:
+                            if command is None and self.armed:
+                                raise ValueError("controller returned no command after starting")
+                            if command is None and now >= deadline:
+                                raise TimeoutError("controller did not receive its required startup telemetry")
+                            if command is not None:
                                 if type(command) not in self.client.commands:
                                     raise TypeError("expected BodyRates, PositionNed or VelocityNed")
                                 if not self.armed:
