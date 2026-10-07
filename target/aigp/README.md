@@ -1,7 +1,9 @@
 # aigp
 
-A simulator arena for Python controllers. `simulator.py` is the implementation
-entrypoint; controller code lives in `controllers/`.
+A simulator arena for Python controllers. `simulator.py` is the controller loop
+and command-line entrypoint. `client.py` receives packets and encodes commands;
+`native.py` installs and owns the native process. Controller code lives in
+`controllers/`.
 
 Use Python 3.11 or newer and install dependencies once from the repository root:
 

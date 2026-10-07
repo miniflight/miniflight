@@ -20,12 +20,13 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from target.aigp.simulator import AIGPSimulator, _stop_process
+from target.aigp.simulator import AIGPSimulator
+from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as Gates
 from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
-from target.aigp.simulator import _Camera as Camera
+from target.aigp.client import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, read_state, recording, replay
 
 

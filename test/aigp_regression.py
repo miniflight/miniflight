@@ -25,6 +25,7 @@ def run(name, trace, camera=False, record_frames=False):
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
+               "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/experiments/recording.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera, recorded_frames=record_frames,
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),

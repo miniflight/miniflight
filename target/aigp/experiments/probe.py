@@ -141,7 +141,8 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
                         for key in ("gain", "max_correction", "max_rate", "settle_time", "step_threshold")}
                        if yaw_feedback else None)
     root = BASE.parents[1]
-    sources = ("target/aigp/simulator.py", "target/aigp/experiments/recording.py", "miniflight/vehicle.py",
+    sources = ("target/aigp/simulator.py", "target/aigp/client.py", "target/aigp/native.py",
+               "target/aigp/experiments/recording.py", "miniflight/vehicle.py",
                "miniflight/control.py", "miniflight/state.py", "target/aigp/experiments/probe.py",
                "target/aigp/experiments/yaw_tracking.py", "examples/aigp/probe_body_rates.py")
     metadata = dict(target="vq1.r1", hz=hz, timeout=.3, duration=duration, yaw_feedback=feedback_config,
