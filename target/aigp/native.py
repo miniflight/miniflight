@@ -68,6 +68,9 @@ def prepare(version, base=BASE):
         destination = sim / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(base / "config" / version / name, destination)
+        if name == "main.lua":
+            with destination.open("a") as script:
+                script.write("\n" + (base / "config/race.lua").read_text())
     return sim
 
 
@@ -97,7 +100,7 @@ def wine_commands():
 
 
 @contextmanager
-def launch(target, simulator_args=(), attach=False):
+def launch(target, simulator_args=(), attach=False, race_status_path=None):
     """Start a direct arena race; official training/qualification is not selected."""
     if target not in TARGETS:
         raise ValueError(f"unsupported simulator: {target}")
@@ -122,7 +125,10 @@ def launch(target, simulator_args=(), attach=False):
         except BlockingIOError:
             raise RuntimeError(f"{version} is already running") from None
         sim = prepare(version, BASE)
+        race_status_path = sim / "race-status.jsonl" if race_status_path is None else Path(race_status_path)
+        race_status_path.write_text("")  # A previous process cannot authorize this race.
         env = dict(os.environ, WINEPREFIX=str(prefix), WINEDLLOVERRIDES="dwmapi=n,b;winegstreamer=")
+        env["MINIFLIGHT_RACE_STATUS_FILE"] = "Z:" + str(race_status_path.resolve())
         if version == "vq2":
             env["MINIFLIGHT_VQ2_MODE"] = round_name  # r1/r2 course, not a flight mode.
         if sys.platform == "darwin":
