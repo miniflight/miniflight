@@ -15,9 +15,9 @@ CONFIG = PositionConfig(hover_thrust=.266, thrust_acceleration=53.5)
 class Controller(BaseController[BodyRates]):
     targets = ("vq1.r1",)
 
-    def __init__(self, track=None, config: PositionConfig = CONFIG):
+    def __init__(self, config: PositionConfig = CONFIG):
         self.config = config
-        self.course = GatePlanner(track)
+        self.course = GatePlanner()
         self.target_position = None
         self.target_yaw = None
 

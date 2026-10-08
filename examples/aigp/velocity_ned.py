@@ -8,7 +8,7 @@ from target.aigp.simulator import AIGPSimulator
 class Controller(BaseController[VelocityNed]):
     targets = ("vq1.r1",)
 
-    def __init__(self, track=None):
+    def __init__(self):
         self.started_at = None
         self.imu = None
 

@@ -12,9 +12,9 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import Frame, Ned
+from miniflight import Frame
 from target.aigp.client import Packet, SimulatorClient
-from target.aigp.controllers import BaseController, CommandT, Gate
+from target.aigp.controllers import BaseController, CommandT
 from target.aigp.native import TARGETS
 
 
@@ -81,9 +81,9 @@ class RecordedController(BaseController[CommandT]):
     def targets(self):
         return getattr(self.create, "targets", TARGETS)
 
-    def __call__(self, track=None):
-        self.controller = self.create(track=track)
-        self.record(event="init", track=None if track is None else [asdict(gate) for gate in track])
+    def __call__(self):
+        self.controller = self.create()
+        self.record(event="init")
         return self
 
     def update(self, telemetry, frames) -> CommandT | None:
@@ -130,10 +130,7 @@ def replay(create, path):
         for line in source:
             row = json.loads(line)
             if row["event"] == "init":
-                track = row["track"]
-                gates = None if track is None else tuple(Gate(gate["id"], Ned(*gate["position"]), tuple(gate["orientation"]),
-                                                             gate["width"], gate["height"]) for gate in track)
-                controller = create(track=gates)
+                controller = create()
             if row["event"] != "update":
                 continue
             if terminal or controller is None:

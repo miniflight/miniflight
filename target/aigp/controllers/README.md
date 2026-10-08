@@ -12,8 +12,7 @@ class Controller(BaseController[BodyRates]):
 ```
 
 Run from `target/aigp`: `python simulator.py vq1.r1 --controller mine`.
-The runner constructs the controller after the native heartbeat. Its constructor
-receives `track=None` or the course already received. Do not wait for geometry.
+The runner constructs `Controller()` after the native heartbeat.
 
 `telemetry` is an ordered tuple of new `Packet` arrivals from UDP 14550.
 `packet.data` is the original pymavlink message, with full fields, flags and

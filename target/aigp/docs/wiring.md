@@ -90,8 +90,7 @@ pilot together.
 
 ## observation to command
 
-The runner constructs `Controller(track=...)` after the native heartbeat. Track
-is the complete course already received, or `None`; startup never requires it.
+The runner constructs `Controller()` after the native heartbeat.
 
 ```python
 packets = client.poll(timeout=...)

@@ -101,7 +101,7 @@ class AIGPSimulator:
                         raise arrival
                     packets.extend(arrival)
                 if self.controller is None and self.client.connected:
-                    self.controller = self.create_controller(track=self.client.gates)
+                    self.controller = self.create_controller()
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
                 now = time.monotonic()

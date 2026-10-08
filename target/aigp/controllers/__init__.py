@@ -22,9 +22,6 @@ class Gate:
 
 
 class BaseController(Generic[CommandT]):
-    def __init__(self, track: tuple[Gate, ...] | None = None):
-        self.track = track  # Course already received at construction; never required.
-
     def update(self, telemetry: tuple["Packet", ...], frames: tuple[Frame, ...]) -> CommandT | None:
         """Return a command from new arrivals since the previous call.
 

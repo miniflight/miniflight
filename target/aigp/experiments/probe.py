@@ -117,7 +117,7 @@ def replay(path):
     probe = Probe([BodyRates(**command) for command in config["commands"]], config["duration"])
     feedback = config.get("yaw_feedback", False)
     controller = TrackedProbe(probe, feedback_config=feedback if isinstance(feedback, dict) else None) if feedback else probe
-    updates = replay_controller(lambda track=None: controller, path)
+    updates = replay_controller(lambda: controller, path)
     return {"updates": updates, "completed": probe.phase == "done"}
 
 
@@ -164,7 +164,7 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
         client = DiagnosticClient(record)
         if yaw_feedback:
             controller.record = record
-        sim = AIGPSimulator(RecordedController(lambda track=None: controller, record), client=client, hz=hz, timeout=.3)
+        sim = AIGPSimulator(RecordedController(lambda: controller, record), client=client, hz=hz, timeout=.3)
         try:
             sim.rollout()
             if probe.phase != "done":

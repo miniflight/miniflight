@@ -33,8 +33,8 @@ def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
 class Controller(BaseController[PositionNed]):
     targets = ("vq1.r1",)
 
-    def __init__(self, track=None):
-        super().__init__(track)
+    def __init__(self):
+        self.track = None
         self.telemetry = {}
         self.race = None
         self.gate = None

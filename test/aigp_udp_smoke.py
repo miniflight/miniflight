@@ -534,7 +534,7 @@ class UDPSmokeTest(unittest.TestCase):
         rows = [json.loads(line) for line in path.read_text().splitlines()]
         count = 10 if "--fragmented-track" in fixture_args else 6
         decoder, observed = mavlink.MAVLink(None), SimulatorClient(camera_port=None)
-        tracks = [row["track"] for row in rows if row["event"] == "init" and row["track"]]
+        tracks = []
         for row in rows:
             for saved in row.get("telemetry", ()):
                 message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))

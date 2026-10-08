@@ -49,9 +49,9 @@ sim = AIGPSimulator(Controller, "vq1.r1")
 result = sim.rollout()
 ```
 
-The runner constructs the controller after the heartbeat, passing any received
-course as `track`, or `None`. Each simulator accepts
-one `rollout()` attempt, including attempts that fail or are interrupted.
+The runner constructs `Controller()` after the heartbeat. Courses arrive through
+`update()`. Each simulator accepts one `rollout()` attempt, including attempts
+that fail or are interrupted.
 
 Runnable examples remain under `examples/aigp/`: `thread_gates` runs the position
 baseline and `velocity_ned` sends a short velocity request. The body-rate
