@@ -1,17 +1,17 @@
-import time
-
+"""Print one native position packet from an already-running simulator."""
+from target.aigp.controllers import BaseController
 from target.aigp.client import SimulatorClient
+from target.aigp.simulator import AIGPSimulator
 
 
-client = SimulatorClient(camera_port=None)
-try:
-    client.open()
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline:
-        for packet in client.poll(.1):
+class Observe(BaseController):
+    def update(self, telemetry, frames, race_state):
+        for packet in telemetry:
             if packet.data.get_type() == "LOCAL_POSITION_NED":
                 print(packet.data)
-                raise SystemExit
-    raise TimeoutError("no native position received")
-finally:
-    client.disconnect()
+                raise StopIteration
+        return None
+
+
+if __name__ == "__main__":
+    AIGPSimulator(Observe, client=SimulatorClient(camera_port=None)).rollout(attach=True)
