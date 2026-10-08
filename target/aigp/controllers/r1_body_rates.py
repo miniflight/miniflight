@@ -21,8 +21,8 @@ class Controller(BaseController[BodyRates]):
         self.target_position = None
         self.target_yaw = None
 
-    def update(self, telemetry, frames) -> BodyRates | None:
-        target = self.course.update(telemetry, frames)
+    def update(self, telemetry, frames, race_state) -> BodyRates | None:
+        target = self.course.update(telemetry, frames, race_state)
         attitude = self.course.telemetry.get("ATTITUDE")
         imu = self.course.telemetry.get("HIGHRES_IMU")
         if target is None or attitude is None or imu.received_at - attitude.received_at > 1:

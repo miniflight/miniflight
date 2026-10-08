@@ -2,6 +2,7 @@
 
 import json
 import math
+from pathlib import Path
 import signal
 import socket
 import struct
@@ -14,6 +15,12 @@ from pymavlink.dialects.v20 import common as mavlink
 GATES = tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6))
 
 
+def write_race(stream, started=True, valid=True, completed=False, time_seconds=0.0, active_gate_index=0):
+    stream.write(json.dumps(dict(started=started, valid=valid, completed=completed, time_seconds=time_seconds,
+                                active_gate_index=active_gate_index, finish_time_seconds=1.0 if completed else -1.0)) + "\n")
+    stream.flush()
+
+
 def main():
     peer = ("127.0.0.1", int(sys.argv[1]))
     finish_without_imu = "--finish-without-imu" in sys.argv[2:]
@@ -23,6 +30,8 @@ def main():
     track_after_go = "--track-after-go" in sys.argv[2:]
     delayed_finish = "--delayed-finish" in sys.argv[2:]
     fragmented_track = "--fragmented-track" in sys.argv[2:]
+    native_start = 1100 if "--slow-countdown" in sys.argv else 500
+    native_path = Path(sys.argv[sys.argv.index("--native-race") + 1])
     gates = GATES + tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6, 10)) if fragmented_track else GATES
     result = {"too_soon": [], "gates": [], "arms": [], "positions": 0,
               "position_masks": [], "stopped_by_parent": False,
@@ -34,7 +43,7 @@ def main():
         result["stopped_by_parent"] = True
 
     signal.signal(signal.SIGTERM, stop)
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock, native_path.open("w") as native:
         sock.bind(("127.0.0.1", 0))
         sock.setblocking(False)
         decoder = mavlink.MAVLink(None)
@@ -74,7 +83,7 @@ def main():
                             result["disarmed_before_finish"] = True
                         if armed and not result["track_sent"]:
                             result["too_soon"].append("arm_without_track")
-                        if armed and (start < 0 or boot < start):
+                        if armed and (start < 0 or boot < native_start):
                             result["too_soon"].append("arm")
                     elif kind == "SET_POSITION_TARGET_LOCAL_NED":
                         target = (message.x, message.y, message.z)
@@ -82,7 +91,7 @@ def main():
                         result["positions_after_disarm"] += int(result["disarmed_before_finish"])
                         if message.type_mask not in result["position_masks"]:
                             result["position_masks"].append(message.type_mask)
-                        if start < 0 or boot < start:
+                        if start < 0 or boot < native_start:
                             result["too_soon"].append("position")
 
         while not result["stopped_by_parent"] and time.monotonic() - started < 12:
@@ -122,6 +131,10 @@ def main():
             finish_ready = at_end and (not delayed_finish or now - ended_at >= 2.5)
             finish = 1000000000 if finish_ready and not no_finish else -1
             result["finish_sent"] |= finish >= 0
+            valid = not ("--invalid-race" in sys.argv and boot >= 800
+                         or "--invalid-finish" in sys.argv and finish >= 0)
+            if "--no-native-race" not in sys.argv and not ("--stale-native-race" in sys.argv and boot > 650):
+                write_race(native, boot >= native_start, valid, finish >= 0, (boot - native_start) / 1000, index)
             data = struct.pack("<BQqqIq", 1, boot, start, finish, index, 0).ljust(253, b"\0")
             if race_gap and gap_started is not None and now - gap_started < 3:
                 result["race_packets_skipped"] += 1

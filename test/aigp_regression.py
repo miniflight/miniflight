@@ -26,7 +26,8 @@ def run(name, trace, camera=False, record_frames=False):
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
-               "target/aigp/client.py", "target/aigp/native.py",
+               "target/aigp/client.py", "target/aigp/native.py", "target/aigp/race.py",
+               "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera, recorded_frames=record_frames,
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
@@ -34,15 +35,16 @@ def run(name, trace, camera=False, record_frames=False):
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
-        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames), "vq1.r1", client=client)
+        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames), "vq1.r1", client=client,
+                                  race_status_path=trace.with_suffix(".native.jsonl"))
         try:
             result = simulator.rollout()
         finally:
             record(event="result", connection_closed=not client.connected,
-                   race=None if result is None else asdict(result),
+                   race=None if simulator.status is None else asdict(simulator.status),
                    executable_sha256=sha256(BASE / ".runtime/vq1" / SHIPPING))
 
-    if result is None or not result.started or not result.finished or result.active_gate_index != 6:
+    if result is None or not result.started or not result.valid or not result.completed or result.active_gate_index != 6:
         raise AssertionError("native R1 did not finish all six gates")
     if client.connected or client.gates is None or len(client.gates) != 6:
         raise AssertionError("native R1 did not expose six gates and close its connection")

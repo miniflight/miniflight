@@ -9,9 +9,10 @@ if race_path then
             local state = valid(player) and player.PlayerState or nil
             if valid(game) and valid(state) then
                 output:write(string.format(
-                    '{"started":%s,"valid":%s,"completed":%s,"time_seconds":%.9f}\n',
+                    '{"started":%s,"valid":%s,"completed":%s,"time_seconds":%.9f,"active_gate_index":%d,"finish_time_seconds":%.9f}\n',
                     tostring(game:HasRaceStarted()), tostring(state:IsRaceValid()),
-                    tostring(state.bRaceCompleted), game:GetRaceTime()))
+                    tostring(state.bRaceCompleted), game:GetRaceTime(),
+                    state.ActiveGateSequentialId, state:GetCompletedRaceTotalTime()))
                 output:flush()
             end
             ExecuteWithDelay(50, observe_race)

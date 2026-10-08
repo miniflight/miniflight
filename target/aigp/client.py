@@ -17,8 +17,8 @@ from target.aigp.controllers import Gate
 
 
 @dataclass(frozen=True)
-class RaceStatus:
-    """Latest native race packet, received independently of sensor packets."""
+class RaceTelemetry:
+    """Decoded MAVLink race fields; no inferred game state."""
 
     sim_boot_time_ms: int
     race_start_boot_time_ms: int
@@ -26,14 +26,6 @@ class RaceStatus:
     active_gate_index: int
     last_gate_race_time: int  # unchanged wire value
     received_at: float = 0.0  # host monotonic seconds
-
-    @property
-    def started(self):
-        return self.race_start_boot_time_ms >= 0 and self.sim_boot_time_ms >= self.race_start_boot_time_ms
-
-    @property
-    def finished(self):
-        return self.race_finish_time_ns >= 0
 
 
 @dataclass(frozen=True)
@@ -50,7 +42,7 @@ class Packet:
 
     data: mavlink.MAVLink_message | bytes
     received_at: float  # host monotonic receipt; device timestamps remain in data
-    decoded: RaceStatus | TrackInfo | Frame | None = None
+    decoded: RaceTelemetry | TrackInfo | Frame | None = None
 
     @property
     def privileged(self) -> bool:
@@ -74,7 +66,7 @@ class SimulatorClient:
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
-        self.race_status: RaceStatus | None = None  # Latest packet, independent of the IMU.
+        self.race_telemetry: RaceTelemetry | None = None
 
     @property
     def connected(self):
@@ -97,7 +89,7 @@ class SimulatorClient:
         self._telemetry.clear()
         self._camera = _Camera()
         self._track = _Track()
-        self.race_status = None
+        self.race_telemetry = None
         self._boot = time.monotonic()
         self.mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
         self.mav.robust_parsing = True
@@ -193,12 +185,11 @@ class SimulatorClient:
             return self._track.receive(message, now)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             # Native boot/start/finish/gate values, not an IMU or host tick.
-            race = RaceStatus(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
-            if (self.race_status is not None and race.sim_boot_time_ms < self.race_status.sim_boot_time_ms
-                    and not self.race_status.started and not race.started):
-                # The native sensor clock can restart before GO.
+            race = RaceTelemetry(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
+            if self.race_telemetry is not None and race.sim_boot_time_ms < self.race_telemetry.sim_boot_time_ms:
+                # A restarted source clock cannot inherit the previous IMU watermark.
                 self._telemetry.pop("HIGHRES_IMU", None)
-            self.race_status = race
+            self.race_telemetry = race
             return race
 
     def _wait(self, deadline, description):

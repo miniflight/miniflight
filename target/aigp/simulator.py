@@ -13,7 +13,8 @@ import time
 
 from miniflight import BodyRates, Command
 from target.aigp.controllers import BaseController
-from target.aigp.client import RaceStatus, SimulatorClient
+from target.aigp.client import SimulatorClient
+from target.aigp.race import RaceStateReader
 from target.aigp.native import (BASE, BINARIES, SHIPPING, TARGETS, VERSIONS,
                                launch, prepare, sha256)
 
@@ -25,7 +26,7 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
@@ -42,6 +43,7 @@ class AIGPSimulator:
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
         self.status = None
+        self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
         self.armed = False
         self._send_lock = Lock()  # One MAVLink encoder serves control and heartbeat.
         self._used = False
@@ -54,14 +56,19 @@ class AIGPSimulator:
         with ExitStack() as cleanup:
             cleanup.callback(self.client.disconnect)
             self.client.open()
-            process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach))
-            arrivals, stopped = Queue(), Event()
+            process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
+                                                   race_status_path=self.race_status_path))
+            race_reader = RaceStateReader(self.race_status_path, self.timeout)
+            cleanup.callback(race_reader.close)
+            arrivals, race_arrivals, stopped = Queue(), Queue(), Event()
             def receive():
                 heartbeat_at = 0.0
                 try:
                     while not stopped.is_set():
                         packets = self.client.poll(timeout=min(self.timeout, 0.1))
                         arrivals.put(packets)
+                        for state in race_reader.poll():
+                            race_arrivals.put(state)
                         now = time.monotonic()
                         if self.client.connected and now >= heartbeat_at:
                             with self._send_lock:
@@ -69,6 +76,7 @@ class AIGPSimulator:
                             heartbeat_at = now + 0.5
                 except BaseException as error:
                     arrivals.put(error)
+                    race_arrivals.put(error)
             receiver = Thread(target=receive, name="aigp-rx")
             def stop_receiver():
                 stopped.set()
@@ -82,7 +90,6 @@ class AIGPSimulator:
             period = 1.0 / self.hz
             next_tick = now - period
             last_imu_at = now
-            status = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
             while True:
@@ -105,46 +112,39 @@ class AIGPSimulator:
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
                 now = time.monotonic()
+                self.read_race(race_arrivals)
                 for packet in packets:
                     if (not isinstance(packet.data, bytes) and packet.data.get_type() == "HIGHRES_IMU"
                             and getattr(packet.data, "_host_received_at", None) == packet.received_at):
                         last_imu_at = packet.received_at  # Accepted IMU; duplicates and invalid samples still reach the controller.
-                    if not isinstance(packet.decoded, RaceStatus):
-                        continue
-                    previous, status = self.status, packet.decoded
-                    if previous is not None and (
-                            status.race_start_boot_time_ms != previous.race_start_boot_time_ms
-                            or status.sim_boot_time_ms < previous.sim_boot_time_ms
-                            or status.active_gate_index < previous.active_gate_index):
-                        raise RuntimeError("race reset during control; start a new run")
-                    if status.finished or previous is not None or (status.started and now - status.received_at <= 1.0):
-                        self.status = status
-                if (status is None or not status.finished) and process is not None and (exit_code := process.poll()) is not None:
+                if (self.status is None or not self.status.completed) and process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
-                if self.status is None:
+                if self.status is None or not self.status.started:
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
                 # IMU loss ends control permanently; only native finish can end the wait.
-                if self.status is not None and not self.status.finished and finish_deadline is None and now - last_imu_at >= self.timeout:
+                if (self.status is not None and self.status.started and not self.status.completed
+                        and finish_deadline is None and now - last_imu_at >= self.timeout):
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
-                if finish_deadline is not None and now >= finish_deadline and not self.status.finished:
-                    raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {status}")
-                if self.controller is None or (finish_deadline is not None and not self.status.finished):
+                if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
+                    raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {self.status}")
+                if self.controller is None or (finish_deadline is not None and not self.status.completed):
                     continue
                 try:
                     command = self.controller.update(
                         tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
-                        tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None))
+                        tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None),
+                        self.status)
                 except StopIteration:
-                    return self.status if self.status is not None and self.status.finished else None
+                    self.read_race(race_arrivals)
+                    return self.status if self.status is not None and self.status.completed else None
                 now = time.monotonic()
-                if self.status is not None and self.status.finished:
+                self.read_race(race_arrivals)  # A slow controller cannot hide a new invalidation.
+                if self.status is not None and self.status.completed:
                     return self.status
-                if self.status is None:
+                if self.status is None or not self.status.started:
                     continue
-                if self.client.race_status.finished:
-                    continue  # Deliver the queued finish packet before accepting another command.
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if command is None:
@@ -160,6 +160,20 @@ class AIGPSimulator:
                         self.armed = True
                         self.client.arm()
                     self.client.send(command)
+
+    def read_race(self, arrivals):
+        while not arrivals.empty():
+            state = arrivals.get_nowait()
+            if isinstance(state, BaseException):
+                raise state
+            previous, self.status = self.status, state
+            if not state.valid:
+                raise RuntimeError(f"native race is invalid: {state}")
+            if previous is not None and previous.started and (not state.started or state.active_gate_index < previous.active_gate_index):
+                raise RuntimeError("native race reset during control")
+        if (self.status is not None and self.status.started
+                and time.monotonic() - self.status.received_at > self.timeout):
+            raise TimeoutError("native race state is stale")
 
     def stop(self):
         if not self.armed:

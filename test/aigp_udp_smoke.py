@@ -25,12 +25,14 @@ from pymavlink.dialects.v20 import common as mavlink
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
-from target.aigp.client import RaceStatus, TrackInfo
+from target.aigp.client import RaceTelemetry, TrackInfo
 from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
 from miniflight import BodyRates, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.client import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, read_frame, recording, replay
+from test.aigp_fake_simulator import write_race
+from target.aigp.race import RaceStateReader
 
 
 def packet(message, system=42, component=7):
@@ -47,6 +49,23 @@ def imu(stamp=1000000):
 
 
 class UDPSmokeTest(unittest.TestCase):
+    def test_native_state_waits_for_a_complete_record_and_rejects_untyped_flags(self):
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        path = Path(directory) / "native.jsonl"
+        output = self.enterContext(path.open("w"))
+        reader = RaceStateReader(path)
+        self.addCleanup(reader.close)
+        output.write('{"started":true')
+        output.flush()
+        self.assertEqual(reader.poll(), ())
+        output.write(',"valid":true,"completed":false,"time_seconds":0,"active_gate_index":0,"finish_time_seconds":-1}\n')
+        output.flush()
+        self.assertTrue(reader.poll()[0].started)
+        self.assertEqual(reader.poll(), ())
+        write_race(output, valid=1)
+        with self.assertRaisesRegex(ValueError, "flags must be booleans"):
+            reader.poll()
+
     def test_poll_preserves_native_packets_and_receipt_times(self):
         server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         server.bind(("127.0.0.1", 0))
@@ -94,7 +113,7 @@ class UDPSmokeTest(unittest.TestCase):
         camera = Camera.HEADER.pack(9, 0, 1, len(jpeg), len(jpeg), 123456900) + jpeg.tobytes()
         server.sendto(camera, camera_address)
         arrivals = client.poll(.1)
-        status = next(item.decoded for item in arrivals if isinstance(item.decoded, RaceStatus))
+        status = next(item.decoded for item in arrivals if isinstance(item.decoded, RaceTelemetry))
         self.assertEqual((status.sim_boot_time_ms, status.active_gate_index), (5000, 2))
         frame_packet = next(item for item in arrivals if isinstance(item.data, bytes))
         self.assertFalse(any(item.privileged for item in arrivals))
@@ -205,6 +224,9 @@ class UDPSmokeTest(unittest.TestCase):
         self.round_trip(False, reset_in_batch=True)
 
     def test_receiver_and_heartbeat_continue_during_controller_work(self):
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        native_path = Path(directory) / "native.jsonl"
+        native = self.enterContext(native_path.open("w"))
         server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         server.bind(("127.0.0.1", 0))
         server.setblocking(False)
@@ -225,6 +247,7 @@ class UDPSmokeTest(unittest.TestCase):
                     except OSError:
                         continue
                     sequence += 1
+                    write_race(native)
                     race = struct.pack("<BQqqIq", 1, sequence * 10, 0, -1, 0, -1).ljust(253, b"\0")
                     for message in (heartbeat(), mavlink.MAVLink_encapsulated_data_message(0, race), imu(sequence * 10000)):
                         server.sendto(packet(message), address)
@@ -239,7 +262,7 @@ class UDPSmokeTest(unittest.TestCase):
                 failures.append(error)
 
         class Controller(BaseController):
-            def update(self, telemetry, frames):
+            def update(self, telemetry, frames, race_state):
                 current = client.telemetry.get("HIGHRES_IMU")
                 if current is None:
                     return None
@@ -253,7 +276,7 @@ class UDPSmokeTest(unittest.TestCase):
         worker = threading.Thread(target=serve)
         worker.start()
         try:
-            AIGPSimulator(Controller, client=client).rollout(attach=True)
+            AIGPSimulator(Controller, client=client, race_status_path=native_path).rollout(attach=True)
         finally:
             stop.set()
             worker.join(timeout=2)
@@ -265,6 +288,9 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertFalse(any(thread.name == "aigp-rx" for thread in threading.enumerate()))
 
     def round_trip(self, with_pose, command=BodyRates(.1, -.2, .3, .4), invalid_optional=False, closed_on_exit=False, wire_io=False, record_frames=None, reset_in_batch=False):
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        native_path = Path(directory) / "native.jsonl"
+        native = self.enterContext(native_path.open("w"))
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.addCleanup(server.close)
         server.bind(("127.0.0.1", 0))
@@ -294,6 +320,9 @@ class UDPSmokeTest(unittest.TestCase):
                     except OSError:  # the runner has just closed its sockets
                         continue
                     sequence += 1
+                    if reset_in_batch and observations:
+                        write_race(native, started=False)
+                    write_race(native)
                     stamp = 1000000 + sequence * 5000
                     server.sendto(packet(heartbeat()), address)
                     race = struct.pack("<BQqqIq", 1, stamp // 1000, 0, -1, 0, 0).ljust(253, b"\0")
@@ -333,7 +362,7 @@ class UDPSmokeTest(unittest.TestCase):
                 failures.append(error)
 
         class Controller(BaseController):
-            def update(self, telemetry, frames):
+            def update(self, telemetry, frames, race_state):
                 observations.append((telemetry, frames))
                 if wire_io and len(observations) == 1:
                     assert client.target_ids == (42, 7)
@@ -362,7 +391,7 @@ class UDPSmokeTest(unittest.TestCase):
         try:
             expected = RuntimeError if reset_in_batch else OSError if closed_on_exit else KeyboardInterrupt
             with self.assertRaises(expected):
-                AIGPSimulator(controller, client=client).rollout(attach=True)
+                AIGPSimulator(controller, client=client, race_status_path=native_path).rollout(attach=True)
         finally:
             stop.set()
             worker.join(timeout=2)
@@ -506,21 +535,36 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertGreater(result["recovered_imu"], 0)
         self.assertEqual(result["positions_after_disarm"], 0)
 
-    def owned_session(self, *fixture_args, expect_timeout=False):
+    def test_clock_prediction_cannot_start_a_slow_countdown(self):
+        self.owned_session("--slow-countdown")
+
+    def test_native_invalid_race_and_invalid_finish_are_rejected(self):
+        for fault in ("--invalid-race", "--invalid-finish"):
+            with self.subTest(fault=fault):
+                self.owned_session(fault, expect_error=(RuntimeError, "native race is invalid"))
+
+    def test_missing_or_stale_native_state_cannot_authorize_control(self):
+        for fault, message in (("--no-native-race", "never reported GO"), ("--stale-native-race", "native race state is stale")):
+            with self.subTest(fault=fault):
+                self.owned_session(fault, expect_error=(TimeoutError, message))
+
+    def owned_session(self, *fixture_args, expect_timeout=False, expect_error=None):
         # Real child-process ownership and UDP; the child is a test fixture, not Unreal.
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "trace.jsonl"
+        native_path = Path(directory) / "native.jsonl"
         with recording(path) as record:
             controller = RecordedController(Gates, record)
             client = RecordedClient(record, port=0, camera_port=None)
             children = []
 
             @contextmanager
-            def launch(target, simulator_args=(), attach=False):
+            def launch(target, simulator_args=(), attach=False, race_status_path=None):
                 self.assertFalse(attach)
                 self.assertEqual(target, "vq1.r1")
                 port = client._socket.getsockname()[1]
-                child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port), *fixture_args],
+                child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port),
+                                          "--native-race", str(race_status_path), *fixture_args],
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
                 children.append(child)
                 try:
@@ -529,11 +573,16 @@ class UDPSmokeTest(unittest.TestCase):
                     _stop_process(child)
 
             with patch("target.aigp.simulator.launch", side_effect=launch):
-                if expect_timeout:
-                    with self.assertRaisesRegex(TimeoutError, "fresh IMU.*race_finish_time_ns=-1.*active_gate_index=6"):
-                        AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
+                simulator = AIGPSimulator(controller, "vq1.r1", startup_timeout=1.5 if expect_error else 8,
+                                          client=client, race_status_path=native_path)
+                if expect_error:
+                    with self.assertRaisesRegex(*expect_error):
+                        simulator.rollout()
+                elif expect_timeout:
+                    with self.assertRaisesRegex(TimeoutError, "fresh IMU.*completed=False.*active_gate_index=6"):
+                        simulator.rollout()
                 else:
-                    AIGPSimulator(controller, "vq1.r1", startup_timeout=8, client=client).rollout()
+                    simulator.rollout()
         self.assertGreater(replay(Gates, path), 6)
         rows = [json.loads(line) for line in path.read_text().splitlines()]
         count = 10 if "--fragmented-track" in fixture_args else 6
@@ -547,16 +596,18 @@ class UDPSmokeTest(unittest.TestCase):
                     tracks.append(decoded.gates)
         self.assertTrue(tracks)
         self.assertTrue(all(len(track) == count for track in tracks))
-        self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], [True, False])
+        arms = [] if "--no-native-race" in fixture_args else [True, False]
+        self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], arms)
         child, = children
         output, error = child.communicate(timeout=2)
         self.assertEqual(child.returncode, 0, error)
         result = json.loads(output)
         self.assertEqual(result["too_soon"], [])
-        self.assertEqual(result["gates"], list(range(1, count + 1)))
-        self.assertEqual(result["arms"], [1, 0])
-        self.assertGreater(result["positions"], 6)
-        self.assertEqual(result["position_masks"], [3576])
+        if expect_error is None:
+            self.assertEqual(result["gates"], list(range(1, count + 1)))
+            self.assertGreater(result["positions"], 6)
+        self.assertEqual(result["arms"], [int(arm) for arm in arms])
+        self.assertEqual(result["position_masks"], [3576] if arms else [])
         self.assertTrue(result["stopped_by_parent"])
         self.assertIsNone(client._socket)
         self.assertFalse(client.connected)

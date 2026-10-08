@@ -47,11 +47,11 @@ class Probe(BaseController[BodyRates | PositionNed]):
         self.dt = 0
         self.gyro = (0, 0, 0)
 
-    def update(self, telemetry, frames) -> BodyRates | PositionNed | None:
+    def update(self, telemetry, frames, race_state) -> BodyRates | PositionNed | None:
         for packet in telemetry:
             self.telemetry[packet.data.get_type()] = packet.data
         imu, motion, attitude = (self.telemetry.get(kind) for kind in ("HIGHRES_IMU", "LOCAL_POSITION_NED", "ATTITUDE"))
-        if imu is None or motion is None or attitude is None:
+        if imu is None or motion is None or attitude is None or race_state is None or not race_state.started:
             return None
         stamp = imu.time_usec * 1e-6
         self.dt = 0 if self.time is None else stamp - self.time
@@ -102,8 +102,8 @@ class TrackedProbe(BaseController[BodyRates | PositionNed]):
         self.probe, self.record = probe, record
         self.feedback = YawRateFeedback(**(feedback_config or {}))
 
-    def update(self, telemetry, frames):
-        requested = self.probe.update(telemetry, frames)
+    def update(self, telemetry, frames, race_state):
+        requested = self.probe.update(telemetry, frames, race_state)
         if self.record is not None:
             self.record(event="requested", command=command_data(requested))
         if isinstance(requested, BodyRates):

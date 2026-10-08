@@ -4,7 +4,7 @@ import math
 from common.math import Vector3D
 from miniflight import BodyRates
 from miniflight.position import PositionConfig, acceleration_control
-from target.aigp.client import RaceStatus, TrackInfo
+from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import gate_target, usable_track
 
@@ -21,7 +21,7 @@ class Controller(BaseController[BodyRates]):
         self.kd = kd  # 1/s
         self.exit_distance, self.config = exit_distance, config
         self.privileged = {}  # Original labelled pose packets, retained between arrivals.
-        self.imu = self.race = None
+        self.imu = None
         self.track = self.gate = None
         self.target = self.target_yaw = None
         self.time = None
@@ -36,7 +36,7 @@ class Controller(BaseController[BodyRates]):
         self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
         return self.kp * error + self.integral - self.kd * velocity
 
-    def update(self, telemetry, frames) -> BodyRates | None:
+    def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
             kind = packet.data.get_type()
             if packet.privileged and kind in ("LOCAL_POSITION_NED", "ATTITUDE"):
@@ -45,9 +45,7 @@ class Controller(BaseController[BodyRates]):
                 self.track = packet.decoded.gates
             elif kind == "HIGHRES_IMU":
                 self.imu = packet
-            elif isinstance(packet.decoded, RaceStatus):
-                self.race = packet.decoded
-        if self.imu is None or len(self.privileged) != 2 or self.race is None or not self.race.started or self.track is None:
+        if self.imu is None or len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None:
             return None
         motion, orientation = (self.privileged[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE"))
         if max(self.imu.received_at - packet.received_at for packet in (motion, orientation)) > .3:
@@ -61,7 +59,7 @@ class Controller(BaseController[BodyRates]):
         stamp = imu.time_usec * 1e-6
         dt = 0.0 if self.time is None else max(0.0, stamp - self.time)
         self.time = stamp
-        index = self.race.active_gate_index
+        index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):
             raise ValueError("gate index outside the published track")
         if index < len(self.track) and self.track[index] != self.gate:

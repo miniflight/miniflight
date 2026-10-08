@@ -19,6 +19,7 @@ from target.aigp.controllers.r1_beautiful import Controller as PIDController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.client import SimulatorClient
+from test.aigp_fake_simulator import write_race
 
 
 class ControllerSmokeTest(unittest.TestCase):
@@ -69,6 +70,8 @@ class ControllerSmokeTest(unittest.TestCase):
     def flight(self, make, replace_geometry=False):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "trace.jsonl"
+        native_path = Path(directory) / "native.jsonl"
+        native = self.enterContext(native_path.open("w"))
         stop = threading.Event()
         failures, received = [], []
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server, recording(path) as record:
@@ -108,6 +111,7 @@ class ControllerSmokeTest(unittest.TestCase):
                         stamp = sequence * 5000
                         north = .2 * stamp * 1e-6 if replace_geometry else 0
                         finish = 1000000000 if commands >= 10 else -1
+                        write_race(native, completed=finish >= 0)
                         race = struct.pack("<BQqqIq", 1, stamp // 1000, 0, finish, 0, 0).ljust(253, b"\0")
                         messages = (
                             mavlink.MAVLink_heartbeat_message(2, 0, 0, 0, 4, 3),
@@ -125,7 +129,8 @@ class ControllerSmokeTest(unittest.TestCase):
 
             worker = threading.Thread(target=serve)
             worker.start()
-            simulator = AIGPSimulator(RecordedController(make, record), startup_timeout=3, client=client)
+            simulator = AIGPSimulator(RecordedController(make, record), startup_timeout=3, client=client,
+                                      race_status_path=native_path)
             try:
                 if replace_geometry:
                     simulator.rollout(attach=True)
@@ -150,7 +155,7 @@ class ControllerSmokeTest(unittest.TestCase):
                 message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
                 observed._receive(message, ("test", 0), saved["received_at"])
             row["gates"] = None if observed.gates is None else json.loads(json.dumps([asdict(gate) for gate in observed.gates]))
-            row["gate_index"] = None if observed.race_status is None else observed.race_status.active_gate_index
+            row["gate_index"] = None if row["native_race"] is None else row["native_race"]["active_gate_index"]
             updates.append(row)
         self.assertEqual(replay(make, path), len(updates))
         return updates, received

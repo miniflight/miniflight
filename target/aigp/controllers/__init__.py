@@ -5,6 +5,7 @@ from miniflight import Command, Frame, Ned
 
 if TYPE_CHECKING:
     from target.aigp.client import Packet
+    from target.aigp.race import NativeRaceState
 
 
 CommandT = TypeVar("CommandT", bound=Command, covariant=True)
@@ -22,14 +23,16 @@ class Gate:
 
 
 class BaseController(Generic[CommandT]):
-    def update(self, telemetry: tuple["Packet", ...], frames: tuple[Frame, ...]) -> CommandT | None:
+    def update(self, telemetry: tuple["Packet", ...], frames: tuple[Frame, ...],
+               race_state: "NativeRaceState | None") -> CommandT | None:
         """Return a command from new arrivals since the previous call.
 
         telemetry retains ordered MAVLink packets, full fields and source clocks.
-        Packet.decoded contains RaceStatus, or TrackInfo when its transfer completes.
+        Packet.decoded contains RaceTelemetry, or TrackInfo when its transfer completes.
         Packet.privileged labels native pose and course traffic.
         frames contains newly completed BGR images, each with its own timestamp.
         Empty tuples mean no new arrivals. The controller owns retained history.
         Inputs arrive before GO and at finish; the runner gates command sending.
+        race_state contains native GO and validity; None means it is unavailable.
         """
         raise NotImplementedError
