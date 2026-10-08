@@ -4,7 +4,7 @@ import math
 
 from common.math import Quaternion, Vector3D
 from miniflight import Ned, PositionNed
-from target.aigp.client import RaceStatus
+from target.aigp.client import RaceStatus, TrackInfo
 from target.aigp.controllers import BaseController, Gate
 
 
@@ -45,8 +45,8 @@ class Controller(BaseController[PositionNed]):
             self.telemetry[packet.data.get_type()] = packet
             if isinstance(packet.decoded, RaceStatus):
                 self.race = packet.decoded
-            elif isinstance(packet.decoded, tuple) and usable_track(packet.decoded):
-                self.track = packet.decoded
+            elif isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
+                self.track = packet.decoded.gates
         pose, imu = self.telemetry.get("LOCAL_POSITION_NED"), self.telemetry.get("HIGHRES_IMU")
         if pose is None or imu is None or self.race is None or not self.race.started or not usable_track(self.track):
             return None

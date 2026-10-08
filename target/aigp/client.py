@@ -39,12 +39,29 @@ class RaceStatus:
 
 
 @dataclass(frozen=True)
+class TrackInfo:
+    """Fixed gate layout from one completed native transfer; it may be redacted."""
+
+    transfer_id: int
+    gates: tuple[Gate, ...]
+
+
+@dataclass(frozen=True)
 class Packet:
     """One received MAVLink message or camera datagram; no field or clock conversion."""
 
     data: mavlink.MAVLink_message | bytes
     received_at: float  # host monotonic receipt; device timestamps remain in data
-    decoded: RaceStatus | tuple[Gate, ...] | Frame | None = None
+    decoded: RaceStatus | TrackInfo | Frame | None = None
+
+    @property
+    def privileged(self) -> bool:
+        """AIGP pose or course traffic, regardless of whether its values are usable."""
+        if isinstance(self.data, bytes):
+            return False
+        kind = self.data.get_type()
+        return (kind in ("ATTITUDE", "LOCAL_POSITION_NED", "ODOMETRY", "DATA_TRANSMISSION_HANDSHAKE")
+                or kind == "ENCAPSULATED_DATA" and self.data.data[0] == 2)
 
 
 class SimulatorClient(Target):
@@ -322,7 +339,7 @@ class _Track:
             gates.append(Gate(gate_id, Ned(north, east, down), (w, x, y, z), width, height))
         gates = tuple(gates)
         self.gates, self.received_at = gates, now
-        return gates
+        return TrackInfo(transfer_id, gates)
 
 
 class _Camera:

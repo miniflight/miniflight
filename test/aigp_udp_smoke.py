@@ -25,7 +25,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
-from target.aigp.client import RaceStatus
+from target.aigp.client import RaceStatus, TrackInfo
 from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
 from miniflight import BodyRates, State, VelocityNed
 from target.aigp.simulator import SimulatorClient
@@ -73,7 +73,8 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertTrue(all(item.received_at <= time.monotonic() for item in arrivals))
         self.assertEqual(client.telemetry["HIGHRES_IMU"].time_usec, 1000001)
         self.assertEqual(struct.unpack_from("<H9f", bytes(arrivals[2].data.data), 5)[1:4], (1, 2, 3))
-        self.assertEqual(arrivals[2].decoded, client.gates)
+        self.assertEqual(arrivals[2].decoded, TrackInfo(7, client.gates))
+        self.assertEqual([item.privileged for item in arrivals], [False, True, True, False, False, False, False])
         self.assertEqual(client.poll(), ())
 
         # Incomplete, repeated and old camera packets remain visible byte for byte.
@@ -96,6 +97,7 @@ class UDPSmokeTest(unittest.TestCase):
         status = next(item.decoded for item in arrivals if isinstance(item.decoded, RaceStatus))
         self.assertEqual((status.sim_boot_time_ms, status.active_gate_index), (5000, 2))
         frame_packet = next(item for item in arrivals if isinstance(item.data, bytes))
+        self.assertFalse(any(item.privileged for item in arrivals))
         self.assertEqual(frame_packet.data, camera)
         self.assertEqual((frame_packet.decoded.id, frame_packet.decoded.time_ns), (9, 123456900))
         self.assertEqual(frame_packet.decoded.bgr.shape, (2, 3, 3))
@@ -159,9 +161,10 @@ class UDPSmokeTest(unittest.TestCase):
         fragment(9, redacted)
         retained_at = client.gates_received_at
         arrivals = client.poll(.1)
-        self.assertEqual(arrivals[-1].decoded[0].orientation, (0, 0, 0, 0))
-        self.assertEqual(arrivals[-1].decoded[0].width, 0)
-        self.assertIs(client.gates, arrivals[-1].decoded)
+        self.assertEqual(arrivals[-1].decoded.gates[0].orientation, (0, 0, 0, 0))
+        self.assertEqual(arrivals[-1].decoded.gates[0].width, 0)
+        self.assertIs(client.gates, arrivals[-1].decoded.gates)
+        self.assertTrue(arrivals[-1].privileged)
         self.assertGreater(client.gates_received_at, retained_at)
         gates, retained_at = client.gates, client.gates_received_at
 
@@ -403,6 +406,9 @@ class UDPSmokeTest(unittest.TestCase):
         for packets, _ in observations:
             for arrival in packets:
                 latest[arrival.data.get_type()] = arrival.data
+        privileged = {arrival.data.get_type() for packets, _ in observations for arrival in packets if arrival.privileged}
+        expected = {"ATTITUDE", "LOCAL_POSITION_NED"} if with_pose else set()
+        self.assertEqual(privileged, expected | ({"ODOMETRY"} if wire_io else set()))
         self.assertEqual("LOCAL_POSITION_NED" in latest, with_pose)
         self.assertEqual("ATTITUDE" in latest, with_pose)
         self.assertEqual("ACTUATOR_OUTPUT_STATUS" in latest, with_pose)
@@ -539,8 +545,8 @@ class UDPSmokeTest(unittest.TestCase):
             for saved in row.get("telemetry", ()):
                 message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
                 decoded = observed._receive(message, ("test", 0), saved["received_at"])
-                if isinstance(decoded, tuple) and usable_track(decoded):
-                    tracks.append(decoded)
+                if isinstance(decoded, TrackInfo) and usable_track(decoded.gates):
+                    tracks.append(decoded.gates)
         self.assertTrue(tracks)
         self.assertTrue(all(len(track) == count for track in tracks))
         self.assertEqual([row["armed"] for row in rows if row["event"] == "arm_request"], [True, False])

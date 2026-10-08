@@ -102,9 +102,10 @@ command = controller.update(telemetry, frames)
 `telemetry` contains new ordered MAVLink arrivals. `Packet.data` retains every
 native field and flag; `Packet.received_at` is host monotonic receipt time.
 `Packet.decoded` exposes race status (`ENCAPSULATED_DATA` type 1) or a newly
-completed course (handshake plus type-2 indexed fragments). The course is a tuple
-of native `Gate(id, position, orientation, width, height)` records: NED base,
-wxyz quaternion and overall dimensions. Redacted fields remain visible.
+completed `TrackInfo` (handshake plus type-2 indexed fragments). `TrackInfo`
+contains the native transfer ID and a tuple of `Gate(id, position, orientation,
+width, height)` records: NED base, wxyz quaternion and overall dimensions.
+`Packet.privileged` labels pose and course traffic, including redacted fields.
 
 `frames` contains newly completed JPEGs decoded to readonly BGR images, with
 frame IDs and original device nanosecond timestamps. Empty tuples mean no new

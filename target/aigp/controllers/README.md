@@ -17,9 +17,10 @@ The runner constructs `Controller()` after the native heartbeat.
 `telemetry` is an ordered tuple of new `Packet` arrivals from UDP 14550.
 `packet.data` is the original pymavlink message, with full fields, flags and
 source timestamps. `packet.received_at` is host monotonic receipt time.
-`packet.decoded` contains a native `RaceStatus` for race packets, a tuple of
-`Gate` records when a course transfer completes, or `None` otherwise. Gate
-records retain the published NED base, wxyz quaternion and overall dimensions.
+`packet.decoded` contains `RaceStatus`, `TrackInfo(transfer_id, gates)` when a
+course transfer completes, or `None`. Each `Gate` retains the published NED
+base, wxyz quaternion and overall dimensions. `packet.privileged` labels pose
+(`ATTITUDE`, `LOCAL_POSITION_NED`, `ODOMETRY`) and course traffic.
 The receiver preserves redacted fields; the controller decides if they are useful.
 
 `frames` is a tuple of new complete images from UDP 5600. Each has `id`, device
