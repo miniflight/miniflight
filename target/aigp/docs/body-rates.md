@@ -7,20 +7,20 @@ VQ2 and physical flight controllers have not received this response validation.
 
 ## Frames
 
-The Python API uses forward/right/down body axes and local north/east/down world
+The command API uses forward/right/down body axes and local north/east/down world
 coordinates. Rates and angles are radians. Collective thrust is normalized to 0–1.
-The AIGP adapter performs these build-3391 conversions:
+The build-3391 frame mappings are:
 
 | Data | Conversion |
 | --- | --- |
-| Python body-rate command → wire | Negate roll, pitch, and yaw rates |
-| Wire `HIGHRES_IMU` gyro → `State.gyro` | Negate all three components |
-| Wire `ATTITUDE` → `State.attitude` | Keep roll; negate pitch and yaw |
+| Body-rate command → wire | Negate roll, pitch, and yaw rates |
+| Wire `HIGHRES_IMU` gyro → FRD gyro | Negate all three components |
+| Wire `ATTITUDE` → FRD/NED angles | Keep roll; negate pitch and yaw |
 | Position, velocity, reported acceleration | Preserve wire signs |
 
 The transmitted attitude-target mask remains 144: ignore the quaternion and enable
-the vendor's physical-rad/s extension. `SimulatorClient.telemetry` keeps the raw
-messages; controller inputs use the converted values.
+the vendor's physical-rad/s extension. Controller inputs retain raw wire values;
+input frame conversions belong to the controller or its Miniflight routines.
 
 The signs were checked against positive and negative pulses, integrated gyro versus
 attitude changes, the direction of NED velocity changes, and camera heading. At one
@@ -30,10 +30,10 @@ camera calibration. The camera's vertical projection remains outside this valida
 
 `test/fixtures/vq1_body_rates_frames.json` retains wire samples and the camera
 measurement. Tests decode the recorded values and check angular kinematics, NED
-motion direction, and horizontal camera projection. Controllers should not add
-their own AIGP sign corrections.
+motion direction, and horizontal camera projection. Outgoing command conversion
+remains in `SimulatorClient.send`.
 
-Nonfinite attitude angles produce `None`, like unavailable or stale observations.
+Nonfinite input fields remain visible; the controller decides how to handle them.
 The runner accepts positive command rates below 100 Hz; the default remains 50 Hz.
 
 ## Probe

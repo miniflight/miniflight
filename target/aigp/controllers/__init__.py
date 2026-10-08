@@ -27,7 +27,7 @@ class BaseController(Generic[CommandT]):
 
         telemetry retains ordered MAVLink packets, full fields and source clocks.
         Packet.decoded contains RaceStatus, or TrackInfo when its transfer completes.
-        Packet.privileged labels native pose and course traffic; nothing is filled in.
+        Packet.privileged labels native pose and course traffic.
         frames contains newly completed BGR images, each with its own timestamp.
         Empty tuples mean no new arrivals. The controller owns retained history.
         Inputs arrive before GO and at finish; the runner gates command sending.

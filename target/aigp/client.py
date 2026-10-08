@@ -12,9 +12,7 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import (Attitude, BodyRates, Command, Frame, Motion, MotorOutputs,
-                       Ned, PositionNed, State, VelocityNed)
-from target import Target
+from miniflight import BodyRates, Command, Frame, Ned, PositionNed, VelocityNed
 from target.aigp.controllers import Gate
 
 
@@ -64,14 +62,8 @@ class Packet:
                 or kind == "ENCAPSULATED_DATA" and self.data.data[0] == 2)
 
 
-class SimulatorClient(Target):
-    """UDP transport for VQ1 and VQ2. Connecting never launches, arms, or resets.
-
-    mav and target_ids expose the wire; send converts the three flight commands.
-    poll receives packets; properties only inspect caches. read waits for a new
-    IMU sample and joins the latest optional samples, each with its own clock.
-    telemetry holds the latest raw packet per message name, not packet history.
-    """
+class SimulatorClient:
+    """Receive native packets and send control commands."""
 
     commands = frozenset((BodyRates, PositionNed, VelocityNed))
 
@@ -105,7 +97,7 @@ class SimulatorClient(Target):
         self._telemetry.clear()
         self._camera = _Camera()
         self._track = _Track()
-        self.race_status = self._last_imu = None
+        self.race_status = None
         self._boot = time.monotonic()
         self.mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
         self.mav.robust_parsing = True
@@ -197,7 +189,7 @@ class SimulatorClient(Target):
             # Announcement only: transfer ID, byte count, fragment count.
             self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:
-            # Fragment arrival may complete a track; an IMU read never does.
+            # Fragment arrival may complete a track; sensor arrival never does.
             return self._track.receive(message, now)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             # Native boot/start/finish/gate values, not an IMU or host tick.
@@ -206,7 +198,6 @@ class SimulatorClient(Target):
                     and not self.race_status.started and not race.started):
                 # The native sensor clock can restart before GO.
                 self._telemetry.pop("HIGHRES_IMU", None)
-                self._last_imu = None
             self.race_status = race
             return race
 
@@ -215,43 +206,6 @@ class SimulatorClient(Target):
         if remaining <= 0:
             raise TimeoutError(f"timed out waiting for {description}")
         self.poll(min(remaining, 0.1))
-
-    def read(self, timeout=1.0):
-        """Read the newest unread IMU plus cached motion, attitude, motors and image.
-
-        time and dt are IMU seconds; acceleration is body m/s² and gyro is body rad/s.
-        Intermediate IMU samples may be skipped. Optional packets arrive separately
-        and keep their own timestamps; this is not a synchronized physics step.
-        Race status and gate geometry stay in their separate caches.
-        """
-        deadline = time.monotonic() + timeout
-        self.poll()
-        while self._telemetry.get("HIGHRES_IMU") is self._last_imu:
-            self._wait(deadline, "fresh IMU telemetry")
-        imu = self._telemetry["HIGHRES_IMU"]
-        if time.monotonic() - imu._host_received_at > timeout:
-            raise TimeoutError("IMU telemetry is stale")
-        stamp = imu.time_usec * 1e-6
-        dt = 0.0 if self._last_imu is None else stamp - self._last_imu.time_usec * 1e-6
-        self._last_imu = imu
-        motion = self._telemetry.get("LOCAL_POSITION_NED")
-        if motion is not None:
-            values = (motion.x, motion.y, motion.z, motion.vx, motion.vy, motion.vz)
-            motion = (Motion(motion.time_boot_ms * 1e-3, motion._host_received_at, Ned(*values[:3]), Ned(*values[3:]))
-                      if all(math.isfinite(value) for value in values) else None)
-        attitude = self._telemetry.get("ATTITUDE")
-        if attitude is not None:
-            # Build 3391 reports pitch/yaw with the opposite signs to local NED.
-            attitude = (Attitude(attitude.time_boot_ms * 1e-3, attitude._host_received_at,
-                                 attitude.roll, -attitude.pitch, -attitude.yaw)
-                        if all(math.isfinite(value) for value in (attitude.roll, attitude.pitch, attitude.yaw)) else None)
-        motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
-        if motors is not None:
-            motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
-        # Angular rates on the AIGP wire have the opposite signs to body FRD.
-        return State(time=stamp, dt=dt, received_at=imu._host_received_at,
-                     acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro),
-                     motion=motion, attitude=attitude, motors=motors, frame=self._camera.latest)
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""

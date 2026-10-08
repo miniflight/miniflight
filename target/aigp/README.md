@@ -1,17 +1,14 @@
 # aigp
 
-A simulator arena for Python controllers. `simulator.py` is the controller loop
-and command-line entrypoint. `client.py` receives packets and encodes commands;
-`native.py` installs and owns the native process. Controller code lives in
-`controllers/`.
+Run a controller against the AIGP simulator. Put your controller in `controllers/`.
 
-Use Python 3.11 or newer and install dependencies once from the repository root:
+Install dependencies from the repository root with Python 3.11 or newer:
 
 ```sh
 python -m pip install -e ".[aigp]"
 ```
 
-Then enter the arena directory. The commands below run from here:
+Run:
 
 ```sh
 cd target/aigp
@@ -21,25 +18,19 @@ python simulator.py vq2.r1 --controller zero
 python simulator.py vq2.r2 --controller zero
 ```
 
-These targets select the simulator build and course. The runner starts a direct
-native arena race; it does not select the official Training or Qualification
-event blocks. `--attach` uses an externally started race and does not verify its
-event mode. A native finish proves race completion, not qualification validity.
+Targets select the build and track. Runs use the direct arena.
+Training and Qualification event selection is not implemented.
 
-Both R1 controllers aim through the same six gates. `r1_gates` returns
-`PositionNed` and lets VQ1 control position. `r1_body_rates` uses the same gate
-selection, controls position and attitude in Python, and returns `BodyRates`.
-VQ1 then controls angular rates and motors. Both continue until native finish.
-`zero` sends zero thrust; it does not hover.
+`r1_gates` flies six gates using the simulator's position control.
+`r1_body_rates` computes position and attitude control, then sends body rates
+and thrust. `zero` sends zero thrust.
 
-The simulator calls `controller.update(telemetry, frames)` with new native
-arrivals and sends the returned command. It owns timing, arming, native start/finish,
-and cleanup. The controller owns its target choices and control calculations.
-See [the controller interface](controllers/README.md) to add a controller.
-Read [the simulator wiring](docs/wiring.md) for the launch, packet, native control,
-and sensor paths.
+Implement `update(telemetry, frames)` and return a command. Each call receives
+new packets and completed images. The runner handles timing, arming, race finish,
+and shutdown. See the [controller interface](controllers/README.md) and
+[packet formats](docs/wiring.md).
 
-The same arena can be used from Python:
+Or call the runner directly:
 
 ```python
 from target.aigp.simulator import AIGPSimulator
@@ -49,17 +40,8 @@ sim = AIGPSimulator(Controller, "vq1.r1")
 result = sim.rollout()
 ```
 
-The runner constructs `Controller()` after the heartbeat. Courses arrive through
-`update()`. Each simulator accepts one `rollout()` attempt, including attempts
-that fail or are interrupted.
-
-Runnable examples remain under `examples/aigp/`: `thread_gates` runs the position
-baseline and `velocity_ned` sends a short velocity request. The body-rate
-counterpart is `controllers/r1_body_rates.py`, run with the command above.
-
-Optional probes, recording, replay, and yaw diagnostics are grouped under
-[experiments](experiments/README.md). The simulator and gate controllers do not
-import these tools.
+Create a new `AIGPSimulator` for each run.
+See [examples](../../examples/aigp/) and [recording and probes](experiments/README.md).
 
 ## setup
 
@@ -70,8 +52,8 @@ brew install git-lfs python@3.11
 brew install --cask gcenx/wine/game-porting-toolkit
 ```
 
-Linux needs an x86_64 desktop with Wine, wineserver, git lfs, and Python 3.11 or newer.
-Linux support is experimental and has not been tested on a Linux host.
+Tested on macOS. Linux support is experimental and needs an x86_64 desktop with
+Wine, wineserver, git-lfs, and Python 3.11 or newer.
 
 ```sh
 git lfs install
@@ -80,17 +62,13 @@ cd miniflight
 git lfs pull
 ```
 
-`simulator.py` verifies and extracts the selected archive, launches the AIGP executable
-through Wine, runs the controller, and shuts down its own simulator process.
-`config/`, `archives/`, and `docs/` contain its assets and references;
-`.runtime/` holds generated local data.
+`native.py` extracts and launches the simulator through Wine. `client.py` handles
+UDP. `simulator.py` runs the controller. Generated files go in `.runtime/`.
 
-Run one simulator at a time. Ctrl+C stops the controller and its owned simulator.
-Omit `--controller` to open just the simulator. Use `--attach --controller zero`
-with the same Python command to connect to an existing simulator without taking
-ownership of its process.
+Run one simulator at a time. Ctrl+C stops the controller and the simulator it launched.
+Omit `--controller` to open the simulator alone. Use `--attach --controller zero`
+to connect to a running simulator; it stays open when the controller exits.
 `WINE` and `WINESERVER` select a different Wine installation.
-Pass Unreal command-line options after `--`. Options before `--` belong to
-this Python runner and must use their full names.
+Pass Unreal options after `--`. Use full option names before it.
 
-[Vehicle API](docs/vehicle-api.md) · [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) · [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)
+[Commands](docs/vehicle-api.md) · [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) · [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)

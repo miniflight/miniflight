@@ -122,15 +122,11 @@ starting the receiver late can miss the course. The same build publishes
 privileged pose. VQ2 section 9.3 blocks ATTITUDE, LOCAL_POSITION_NED, ODOMETRY
 and GATE_INFO; absent streams are not synthesized.
 
-`SimulatorClient.read()` remains the generic `Vehicle` observation adapter.
-It converts native packets into `State` for that separate API. The BaseController
-runner receives native arrivals directly and does not call it.
-
 ## the remaining wire interface
 
 `client.telemetry` retains the latest accepted MAVLink packet per message name, including
 `HEARTBEAT`, `TIMESYNC`, `ODOMETRY`, `COMMAND_ACK`, and `COLLISION`. Their original
-fields remain available even when they are not part of `State`. A packet appears
+fields remain available in `Packet.data`. A packet appears
 only if the executable emits it; the cache does not request extra sensors.
 It is not event history: a later `COLLISION` or `COMMAND_ACK` replaces the previous
 one. Record arrivals through `_receive`, as the optional recording client does,
@@ -144,7 +140,7 @@ After `connect`, the vendor time-sync request can be sent directly:
 import time
 
 client.mav.timesync_send(time.time_ns(), 0)
-reply = client.telemetry.get("TIMESYNC")  # poll or read to receive a reply
+reply = client.telemetry.get("TIMESYNC")  # poll to receive a reply
 ```
 
 A native VQ1 build-3391 check received replies to all 97 requests during a complete

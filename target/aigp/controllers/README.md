@@ -25,9 +25,8 @@ The receiver preserves redacted fields; the controller decides if they are usefu
 
 `frames` is a tuple of new complete images from UDP 5600. Each has `id`, device
 `time_ns`, host `received_at` and readonly `bgr` (`uint8[height,width,3]`).
-Both tuples may be empty. They are independent arrivals, not a synchronized step.
-Store history in the controller. Coordinate conversion and estimation are explicit
-controller math; absent native streams are not replaced with estimates.
+Either tuple may be empty. Each stream keeps its own timing.
+Store history, convert coordinates, and estimate state in the controller.
 
 Inputs are delivered before GO and at native finish. Commands are sent only
 after GO with fresh IMU. Return `BodyRates`, `PositionNed`, `VelocityNed`, or `None`

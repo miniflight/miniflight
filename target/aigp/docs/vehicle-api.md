@@ -1,45 +1,13 @@
-# vehicle api
+# AIGP commands
 
-`Vehicle` is a connection to a vehicle, not a controller or a simulator runner
-
-Observation records are defined in `miniflight.state`; AIGP depends on those core
-records. Public imports from `miniflight` and the previous `miniflight.vehicle`
-observation imports remain valid. The host connection interface `Target` stays
-in the adapter layer under `target/`; the core does not import it. `Vehicle`
-delegates to the supplied connection without requiring a target base class.
-The core imports no NumPy runtime; camera adapters own pixel storage. `State`
-is an observation snapshot with independent sample clocks, not an estimator
-result or controller memory. Gate data, race status, launch/cleanup, and AIGP
-recording remain under `target/aigp`.
-
-```python
-from miniflight import Vehicle
-from target.aigp.simulator import SimulatorClient
-
-vehicle = Vehicle(SimulatorClient())
-vehicle.connect()
-try:
-    state = vehicle.read()
-    print(state.gyro, state.acceleration)
-    print(vehicle.commands)
-finally:
-    vehicle.disconnect()
-```
-
-`read` waits for a fresh IMU sample and updates `vehicle.state`
-reading `vehicle.position` or `vehicle.velocity` never does IO
-optional observations remain `None` until reported
-each slower observation keeps its own timestamp and receipt time
-
-`send` accepts one explicit command
-`arm` and `disarm` are separate requests
-`commands` lists the target's supported command types
-an unsupported command raises `NotImplementedError` without emulation
+The arena supplies native arrivals through
+[`BaseController.update(telemetry, frames)`](../controllers/README.md).
+`SimulatorClient.send` encodes the returned command. The runner handles arming
+and disarming.
 
 The PDF names two command messages. Their MAVLink definitions describe five
 basic request forms: position, velocity, acceleration/force, attitude plus thrust,
-and body rates plus thrust. Masks select the active fields; these are not five
-separate messages. The adapter currently exposes three forms:
+and body rates plus thrust. Masks select the active fields. The adapter exposes:
 
 | command | units | loop closed by the target |
 | --- | --- | --- |
@@ -47,14 +15,12 @@ separate messages. The adapter currently exposes three forms:
 | `VelocityNed` | metres per second in local NED | velocity and lower loops |
 | `BodyRates` | radians per second in FRD and collective thrust 0 to 1 | angular rate and motor mixing |
 
-the corresponding convenience methods are `position_ned` `velocity_ned` and `body_rates`
-they each send one command and do not run background loops
 AIGPSimulator owns race timing heartbeats command cadence and process lifetime
 
 `SET_ATTITUDE_TARGET` can carry desired attitude as a wxyz quaternion and
 collective thrust, or desired body rates and thrust. TRPY uses the attitude form:
-roll, pitch and yaw are angles, converted to a quaternion on the wire. It is not
-the `BodyRates` form, whose three rotational fields are rad/s.
+roll, pitch and yaw are angles, converted to a quaternion on the wire.
+`BodyRates` supplies angular speeds in rad/s.
 The native receiver has an attitude branch. Raw requests can be written through
 `client.mav`; this form has no typed command or native flight verification here.
 See the [attitude message](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET).
@@ -69,7 +35,7 @@ hold position. A zero `VelocityNed` target asks it to hold zero velocity, withou
 specifying a fixed location. With TRPY, the simulator would stabilize the requested
 attitude; our controller must still choose thrust and tilt to hold position.
 With `BodyRates`, our controller also chooses the rates needed to reach that
-attitude. Zero rates alone do not level a tilted drone, and zero thrust does not hover.
+attitude. Zero rates request a stop in rotation. Hover needs suitable thrust and attitude.
 
 `PositionNed` and `VelocityNed` express separate physical requests but share the
 adapter's `SET_POSITION_TARGET_LOCAL_NED` encoder. The command type selects the
@@ -93,14 +59,13 @@ the serial boundary is different from those internal firmware functions
 the MAVLink receiver accepts `RC_CHANNELS_OVERRIDE` through `src/main/rx/mavlink.c`
 neither is a physical body rate setpoint without the configured channel mapping and rate curve
 `MSP_SET_MOTOR` writes `motor_disarmed` values used by the disarmed mixer path
-it is a motor test interface rather than an armed flight control plane
+it sets motor test outputs while disarmed
 
 `MSP_RAW_IMU` returns accelerometer ADC counts and gyro degrees per second without a device timestamp
 a serial adapter must resolve sensor scaling frames and timing before exposing vehicle observations
 those wire values cannot be passed through as this API's timestamped SI samples
 
 this release also has optional navigation and MAVLink mission support
-that does not make its mission interface the same as streamed local NED setpoints
 there is no betaflight Python target implemented here
 
 ## simulator boundary
@@ -114,8 +79,8 @@ the installed VQ1 and VQ2 build 3391 executables were checked against the existi
 
 VQ2 retains the body rate attitude local NED and actuator input handlers
 its attitude local position and odometry output workers are stubs in both R1 and R2
-the vehicle adapter exposes the three existing position velocity and body rate command paths
-it converts received telemetry without adding a pose estimator or new telemetry requests
+the client exposes the three existing position velocity and body rate command paths
+it decodes native telemetry
 
 the broader attitude acceleration and direct actuator inputs have no typed commands here
 the [raw wire interface](wiring.md#the-remaining-wire-interface) exposes their packet fields
@@ -128,39 +93,22 @@ the adapter preserves that bit and the existing NED masks
 standard message fields are defined by [MAVLink](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET)
 
 Live VQ1 build-3391 pulses exposed angular sign differences on the wire.
-The adapter negates all three transmitted body rates and received gyro components.
-It preserves reported roll and negates reported pitch and yaw for `State.attitude`.
-Position, velocity, and reported acceleration keep their wire signs.
+The adapter negates all three transmitted body rates. Received fields keep their
+wire signs; controllers apply the input mappings needed by their flight routines.
 `SimulatorClient.telemetry` is a read-only view of the latest original MAVLink
 messages, keyed by message name. A held view follows later packets.
 The [measurements and captured regressions](body-rates.md) establish this conversion
 against attitude changes, NED motion, and the camera heading; VQ2 has not received
 the same physical-response validation.
 
-`r1_gates` consumes `State.motion.position` and returns `PositionNed`
-`r1_body_rates` consumes VQ1 motion and attitude and returns `BodyRates`
-`zero` returns `BodyRates`
-`AIGPSimulator` owns the connection and calls `client.read`, `controller.update`, then `client.send`
-controllers implement `BaseController.update(state, gate_index, gates)`
-the `BaseController` type parameter declares one output plane or an explicit union
-the target validates each actual returned command independently of that annotation
-native `RaceStatus` packets stay inside the AI-GP simulator and client
-optional observations older than the simulator timeout are `None` at controller update
-the client and generic vehicle API retain the original timestamped observations
+The runner passes ordered packet arrivals and completed camera frames to the
+controller. `r1_gates` returns `PositionNed`; `r1_body_rates` returns `BodyRates`.
 
 ## track input
 
-`SimulatorClient.gates` exposes the last complete usable track as immutable gate values
-`DATA_TRANSMISSION_HANDSHAKE` announces its byte count and chunks
-`ENCAPSULATED_DATA` type 2 supplies those chunks, grouped by transfer ID
-each gate retains its published NED base as `origin` and normalized wxyz `orientation`
-the adapter derives `center` from that origin using orientation and half-height
-reported `width` and `height` are overall bounds, not opening clearance
-the whole track is cached between transfers; it is not a fresh per-cycle observation
-an incomplete replacement keeps the last complete track available
-`AIGPSimulator` passes the gates separately from `State` to the controller
-missing or withheld geometry stays `None`; no course coordinates are synthesized
+`TrackInfo` arrives on the packet that completes a native course transfer.
+Its gates retain raw NED base positions, wxyz orientations and overall bounds.
+The controller checks the geometry and derives opening centers if needed.
+`SimulatorClient.gates` caches the last complete transfer, including redacted values.
 
 The captured VQ1 build 3391 packet is preserved in `test/fixtures/vq1_track.json`.
-Its decoded centers match the previously flight-tested R1 coordinates.
-This validates that build's geometry; it does not establish VQ2 geometry availability.

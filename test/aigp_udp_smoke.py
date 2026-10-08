@@ -27,7 +27,7 @@ from target.aigp.native import _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.client import RaceStatus, TrackInfo
 from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
-from miniflight import BodyRates, State, VelocityNed
+from miniflight import BodyRates, VelocityNed
 from target.aigp.simulator import SimulatorClient
 from target.aigp.client import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, read_frame, recording, replay
@@ -104,7 +104,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(frame_packet.decoded.received_at, frame_packet.received_at)
         self.assertEqual(client.poll(), ())
 
-    def test_track_arrival_is_independent_of_imu_reads(self):
+    def test_track_arrival_is_independent_of_sensor_arrivals(self):
         server = self.enterContext(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         server.bind(("127.0.0.1", 0))
         client = SimulatorClient(port=0, camera_port=None)
@@ -137,11 +137,9 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertLessEqual(received_at, time.monotonic())
 
         # A missing or arriving IMU changes neither course nor its receipt time.
-        with self.assertRaises(TimeoutError):
-            client.read(.02)
+        self.assertEqual(client.poll(.02), ())
         send(imu())
-        state = client.read(.1)
-        self.assertIsNone(state.motion)
+        self.assertEqual([item.data.get_type() for item in client.poll(.1)], ["HIGHRES_IMU"])
         self.assertIs(client.gates, gates)
         self.assertEqual(client.gates_received_at, received_at)
 

@@ -1,17 +1,13 @@
-from target.aigp.simulator import SimulatorClient
-from miniflight.vehicle import Vehicle
+from target.aigp.client import SimulatorClient
 
 
-vehicle = Vehicle(SimulatorClient())
-
-print("Connecting to VQ1...")
-vehicle.connect()
-
+client = SimulatorClient(camera_port=None)
 try:
-    print("Connected to VQ1")
-    vehicle.read()
-    print(vehicle.position)
-    print(vehicle.velocity)
+    client.connect()
+    while True:
+        for packet in client.poll(.1):
+            if packet.data.get_type() == "LOCAL_POSITION_NED":
+                print(packet.data)
+                raise SystemExit
 finally:
-    vehicle.disconnect()
-    print("Disconnected from VQ1")
+    client.disconnect()
