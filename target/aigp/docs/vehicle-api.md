@@ -5,35 +5,42 @@ The arena supplies native arrivals through
 `SimulatorClient.send` encodes the returned command. The runner handles arming
 and disarming.
 
-The PDF names two command messages. Their MAVLink definitions describe five
-basic request forms: position, velocity, acceleration/force, attitude plus thrust,
-and body rates plus thrust. Masks select the active fields. The adapter exposes:
+The VQ1 build-3391 native receiver implements six control modes. All six have
+native flight evidence; the acceleration, attitude and motor checks below were
+run on 2026-10-08. The PDF's two named messages omit the direct actuator message.
 
-| command | units | loop closed by the target |
-| --- | --- | --- |
-| `PositionNed` | metres in local NED | position and lower loops |
-| `VelocityNed` | metres per second in local NED | velocity and lower loops |
-| `BodyRates` | radians per second in FRD and collective thrust 0 to 1 | angular rate and motor mixing |
+| Native request | MAVLink message | Mask | Typed adapter |
+| --- | --- | --- | --- |
+| Position, metres NED | `SET_POSITION_TARGET_LOCAL_NED` (84) | 3576 | `PositionNed` |
+| Velocity, m/s NED | same | 3527 | `VelocityNed` |
+| Acceleration, m/s² NED; force, N | same | 3135; force 3647 | raw |
+| Attitude, wxyz quaternion, and thrust 0–1 | `SET_ATTITUDE_TARGET` (82) | 7 | raw |
+| Body rates and thrust 0–1 | same | 144 for native rad/s | `BodyRates`, FRD conversion |
+| Four direct motor controls | `SET_ACTUATOR_CONTROL_TARGET` (139) | none | raw |
 
-AIGPSimulator owns race timing heartbeats command cadence and process lifetime
+`SimulatorClient.send` exposes the three typed commands; `client.mav` exposes
+the raw forms. The runner owns arming, race timing, heartbeats and command cadence.
+The [MAVLink definitions](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED)
+define the fields; native support was checked separately against the executable.
 
-`SET_ATTITUDE_TARGET` can carry desired attitude as a wxyz quaternion and
-collective thrust, or desired body rates and thrust. TRPY uses the attitude form:
-roll, pitch and yaw are angles, converted to a quaternion on the wire.
-`BodyRates` supplies angular speeds in rad/s.
-The native receiver has an attitude branch. Raw requests can be written through
-`client.mav`; this form has no typed command or native flight verification here.
-See the [attitude message](https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET).
+Native acceleration becomes desired roll/pitch and collective thrust, followed
+by the native attitude/rate loops. It has no acceleration-error feedback. Each
+tilt angle is limited to ±0.4 rad (22.9°). Vertical thrust is
+`clamp(mass * (9.81 - down_acceleration) / 29.9, 0, 1)`, without tilt compensation.
+Force mode divides the three requested values by mass first.
 
-`SET_POSITION_TARGET_LOCAL_NED` carries position, velocity, acceleration/force,
-and optional heading fields. Our two NED command types select position or
-velocity and ignore the other fields. Raw acceleration/force requests are available
-through `client.mav`; this form has no typed command or native flight verification. See the [NED message](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED).
+Use full XYZ groups in local NED. The receiver checks bits 0, 3 and 6 for the
+entire position, velocity and acceleration groups; it ignores the frame selector.
+Enabled acceleration overwrites the position/velocity calculation. Otherwise,
+position takes precedence over velocity. Yaw angle takes precedence over yaw rate;
+ignoring both retains the previous yaw request. Rate mask 128 selects native
+stick values; adding the vendor's bit 16 selects rad/s. The actuator receiver
+copies controls 0–3 and ignores controls 4–7 and the group selector.
 
 Hovering belongs to the selected plane. A fixed `PositionNed` target lets VQ1
 hold position. A zero `VelocityNed` target asks it to hold zero velocity, without
-specifying a fixed location. With TRPY, the simulator would stabilize the requested
-attitude; our controller must still choose thrust and tilt to hold position.
+specifying a fixed location. With an attitude target, the simulator stabilizes the
+requested attitude; our controller must still choose thrust and tilt to hold position.
 With `BodyRates`, our controller also chooses the rates needed to reach that
 attitude. Zero rates request a stop in rotation. Hover needs suitable thrust and attitude.
 
@@ -82,10 +89,31 @@ its attitude local position and odometry output workers are stubs in both R1 and
 the client exposes the three existing position velocity and body rate command paths
 it decodes native telemetry
 
-the broader attitude acceleration and direct actuator inputs have no typed commands here
-the [raw wire interface](wiring.md#the-remaining-wire-interface) exposes their packet fields
-their presence in the parser is not a tested control contract
-reported motor output channels are retained with the wire active mask and values without claiming RPM units
+The acceleration, attitude and motor forms still use the
+[raw wire interface](wiring.md#the-remaining-wire-interface). The 2026-10-08 audit
+traced dispatch at `0x14104bf70`, NED at `0x14104b8f0`, and attitude at
+`0x14104b4f0`. VQ2 has matching NED receiver control flow and constants;
+its flight response was not measured.
+
+VQ1 tests sent commands at 50 Hz after a 0.6-second steady position hold, then
+returned to that hold between pulses. Actual outgoing packets and native pose,
+IMU and motor packets are in `.runtime/measurements/control-planes-20261008/`
+with the probe source, binary/source hashes, summaries and disassembly.
+All completed traces have exact controller replay, one arm/disarm pair and no collisions.
+
+| Native test | Observed response |
+| --- | --- |
+| Velocity ±1 m/s north for 1.5 s | End velocity about ±0.915 m/s |
+| Acceleration ±2 m/s² north/east | Late velocity slopes about ±1.8 m/s² |
+| Acceleration +1 / −1 m/s² down | +1.56 / −1.28 m/s² |
+| Acceleration +8 m/s² north | 22.94° pitch; +3.48 m/s² |
+| Force +1 N north | 7.23° pitch; +1.18 m/s² |
+| Raw quaternion pitch +5° / −5° | FRD pitch −5.01° / +5.01° |
+| Four motor values 0.22 / 0.30 | Reported outputs about 0.22 / 0.30; descent / ascent |
+
+These are measured transients, not exact acceleration tracking. The attitude
+probe covers pitch; complete quaternion axis conversion and motor corner order
+remain uncalibrated. Reported motor values are not labelled RPM.
 
 the bundled [specification](VQ1-Technical-Specification-00.02.pdf) defines the NED and body frames
 the [vendor controller](reference/PyAIPilotExample-v4/controller.py) defines the build 3390 radian extension
