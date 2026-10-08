@@ -12,16 +12,25 @@ import unittest
 
 from pymavlink.dialects.v20 import common as mavlink
 
+from common.math import Vector3D
 from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
+from target.aigp.controllers.r1_beautiful import Controller as PIDController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.client import SimulatorClient
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_pid_integral_uses_time_and_unwinds_from_its_limit(self):
+        controller = PIDController(kp=0, ki=1, kd=0)
+        zero, target = Vector3D(), Vector3D(1, 0, 0)
+        for dt, expected in ((.5, .5), (0, .5), (100, 3)):
+            self.assertEqual(controller.desired_acceleration(zero, zero, target, dt).v[0], expected)
+        self.assertEqual(controller.desired_acceleration(zero, zero, -target, 1).v[0], 2)
+
     def test_undefined_gate_approach_stops_before_arming(self):
-        for make in (PositionController, RatesController):
+        for make in (PositionController, RatesController, PIDController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make)
                 self.assertTrue(all(row.get("command") is None for row in updates))
@@ -30,7 +39,7 @@ class ControllerSmokeTest(unittest.TestCase):
                                      for message in received))
 
     def test_active_gate_replacement_changes_target_and_replays(self):
-        for make in (PositionController, RatesController):
+        for make in (PositionController, RatesController, PIDController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make, replace_geometry=True)
                 before = [row for row in updates if row["gates"][0]["position"] == [-2, 0, 1]]

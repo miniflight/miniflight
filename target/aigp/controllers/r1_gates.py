@@ -16,8 +16,8 @@ def gate_center(gate: Gate) -> Ned:
     return Ned(*(float(p + d) for p, d in zip(gate.position, offset)))
 
 
-def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
-    """Choose a point one metre beyond the gate center along the approach."""
+def gate_target(position, index: int, gates: tuple[Gate, ...], exit_distance=1.0) -> Ned:
+    """Choose a point beyond the gate center along the approach."""
     center = gate_center(gates[index])
     direction = tuple(c - p for c, p in zip(center, position))
     distance = math.hypot(*direction)
@@ -27,7 +27,7 @@ def gate_target(position, index: int, gates: tuple[Gate, ...]) -> Ned:
         distance = math.hypot(*direction)
     if distance == 0:
         raise ValueError(f"gate {index} has no approach direction")
-    return Ned(*(c + d / distance for c, d in zip(center, direction)))
+    return Ned(*(c + exit_distance * d / distance for c, d in zip(center, direction)))
 
 
 class Controller(BaseController[PositionNed]):
