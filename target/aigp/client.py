@@ -106,19 +106,6 @@ class SimulatorClient:
             self.disconnect()
             raise
 
-    def connect(self, timeout=10.0):
-        if self.connected:
-            raise RuntimeError("client is already connected")
-        if self._socket is None:
-            self.open()
-        try:
-            deadline = time.monotonic() + timeout
-            while self._peer is None:
-                self._wait(deadline, "simulator heartbeat")
-        except BaseException:
-            self.disconnect()
-            raise
-
     def disconnect(self):
         for sock in (self._socket, self._vision):
             if sock is not None:
@@ -191,12 +178,6 @@ class SimulatorClient:
                 self._telemetry.pop("HIGHRES_IMU", None)
             self.race_telemetry = race
             return race
-
-    def _wait(self, deadline, description):
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(f"timed out waiting for {description}")
-        self.poll(min(remaining, 0.1))
 
     def send(self, command: Command):
         """Write one NED position, NED velocity, or body-rate-and-thrust command."""

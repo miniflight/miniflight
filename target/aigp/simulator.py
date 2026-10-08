@@ -42,7 +42,7 @@ class AIGPSimulator:
         self.client = SimulatorClient() if client is None else client
         self.status = None
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
-        self.armed = False
+        self.arm_requested = False
         self._send_lock = Lock()  # One MAVLink encoder serves control and heartbeat.
         self._used = False
 
@@ -146,7 +146,7 @@ class AIGPSimulator:
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if command is None:
-                    if self.armed:
+                    if self.arm_requested:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
@@ -154,8 +154,8 @@ class AIGPSimulator:
                 if type(command) not in self.client.commands:
                     raise TypeError("expected BodyRates, PositionNed or VelocityNed")
                 with self._send_lock:
-                    if not self.armed:
-                        self.armed = True
+                    if not self.arm_requested:
+                        self.arm_requested = True
                         self.client.arm()
                     self.client.send(command)
 
@@ -174,9 +174,9 @@ class AIGPSimulator:
             raise TimeoutError("native race state is stale")
 
     def stop(self):
-        if not self.armed:
+        if not self.arm_requested:
             return
-        self.armed = False
+        self.arm_requested = False
         with self._send_lock:
             try:
                 self.client.send(BodyRates())

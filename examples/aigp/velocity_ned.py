@@ -1,4 +1,4 @@
-"""Request -1 m/s on the NED north axis for two seconds, then zero velocity."""
+"""Request -1 m/s north for the first two native race seconds, then zero."""
 
 from miniflight import VelocityNed
 from target.aigp.controllers import BaseController
@@ -8,23 +8,12 @@ from target.aigp.simulator import AIGPSimulator
 class Controller(BaseController[VelocityNed]):
     targets = ("vq1.r1",)
 
-    def __init__(self):
-        self.started_at = None
-        self.imu = None
-
-    def update(self, telemetry, frames) -> VelocityNed | None:
-        for packet in telemetry:
-            if packet.data.get_type() == "HIGHRES_IMU":
-                self.imu = packet.data
-        if self.imu is None:
+    def update(self, telemetry, frames, race_state) -> VelocityNed | None:
+        if race_state is None or not race_state.started:
             return None
-        stamp = self.imu.time_usec * 1e-6
-        if self.started_at is None:
-            self.started_at = stamp
-        elapsed = stamp - self.started_at
-        if elapsed < 2:
+        if race_state.time_seconds < 2:
             return VelocityNed(-1, 0, 0)
-        if elapsed < 3:
+        if race_state.time_seconds < 3:
             return VelocityNed(0, 0, 0)
         raise StopIteration
 
