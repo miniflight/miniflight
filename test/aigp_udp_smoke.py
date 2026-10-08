@@ -23,16 +23,14 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from target.aigp.simulator import AIGPSimulator
-from target.aigp.native import _stop_process
+from target.aigp.native import RaceStateReader, _stop_process
 from target.aigp.controllers import BaseController
-from target.aigp.client import RaceTelemetry, TrackInfo
+from target.aigp.client import RaceTelemetry, SimulatorClient, TrackInfo
 from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
 from miniflight import BodyRates, VelocityNed
-from target.aigp.simulator import SimulatorClient
 from target.aigp.client import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, read_frame, recording, replay
 from test.aigp_fake_simulator import write_race
-from target.aigp.race import RaceStateReader
 
 
 def packet(message, system=42, component=7):

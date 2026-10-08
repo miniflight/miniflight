@@ -12,7 +12,8 @@ from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import Controller as PIDGates
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
-from target.aigp.simulator import AIGPSimulator, BASE, SHIPPING, sha256
+from target.aigp.native import BASE, SHIPPING, sha256
+from target.aigp.simulator import AIGPSimulator
 
 
 CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_beautiful": PIDGates}
@@ -26,7 +27,7 @@ def run(name, trace, camera=False, record_frames=False):
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
-               "target/aigp/client.py", "target/aigp/native.py", "target/aigp/race.py",
+               "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera, recorded_frames=record_frames,

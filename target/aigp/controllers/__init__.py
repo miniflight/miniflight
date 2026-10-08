@@ -5,7 +5,7 @@ from miniflight import Command, Frame, Ned
 
 if TYPE_CHECKING:
     from target.aigp.client import Packet
-    from target.aigp.race import NativeRaceState
+    from target.aigp.native import NativeRaceState
 
 
 CommandT = TypeVar("CommandT", bound=Command, covariant=True)

@@ -11,7 +11,8 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import BodyRates, PositionNed
 from target.aigp.controllers import BaseController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay as replay_controller
-from target.aigp.simulator import AIGPSimulator, BASE, SHIPPING, sha256
+from target.aigp.native import BASE, SHIPPING, sha256
+from target.aigp.simulator import AIGPSimulator
 from target.aigp.experiments.yaw_tracking import YawRateFeedback
 
 

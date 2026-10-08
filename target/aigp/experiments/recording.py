@@ -15,8 +15,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import Frame
 from target.aigp.client import Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT
-from target.aigp.native import TARGETS
-from target.aigp.race import NativeRaceState
+from target.aigp.native import TARGETS, NativeRaceState
 
 
 def command_data(command):

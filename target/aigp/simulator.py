@@ -11,12 +11,10 @@ import sys
 from threading import Event, Lock, Thread
 import time
 
-from miniflight import BodyRates, Command
+from miniflight import BodyRates
 from target.aigp.controllers import BaseController
 from target.aigp.client import SimulatorClient
-from target.aigp.race import RaceStateReader
-from target.aigp.native import (BASE, BINARIES, SHIPPING, TARGETS, VERSIONS,
-                               launch, prepare, sha256)
+from target.aigp.native import BASE, TARGETS, VERSIONS, RaceStateReader, launch, prepare
 
 
 FINISH_WAIT_SECONDS = 5.0
