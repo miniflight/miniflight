@@ -21,7 +21,6 @@ class Controller(BaseController[BodyRates]):
         self.kd = kd  # 1/s
         self.exit_distance, self.config = exit_distance, config
         self.privileged = {}  # Original labelled pose packets, retained between arrivals.
-        self.imu = None
         self.track = self.gate = None
         self.target = self.target_yaw = None
         self.time = None
@@ -43,20 +42,18 @@ class Controller(BaseController[BodyRates]):
                 self.privileged[kind] = packet
             elif packet.privileged and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
-            elif kind == "HIGHRES_IMU":
-                self.imu = packet
-        if self.imu is None or len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None:
+        if len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None:
             return None
         motion, orientation = (self.privileged[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE"))
-        if max(self.imu.received_at - packet.received_at for packet in (motion, orientation)) > .3:
+        if not race_state.completed and max(race_state.received_at - packet.received_at for packet in (motion, orientation)) > .3:
             raise TimeoutError("privileged pose is stale")
-        motion, orientation, imu = motion.data, orientation.data, self.imu.data
+        motion, orientation = motion.data, orientation.data
         position = Vector3D(motion.x, motion.y, motion.z)
         velocity = Vector3D(motion.vx, motion.vy, motion.vz)
         angles = (orientation.roll, -orientation.pitch, -orientation.yaw)  # Native wire -> FRD/NED.
         if not all(math.isfinite(v) for v in (*position.v, *velocity.v, *angles)):
             raise ValueError("nonfinite control telemetry")
-        stamp = imu.time_usec * 1e-6
+        stamp = race_state.time_seconds
         dt = 0.0 if self.time is None else max(0.0, stamp - self.time)
         self.time = stamp
         index = race_state.active_gate_index
