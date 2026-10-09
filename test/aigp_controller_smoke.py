@@ -27,6 +27,32 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_pid_rejects_old_pose_and_repeats_without_losing_equal_time_changes(self):
+        controller = PIDController()
+        gate = Gate(0, Ned(2, 0, 1), (1, 0, 0, 0), 2, 2)
+        motion = Packet(mavlink.MAVLink_local_position_ned_message(1100, 2.5, 0, 0, 0, 0, 0), 10)
+        attitude = Packet(mavlink.MAVLink_attitude_message(1100, 0, 0, 0, 0, 0, 0), 10)
+        track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
+                       10, TrackInfo(7, (gate,)))
+        race = NativeRaceState(True, True, False, 0, 0, -1, 10)
+        expected = controller.update((motion, attitude, track), (), race)
+        for stamp, receipt, north, roll in ((1000, 10.1, 0, .2), (1100, 10.2, 2.5, 0)):
+            packets = (Packet(mavlink.MAVLink_local_position_ned_message(stamp, north, 0, 0, 0, 0, 0), receipt),
+                       Packet(mavlink.MAVLink_attitude_message(stamp, roll, 0, 0, 0, 0, 0), receipt))
+            for packet in packets:
+                packet.data._header.seq = 7  # A new envelope does not make the sample new.
+            self.assertEqual(controller.update(packets, (), replace(race, received_at=receipt)), expected)
+            self.assertIs(controller.privileged["LOCAL_POSITION_NED"], motion)
+            self.assertIs(controller.privileged["ATTITUDE"], attitude)
+        # Native timestamps are coarse: a changed payload at the same time is still an observation.
+        changed = Packet(mavlink.MAVLink_attitude_message(1100, .1, 0, 0, 0, 0, 0), 10.25)
+        self.assertNotEqual(controller.update((changed,), (), replace(race, received_at=10.25)), expected)
+        self.assertIs(controller.privileged["ATTITUDE"], changed)
+        # Repeated position packets cannot keep a frozen position source fresh.
+        with self.assertRaisesRegex(TimeoutError, "privileged pose is stale"):
+            controller.update((replace(motion, received_at=10.4), replace(changed, received_at=10.4)),
+                              (), replace(race, received_at=10.4))
+
     def test_pid_uses_native_time_when_imu_clock_advances(self):
         controller = PIDController(kp=0, ki=1, kd=0)
         gate = Gate(0, Ned(2, 0, 1), (1, 0, 0, 0), 2, 2)

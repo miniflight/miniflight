@@ -39,6 +39,10 @@ class Controller(BaseController[BodyRates]):
         for packet in telemetry:
             kind = packet.data.get_type()
             if packet.privileged and kind in ("LOCAL_POSITION_NED", "ATTITUDE"):
+                previous = self.privileged.get(kind)
+                if previous is not None and (packet.data.time_boot_ms < previous.data.time_boot_ms
+                                             or packet.data.to_dict() == previous.data.to_dict()):
+                    continue
                 self.privileged[kind] = packet
             elif packet.privileged and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
