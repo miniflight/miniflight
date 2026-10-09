@@ -50,7 +50,7 @@ class Controller(BaseController[BodyRates]):
         if not 0 <= index <= len(self.track):
             raise ValueError("gate index outside the published track")
         if index < len(self.track) and self.track[index] != self.gate:
-            self.target = Vector3D(*gate_target(position.v, index, self.track, self.exit_distance))
+            self.target = gate_target(position, index, self.track, self.exit_distance)
             self.gate = self.track[index]
         if self.target is None:
             return None

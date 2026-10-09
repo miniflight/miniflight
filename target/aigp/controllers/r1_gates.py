@@ -3,31 +3,30 @@
 import math
 
 from common.math import Quaternion, Vector3D
-from miniflight import Ned, PositionNed
+from miniflight import PositionNed
 from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController, Gate
 
 
-def gate_center(gate: Gate) -> Ned:
+def gate_center(gate: Gate) -> Vector3D:
     """Offset the published gate base to its opening center."""
     norm = math.hypot(*gate.orientation)
     rotation = Quaternion(*(value / norm for value in gate.orientation))
-    offset = rotation.rotate(Vector3D(0, 0, -gate.height / 2)).v
-    return Ned(*(float(p + d) for p, d in zip(gate.position, offset)))
+    return Vector3D(*gate.position) + rotation.rotate(Vector3D(0, 0, -gate.height / 2))
 
 
-def gate_target(position, index: int, gates: tuple[Gate, ...], exit_distance=1.0) -> Ned:
+def gate_target(position: Vector3D, index: int, gates: tuple[Gate, ...], exit_distance=1.0) -> Vector3D:
     """Choose a point beyond the gate center along the approach."""
     center = gate_center(gates[index])
-    direction = tuple(c - p for c, p in zip(center, position))
-    distance = math.hypot(*direction)
+    direction = center - position
+    distance = math.hypot(*direction.v)
     if distance < 0.1:
-        previous = gate_center(gates[index - 1]) if index else (0.0, 0.0, 0.0)
-        direction = tuple(c - p for c, p in zip(center, previous))
-        distance = math.hypot(*direction)
+        previous = gate_center(gates[index - 1]) if index else Vector3D()
+        direction = center - previous
+        distance = math.hypot(*direction.v)
     if distance == 0:
         raise ValueError(f"gate {index} has no approach direction")
-    return Ned(*(c + exit_distance * d / distance for c, d in zip(center, direction)))
+    return center + exit_distance * direction / distance
 
 
 class Controller(BaseController[PositionNed]):
@@ -48,14 +47,14 @@ class Controller(BaseController[PositionNed]):
         if pose is None or imu is None or race_state is None or not race_state.started or not usable_track(self.track):
             return None
         motion = pose.data
-        position = Ned(motion.x, motion.y, motion.z)
-        if imu.received_at - pose.received_at > 1 or not all(math.isfinite(v) for v in (*position, motion.vx, motion.vy, motion.vz)):
+        position = Vector3D(motion.x, motion.y, motion.z)
+        if imu.received_at - pose.received_at > 1 or not all(math.isfinite(v) for v in (*position.v, motion.vx, motion.vy, motion.vz)):
             return None
         gates, gate_index = self.track, race_state.active_gate_index
         if not 0 <= gate_index <= len(gates):
             raise ValueError(f"gate index {gate_index} does not belong to the published track")
         if gate_index < len(gates) and gates[gate_index] != self.gate:
-            self.target = PositionNed(*gate_target(position, gate_index, gates))
+            self.target = PositionNed(*gate_target(position, gate_index, gates).v)
             self.gate = gates[gate_index]
 
         return self.target
