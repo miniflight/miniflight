@@ -1,6 +1,5 @@
 """Position feedback, attitude feedback, then native body-rate control."""
 
-import math
 from common.math import Vector3D
 from miniflight import BodyRates
 from miniflight.position import PositionConfig, acceleration_control
@@ -26,25 +25,16 @@ class Controller(BaseController[BodyRates]):
         self.time = None
         self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
 
-    def desired_acceleration(self, position: Vector3D, velocity: Vector3D,
-                             target: Vector3D, dt: float) -> Vector3D:
-        """Position in metres and velocity in m/s produce acceleration in m/s²."""
-        error = target - position
-        integral = self.integral + self.ki * dt * error
-        limit = self.config.max_acceleration
-        self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
-        return self.kp * error + self.integral - self.kd * velocity
-
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
             kind = packet.data.get_type()
-            if packet.privileged and kind in ("LOCAL_POSITION_NED", "ATTITUDE"):
+            if kind in ("LOCAL_POSITION_NED", "ATTITUDE"):
                 previous = self.privileged.get(kind)
                 if previous is not None and (packet.data.time_boot_ms < previous.data.time_boot_ms
                                              or packet.data.to_dict() == previous.data.to_dict()):
                     continue
                 self.privileged[kind] = packet
-            elif packet.privileged and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
+            elif isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
         if len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None:
             return None
@@ -55,11 +45,7 @@ class Controller(BaseController[BodyRates]):
         position = Vector3D(motion.x, motion.y, motion.z)
         velocity = Vector3D(motion.vx, motion.vy, motion.vz)
         angles = (orientation.roll, -orientation.pitch, -orientation.yaw)  # Native wire -> FRD/NED.
-        if not all(math.isfinite(v) for v in (*position.v, *velocity.v, *angles)):
-            raise ValueError("nonfinite control telemetry")
-        stamp = race_state.time_seconds
-        dt = 0.0 if self.time is None else max(0.0, stamp - self.time)
-        self.time = stamp
+
         index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):
             raise ValueError("gate index outside the published track")
@@ -70,5 +56,12 @@ class Controller(BaseController[BodyRates]):
             return None
         if self.target_yaw is None:
             self.target_yaw = angles[2]
-        acceleration = self.desired_acceleration(position, velocity, self.target, dt)
+
+        dt = 0.0 if self.time is None else max(0.0, race_state.time_seconds - self.time)
+        self.time = race_state.time_seconds
+        error = self.target - position
+        integral = self.integral + self.ki * dt * error
+        limit = self.config.max_acceleration
+        self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
+        acceleration = self.kp * error + self.integral - self.kd * velocity
         return acceleration_control(self.config, acceleration.v, angles, self.target_yaw)

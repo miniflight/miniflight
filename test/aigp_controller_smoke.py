@@ -12,7 +12,6 @@ import unittest
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from common.math import Vector3D
 from miniflight import Ned
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as PositionController
@@ -53,7 +52,7 @@ class ControllerSmokeTest(unittest.TestCase):
             controller.update((replace(motion, received_at=10.4), replace(changed, received_at=10.4)),
                               (), replace(race, received_at=10.4))
 
-    def test_pid_uses_native_time_when_imu_clock_advances(self):
+    def test_pid_uses_native_time_and_unwinds_from_its_limit(self):
         controller = PIDController(kp=0, ki=1, kd=0)
         gate = Gate(0, Ned(2, 0, 1), (1, 0, 0, 0), 2, 2)
         packets = (
@@ -65,22 +64,18 @@ class ControllerSmokeTest(unittest.TestCase):
         race = NativeRaceState(started=True, valid=True, completed=False, time_seconds=0,
                                active_gate_index=0, finish_time_seconds=-1, received_at=10)
         self.assertIsNotNone(controller.update(packets, (), race))
-        for native_time, imu_time, receipt, integral in ((.5, 50000000, 10.1, 1.5), (.5, 100000000, 10.2, 1.5)):
-            controller.update((Packet(imu(imu_time), receipt),), (),
+        cases = ((.5, 50000000, 0, 1.5), (.5, 100000000, 0, 1.5), (100, 101000000, 0, 3), (101, 102000000, 4, 2))
+        for i, (native_time, imu_time, north, integral) in enumerate(cases, 1):
+            receipt = 10 + i * .05
+            motion = mavlink.MAVLink_local_position_ned_message(5000 + i, north, 0, 0, 0, 0, 0)
+            controller.update((Packet(imu(imu_time), receipt), Packet(motion, receipt)), (),
                               replace(race, time_seconds=native_time, received_at=receipt))
             self.assertEqual(tuple(controller.integral.v), (integral, 0, 0))
         with self.assertRaisesRegex(TimeoutError, "privileged pose is stale"):
-            controller.update((), (), replace(race, time_seconds=.5, received_at=10.5))
+            controller.update((), (), replace(race, time_seconds=101, received_at=10.5))
         # Native completion can arrive after the final sensor packet.
-        self.assertIsNotNone(controller.update((), (), replace(race, completed=True, time_seconds=.5,
-                             active_gate_index=1, finish_time_seconds=.5, received_at=11)))
-
-    def test_pid_integral_uses_time_and_unwinds_from_its_limit(self):
-        controller = PIDController(kp=0, ki=1, kd=0)
-        zero, target = Vector3D(), Vector3D(1, 0, 0)
-        for dt, expected in ((.5, .5), (0, .5), (100, 3)):
-            self.assertEqual(controller.desired_acceleration(zero, zero, target, dt).v[0], expected)
-        self.assertEqual(controller.desired_acceleration(zero, zero, -target, 1).v[0], 2)
+        self.assertIsNotNone(controller.update((), (), replace(race, completed=True, time_seconds=101,
+                             active_gate_index=1, finish_time_seconds=101, received_at=11)))
 
     def test_undefined_gate_approach_stops_before_arming(self):
         for make in (PositionController, RatesController, PIDController):
