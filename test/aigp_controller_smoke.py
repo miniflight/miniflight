@@ -91,6 +91,11 @@ class ControllerSmokeTest(unittest.TestCase):
                 self.assertFalse(any(message.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED")
                                      for message in received))
 
+    def test_pid_waits_for_first_imu_and_times_out_if_it_never_arrives(self):
+        for imu_after in (80, None):
+            with self.subTest(imu_after=imu_after):
+                self.flight(PIDController, replace_geometry=True, imu_after=imu_after)
+
     def test_active_gate_replacement_changes_target_and_replays(self):
         for make in (PositionController, RatesController, PIDController):
             with self.subTest(controller=make.__module__):
@@ -119,13 +124,13 @@ class ControllerSmokeTest(unittest.TestCase):
                 neutral = [message for message in received if message.get_type() == "SET_ATTITUDE_TARGET"][-1]
                 self.assertEqual((neutral.body_roll_rate, neutral.body_pitch_rate, neutral.body_yaw_rate, neutral.thrust), (0, 0, 0, 0))
 
-    def flight(self, make, replace_geometry=False):
+    def flight(self, make, replace_geometry=False, imu_after=0):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "trace.jsonl"
         native_path = Path(directory) / "native.jsonl"
         native = self.enterContext(native_path.open("w"))
         stop = threading.Event()
-        failures, received = [], []
+        failures, received, before_imu = [], [], []
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server, recording(path) as record:
             server.bind(("127.0.0.1", 0))
             server.setblocking(False)
@@ -143,6 +148,7 @@ class ControllerSmokeTest(unittest.TestCase):
 
             def serve():
                 sequence = 0
+                imu_sent = False
                 try:
                     while not stop.wait(.005):
                         sock = client._socket
@@ -153,6 +159,8 @@ class ControllerSmokeTest(unittest.TestCase):
                         except OSError:
                             continue
                         drain()
+                        if not imu_sent:
+                            before_imu[:] = [m for m in received if m.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET")]
                         commands = sum(message.get_type() in ("SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED") for message in received)
                         replaced = replace_geometry and commands >= 3
                         center = ((0, -2, 0) if replaced else (-2, 0, 0)) if replace_geometry else (0, 0, 0)
@@ -172,10 +180,13 @@ class ControllerSmokeTest(unittest.TestCase):
                             mavlink.MAVLink_encapsulated_data_message(0, race),
                             mavlink.MAVLink_local_position_ned_message(stamp // 1000, north, 0, 0, .2 if replace_geometry else 0, 0, 0),
                             mavlink.MAVLink_attitude_message(stamp // 1000, 0, 0, 0, 0, 0, 0),
-                            mavlink.MAVLink_highres_imu_message(stamp, 0, 0, -9.81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xffff),
                         )
                         for message in messages:
                             server.sendto(message.pack(encoder), peer)
+                        if imu_after is not None and sequence >= imu_after:
+                            message = mavlink.MAVLink_highres_imu_message(stamp, 0, 0, -9.81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xffff)
+                            server.sendto(message.pack(encoder), peer)
+                            imu_sent = True
                 except BaseException as error:
                     failures.append(error)
 
@@ -184,7 +195,10 @@ class ControllerSmokeTest(unittest.TestCase):
             simulator = AIGPSimulator(RecordedController(make, record), startup_timeout=3, client=client,
                                       race_status_path=native_path)
             try:
-                if replace_geometry:
+                if imu_after is None:
+                    with self.assertRaisesRegex(TimeoutError, "required startup telemetry"):
+                        simulator.rollout(attach=True)
+                elif replace_geometry:
                     simulator.rollout(attach=True)
                 else:
                     with self.assertRaisesRegex(ValueError, "gate 0 has no approach direction"):
@@ -196,6 +210,7 @@ class ControllerSmokeTest(unittest.TestCase):
             self.assertFalse(worker.is_alive())
             self.assertEqual(failures, [])
             drain()
+            self.assertEqual(before_imu, [])
             self.assertIsNone(client._socket)
             self.assertFalse(client.connected)
         updates, observed, decoder = [], SimulatorClient(camera_port=None), mavlink.MAVLink(None)

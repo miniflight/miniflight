@@ -87,7 +87,7 @@ class AIGPSimulator:
             now = time.monotonic()
             period = 1.0 / self.hz
             next_tick = now - period
-            last_imu_at = now
+            last_imu_at = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
             while True:
@@ -122,7 +122,7 @@ class AIGPSimulator:
                         raise TimeoutError("race never reported GO before the startup deadline")
                 # IMU loss ends control permanently; only native finish can end the wait.
                 if (self.status is not None and self.status.started and not self.status.completed
-                        and finish_deadline is None and now - last_imu_at >= self.timeout):
+                        and finish_deadline is None and last_imu_at is not None and now - last_imu_at >= self.timeout):
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
                 if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
@@ -143,14 +143,14 @@ class AIGPSimulator:
                     return self.status
                 if self.status is None or not self.status.started:
                     continue
-                if now - last_imu_at > self.timeout:
-                    raise TimeoutError("controller returned a command for stale IMU telemetry")
-                if command is None:
+                if command is None or last_imu_at is None:
                     if self.arm_requested:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
                     continue
+                if now - last_imu_at > self.timeout:
+                    raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if type(command) not in self.client.commands:
                     raise TypeError("expected BodyRates, PositionNed or VelocityNed")
                 with self._send_lock:
