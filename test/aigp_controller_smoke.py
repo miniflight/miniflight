@@ -27,6 +27,23 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_pid_samples_reference_on_native_pose_clock(self):
+        def reference(time):
+            return (2 * time, 0, 0), (2, 0, 0), (0, 0, 0)
+        controller = PIDController(reference=reference)
+        gate = Gate(0, Ned(2, 0, 0), (1, 0, 0, 0), 2.72, 2.72)
+        track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
+                       10, TrackInfo(7, (gate,)))
+        race = NativeRaceState(True, True, False, .2, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
+        for stamp, north in ((1100, .4), (1120, .44)):
+            packets = (track,
+                       Packet(mavlink.MAVLink_local_position_ned_message(stamp, north, 0, 0, 2, 0, 0), 10),
+                       Packet(mavlink.MAVLink_attitude_message(stamp, 0, 0, 0, 0, 0, 0), 10))
+            command = controller.update(packets, (), race)  # Lua race time can remain unchanged.
+            self.assertAlmostEqual(controller.target.v[0], north)
+            self.assertAlmostEqual(command.pitch_rate, 0, places=6)
+            self.assertEqual(command.thrust, controller.config.hover_thrust)
+
     def test_pid_follows_velocity_and_acceleration_references(self):
         controller = PIDController(kp=0)
         controller.target_velocity = Vector3D(2, 0, 0)

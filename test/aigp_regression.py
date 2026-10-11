@@ -23,7 +23,7 @@ ROOT = BASE.parents[1]
 def run(name, trace, camera=False, record_frames=False):
     camera = camera or record_frames
     make = CONTROLLERS[name]
-    sources = ("miniflight/position.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
+    sources = ("miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",

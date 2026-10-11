@@ -14,7 +14,7 @@ CONFIG = PositionConfig(hover_thrust=.266, thrust_acceleration=53.5)
 class Controller(BaseController[BodyRates]):
     targets = ("vq1.r1",)
 
-    def __init__(self, kp=2.0, ki=0.0, kd=2.0, exit_distance=1.0, config=CONFIG):
+    def __init__(self, kp=2.0, ki=0.0, kd=2.0, exit_distance=1.0, config=CONFIG, reference=None):
         self.kp = kp  # 1/s²
         self.ki = ki  # 1/s³
         self.kd = kd  # 1/s
@@ -24,6 +24,7 @@ class Controller(BaseController[BodyRates]):
         self.target = self.target_yaw = None
         self.target_velocity = Vector3D()  # NED m/s.
         self.target_acceleration = Vector3D()  # NED m/s².
+        self.reference, self.reference_start = reference, None
         self.time = None
         self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
 
@@ -52,9 +53,14 @@ class Controller(BaseController[BodyRates]):
         index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):
             raise ValueError("gate index outside the published track")
-        if index < len(self.track) and (index, race_state.gate_centers[index]) != self.gate:
+        if self.reference is None and index < len(self.track) and (index, race_state.gate_centers[index]) != self.gate:
             self.target = gate_target(position, index, race_state.gate_centers, self.exit_distance)
             self.gate = (index, race_state.gate_centers[index])
+        if self.reference is not None:
+            if self.reference_start is None:
+                self.reference_start = motion.time_boot_ms / 1000 - race_state.time_seconds
+            elapsed = motion.time_boot_ms / 1000 - self.reference_start  # Pose seconds since native GO.
+            self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(elapsed))
         if self.target is None:
             return None
         if self.target_yaw is None:
