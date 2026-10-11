@@ -104,7 +104,7 @@ native field and flag; `Packet.received_at` is host monotonic receipt time.
 `Packet.decoded` exposes race status (`ENCAPSULATED_DATA` type 1) or a newly
 completed `TrackInfo` (handshake plus type-2 indexed fragments). `TrackInfo`
 contains the native transfer ID and a tuple of `Gate(id, position, orientation,
-width, height)` records: NED base, wxyz quaternion and overall dimensions.
+width, height)` records: NED mesh pivot, wxyz quaternion and overall dimensions.
 `Packet.privileged` labels pose and course traffic, including redacted fields.
 
 `frames` contains newly completed JPEGs decoded to readonly BGR images, with

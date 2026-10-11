@@ -8,11 +8,15 @@ from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController, Gate
 
 
+# VQ1 3391 square mesh: pivot to opening center, local NED metres.
+R1_CENTER_OFFSET = Vector3D(0, 0, -1.06823112488)
+
+
 def gate_center(gate: Gate) -> Vector3D:
-    """Offset the published gate base to its opening center."""
+    """Transform the verified R1 mesh opening center into NED."""
     norm = math.hypot(*gate.orientation)
     rotation = Quaternion(*(value / norm for value in gate.orientation))
-    return Vector3D(*gate.position) + rotation.rotate(Vector3D(0, 0, -gate.height / 2))
+    return Vector3D(*gate.position) + rotation.rotate(R1_CENTER_OFFSET)
 
 
 def gate_target(position: Vector3D, index: int, gates: tuple[Gate, ...], exit_distance=1.0) -> Vector3D:
@@ -24,7 +28,7 @@ def gate_target(position: Vector3D, index: int, gates: tuple[Gate, ...], exit_di
         previous = gate_center(gates[index - 1]) if index else Vector3D()
         direction = center - previous
         distance = math.hypot(*direction.v)
-    if distance == 0:
+    if distance < 0.1:
         raise ValueError(f"gate {index} has no approach direction")
     return center + exit_distance * direction / distance
 

@@ -16,7 +16,7 @@ class Gate:
     """Published NED gate position, wxyz orientation and overall bounds in metres."""
 
     id: int
-    position: Ned  # native position is at the gate base
+    position: Ned  # native actor/mesh pivot
     orientation: tuple[float, float, float, float]
     width: float  # reported overall width in metres
     height: float  # reported overall height in metres

@@ -135,8 +135,11 @@ controller. `r1_gates` returns `PositionNed`; `r1_body_rates` returns `BodyRates
 ## track input
 
 `TrackInfo` arrives on the packet that completes a native course transfer.
-Its gates retain raw NED base positions, wxyz orientations and overall bounds.
+Its gates retain raw NED mesh pivots, wxyz orientations and overall bounds.
 The controller checks the geometry and derives opening centers if needed.
 `SimulatorClient.gates` caches the last complete transfer, including redacted values.
 
 The captured VQ1 build 3391 packet is preserved in `test/fixtures/vq1_track.json`.
+All six R1 square gates have a 1.48 m clear opening, centered 1.068231 m above
+the mesh pivot. The reported 2.72 m height spans the outer bounds; its halfway
+point is 0.292 m above the physical opening center.
