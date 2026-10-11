@@ -130,7 +130,7 @@ class SimulatorClient:
             message = self.connection.recv_msg()
             if message is not None:
                 now = time.monotonic()
-                decoded = self._receive(message, None, now)
+                decoded = self._receive(message, now)
                 if (message.get_type() != "BAD_DATA" and self.target_ids is not None
                         and message.get_srcSystem() == self.target_ids[0]):
                     arrivals.append(Packet(message, now, decoded))
@@ -145,7 +145,7 @@ class SimulatorClient:
                 arrivals.append(Packet(packet, now, self._camera.receive(packet, now)))
         return tuple(arrivals)
 
-    def _receive(self, message, peer, now):
+    def _receive(self, message, now):
         kind = message.get_type()
         if kind == "BAD_DATA":
             return

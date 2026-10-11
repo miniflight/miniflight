@@ -127,17 +127,17 @@ class DiagnosticClient(RecordedClient):
 
     def __init__(self, record):
         super().__init__(record, camera_port=None)
-        self._outgoing = mavlink.MAVLink(None)
 
-    def write(self, packet):
-        result = super().write(packet)
-        for message in self._outgoing.parse_buffer(packet) or ():
-            if message.get_type() in ("SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED"):
-                self.record(event="wire_sent", packet_hex=bytes(packet).hex(), message=message.to_dict())
-        return result
+    def open(self):
+        super().open()
+        self.connection.mav.set_send_callback(self._sent)
 
-    def _receive(self, message, peer, now):
-        decoded = super()._receive(message, peer, now)
+    def _sent(self, message):
+        if message.get_type() in ("SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED"):
+            self.record(event="wire_sent", packet_hex=bytes(message.get_msgbuf()).hex(), message=message.to_dict())
+
+    def _receive(self, message, now):
+        decoded = super()._receive(message, now)
         if (message.get_type() in ("HIGHRES_IMU", "ATTITUDE", "LOCAL_POSITION_NED", "ACTUATOR_OUTPUT_STATUS")
                 and self._telemetry.get(message.get_type()) is message):
             # Bytes preserve unsupported/NaN fields without inventing JSON values.

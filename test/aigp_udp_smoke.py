@@ -605,7 +605,7 @@ class UDPSmokeTest(unittest.TestCase):
         for row in rows:
             for saved in row.get("telemetry", ()):
                 message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
-                decoded = observed._receive(message, ("test", 0), saved["received_at"])
+                decoded = observed._receive(message, saved["received_at"])
                 if isinstance(decoded, TrackInfo) and usable_track(decoded.gates):
                     tracks.append(decoded.gates)
         self.assertTrue(tracks)

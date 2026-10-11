@@ -246,7 +246,7 @@ class ControllerSmokeTest(unittest.TestCase):
                 continue
             for saved in row["telemetry"]:
                 message, = decoder.parse_buffer(base64.b64decode(saved["wire"]))
-                observed._receive(message, ("test", 0), saved["received_at"])
+                observed._receive(message, saved["received_at"])
             row["gates"] = None if observed.gates is None else json.loads(json.dumps([asdict(gate) for gate in observed.gates]))
             row["gate_index"] = None if row["native_race"] is None else row["native_race"]["active_gate_index"]
             updates.append(row)

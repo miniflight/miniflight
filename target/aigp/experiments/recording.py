@@ -113,8 +113,8 @@ class RecordedClient(SimulatorClient):
         super()._set_armed(armed)
         self.record(event="arm_request", armed=armed)
 
-    def _receive(self, message, peer, now):
-        decoded = super()._receive(message, peer, now)
+    def _receive(self, message, now):
+        decoded = super()._receive(message, now)
         if (message.get_type() in ("COMMAND_ACK", "COLLISION", "HEARTBEAT")
                 and self._telemetry.get(message.get_type()) is message):
             self.record(event="telemetry", message=message.to_dict())
@@ -140,7 +140,7 @@ def replay(create, path):
             for packet in row["telemetry"]:
                 message, = decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
                 stamp = packet["received_at"]
-                telemetry.append(Packet(message, stamp, client._receive(message, ("replay", 0), stamp)))
+                telemetry.append(Packet(message, stamp, client._receive(message, stamp)))
             frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
             try:
                 race = row["native_race"]
