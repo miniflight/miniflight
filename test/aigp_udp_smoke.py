@@ -47,6 +47,22 @@ def imu(stamp=1000000):
 
 
 class UDPSmokeTest(unittest.TestCase):
+    def test_native_centers_are_retained_between_race_observations(self):
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        path = Path(directory) / "native.jsonl"
+        output = self.enterContext(path.open("w"))
+        reader = RaceStateReader(path)
+        self.addCleanup(reader.close)
+        centers = json.loads((Path(__file__).parent / "fixtures/vq1_track.json").read_text())["expected_centers"]
+        output.write(json.dumps({"gate_centers": centers}) + "\n")
+        output.flush()
+        self.assertEqual(reader.poll(), ())
+        for index in (0, 1):
+            write_race(output, active_gate_index=index)
+            state, = reader.poll()
+            self.assertEqual(state.gate_centers, tuple(map(tuple, centers)))
+            self.assertEqual(state.active_gate_index, index)
+
     def test_native_state_waits_for_a_complete_record_and_rejects_untyped_flags(self):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "native.jsonl"

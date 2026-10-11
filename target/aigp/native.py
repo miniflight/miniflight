@@ -17,6 +17,8 @@ import tarfile
 import tempfile
 import time
 
+from miniflight import Ned
+
 
 BASE = Path(__file__).resolve().parent
 BINARIES = Path("FlightSim/Binaries/Win64")
@@ -46,6 +48,7 @@ class NativeRaceState:
     active_gate_index: int  # Local PlayerStateRaceBase.ActiveGateSequentialId
     finish_time_seconds: float  # Local PlayerStateRaceBase.GetCompletedRaceTotalTime()
     received_at: float  # Host monotonic receipt
+    gate_centers: tuple[Ned, ...] = ()  # Native mesh bounds centers, local NED metres, sequential order.
 
     def __post_init__(self):
         if any(type(value) is not bool for value in (self.started, self.valid, self.completed)):
@@ -54,11 +57,16 @@ class NativeRaceState:
             raise ValueError("native race clocks must be finite")
         if type(self.active_gate_index) is not int:
             raise ValueError("native gate index must be an integer")
+        centers = tuple(Ned(*center) for center in self.gate_centers)
+        if not all(math.isfinite(value) for center in centers for value in center):
+            raise ValueError("native gate centers must be finite")
+        object.__setattr__(self, "gate_centers", centers)
 
 
 class RaceStateReader:
     def __init__(self, path, timeout=1.0):
         self.path, self.timeout, self.stream = Path(path), timeout, None
+        self.gate_centers = ()
 
     def poll(self):
         if self.stream is None:
@@ -75,7 +83,11 @@ class RaceStateReader:
             if not line.endswith("\n"):
                 self.stream.seek(position)  # Wait for a complete observation.
                 return tuple(states)
-            states.append(NativeRaceState(**json.loads(line), received_at=time.monotonic()))
+            data = json.loads(line)
+            if "gate_centers" in data:
+                self.gate_centers = data["gate_centers"]
+                continue
+            states.append(NativeRaceState(**data, gate_centers=self.gate_centers, received_at=time.monotonic()))
 
     def close(self):
         if self.stream is not None:
