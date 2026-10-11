@@ -64,7 +64,7 @@ class SimulatorClient:
         self.port = port
         self.camera_port = camera_port
         self._connection = None
-        self._socket = self._vision = self._peer = self.mav = self.target_ids = None
+        self._socket = self._vision = self.target_ids = None
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
@@ -72,7 +72,15 @@ class SimulatorClient:
 
     @property
     def connected(self):
-        return self._peer is not None
+        return self.target_ids is not None
+
+    @property
+    def mav(self):
+        if self._connection is None or not self.connected:
+            raise RuntimeError("client is not connected")
+        if self._connection.port.fileno() < 0:
+            raise OSError("MAVLink connection is closed")
+        return self._connection.mav
 
     @property
     def gates(self):
@@ -93,8 +101,6 @@ class SimulatorClient:
         self._track = _Track()
         self.race_telemetry = None
         self._boot = time.monotonic()
-        self.mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
-        self.mav.robust_parsing = True
         try:
             self._connection = mavutil.mavlink_connection(
                 f"udpin:127.0.0.1:{self.port}", dialect="common", source_component=191)
@@ -114,12 +120,7 @@ class SimulatorClient:
             if sock is not None:
                 sock.close()
         self._connection = None
-        self._socket = self._vision = self._peer = self.mav = self.target_ids = None
-
-    def write(self, packet):
-        if self._socket is None or self._peer is None:
-            raise RuntimeError("client is not connected")
-        return self._socket.sendto(packet, self._peer)
+        self._socket = self._vision = self.target_ids = None
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
         if self._socket is None:
@@ -128,23 +129,23 @@ class SimulatorClient:
         sockets = [s for s in (self._socket, self._vision) if s is not None]
         # Bound each drain so continuous traffic cannot starve the controller.
         for _ in range(128):
+            # Drain buffered messages too: one UDP datagram can contain several.
+            message = self._connection.recv_msg()
+            if message is not None:
+                now = time.monotonic()
+                decoded = self._receive(message, None, now)
+                if (message.get_type() != "BAD_DATA" and self.target_ids is not None
+                        and message.get_srcSystem() == self.target_ids[0]):
+                    arrivals.append(Packet(message, now, decoded))
+                timeout = 0.0
             ready, _, _ = select.select(sockets, [], [], timeout)
-            if not ready:
+            if not ready and message is None:
                 break
             timeout = 0.0
-            for sock in ready:
-                packet, peer = sock.recvfrom(65536)
+            if self._vision in ready:
+                packet, _ = self._vision.recvfrom(65536)
                 now = time.monotonic()
-                if sock is self._vision:
-                    arrivals.append(Packet(packet, now, self._camera.receive(packet, now)))
-                    continue
-                if self._peer is not None and peer != self._peer:
-                    continue
-                for message in self.mav.parse_buffer(packet) or ():
-                    decoded = self._receive(message, peer, now)
-                    if (peer == self._peer and message.get_type() != "BAD_DATA"
-                            and message.get_srcSystem() == self.target_ids[0]):
-                        arrivals.append(Packet(message, now, decoded))
+                arrivals.append(Packet(packet, now, self._camera.receive(packet, now)))
         return tuple(arrivals)
 
     def _receive(self, message, peer, now):
@@ -152,10 +153,12 @@ class SimulatorClient:
         if kind == "BAD_DATA":
             return
         source = (message.get_srcSystem(), message.get_srcComponent())
-        if self._peer is None:
+        if self.target_ids is None:
             if kind != "HEARTBEAT":
                 return
-            self._peer, self.target_ids = peer, source
+            self.target_ids = source
+            if self._connection is not None:
+                self._connection.target_system, self._connection.target_component = source
         if source[0] != self.target_ids[0]:
             return
         if kind == "HIGHRES_IMU":
