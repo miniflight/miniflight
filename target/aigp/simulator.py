@@ -4,6 +4,7 @@ import argparse
 from contextlib import ExitStack
 import importlib
 import math
+from pathlib import Path
 from queue import Empty, Queue
 import signal
 import subprocess
@@ -25,7 +26,7 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
@@ -42,6 +43,7 @@ class AIGPSimulator:
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
         self.monitor = Monitor()
+        self.monitor_path = Path(monitor_path) if monitor_path is not None else BASE / ".runtime/rollouts" / f"{target}-{time.time_ns()}.png"
         self.status = None
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
         self.arm_requested = False
@@ -54,6 +56,7 @@ class AIGPSimulator:
             raise RuntimeError("create a fresh controller and simulator for each rollout")
         self._used = True
         with ExitStack() as cleanup:
+            cleanup.callback(self.save_monitor)  # Plot only after control, receiver, process and connection stop.
             cleanup.callback(self.client.disconnect)
             self.client.open()
             process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
@@ -166,6 +169,15 @@ class AIGPSimulator:
                         self.arm_requested = True
                         self.client.arm()
                     self.client.send(command)
+
+    def save_monitor(self):
+        self.monitor.save(self.monitor_path.with_suffix(".csv"))
+        race = self.status
+        outcome = "not observed" if race is None else f"completed={race.completed}, valid={race.valid}, gate={race.active_gate_index}"
+        self.monitor.plot(self.monitor_path, () if race is None else race.gate_centers,
+                          title=f"{self.target}: MAVLink LOCAL_POSITION_NED (privileged)\nNative Lua race: {outcome}",
+                          reference_label="Lua mesh bounds centers (privileged)")
+        print(f"Rollout plot: {self.monitor_path}", flush=True)
 
     def read_race(self, arrivals):
         while not arrivals.empty():

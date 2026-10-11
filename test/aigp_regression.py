@@ -23,7 +23,7 @@ ROOT = BASE.parents[1]
 def run(name, trace, camera=False, record_frames=False):
     camera = camera or record_frames
     make = CONTROLLERS[name]
-    sources = ("miniflight/position.py", "miniflight/state.py", "miniflight/control.py",
+    sources = ("miniflight/position.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
@@ -37,7 +37,7 @@ def run(name, trace, camera=False, record_frames=False):
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames), "vq1.r1", client=client,
-                                  race_status_path=trace.with_suffix(".native.jsonl"))
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"))
         try:
             result = simulator.rollout()
         finally:
