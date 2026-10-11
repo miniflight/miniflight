@@ -2,7 +2,9 @@
 
 import argparse
 from contextlib import ExitStack
+from dataclasses import asdict
 import importlib
+import json
 import math
 from pathlib import Path
 from queue import Empty, Queue
@@ -173,6 +175,17 @@ class AIGPSimulator:
     def save_monitor(self):
         self.monitor.save(self.monitor_path.with_suffix(".csv"))
         race = self.status
+        with self.monitor_path.with_suffix(".sources.json").open("x") as output:
+            json.dump(dict(target=self.target, hz=self.hz, position_samples=len(self.monitor.motion),
+                           position_source="MAVLink.LOCAL_POSITION_NED (privileged)",
+                           position_frame="local NED metres; velocity in m/s",
+                           device_time="LOCAL_POSITION_NED.time_boot_ms / 1000 (seconds)",
+                           host_received_at="Packet.received_at (host monotonic seconds)",
+                           reference_source="target/aigp/config/race.lua: mesh bounds centers (privileged)",
+                           reference_frame="local NED metres relative to starting grid",
+                           race_source="target/aigp/config/race.lua: engine observations (privileged)",
+                           race_clock="GetRaceTime (game seconds); received_at is host monotonic file-read time",
+                           clocks_synchronized=False, race_state=None if race is None else asdict(race)), output, indent=2)
         outcome = "not observed" if race is None else f"completed={race.completed}, valid={race.valid}, gate={race.active_gate_index}"
         self.monitor.plot(self.monitor_path, () if race is None else race.gate_centers,
                           title=f"{self.target}: MAVLink LOCAL_POSITION_NED (privileged)\nNative Lua race: {outcome}",
