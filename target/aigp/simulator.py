@@ -11,7 +11,8 @@ import sys
 from threading import Event, Lock, Thread
 import time
 
-from miniflight import BodyRates
+from miniflight import BodyRates, Motion, Ned
+from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
 from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, TARGETS, VERSIONS, RaceStateReader, launch, prepare
@@ -40,6 +41,7 @@ class AIGPSimulator:
         self.timeout = timeout
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
+        self.monitor = Monitor()
         self.status = None
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
         self.arm_requested = False
@@ -64,6 +66,12 @@ class AIGPSimulator:
                 try:
                     while not stopped.is_set():
                         packets = self.client.poll(timeout=min(self.timeout, 0.1))
+                        for packet in packets:
+                            message = packet.data
+                            if not isinstance(message, bytes) and message.get_type() == "LOCAL_POSITION_NED":
+                                self.monitor.observe(Motion(message.time_boot_ms / 1000, packet.received_at,
+                                                            Ned(message.x, message.y, message.z),
+                                                            Ned(message.vx, message.vy, message.vz)))
                         arrivals.put(packets)
                         for state in race_reader.poll():
                             race_arrivals.put(state)
