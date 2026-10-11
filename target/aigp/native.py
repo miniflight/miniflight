@@ -41,6 +41,11 @@ TARGETS = {
 
 @dataclass(frozen=True)
 class NativeRaceState:
+    """Privileged engine observations supplied by our Lua instrumentation.
+
+    Race time uses the game clock; received_at is Python's file-read time.
+    """
+
     started: bool  # GameStateRaceBase.HasRaceStarted()
     valid: bool  # Local PlayerStateRaceBase.IsRaceValid()
     completed: bool  # Local PlayerStateRaceBase.bRaceCompleted

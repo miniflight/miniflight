@@ -17,13 +17,18 @@ The runner constructs `Controller()` after the native heartbeat.
 `telemetry` is an ordered tuple of new `Packet` arrivals from UDP 14550.
 `packet.data` is the original pymavlink message, with full fields, flags and
 source timestamps. `packet.received_at` is host monotonic receipt time.
-`packet.decoded` contains `RaceStatus`, `TrackInfo(transfer_id, gates)` when a
+`packet.decoded` contains wire `RaceTelemetry`, `TrackInfo(transfer_id, gates)` when a
 course transfer completes, or `None`. Each `Gate` retains the published NED
 mesh pivot, wxyz quaternion and overall dimensions. `packet.privileged` labels pose
 (`ATTITUDE`, `LOCAL_POSITION_NED`, `ODOMETRY`) and course traffic.
 The receiver preserves redacted fields; the controller decides if they are useful.
-`race_state.gate_centers` supplies native NED mesh centers read at track load.
-The R1 controllers use these centers and retain the published gates unchanged.
+`race_state` is the latest `NativeRaceState` snapshot from our
+[Lua instrumentation](../config/race.lua). This additional privileged stream
+reads engine GO, validity, completion and gate index. Its `time_seconds` is game
+race time; `received_at` is Python's file-read time. Each snapshot retains mesh
+bounds centers read once at track load, converted from world centimetres to NED
+metres relative to the starting grid. The R1 controllers use these centers and
+retain the published gate packets unchanged.
 
 `frames` is a tuple of new complete images from UDP 5600. Each has `id`, device
 `time_ns`, host `received_at` and readonly `bgr` (`uint8[height,width,3]`).
