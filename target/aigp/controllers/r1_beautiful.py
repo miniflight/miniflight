@@ -22,6 +22,8 @@ class Controller(BaseController[BodyRates]):
         self.privileged = {}  # Original labelled pose packets, retained between arrivals.
         self.track = self.gate = None
         self.target = self.target_yaw = None
+        self.target_velocity = Vector3D()  # NED m/s.
+        self.target_acceleration = Vector3D()  # NED m/s².
         self.time = None
         self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
 
@@ -64,5 +66,6 @@ class Controller(BaseController[BodyRates]):
         integral = self.integral + self.ki * dt * error
         limit = self.config.max_acceleration
         self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
-        acceleration = self.kp * error + self.integral - self.kd * velocity
+        acceleration = (self.target_acceleration + self.kp * error + self.integral
+                        + self.kd * (self.target_velocity - velocity))
         return acceleration_control(self.config, acceleration.v, angles, self.target_yaw)

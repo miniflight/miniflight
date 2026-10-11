@@ -12,7 +12,8 @@ import unittest
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import Ned
+from common.math import Vector3D
+from miniflight import BodyRates, Ned
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
@@ -26,6 +27,23 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_pid_follows_velocity_and_acceleration_references(self):
+        controller = PIDController(kp=0)
+        controller.target_velocity = Vector3D(2, 0, 0)
+        gate = Gate(0, Ned(2, 0, 0), (1, 0, 0, 0), 2.72, 2.72)
+        packets = (
+            Packet(mavlink.MAVLink_local_position_ned_message(1100, 0, 0, 0, 2, 0, 0), 10),
+            Packet(mavlink.MAVLink_attitude_message(1100, 0, 0, 0, 0, 0, 0), 10),
+            Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
+                   10, TrackInfo(7, (gate,))),
+        )
+        race = NativeRaceState(True, True, False, 0, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
+        self.assertEqual(controller.update(packets, (), race), BodyRates(thrust=controller.config.hover_thrust))
+        controller.target_acceleration = Vector3D(1, 0, 0)
+        command = controller.update((), (), race)
+        self.assertLess(command.pitch_rate, 0)  # North acceleration requests a forward tilt.
+        self.assertEqual((command.roll_rate, command.yaw_rate), (0, 0))
+
     def test_pid_uses_native_centers_and_preserves_all_six_published_gates(self):
         fixture = json.loads((Path(__file__).parent / "fixtures/vq1_track.json").read_text())
         reader = _Track()
