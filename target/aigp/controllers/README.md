@@ -41,9 +41,10 @@ while waiting for required startup input. Returning `None` after arming ends the
 run; `StopIteration` stops early. A race reset ends the run. IMU loss disarms and
 starts a bounded finish wait; recovering IMU never resumes control.
 
-`r1_gates` chooses a point beyond the active published gate. `r1_body_rates`
+`r1_gates` chooses a point beyond the active native mesh center. `r1_body_rates`
 reuses that planner and applies the numerical `position_control` routine.
+`r1_beautiful` uses PID feedback and accepts a timed position/velocity/acceleration
+reference. Without a reference it follows the next gate center.
 VQ2 needs its own perception and estimation when course/pose streams are blocked.
-`r1_trpy` remains an unimplemented experiment.
 
 [Setup](../README.md) · [Native wiring](../docs/wiring.md) · [Recording](../experiments/README.md)

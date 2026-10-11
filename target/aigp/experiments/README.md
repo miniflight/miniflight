@@ -2,6 +2,32 @@
 
 These tools are optional. The simulator and gate controllers do not import them.
 
+The R1 goal is six valid gates, no collision, and a native finish below 10 seconds
+with a computed reference and PID. MPC comes after that.
+
+Each experiment asks one question and changes one variable. Retain the initial
+state, reference, configuration, source/binary hashes, raw signals and native
+result. Device time, game time and host receipt time remain separate.
+
+| Experiment | Question | Change | Evidence |
+| --- | --- | --- | --- |
+| Control signals | Where does tracking fail? | Expose the reference time and PID acceleration request. | Reference/measured motion, attitude, body rates, thrust, source age and clipping. Exact command replay. |
+| Vehicle response | What force and rotation can a command produce? | One thrust or body-rate pulse at a time. | Thrust response, rotation delay and drag, checked on withheld pulses. State the measured range. |
+| Gate clearance | Can the whole tilted vehicle cross? | Crossing offset or attitude at one gate. | Native opening and vehicle footprint, orientation and collision reports. Packet dimensions describe outer bounds. |
+| Offline search | Which feasible motion finishes sooner? | Search duration and thrust/body-rate sequences. | Full motion under measured dynamics, ordered gate openings and actuator limits. Crossing points and times stay free. |
+| Native flight | Can PID follow the computed motion? | Increase search effort or pace, one at a time. | Six valid gates, no collision, exact replay, closed connection and native finish below 10 seconds. |
+
+Measured on 2026-10-11: PID followed a 35-second reference through all six gates
+in 35.18 native seconds; all 2,068 control updates replayed exactly. The same
+controller settings hit gate 4 with a 25-second reference. The PID correction
+exceeded the configured acceleration cap before contact. A separate 35-second
+attempt stopped on stale position data after five gates, with no collision.
+
+That reference fixed gate centers and crossing times and minimized jerk. It
+checks the follower; it does not establish the fastest feasible whole pose.
+Search should choose the motion. Geometry, dynamics and measured limits define
+the constraints; a preferred bend shape or gate-specific braking rule does not.
+
 `probe.py` runs bounded body-rate measurements. The command-line example remains
 under `examples/aigp/`:
 
@@ -30,7 +56,7 @@ with recording("r1.jsonl", {"target": "vq1.r1"}) as record:
     client = RecordedClient(record, camera_port=None)
     sim = AIGPSimulator(RecordedController(Controller, record), client=client)
     result = sim.rollout()
-    record(event="result", race_finished=result is not None and result.finished,
+    record(event="result", race_finished=result is not None and result.completed,
            connection_closed=not client.connected)
 
 updates = replay(Controller, "r1.jsonl")
