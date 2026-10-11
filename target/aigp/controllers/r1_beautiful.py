@@ -25,6 +25,7 @@ class Controller(BaseController[BodyRates]):
         self.target_velocity = Vector3D()  # NED m/s.
         self.target_acceleration = Vector3D()  # NED m/s².
         self.reference, self.reference_start = reference, None
+        self.reference_time = self.requested_acceleration = None
         self.time = None
         self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
 
@@ -59,8 +60,8 @@ class Controller(BaseController[BodyRates]):
         if self.reference is not None:
             if self.reference_start is None:
                 self.reference_start = motion.time_boot_ms / 1000 - race_state.time_seconds
-            elapsed = motion.time_boot_ms / 1000 - self.reference_start  # Pose seconds since native GO.
-            self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(elapsed))
+            self.reference_time = motion.time_boot_ms / 1000 - self.reference_start  # Pose seconds since native GO.
+            self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(self.reference_time))
         if self.target is None:
             return None
         if self.target_yaw is None:
@@ -72,6 +73,6 @@ class Controller(BaseController[BodyRates]):
         integral = self.integral + self.ki * dt * error
         limit = self.config.max_acceleration
         self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
-        acceleration = (self.target_acceleration + self.kp * error + self.integral
-                        + self.kd * (self.target_velocity - velocity))
-        return acceleration_control(self.config, acceleration.v, angles, self.target_yaw)
+        self.requested_acceleration = (self.target_acceleration + self.kp * error + self.integral
+                                       + self.kd * (self.target_velocity - velocity))
+        return acceleration_control(self.config, self.requested_acceleration.v, angles, self.target_yaw)

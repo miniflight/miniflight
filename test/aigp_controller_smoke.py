@@ -17,8 +17,9 @@ from miniflight import BodyRates, Ned
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
-from target.aigp.controllers.r1_beautiful import Controller as PIDController
+from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
+from target.aigp.experiments.r1_signals import r1_signals
 from target.aigp.simulator import AIGPSimulator
 from target.aigp.client import Packet, SimulatorClient, TrackInfo, _Track
 from target.aigp.native import NativeRaceState
@@ -27,6 +28,14 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_recorded_pid_signals_expose_requests_before_clipping(self):
+        updates, _ = self.flight(PIDController, replace_geometry=True, signals=r1_signals)
+        samples = [row["signals"] for row in updates if "signals" in row]
+        self.assertTrue(samples)
+        self.assertTrue(all(sample["reference_time_s"] is None for sample in samples))
+        self.assertTrue(any(sample["acceleration_request_ned_m_s2"][0] < -CONFIG.max_acceleration
+                            for sample in samples))
+
     def test_pid_samples_reference_on_native_pose_clock(self):
         def reference(time):
             return (2 * time, 0, 0), (2, 0, 0), (0, 0, 0)
@@ -180,7 +189,7 @@ class ControllerSmokeTest(unittest.TestCase):
                 neutral = [message for message in received if message.get_type() == "SET_ATTITUDE_TARGET"][-1]
                 self.assertEqual((neutral.body_roll_rate, neutral.body_pitch_rate, neutral.body_yaw_rate, neutral.thrust), (0, 0, 0, 0))
 
-    def flight(self, make, replace_geometry=False, imu_after=0):
+    def flight(self, make, replace_geometry=False, imu_after=0, signals=None):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "trace.jsonl"
         native_path = Path(directory) / "native.jsonl"
@@ -253,7 +262,7 @@ class ControllerSmokeTest(unittest.TestCase):
 
             worker = threading.Thread(target=serve)
             worker.start()
-            simulator = AIGPSimulator(RecordedController(make, record), startup_timeout=3, client=client,
+            simulator = AIGPSimulator(RecordedController(make, record, signals=signals), startup_timeout=3, client=client,
                                       race_status_path=native_path)
             try:
                 if imu_after is None:
@@ -285,7 +294,7 @@ class ControllerSmokeTest(unittest.TestCase):
             row["gates"] = None if observed.gates is None else json.loads(json.dumps([asdict(gate) for gate in observed.gates]))
             row["gate_index"] = None if row["native_race"] is None else row["native_race"]["active_gate_index"]
             updates.append(row)
-        self.assertEqual(replay(make, path), len(updates))
+        self.assertEqual(replay(make, path, signals=signals), len(updates))
         return updates, received
 
 

@@ -48,21 +48,24 @@ rate loop. See [yaw tracking](../docs/yaw-tracking.md) for measurements and limi
 not change the simulator or controller interface:
 
 ```python
-from target.aigp.controllers.r1_body_rates import Controller
+from target.aigp.controllers.r1_beautiful import Controller
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
+from target.aigp.experiments.r1_signals import r1_signals
 from target.aigp.simulator import AIGPSimulator
 
 with recording("r1.jsonl", {"target": "vq1.r1"}) as record:
     client = RecordedClient(record, camera_port=None)
-    sim = AIGPSimulator(RecordedController(Controller, record), client=client)
+    sim = AIGPSimulator(RecordedController(Controller, record, signals=r1_signals), client=client)
     result = sim.rollout()
     record(event="result", race_finished=result is not None and result.completed,
            connection_closed=not client.connected)
 
-updates = replay(Controller, "r1.jsonl")
+updates = replay(Controller, "r1.jsonl", signals=r1_signals)
 ```
 
 Use a fresh controller for replay. It checks returned commands and exceptions
 against the recorded observations, without connecting to a simulator. A matching
 replay does not prove race completion; the native result records that separately.
 Omit `camera_port=None` to include camera images. Recordings are never overwritten.
+The optional signal projection records R1's reference time, position, velocity,
+acceleration and the PID request before command limits. Replay checks those values too.

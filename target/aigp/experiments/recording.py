@@ -73,8 +73,9 @@ def read_metadata(path):
 
 
 class RecordedController(BaseController[CommandT]):
-    def __init__(self, create, record, frames=False):
+    def __init__(self, create, record, frames=False, signals=None):
         self.create, self.record, self.frames = create, record, frames
+        self.signals = signals
         self.controller = None
 
     @property
@@ -96,6 +97,8 @@ class RecordedController(BaseController[CommandT]):
         except BaseException as error:
             self.record(**row, error={"type": type(error).__name__, "message": str(error)})
             raise
+        if command is not None and self.signals is not None:
+            row["signals"] = self.signals(self.controller)
         self.record(**row, command=command_data(command))
         return command
 
@@ -121,7 +124,7 @@ class RecordedClient(SimulatorClient):
         return decoded
 
 
-def replay(create, path):
+def replay(create, path, signals=None):
     """Replay native-arrival recordings. Older State snapshots use their old API."""
     updates, terminal, controller = 0, False, None
     decoder, client = mavlink.MAVLink(None), SimulatorClient(camera_port=None)
@@ -153,6 +156,8 @@ def replay(create, path):
             expected = {key: row[key] for key in ("command", "error") if key in row}
             if actual != expected:
                 raise AssertionError(f"replay differs at update {updates}: expected {expected}, got {actual}")
+            if signals is not None and "signals" in row and signals(controller) != row["signals"]:
+                raise AssertionError(f"control signals differ at update {updates}")
             updates += 1
     if not updates:
         raise ValueError("recording contains no controller updates")

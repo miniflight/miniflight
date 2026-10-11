@@ -20,7 +20,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False):
+def run(name, trace, camera=False, record_frames=False, signals=None):
     camera = camera or record_frames
     make = CONTROLLERS[name]
     sources = ("miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
@@ -29,14 +29,14 @@ def run(name, trace, camera=False, record_frames=False):
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
                "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
-               "target/aigp/experiments/recording.py", "test/aigp_regression.py")
+               "target/aigp/experiments/recording.py", "target/aigp/experiments/r1_signals.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera, recorded_frames=record_frames,
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
-        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames), "vq1.r1", client=client,
+        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"))
         try:
             result = simulator.rollout()
@@ -53,7 +53,7 @@ def run(name, trace, camera=False, record_frames=False):
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
-    updates = replay(make, trace)
+    updates = replay(make, trace, signals=signals)
     with trace.open() as source:
         rows = [json.loads(line) for line in source]
     if [row["armed"] for row in rows if row["event"] == "arm_request"] != [True, False]:
