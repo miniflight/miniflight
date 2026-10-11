@@ -173,11 +173,11 @@ class ControllerSmokeTest(unittest.TestCase):
                 last_transfer = None
                 try:
                     while not stop.wait(.005):
-                        sock = client._socket
-                        if sock is None:
+                        connection = client.connection
+                        if connection is None:
                             continue
                         try:
-                            peer = sock.getsockname()
+                            peer = connection.port.getsockname()
                         except OSError:
                             continue
                         drain()
@@ -237,7 +237,7 @@ class ControllerSmokeTest(unittest.TestCase):
             self.assertEqual(failures, [])
             drain()
             self.assertEqual(before_imu, [])
-            self.assertIsNone(client._socket)
+            self.assertIsNone(client.connection)
             self.assertFalse(client.connected)
         updates, observed, decoder = [], SimulatorClient(camera_port=None), mavlink.MAVLink(None)
         for line in path.read_text().splitlines():

@@ -86,7 +86,7 @@ class UDPSmokeTest(unittest.TestCase):
         client = SimulatorClient(port=0, camera_port=0)
         self.addCleanup(client.disconnect)
         client.open()
-        address, camera_address = client._socket.getsockname(), client._vision.getsockname()
+        address, camera_address = client.connection.port.getsockname(), client._vision.getsockname()
         invalid = imu(1000002)
         invalid.xacc = math.nan
         course = struct.pack("<HH9f", 1, 0, 1, 2, 3, 1, 0, 0, 0, 2, 2)
@@ -143,7 +143,7 @@ class UDPSmokeTest(unittest.TestCase):
         client = SimulatorClient(port=0, camera_port=None)
         self.addCleanup(client.disconnect)
         client.open()
-        address = client._socket.getsockname()
+        address = client.connection.port.getsockname()
 
         def send(message):
             server.sendto(packet(message), address)
@@ -253,11 +253,11 @@ class UDPSmokeTest(unittest.TestCase):
             sequence = 0
             try:
                 while not stop.wait(.01):
-                    sock = client._socket
-                    if sock is None:
+                    connection = client.connection
+                    if connection is None:
                         continue
                     try:
-                        address = sock.getsockname()
+                        address = connection.port.getsockname()
                     except OSError:
                         continue
                     sequence += 1
@@ -326,11 +326,11 @@ class UDPSmokeTest(unittest.TestCase):
             sequence = 0
             try:
                 while not stop.wait(.005):
-                    sock, vision = client._socket, client._vision
-                    if sock is None or vision is None:
+                    connection, vision = client.connection, client._vision
+                    if connection is None or vision is None:
                         continue
                     try:
-                        address, camera_address = sock.getsockname(), vision.getsockname()
+                        address, camera_address = connection.port.getsockname(), vision.getsockname()
                     except OSError:  # the runner has just closed its sockets
                         continue
                     sequence += 1
@@ -386,7 +386,7 @@ class UDPSmokeTest(unittest.TestCase):
                     client.mav.command_long_send(*client.target_ids, 31000, 0, 0, 0, 0, 0, 0, 0, 0)
                 if len(observations) == 5:
                     if closed_on_exit:
-                        client._socket.close()
+                        client.connection.close()
                         raise StopIteration
                     raise KeyboardInterrupt
                 return command
@@ -415,7 +415,7 @@ class UDPSmokeTest(unittest.TestCase):
         drain()
         if reset_in_batch:
             self.assertLess(len(observations), 5)
-            self.assertIsNone(client._socket)
+            self.assertIsNone(client.connection)
             arms = [m.param1 for m in received if m.get_type() == "COMMAND_LONG"]
             self.assertEqual(arms, [1, 0])
             return
@@ -502,7 +502,7 @@ class UDPSmokeTest(unittest.TestCase):
                 and m.command == mavlink.MAV_CMD_COMPONENT_ARM_DISARM]
         self.assertEqual(arms, [1] if closed_on_exit else [1, 0])
         self.assertFalse(client.connected)
-        self.assertIsNone(client._socket)
+        self.assertIsNone(client.connection)
         self.assertIsNone(client._vision)
 
     def test_owned_process_countdown_six_gates_finish_and_cleanup(self):
@@ -576,7 +576,7 @@ class UDPSmokeTest(unittest.TestCase):
             def launch(target, simulator_args=(), attach=False, race_status_path=None):
                 self.assertFalse(attach)
                 self.assertEqual(target, "vq1.r1")
-                port = client._socket.getsockname()[1]
+                port = client.connection.port.getsockname()[1]
                 child = subprocess.Popen([sys.executable, "-m", "test.aigp_fake_simulator", str(port),
                                           "--native-race", str(race_status_path), *fixture_args],
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
@@ -623,7 +623,7 @@ class UDPSmokeTest(unittest.TestCase):
         self.assertEqual(result["arms"], [int(arm) for arm in arms])
         self.assertEqual(result["position_masks"], [3576] if arms else [])
         self.assertTrue(result["stopped_by_parent"])
-        self.assertIsNone(client._socket)
+        self.assertIsNone(client.connection)
         self.assertFalse(client.connected)
         return result
 

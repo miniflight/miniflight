@@ -134,9 +134,12 @@ It is not event history: a later `COLLISION` or `COMMAND_ACK` replaces the previ
 one. Record arrivals through `_receive`, as the optional recording client does,
 when every event matters.
 
-`client.mav` is the same pymavlink encoder/parser used by the adapter.
+`client.connection` is the actual pymavlink `udpin` connection. It owns the UDP
+transport, peer discovery and MAVLink parsing. The adapter drains `recv_msg()`;
+`client.mav` delegates to that connection's current encoder.
 `client.target_ids` is the `(system, component)` tuple from the first heartbeat.
-After `connect`, the vendor time-sync request can be sent directly:
+After `open()` and a heartbeat received through `poll()`, the vendor time-sync
+request can be sent directly:
 
 ```python
 import time

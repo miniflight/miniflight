@@ -63,8 +63,7 @@ class SimulatorClient:
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
         self.camera_port = camera_port
-        self._connection = None
-        self._socket = self._vision = self.target_ids = None
+        self.connection = self._vision = self.target_ids = None
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
@@ -76,11 +75,11 @@ class SimulatorClient:
 
     @property
     def mav(self):
-        if self._connection is None or not self.connected:
+        if self.connection is None or not self.connected:
             raise RuntimeError("client is not connected")
-        if self._connection.port.fileno() < 0:
+        if self.connection.port.fileno() < 0:
             raise OSError("MAVLink connection is closed")
-        return self._connection.mav
+        return self.connection.mav
 
     @property
     def gates(self):
@@ -94,7 +93,7 @@ class SimulatorClient:
 
     def open(self):
         """Reserve the UDP ports without waiting for or commanding the simulator."""
-        if self._socket is not None:
+        if self.connection is not None:
             raise RuntimeError("client is already open")
         self._telemetry.clear()
         self._camera = _Camera()
@@ -102,11 +101,10 @@ class SimulatorClient:
         self.race_telemetry = None
         self._boot = time.monotonic()
         try:
-            self._connection = mavutil.mavlink_connection(
+            self.connection = mavutil.mavlink_connection(
                 f"udpin:127.0.0.1:{self.port}", dialect="common", source_component=191)
-            self._socket = self._connection.port
             # Keep the simulator port exclusive to this controller.
-            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+            self.connection.port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
             if self.camera_port is not None:
                 self._vision = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self._vision.bind(("127.0.0.1", self.camera_port))
@@ -116,21 +114,20 @@ class SimulatorClient:
             raise
 
     def disconnect(self):
-        for sock in (self._connection, self._vision):
+        for sock in (self.connection, self._vision):
             if sock is not None:
                 sock.close()
-        self._connection = None
-        self._socket = self._vision = self.target_ids = None
+        self.connection = self._vision = self.target_ids = None
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
-        if self._socket is None:
+        if self.connection is None:
             raise RuntimeError("client is not connected")
         arrivals = []
-        sockets = [s for s in (self._socket, self._vision) if s is not None]
+        sockets = [s for s in (self.connection.port, self._vision) if s is not None]
         # Bound each drain so continuous traffic cannot starve the controller.
         for _ in range(128):
             # Drain buffered messages too: one UDP datagram can contain several.
-            message = self._connection.recv_msg()
+            message = self.connection.recv_msg()
             if message is not None:
                 now = time.monotonic()
                 decoded = self._receive(message, None, now)
@@ -157,8 +154,8 @@ class SimulatorClient:
             if kind != "HEARTBEAT":
                 return
             self.target_ids = source
-            if self._connection is not None:
-                self._connection.target_system, self._connection.target_component = source
+            if self.connection is not None:
+                self.connection.target_system, self.connection.target_component = source
         if source[0] != self.target_ids[0]:
             return
         if kind == "HIGHRES_IMU":
