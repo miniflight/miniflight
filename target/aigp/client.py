@@ -10,6 +10,7 @@ from types import MappingProxyType
 
 import cv2
 import numpy as np
+from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates, Command, Frame, Ned, PositionNed, VelocityNed
@@ -62,6 +63,7 @@ class SimulatorClient:
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
         self.camera_port = camera_port
+        self._connection = None
         self._socket = self._vision = self._peer = self.mav = self.target_ids = None
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
@@ -94,10 +96,11 @@ class SimulatorClient:
         self.mav = mavlink.MAVLink(self, srcSystem=255, srcComponent=191)
         self.mav.robust_parsing = True
         try:
-            # Exclusive binds: a second client must not steal these packets.
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self._socket.bind(("127.0.0.1", self.port))
-            self._socket.setblocking(False)
+            self._connection = mavutil.mavlink_connection(
+                f"udpin:127.0.0.1:{self.port}", dialect="common", source_component=191)
+            self._socket = self._connection.port
+            # Keep the simulator port exclusive to this controller.
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
             if self.camera_port is not None:
                 self._vision = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self._vision.bind(("127.0.0.1", self.camera_port))
@@ -107,9 +110,10 @@ class SimulatorClient:
             raise
 
     def disconnect(self):
-        for sock in (self._socket, self._vision):
+        for sock in (self._connection, self._vision):
             if sock is not None:
                 sock.close()
+        self._connection = None
         self._socket = self._vision = self._peer = self.mav = self.target_ids = None
 
     def write(self, packet):
