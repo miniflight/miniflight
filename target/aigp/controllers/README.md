@@ -7,7 +7,7 @@ from miniflight import BodyRates
 from target.aigp.controllers import BaseController
 
 class Controller(BaseController[BodyRates]):
-    def update(self, telemetry, frames):
+    def update(self, telemetry, frames, race_state):
         return BodyRates()
 ```
 
@@ -19,9 +19,11 @@ The runner constructs `Controller()` after the native heartbeat.
 source timestamps. `packet.received_at` is host monotonic receipt time.
 `packet.decoded` contains `RaceStatus`, `TrackInfo(transfer_id, gates)` when a
 course transfer completes, or `None`. Each `Gate` retains the published NED
-base, wxyz quaternion and overall dimensions. `packet.privileged` labels pose
+mesh pivot, wxyz quaternion and overall dimensions. `packet.privileged` labels pose
 (`ATTITUDE`, `LOCAL_POSITION_NED`, `ODOMETRY`) and course traffic.
 The receiver preserves redacted fields; the controller decides if they are useful.
+`race_state.gate_centers` supplies native NED mesh centers read at track load.
+The R1 controllers use these centers and retain the published gates unchanged.
 
 `frames` is a tuple of new complete images from UDP 5600. Each has `id`, device
 `time_ns`, host `received_at` and readonly `bgr` (`uint8[height,width,3]`).

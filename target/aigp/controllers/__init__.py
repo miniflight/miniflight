@@ -33,6 +33,7 @@ class BaseController(Generic[CommandT]):
         frames contains newly completed BGR images, each with its own timestamp.
         Empty tuples mean no new arrivals. The controller owns retained history.
         Inputs arrive before GO and at finish; the runner gates command sending.
-        race_state contains native GO and validity; None means it is unavailable.
+        race_state contains native GO, validity and separately derived mesh centers;
+        None means it is unavailable. Published Gate fields remain unchanged.
         """
         raise NotImplementedError

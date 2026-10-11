@@ -10,7 +10,6 @@ import sys
 import time
 
 from pymavlink.dialects.v20 import common as mavlink
-from target.aigp.controllers.r1_gates import R1_CENTER_OFFSET
 
 # Deliberately different from VQ1: the controller must follow this wire input.
 GATES = tuple((-20.0 * (i + 1), -float(i), -2.0 - .5 * i) for i in range(6))
@@ -116,7 +115,8 @@ def main():
             if not result["track_sent"] and (not track_after_go or boot >= 800):
                 track_data = struct.pack("<H", len(gates))
                 for i, (north, east, down) in enumerate(gates):
-                    track_data += struct.pack("<H9f", i, north, east, down - R1_CENTER_OFFSET.v[2], 1, 0, 0, 0, 2.72, 2.72)
+                    track_data += struct.pack("<H9f", i, north, east, down + .3, 1, 0, 0, 0, 2.72, 2.72)
+                native.write(json.dumps({"gate_centers": gates}) + "\n")
                 track(track_data, 7)
                 result["track_sent"] = True
             if fragmented_track and index >= 1 and not result["track_replaced"]:

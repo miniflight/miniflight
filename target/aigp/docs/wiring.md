@@ -96,7 +96,7 @@ The runner constructs `Controller()` after the native heartbeat.
 packets = client.poll(timeout=...)
 telemetry = tuple(p for p in packets if not isinstance(p.data, bytes))
 frames = tuple(p.decoded for p in packets if isinstance(p.data, bytes) and p.decoded is not None)
-command = controller.update(telemetry, frames)
+command = controller.update(telemetry, frames, race_state)
 ```
 
 `telemetry` contains new ordered MAVLink arrivals. `Packet.data` retains every
@@ -106,6 +106,8 @@ completed `TrackInfo` (handshake plus type-2 indexed fragments). `TrackInfo`
 contains the native transfer ID and a tuple of `Gate(id, position, orientation,
 width, height)` records: NED mesh pivot, wxyz quaternion and overall dimensions.
 `Packet.privileged` labels pose and course traffic, including redacted fields.
+`race_state.gate_centers` contains native mesh bounds centers in local NED,
+read once when the track is ready and kept separate from the course packets.
 
 `frames` contains newly completed JPEGs decoded to readonly BGR images, with
 frame IDs and original device nanosecond timestamps. Empty tuples mean no new

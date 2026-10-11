@@ -136,7 +136,9 @@ controller. `r1_gates` returns `PositionNed`; `r1_body_rates` returns `BodyRates
 
 `TrackInfo` arrives on the packet that completes a native course transfer.
 Its gates retain raw NED mesh pivots, wxyz orientations and overall bounds.
-The controller checks the geometry and derives opening centers if needed.
+At track load, the native bridge reads each `GateMesh` world-space bounds center
+and converts it to local NED. `race_state.gate_centers` retains these separately;
+the controller uses them without changing the published gate fields.
 `SimulatorClient.gates` caches the last complete transfer, including redacted values.
 
 The captured VQ1 build 3391 packet is preserved in `test/fixtures/vq1_track.json`.

@@ -2,30 +2,19 @@
 
 import math
 
-from common.math import Quaternion, Vector3D
-from miniflight import PositionNed
+from common.math import Vector3D
+from miniflight import Ned, PositionNed
 from target.aigp.client import TrackInfo
-from target.aigp.controllers import BaseController, Gate
+from target.aigp.controllers import BaseController
 
 
-# VQ1 3391 square mesh: pivot to opening center, local NED metres.
-R1_CENTER_OFFSET = Vector3D(0, 0, -1.06823112488)
-
-
-def gate_center(gate: Gate) -> Vector3D:
-    """Transform the verified R1 mesh opening center into NED."""
-    norm = math.hypot(*gate.orientation)
-    rotation = Quaternion(*(value / norm for value in gate.orientation))
-    return Vector3D(*gate.position) + rotation.rotate(R1_CENTER_OFFSET)
-
-
-def gate_target(position: Vector3D, index: int, gates: tuple[Gate, ...], exit_distance=1.0) -> Vector3D:
-    """Choose a point beyond the gate center along the approach."""
-    center = gate_center(gates[index])
+def gate_target(position: Vector3D, index: int, centers: tuple[Ned, ...], exit_distance=1.0) -> Vector3D:
+    """Choose a point beyond the native gate center along the approach."""
+    center = Vector3D(*centers[index])
     direction = center - position
     distance = math.hypot(*direction.v)
     if distance < 0.1:
-        previous = gate_center(gates[index - 1]) if index else Vector3D()
+        previous = Vector3D(*centers[index - 1]) if index else Vector3D()
         direction = center - previous
         distance = math.hypot(*direction.v)
     if distance < 0.1:
@@ -48,7 +37,8 @@ class Controller(BaseController[PositionNed]):
             if isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
         pose, imu = self.telemetry.get("LOCAL_POSITION_NED"), self.telemetry.get("HIGHRES_IMU")
-        if pose is None or imu is None or race_state is None or not race_state.started or not usable_track(self.track):
+        if (pose is None or imu is None or race_state is None or not race_state.started or not usable_track(self.track)
+                or len(race_state.gate_centers) != len(self.track)):
             return None
         motion = pose.data
         position = Vector3D(motion.x, motion.y, motion.z)
@@ -57,9 +47,9 @@ class Controller(BaseController[PositionNed]):
         gates, gate_index = self.track, race_state.active_gate_index
         if not 0 <= gate_index <= len(gates):
             raise ValueError(f"gate index {gate_index} does not belong to the published track")
-        if gate_index < len(gates) and gates[gate_index] != self.gate:
-            self.target = PositionNed(*gate_target(position, gate_index, gates).v)
-            self.gate = gates[gate_index]
+        if gate_index < len(gates) and (gate_index, race_state.gate_centers[gate_index]) != self.gate:
+            self.target = PositionNed(*gate_target(position, gate_index, race_state.gate_centers).v)
+            self.gate = (gate_index, race_state.gate_centers[gate_index])
 
         return self.target
 

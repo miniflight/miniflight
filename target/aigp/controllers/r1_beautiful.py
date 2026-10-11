@@ -36,7 +36,8 @@ class Controller(BaseController[BodyRates]):
                 self.privileged[kind] = packet
             elif isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
-        if len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None:
+        if (len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None
+                or len(race_state.gate_centers) != len(self.track)):
             return None
         motion, orientation = (self.privileged[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE"))
         if not race_state.completed and max(race_state.received_at - packet.received_at for packet in (motion, orientation)) > .3:
@@ -49,9 +50,9 @@ class Controller(BaseController[BodyRates]):
         index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):
             raise ValueError("gate index outside the published track")
-        if index < len(self.track) and self.track[index] != self.gate:
-            self.target = gate_target(position, index, self.track, self.exit_distance)
-            self.gate = self.track[index]
+        if index < len(self.track) and (index, race_state.gate_centers[index]) != self.gate:
+            self.target = gate_target(position, index, race_state.gate_centers, self.exit_distance)
+            self.gate = (index, race_state.gate_centers[index])
         if self.target is None:
             return None
         if self.target_yaw is None:

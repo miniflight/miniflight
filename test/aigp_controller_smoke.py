@@ -14,7 +14,7 @@ from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Ned
 from target.aigp.controllers import Gate
-from target.aigp.controllers.r1_gates import Controller as PositionController, R1_CENTER_OFFSET, gate_center
+from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
 from target.aigp.controllers.r1_beautiful import Controller as PIDController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
@@ -26,7 +26,7 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
-    def test_gate_centers_match_all_six_native_mesh_centers(self):
+    def test_pid_uses_native_centers_and_preserves_all_six_published_gates(self):
         fixture = json.loads((Path(__file__).parent / "fixtures/vq1_track.json").read_text())
         reader = _Track()
         reader.start(mavlink.MAVLink_data_transmission_handshake_message(
@@ -35,20 +35,31 @@ class ControllerSmokeTest(unittest.TestCase):
             track = reader.receive(mavlink.MAVLink_encapsulated_data_message(
                 chunk["seqnr"], bytes.fromhex(chunk["data_hex"])), 0)
         self.assertEqual(len(track.gates), 6)
-        self.assertEqual(len(fixture["expected_centers"]), 6)
-        for gate, expected in zip(track.gates, fixture["expected_centers"]):
+        controller = PIDController(exit_distance=0)
+        packets = (
+            Packet(mavlink.MAVLink_local_position_ned_message(1100, 0, 0, 0, 0, 0, 0), 10),
+            Packet(mavlink.MAVLink_attitude_message(1100, 0, 0, 0, 0, 0, 0), 10),
+            Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")), 10, track),
+        )
+        race = NativeRaceState(True, True, False, 0, 0, -1, 10)
+        self.assertIsNone(controller.update(packets, (), race))  # Wait for native geometry; never infer it from outer dimensions.
+        centers = tuple(Ned(north, east, down + .3) for north, east, down in fixture["expected_centers"])
+        for gate, expected in zip(track.gates, centers):
             with self.subTest(gate=gate.id):
-                for actual, wanted in zip(gate_center(gate).v, expected):
-                    self.assertAlmostEqual(actual, wanted, delta=2e-5)  # Native world and packet float32 precision.
+                controller.update(packets, (), replace(race, active_gate_index=gate.id, gate_centers=centers))
+                self.assertEqual(tuple(controller.target.v), expected)
+        wire = b''.join(bytes.fromhex(chunk["data_hex"])[3:] for chunk in fixture["chunks"])[:fixture["handshake"]["size"]]
+        self.assertEqual(struct.pack("<H", 6) + b''.join(struct.pack("<H9f", gate.id, *gate.position,
+                         *gate.orientation, gate.width, gate.height) for gate in controller.track), wire)
 
     def test_pid_rejects_old_pose_and_repeats_without_losing_equal_time_changes(self):
         controller = PIDController()
-        gate = Gate(0, Ned(2, 0, -R1_CENTER_OFFSET.v[2]), (1, 0, 0, 0), 2.72, 2.72)
+        gate = Gate(0, Ned(17, 8, -3), (1, 0, 0, 0), 2.72, 2.72)
         motion = Packet(mavlink.MAVLink_local_position_ned_message(1100, 2.5, 0, 0, 0, 0, 0), 10)
         attitude = Packet(mavlink.MAVLink_attitude_message(1100, 0, 0, 0, 0, 0, 0), 10)
         track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
                        10, TrackInfo(7, (gate,)))
-        race = NativeRaceState(True, True, False, 0, 0, -1, 10)
+        race = NativeRaceState(True, True, False, 0, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
         expected = controller.update((motion, attitude, track), (), race)
         for stamp, receipt, north, roll in ((1000, 10.1, 0, .2), (1100, 10.2, 2.5, 0)):
             packets = (Packet(mavlink.MAVLink_local_position_ned_message(stamp, north, 0, 0, 0, 0, 0), receipt),
@@ -69,7 +80,7 @@ class ControllerSmokeTest(unittest.TestCase):
 
     def test_pid_uses_native_time_and_unwinds_from_its_limit(self):
         controller = PIDController(kp=0, ki=1, kd=0)
-        gate = Gate(0, Ned(2, 0, -R1_CENTER_OFFSET.v[2]), (1, 0, 0, 0), 2.72, 2.72)
+        gate = Gate(0, Ned(17, 8, -3), (1, 0, 0, 0), 2.72, 2.72)
         packets = (
             Packet(mavlink.MAVLink_local_position_ned_message(5000, 0, 0, 0, 0, 0, 0), 10),
             Packet(mavlink.MAVLink_attitude_message(5000, 0, 0, 0, 0, 0, 0), 10),
@@ -77,7 +88,7 @@ class ControllerSmokeTest(unittest.TestCase):
                    10, TrackInfo(7, (gate,))),
         )
         race = NativeRaceState(started=True, valid=True, completed=False, time_seconds=0,
-                               active_gate_index=0, finish_time_seconds=-1, received_at=10)
+                               active_gate_index=0, finish_time_seconds=-1, received_at=10, gate_centers=(Ned(2, 0, 0),))
         self.assertIsNotNone(controller.update(packets, (), race))
         cases = ((.5, 50000000, 0, 1.5), (.5, 100000000, 0, 1.5), (100, 101000000, 0, 3), (101, 102000000, 4, 2))
         for i, (native_time, imu_time, north, integral) in enumerate(cases, 1):
@@ -110,8 +121,8 @@ class ControllerSmokeTest(unittest.TestCase):
         for make in (PositionController, RatesController, PIDController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make, replace_geometry=True)
-                before = [row for row in updates if row["gates"][0]["position"][:2] == [-2, 0]]
-                after = [row for row in updates if row["gates"][0]["position"][:2] == [0, -2]]
+                before = [row for row in updates if row["native_race"]["gate_centers"][0][:2] == [-2, 0]]
+                after = [row for row in updates if row["native_race"]["gate_centers"][0][:2] == [0, -2]]
                 self.assertGreaterEqual(len(before), 3)
                 self.assertGreater(len(after), 1)
                 self.assertTrue(all(row["gate_index"] == 0 for row in updates))
@@ -159,6 +170,7 @@ class ControllerSmokeTest(unittest.TestCase):
             def serve():
                 sequence = 0
                 imu_sent = False
+                last_transfer = None
                 try:
                     while not stop.wait(.005):
                         sock = client._socket
@@ -175,9 +187,12 @@ class ControllerSmokeTest(unittest.TestCase):
                         replaced = replace_geometry and commands >= 3
                         center = ((0, -2, 0) if replaced else (-2, 0, 0)) if replace_geometry else (0, 0, 0)
                         transfer = 8 if replaced else 7
-                        # Identity rotation: publish the R1 mesh pivot for the chosen opening center.
+                        if transfer != last_transfer:
+                            native.write(json.dumps({"gate_centers": [center]}) + "\n")
+                            last_transfer = transfer
+                        # The published pivot is deliberately separate from the native center.
                         track = struct.pack("<H", 1) + struct.pack("<H9f", 0, center[0], center[1],
-                                center[2] - R1_CENTER_OFFSET.v[2], 1, 0, 0, 0, 2.72, 2.72)
+                                center[2] + .3, 1, 0, 0, 0, 2.72, 2.72)
                         sequence += 1
                         stamp = sequence * 5000
                         north = .2 * stamp * 1e-6 if replace_geometry else 0
