@@ -15,7 +15,9 @@ aigp = [
     "numpy>=1.24",
     "pymavlink==2.4.49",
     "opencv-python-headless>=4.8",
+    "matplotlib>=3.8",
 ]
+monitor = ["numpy>=1.24", "matplotlib>=3.8"]
 examples = [
     "numpy>=1.24",
     "matplotlib",
