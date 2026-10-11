@@ -1,7 +1,7 @@
 # AIGP commands
 
 The arena supplies native arrivals through
-[`BaseController.update(telemetry, frames)`](../controllers/README.md).
+[`BaseController.update(telemetry, frames, race_state)`](../controllers/README.md).
 `SimulatorClient.send` encodes the returned command. The runner handles arming
 and disarming.
 

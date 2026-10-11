@@ -25,7 +25,7 @@ Training and Qualification event selection is not implemented.
 `r1_body_rates` computes position and attitude control, then sends body rates
 and thrust. `zero` sends zero thrust.
 
-Implement `update(telemetry, frames)` and return a command. Each call receives
+Implement `update(telemetry, frames, race_state)` and return a command. Each call receives
 new packets and completed images. The runner handles timing, arming, race finish,
 and shutdown. See the [controller interface](controllers/README.md) and
 [packet formats](docs/wiring.md).
