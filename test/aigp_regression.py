@@ -61,6 +61,8 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                     sources={path: sha256(ROOT / path) for path in sources})
     if name == "r1_motors":
         metadata["controller_config"] = asdict(make().position.config)
+    if race_reader is not None:
+        metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets)
@@ -96,6 +98,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         raise AssertionError("R1 must use only motor commands before the zero-thrust cleanup")
     print(json.dumps(dict(controller=name, gates=6, replayed_updates=updates,
                           frame_shape=None if frame is None else frame.bgr.shape, recorded_frames=record_frames, trace=str(trace))), flush=True)
+    return result
 
 
 def stop(signum, frame):
