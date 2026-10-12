@@ -1,5 +1,9 @@
 """Offline race planning with free crossing positions and interval durations."""
 
+import argparse
+import json
+from pathlib import Path
+
 import numpy as np
 from scipy.optimize import minimize
 
@@ -62,10 +66,13 @@ def crossing_constraints(states, gates, centers, model):
 def plan(reference, model, *, callback=None, max_iterations=500):
     """Minimize duration with SLSQP; gate positions and six phase durations remain free."""
     initial, seed_jerk = reference["states"][0], reference["acceleration_rates"]
-    gates, centers = reference["gates"], reference["points"][1:]
+    gates = reference["gates"]
+    centers = reference["gate_centers"] if "gate_centers" in reference else reference["points"][1:]
     counts = np.diff(np.r_[0, gates])
     phases = len(gates)
-    seed = np.r_[counts * float(reference["dt"]), seed_jerk.ravel()]
+    crossing_times = reference["times"][gates] if "times" in reference else gates * float(reference["dt"])
+    seed_durations = np.diff(np.r_[0, crossing_times])
+    seed = np.r_[seed_durations, seed_jerk.ravel()]
     def motion(variables):
         durations, jerk = variables[:phases], variables[phases:].reshape(-1, 3)
         intervals = np.repeat(durations / counts, counts)
@@ -93,5 +100,25 @@ def plan(reference, model, *, callback=None, max_iterations=500):
     states, jerk, intervals = motion(result.x)
     times = np.r_[0, np.cumsum(intervals)]
     return dict(states=states, acceleration_rates=jerk, times=times, dt=intervals.mean(), gates=gates,
-                points=np.vstack((states[0, 0], states[gates, 0])), iterations=result.nit,
+                points=np.vstack((states[0, 0], states[gates, 0])), gate_centers=centers, iterations=result.nit,
                 equality_error=equality_error, minimum_margin=minimum_margin)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("reference", type=Path)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--max-iterations", type=int, default=500)
+    args = parser.parse_args()
+    model = json.loads(args.model.read_text())
+    with np.load(args.reference) as reference:
+        result = plan(reference, model, max_iterations=args.max_iterations)
+    with args.output.open("xb") as output:
+        np.savez(output, **result)
+    print(json.dumps(dict(duration_s=float(result["times"][-1]), iterations=int(result["iterations"]),
+                          crossing_times_s=result["times"][result["gates"]].tolist())))
+
+
+if __name__ == "__main__":
+    main()

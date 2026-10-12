@@ -50,6 +50,16 @@ Omit `--offscreen` to watch the native window. `--camera` also saves its final
 image. The optional `planning` extra supports `python -m target.aigp.experiments.plan_motion`;
 this planner still fixes gate centers and crossing fractions and minimizes absolute jerk.
 
+`plan_race` uses SLSQP to minimize finish time with free crossing points and phase
+durations. It constrains thrust using fitted resistance, reserves room for the
+native collision body and tracking error, and bounds speed, tilt and direction slew:
+
+```sh
+python -m target.aigp.experiments.plan_race test/fixtures/vq1_r1_lift_30s.npz /tmp/r1-plan.npz --model test/fixtures/vq1_r1_model.json
+```
+
+The model is a local fit; this search produces a candidate for native validation.
+
 `probe.py` runs bounded body-rate measurements. The command-line example remains
 under `examples/aigp/`:
 

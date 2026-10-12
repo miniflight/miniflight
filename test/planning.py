@@ -17,6 +17,9 @@ class MotionPlanningTest(unittest.TestCase):
         self.assertLess(result["times"][-1], 3)
         self.assertAlmostEqual(result["states"][-1, 0, 0], -1, places=4)
         self.assertGreaterEqual(result["minimum_margin"], -1e-5)
+        result["points"][1, 1] += 1  # A prior chosen crossing must not move the physical gate.
+        replanned = plan_race(result, model)
+        self.assertLessEqual(abs(replanned["states"][-1, 0, 1]), model["clearance_halfspan_m"][0] + 1e-5)
 
     def test_crossings_clear_the_opening_and_follow_its_permitted_direction(self):
         model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
