@@ -37,7 +37,8 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             raise ValueError("a recorded reference requires r1_motors")
         reference = Path(reference)
         with np.load(reference) as data:
-            trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]))
+            times = data["times"] if "times" in data else None
+            trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
         make = lambda: MotorGates(position=PIDGates(reference=trajectory))
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}

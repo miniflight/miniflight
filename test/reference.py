@@ -7,6 +7,16 @@ from miniflight.reference import sample_motion
 
 
 class MotionReferenceTest(unittest.TestCase):
+    def test_nonuniform_intervals_keep_position_velocity_and_acceleration(self):
+        states = np.array([[[0, 0, 0], [1, 0, 0], [0, 0, 0]],
+                           [[25/48, 0, 0], [1.125, 0, 0], [.5, 0, 0]],
+                           [[10/3, 0, 0], [3, 0, 0], [2, 0, 0]]])
+        for time in (.25, .5, 1.25, 2):
+            position, velocity, acceleration = sample_motion(states, np.array([[1, 0, 0], [1, 0, 0]]), 1, time, times=(0, .5, 2))
+            np.testing.assert_allclose(position, [time + time**3/6, 0, 0])
+            np.testing.assert_allclose(velocity, [1 + time**2/2, 0, 0])
+            np.testing.assert_allclose(acceleration, [time, 0, 0])
+
     def test_saved_r1_reference_crosses_its_six_gate_centers(self):
         for name, duration in (("vq1_r1_35s", 35), ("vq1_r1_lift_35s", 35),
                                ("vq1_r1_lift_32s", 32), ("vq1_r1_lift_30s", 30)):
