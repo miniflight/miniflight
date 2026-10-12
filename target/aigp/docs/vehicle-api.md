@@ -92,7 +92,11 @@ command = MotorControls(requested)
 This is a small roll-torque request, not a roll-rate setpoint. `mix` preserves
 outputs outside [0, 1]; `MotorControls` rejects them. A saturation policy must
 resolve such requests explicitly. No force-to-RPM calibration is implied.
-The rate feedback routine and real STM32 sensor/ESC drivers remain to be built.
+[`rate_control`](../../../miniflight/rate.py) supplies PI rate feedback. It takes
+FRD rate error and elapsed device time, returning torque effort and the next
+integral state. [`r1_motors`](../controllers/r1_motors.py) owns that state and
+feeds the result through `mix` and `MotorControls`. Real STM32 sensor/ESC drivers
+remain to be built.
 
 ## source boundary
 

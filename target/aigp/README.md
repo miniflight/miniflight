@@ -25,6 +25,18 @@ Training and Qualification event selection is not implemented.
 `r1_body_rates` computes position and attitude control, then sends body rates
 and thrust. `zero` sends zero thrust.
 
+`r1_motors` adds our rate PI and mixer, then sends four individual motor controls.
+Run its recorded six-gate verification from the repository root:
+
+```sh
+python -m test.aigp_regression r1_motors
+```
+
+On VQ1 build 3391 this completed six valid gates in 48.92 native seconds with
+no collisions. All 2,446 flight commands were motor commands; the runner sent
+one zero-thrust body-rate command during cleanup. All 2,745 updates and control
+signals replayed exactly. The run used 50 Hz and a 0.3-second IMU timeout.
+
 Implement `update(telemetry, frames, race_state)` and return a command. Each call receives
 new packets and completed images. The runner handles timing, arming, race finish,
 and shutdown. See the [controller interface](controllers/README.md) and
