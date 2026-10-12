@@ -18,7 +18,7 @@
   .chart { height:300px; overflow:hidden; }
   @media(max-width:780px) { body { padding:16px; } main { grid-template-columns:1fr; } }
 </style>
-<header><h1>Miniflight pitwall</h1><p id="source">Waiting for recorded signals</p></header>
+<header><h1>Miniflight pitwall</h1><p><span id="source">Waiting for recorded signals</span><br><small id="feed"></small></p></header>
 <section id="summary" aria-label="Flight summary"></section>
 <main aria-label="Performance charts"></main>
 <footer>Time axis: controller reference clock. Native time uses the game clock.<br>Motor values are sent fractions. Missing channels stay blank. Drag to zoom; double-click to reset.</footer>
@@ -30,6 +30,9 @@ async function refresh() {
     if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
     const data = await response.json();
     document.querySelector('#source').textContent = data.title;
+    const age = data.published_at === undefined ? null : Math.max(0, Date.now()/1000-data.published_at);
+    document.querySelector('#feed').textContent = age === null ? 'Recorded snapshot' :
+      `${data.completed ? 'Flight completed' : 'Recorded signals'} · observer ${age < 3 ? 'updating' : 'stopped'} · snapshot ${age.toFixed(1)} s ago`;
     const summary = document.querySelector('#summary');
     summary.replaceChildren(...Object.entries(data.summary).map(([label, value]) => {
       const card = document.createElement('article'), name = document.createElement('small'), number = document.createElement('strong');
