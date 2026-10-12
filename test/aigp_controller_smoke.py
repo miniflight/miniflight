@@ -17,6 +17,7 @@ from miniflight import BodyRates, Ned
 from target.aigp.controllers import Gate
 from target.aigp.controllers.r1_gates import Controller as PositionController
 from target.aigp.controllers.r1_body_rates import Controller as RatesController
+from target.aigp.controllers.r1_motors import Controller as MotorController
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
 from target.aigp.experiments.r1_signals import r1_signals
@@ -28,6 +29,27 @@ from test.aigp_udp_smoke import imu
 
 
 class ControllerSmokeTest(unittest.TestCase):
+    def test_motor_integral_uses_imu_time_and_rejects_long_gaps(self):
+        controller = MotorController()
+        gate = Gate(0, Ned(2, 0, 0), (1, 0, 0, 0), 2, 2)
+        track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
+                       10, TrackInfo(7, (gate,)))
+        race = NativeRaceState(True, True, False, 0, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
+        controller.update((track, Packet(mavlink.MAVLink_local_position_ned_message(1000, 0, 0, 0, 0, 0, 0), 10),
+                           Packet(mavlink.MAVLink_attitude_message(1000, 0, 0, 0, 0, 0, 0), 10)), (), race)
+        for stamp in (1000000, 1135000):
+            sample = imu(stamp)
+            sample.xgyro = sample.ygyro = sample.zgyro = 0
+            controller.update((Packet(sample, 10),), (), race)
+        integral = controller.integral
+        self.assertLess(integral[1], 0)
+        controller.update((), (), race)
+        self.assertEqual(controller.integral, integral)
+        sample = imu(1436000)
+        sample.xgyro = sample.ygyro = sample.zgyro = 0
+        with self.assertRaisesRegex(TimeoutError, "IMU cadence"):
+            controller.update((Packet(sample, 10),), (), race)
+
     def test_recorded_pid_signals_expose_requests_before_clipping(self):
         updates, _ = self.flight(PIDController, replace_geometry=True, signals=r1_signals)
         samples = [row["signals"] for row in updates if "signals" in row]
@@ -148,12 +170,12 @@ class ControllerSmokeTest(unittest.TestCase):
                              active_gate_index=1, finish_time_seconds=101, received_at=11)))
 
     def test_undefined_gate_approach_stops_before_arming(self):
-        for make in (PositionController, RatesController, PIDController):
+        for make in (PositionController, RatesController, PIDController, MotorController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make)
                 self.assertTrue(all(row.get("command") is None for row in updates))
                 self.assertEqual(updates[-1]["error"]["type"], "ValueError")
-                self.assertFalse(any(message.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED")
+                self.assertFalse(any(message.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED", "SET_ACTUATOR_CONTROL_TARGET")
                                      for message in received))
 
     def test_pid_waits_for_first_imu_and_times_out_if_it_never_arrives(self):
@@ -162,7 +184,7 @@ class ControllerSmokeTest(unittest.TestCase):
                 self.flight(PIDController, replace_geometry=True, imu_after=imu_after)
 
     def test_active_gate_replacement_changes_target_and_replays(self):
-        for make in (PositionController, RatesController, PIDController):
+        for make in (PositionController, RatesController, PIDController, MotorController):
             with self.subTest(controller=make.__module__):
                 updates, received = self.flight(make, replace_geometry=True)
                 before = [row for row in updates if row["native_race"]["gate_centers"][0][:2] == [-2, 0]]
@@ -180,6 +202,12 @@ class ControllerSmokeTest(unittest.TestCase):
                     self.assertAlmostEqual(positions[-1].x, targets[0][0], delta=1e-6)
                     self.assertAlmostEqual(positions[-1].y, targets[0][1], delta=1e-6)
                     self.assertEqual(positions[-1].type_mask, 3576)
+                elif make is MotorController:
+                    motors = [message for message in received if message.get_type() == "SET_ACTUATOR_CONTROL_TARGET"]
+                    self.assertTrue(motors)
+                    self.assertTrue(all(row["command"]["kind"] == "MotorControls" for row in after))
+                    self.assertLess(motors[-1].controls[0] + motors[-1].controls[2],
+                                    motors[-1].controls[1] + motors[-1].controls[3])  # Negative FRD roll effort.
                 else:
                     self.assertTrue(all(row["command"]["roll_rate"] < -.5 for row in after))
                     rates = [message for message in received if message.get_type() == "SET_ATTITUDE_TARGET"]
@@ -227,7 +255,7 @@ class ControllerSmokeTest(unittest.TestCase):
                         drain()
                         if not imu_sent:
                             before_imu[:] = [m for m in received if m.get_type() in ("COMMAND_LONG", "SET_ATTITUDE_TARGET")]
-                        commands = sum(message.get_type() in ("SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED") for message in received)
+                        commands = sum(message.get_type() in ("SET_ATTITUDE_TARGET", "SET_POSITION_TARGET_LOCAL_NED", "SET_ACTUATOR_CONTROL_TARGET") for message in received)
                         replaced = replace_geometry and commands >= 3
                         center = ((0, -2, 0) if replaced else (-2, 0, 0)) if replace_geometry else (0, 0, 0)
                         transfer = 8 if replaced else 7

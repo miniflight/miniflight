@@ -8,35 +8,42 @@ import signal
 import subprocess
 import time
 
+from miniflight import BodyRates
 from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import Controller as PIDGates
-from target.aigp.experiments.recording import RecordedClient, RecordedController, recording, replay
+from target.aigp.controllers.r1_motors import Controller as MotorGates
+from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, recording, replay
+from target.aigp.experiments.r1_signals import motor_signals
 from target.aigp.native import BASE, SHIPPING, sha256
 from target.aigp.simulator import AIGPSimulator
 
 
-CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_beautiful": PIDGates}
+CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_beautiful": PIDGates, "r1_motors": MotorGates}
 ROOT = BASE.parents[1]
 
 
 def run(name, trace, camera=False, record_frames=False, signals=None):
     camera = camera or record_frames
     make = CONTROLLERS[name]
-    sources = ("miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
+    timeout = .3 if name == "r1_motors" else 1.0
+    if name == "r1_motors" and signals is None:
+        signals = motor_signals
+    sources = ("miniflight/rate.py", "miniflight/mixer.py", "target/aigp/__init__.py", "target/aigp/controllers/r1_motors.py",
+               "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
                "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "target/aigp/experiments/r1_signals.py", "test/aigp_regression.py")
-    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=1.0, camera=camera, recorded_frames=record_frames,
+    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames,
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
-        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client,
+        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"))
         try:
             result = simulator.rollout()
@@ -60,6 +67,10 @@ def run(name, trace, camera=False, record_frames=False, signals=None):
         raise AssertionError("native R1 did not arm and disarm once")
     if any(row["event"] == "telemetry" and row["message"]["mavpackettype"] == "COLLISION" for row in rows):
         raise AssertionError("native R1 reported a collision")
+    sent = [row["command"] for row in rows if row["event"] == "sent"]
+    if name == "r1_motors" and (len(sent) < 2 or sent[-1] != command_data(BodyRates())
+            or any(command["kind"] != "MotorControls" for command in sent[:-1])):
+        raise AssertionError("R1 must use only motor commands before the zero-thrust cleanup")
     print(json.dumps(dict(controller=name, gates=6, replayed_updates=updates,
                           frame_shape=None if frame is None else frame.bgr.shape, recorded_frames=record_frames, trace=str(trace))), flush=True)
 
