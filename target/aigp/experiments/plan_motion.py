@@ -14,7 +14,9 @@ from scipy.optimize import linprog
 def plan(reference, duration, initial_acceleration=(0, 0, -2), acceleration_limit=2.1, jerk_limit=4):
     if not np.isfinite(duration) or duration <= 0:
         raise ValueError("duration must be finite and positive")
-    count, gates, points = len(reference["acceleration_rates"]), reference["gates"], reference["points"]
+    gates = reference["gates"]
+    points = reference["points"]
+    count = len(reference["acceleration_rates"])
     dt = duration / count
     transition = np.array([[1, dt, dt**2 / 2], [0, 1, dt], [0, 0, 1]])
     effect = np.array([dt**3 / 6, dt**2 / 2, dt])
@@ -32,14 +34,21 @@ def plan(reference, duration, initial_acceleration=(0, 0, -2), acceleration_limi
     states, rates = [], []
     for axis in range(3):
         base = initial[:, :, axis]
-        result = linprog(np.r_[np.zeros(count), np.ones(count)], A_ub=inequalities,
-                         b_ub=np.r_[acceleration_limit - base[:, 2], acceleration_limit + base[:, 2], np.zeros(2 * count)],
-                         A_eq=equalities, b_eq=np.r_[points[1:, axis] - base[gates, 0], -base[-1, 2]],
+        acceleration_room = np.r_[acceleration_limit - base[:, 2], acceleration_limit + base[:, 2]]
+        inequality_limits = np.r_[acceleration_room, np.zeros(2 * count)]
+        gate_displacements = points[1:, axis] - base[gates, 0]
+        terminal_acceleration_change = -base[-1, 2]
+        required_motion = np.r_[gate_displacements, terminal_acceleration_change]
+        objective = np.r_[np.zeros(count), np.ones(count)]  # Minimize the auxiliary absolute-jerk variables.
+        result = linprog(objective, A_ub=inequalities, b_ub=inequality_limits,
+                         A_eq=equalities, b_eq=required_motion,
                          bounds=[(-jerk_limit, jerk_limit)] * count + [(0, None)] * count, method="highs")
         if not result.success:
             raise ValueError(f"axis {axis}: {result.message}")
-        rates.append(result.x[:count])
-        states.append(base + motion @ rates[-1])
+        jerk = result.x[:count]
+        planned_motion = base + motion @ jerk
+        rates.append(jerk)
+        states.append(planned_motion)
     return dict(states=np.stack(states, axis=2), acceleration_rates=np.stack(rates, axis=1), dt=dt, gates=gates, points=points)
 
 
