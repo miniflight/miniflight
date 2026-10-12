@@ -13,15 +13,15 @@ def write_snapshot(path, data):
     temporary.replace(path)
 
 
-def chart_data(samples, panels):
+def chart_data(samples, panels, *, x_key="time_s", x_label="Time (s)"):
     """Map scalar samples into labelled series; no target or control knowledge."""
-    time = [sample["time_s"] for sample in samples]
+    time = [sample[x_key] for sample in samples]
     charts = []
     for title, unit, channels in panels:
         series = []
         for label, key in channels:
             series.append(dict(label=label, x=time, y=[sample.get(key) for sample in samples]))
-        charts.append(dict(title=title, unit=unit, series=series))
+        charts.append(dict(title=title, unit=unit, x_label=x_label, series=series))
     return charts
 
 

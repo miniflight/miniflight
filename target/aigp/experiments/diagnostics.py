@@ -25,7 +25,7 @@ def snapshot(observer, samples, source):
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
                          "Collisions": observer.collisions, "Sent motor commands": len(samples)},
-                charts=chart_data(samples, PANELS))
+                charts=chart_data(samples, PANELS, x_label="Reference time (s)"))
 
 
 class Observe:
