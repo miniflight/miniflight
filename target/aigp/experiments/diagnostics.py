@@ -8,11 +8,13 @@ from miniflight.diagnostics import chart_data
 
 PANELS = (
     ("Horizontal speed", "m/s", (("Reference", "speed_ref_m_s"), ("Observed", "speed_m_s"))),
-    ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
     ("Position error: reference minus observed", "m", (("North", "north_error_m"), ("East", "east_error_m"), ("Down", "down_error_m"))),
-    ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
-    ("Sent motor requests and native reported outputs", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"), ("Reported mean", "motor_reported_mean"))),
     ("Horizontal acceleration request before limits", "m/s²", (("Requested", "acceleration_request_m_s2"), ("Limit", "acceleration_limit_m_s2"))),
+    ("Sent motor requests and native reported outputs", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"), ("Reported mean", "motor_reported_mean"))),
+)
+DETAIL_PANELS = (
+    ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
+    ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
     ("IMU boot time minus pose boot time", "s", (("Timestamp difference", "pose_clock_gap_s"),)),
 )
@@ -27,7 +29,8 @@ def snapshot(observer, samples, source):
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
                          "Collisions": observer.collisions, "Sent motor commands": len(samples)},
-                charts=chart_data(samples, PANELS, x_label="Reference time (s)"))
+                charts=chart_data(samples, PANELS, x_label="Reference time (s)") +
+                       [dict(chart, detail=True) for chart in chart_data(samples, DETAIL_PANELS, x_label="Reference time (s)")])
 
 
 class Observe:
