@@ -3,6 +3,7 @@
 import math
 import base64
 from pymavlink.dialects.v20 import common as mavlink
+from miniflight.diagnostics import chart_data
 
 
 PANELS = (
@@ -13,6 +14,18 @@ PANELS = (
     ("Horizontal acceleration request before limits", "m/s²", (("Requested", "acceleration_request_m_s2"), ("Limit", "acceleration_limit_m_s2"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
 )
+
+
+def snapshot(observer, samples, source):
+    race, metadata = observer.status, observer.metadata
+    clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
+    reference = (metadata.get("reference") or {}).get("duration_s")
+    seconds = lambda value: "—" if value is None else f"{value:.3f} s"
+    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {source.name}",
+                summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
+                         "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
+                         "Collisions": observer.collisions, "Sent motor commands": len(samples)},
+                charts=chart_data(samples, PANELS))
 
 
 class Observe:
