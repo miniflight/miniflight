@@ -37,18 +37,27 @@ class ControllerSmokeTest(unittest.TestCase):
         race = NativeRaceState(True, True, False, 0, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
         controller.update((track, Packet(mavlink.MAVLink_local_position_ned_message(1000, 0, 0, 0, 0, 0, 0), 10),
                            Packet(mavlink.MAVLink_attitude_message(1000, 0, 0, 0, 0, 0, 0), 10)), (), race)
-        for stamp in (1000000, 1135000):
+        sample = imu(1000000)
+        sample.xgyro = sample.ygyro = sample.zgyro = 0
+        controller.update((Packet(sample, 10),), (), race)
+        acknowledgement = mavlink.MAVLink_command_ack_message(mavlink.MAV_CMD_COMPONENT_ARM_DISARM, mavlink.MAV_RESULT_ACCEPTED)
+        controller.update((Packet(acknowledgement, 10.01),), (), race)
+        controller.update((Packet(sample, 10.015),), (), race)  # A repeated old IMU cannot seed the new clock.
+        self.assertIsNone(controller.time)  # The cached IMU predates the arm acknowledgement.
+        for stamp, receipt in ((1135000, 10.02), (1155000, 10.04)):
             sample = imu(stamp)
             sample.xgyro = sample.ygyro = sample.zgyro = 0
-            controller.update((Packet(sample, 10),), (), race)
+            controller.update((Packet(sample, receipt),), (), race)
+            if stamp == 1135000:
+                self.assertEqual(controller.integral, (0, 0, 0))  # Never integrate the pre-arm gap.
         integral = controller.integral
         self.assertLess(integral[1], 0)
         controller.update((), (), race)
         self.assertEqual(controller.integral, integral)
-        sample = imu(1436000)
+        sample = imu(1456000)
         sample.xgyro = sample.ygyro = sample.zgyro = 0
         with self.assertRaisesRegex(TimeoutError, "IMU cadence"):
-            controller.update((Packet(sample, 10),), (), race)
+            controller.update((Packet(sample, 10.341),), (), race)
 
     def test_recorded_pid_signals_expose_requests_before_clipping(self):
         updates, _ = self.flight(PIDController, replace_geometry=True, signals=r1_signals)
@@ -234,10 +243,14 @@ class ControllerSmokeTest(unittest.TestCase):
             def drain():
                 while True:
                     try:
-                        packet, _ = server.recvfrom(65536)
+                        packet, peer = server.recvfrom(65536)
                     except BlockingIOError:
                         return
-                    received.extend(decoder.parse_buffer(packet) or ())
+                    messages = decoder.parse_buffer(packet) or ()
+                    received.extend(messages)
+                    for message in messages:
+                        if message.get_type() == "COMMAND_LONG":
+                            server.sendto(mavlink.MAVLink_command_ack_message(message.command, mavlink.MAV_RESULT_ACCEPTED).pack(encoder), peer)
 
             def serve():
                 sequence = 0

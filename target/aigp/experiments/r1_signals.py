@@ -12,7 +12,8 @@ def r1_signals(controller):
 
 
 def motor_signals(controller):
-    return dict(imu_time_s=controller.time,
+    return dict(imu_time_s=controller.imu.time_usec * 1e-6,
+                integral_dt_s=controller.integral_dt,
                 rate_ref_frd_rad_s=list(controller.rate_request),
                 gyro_frd_rad_s=list(controller.gyro),
                 torque_request_frd=list(controller.torque),

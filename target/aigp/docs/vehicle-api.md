@@ -98,6 +98,10 @@ integral state. [`r1_motors`](../controllers/r1_motors.py) owns that state and
 feeds the result through `mix` and `MotorControls`. Real STM32 sensor/ESC drivers
 remain to be built.
 
+The rate integral starts from the first new IMU sample received after the native
+arm acknowledgement. Pre-arm sample gaps and repeated samples cannot advance
+that clock. Recorded signals retain both the raw IMU time and the integral's dt.
+
 ## source boundary
 
 [PX4](https://docs.px4.io/main/en/concept/control_allocation) separates rate
