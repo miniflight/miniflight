@@ -23,7 +23,7 @@
 <main aria-label="Performance charts"></main>
 <footer>Time axis: controller reference clock. Native time uses the game clock.<br>Motor values are sent fractions. Missing channels stay blank. Drag to zoom; double-click to reset.</footer>
 <script>
-const colors = ['#64dac3', '#ffb66b', '#b6a1ff'];
+const colors = ['#64dac3', '#ffb66b', '#b6a1ff', '#ff7898'];
 async function refresh() {
   try {
     const response = await fetch('./latest.json', {cache:'no-store'});

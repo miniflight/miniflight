@@ -11,9 +11,10 @@ PANELS = (
     ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
     ("Position error: reference minus observed", "m", (("North", "north_error_m"), ("East", "east_error_m"), ("Down", "down_error_m"))),
     ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
-    ("Sent motor requests", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"))),
+    ("Sent motor requests and native reported outputs", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"), ("Reported mean", "motor_reported_mean"))),
     ("Horizontal acceleration request before limits", "m/s²", (("Requested", "acceleration_request_m_s2"), ("Limit", "acceleration_limit_m_s2"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
+    ("IMU boot time minus pose boot time", "s", (("Timestamp difference", "pose_clock_gap_s"),)),
 )
 
 
@@ -48,13 +49,13 @@ class Observe:
             for packet in row["telemetry"]:
                 message, = self.decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
                 kind = message.get_type()
-                if kind not in ("LOCAL_POSITION_NED", "HIGHRES_IMU"):
+                if kind not in ("LOCAL_POSITION_NED", "HIGHRES_IMU", "ACTUATOR_OUTPUT_STATUS"):
                     continue
                 previous = self.latest.get(kind)
-                stamp = message.time_usec if kind == "HIGHRES_IMU" else message.time_boot_ms
+                stamp = message.time_boot_ms if kind == "LOCAL_POSITION_NED" else message.time_usec
                 if previous is not None:
                     old = previous[0]
-                    old_stamp = old.time_usec if kind == "HIGHRES_IMU" else old.time_boot_ms
+                    old_stamp = old.time_boot_ms if kind == "LOCAL_POSITION_NED" else old.time_usec
                     if stamp < old_stamp or message.to_dict() == old.to_dict() or kind == "HIGHRES_IMU" and stamp == old_stamp:
                         continue
                 if kind == "HIGHRES_IMU" and not all(math.isfinite(v) for v in (message.xacc,message.yacc,message.zacc,message.xgyro,message.ygyro,message.zgyro)):
@@ -66,11 +67,15 @@ class Observe:
         if row["command"] != self.pending["command"]:
             raise ValueError("sent command has no matching controller update")
         motion, pose_at = self.latest["LOCAL_POSITION_NED"]
-        _, imu_at = self.latest["HIGHRES_IMU"]
+        imu, imu_at = self.latest["HIGHRES_IMU"]
         config = self.metadata.get("controller_config", {})
         sample = quantities(self.pending["signals"], (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
                             row["command"]["outputs"], row["host_time"]-pose_at, row["host_time"]-imu_at,
                             config.get("max_acceleration"))
+        native = self.latest.get("ACTUATOR_OUTPUT_STATUS")
+        values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
+        sample["motor_reported_mean"] = sum(values)/4 if len(values) == 4 and all(math.isfinite(v) for v in values) else None
+        sample["pose_clock_gap_s"] = imu.time_usec/1e6 - motion.time_boot_ms/1e3
         self.pending = None
         return sample
 
