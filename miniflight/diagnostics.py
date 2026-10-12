@@ -4,6 +4,15 @@ import json
 from pathlib import Path
 
 
+def write_snapshot(path, data):
+    """Publish one complete view; readers see the previous or next JSON object."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(data, allow_nan=False) + "\n")
+    temporary.replace(path)
+
+
 def chart_data(samples, panels):
     """Map scalar samples into labelled series; no target or control knowledge."""
     time = [sample["time_s"] for sample in samples]
