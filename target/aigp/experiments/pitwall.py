@@ -6,17 +6,18 @@ from pathlib import Path
 import shutil
 import time
 
-from miniflight.diagnostics import JsonLines, write_snapshot
+from miniflight.diagnostics import JsonLines, chart_data, write_snapshot
 from target.aigp.experiments.diagnostics import Observe, snapshot
 
 
 def watch(source, output, current=False, once=False):
     output.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(Path(__file__).parents[3] / "miniflight/pitwall.html", output / "index.html")
-    reader, trace = None, None
+    reader, trace, ledger, history = None, None, None, []
     try:
         while True:
-            path = Path(json.loads(source.read_text())["trace"]) if current and source.exists() else source
+            pointer = json.loads(source.read_text()) if current and source.exists() else dict(trace=str(source))
+            path = Path(pointer["trace"])
             if current and not source.exists():
                 time.sleep(.5)
                 continue
@@ -26,6 +27,18 @@ def watch(source, output, current=False, once=False):
                 reader, observer, samples, trace = JsonLines(path), Observe(), [], path
             samples.extend(sample for row in reader.poll() if (sample := observer.consume(row)) is not None)
             view = snapshot(observer, samples, trace)
+            if "ledger" in pointer:
+                if ledger is None:
+                    ledger = JsonLines(pointer["ledger"])
+                history.extend(ledger.poll())
+                passed = sum(row["passed"] for row in history)
+                view["summary"].update({"Clean trials": passed, "Failed trials": len(history)-passed})
+                duration = (observer.metadata.get("reference") or {}).get("duration_s")
+                results = [dict(trial=row["trial"], finish=row.get("finish_time_s"), reference=duration) for row in history[-100:]]
+                chart, = chart_data(results, [("Native finish across trials", "s", [("Reference", "reference"), ("Clean finish", "finish")])],
+                                    x_key="trial", x_label="Trial")
+                chart["mode"] = "lines+markers"
+                view["charts"].insert(0, chart)
             view.update(published_at=time.time(), completed=observer.status.get("completed", False))
             write_snapshot(output / "latest.json", view)
             if once:
@@ -34,6 +47,8 @@ def watch(source, output, current=False, once=False):
     finally:
         if reader is not None:
             reader.close()
+        if ledger is not None:
+            ledger.close()
 
 
 if __name__ == "__main__":
