@@ -21,6 +21,14 @@ class PositionConfig:
     max_acceleration: float = 3.0  # m/s², horizontal magnitude and vertical bound
     max_tilt: float = .35  # radians from vertical
     max_rate: float = .75  # rad/s, body-rate vector magnitude
+    resistance_per_m: Vector3 = (0, 0, 0)  # quadratic resistance in the motion frame, 1/m
+
+
+def quadratic_resistance(velocity, coefficients):
+    """Acceleration needed to cancel resistance along each velocity axis, m/s²."""
+    if not all(math.isfinite(v) for v in velocity) or not all(math.isfinite(c) and c >= 0 for c in coefficients):
+        raise ValueError("resistance requires finite velocity and nonnegative coefficients")
+    return tuple(c * abs(v) * v for v, c in zip(velocity, coefficients, strict=True))
 
 
 def _limit(vector, magnitude):
