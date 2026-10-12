@@ -33,6 +33,9 @@ def watch(source, output, current=False, once=False):
                 history.extend(ledger.poll())
                 passed = sum(row["passed"] for row in history)
                 view["summary"].update({"Clean trials": passed, "Failed trials": len(history)-passed})
+                if history and history[-1]["trace"] == str(trace) and not history[-1]["passed"]:
+                    error = history[-1]["error"]
+                    view["note"] = f"Trial failed: {error['type']}: {error['message']}"
                 duration = (observer.metadata.get("reference") or {}).get("duration_s")
                 results = [dict(trial=row["trial"], finish=row.get("finish_time_s"), reference=duration) for row in history[-100:]]
                 chart, = chart_data(results, [("Native finish across trials", "s", [("Reference", "reference"), ("Clean finish", "finish")])],

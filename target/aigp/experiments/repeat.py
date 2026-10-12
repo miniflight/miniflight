@@ -17,11 +17,15 @@ from target.aigp.native import BASE, RaceStateReader, launch, sha256
 def fresh_race(path, timeout=120, course_packets=()):
     reader, client = RaceStateReader(path, .3), SimulatorClient(camera_port=None)
     requested, accepted, fresh, before, course = None, False, None, None, []
+    packet_counts = {}
     deadline, heartbeat_at = time.monotonic() + timeout, 0
     client.open()
     try:
         while time.monotonic() < deadline:
             packets, states = client.poll(.02), reader.poll()
+            for packet in packets:
+                kind = packet.data.get_type()
+                packet_counts[kind] = packet_counts.get(kind, 0) + 1
             course.extend(packet for packet in packets if packet.data.get_type() == "DATA_TRANSMISSION_HANDSHAKE"
                           or packet.data.get_type() == "ENCAPSULATED_DATA" and packet.data.data[0] == 2)
             now = time.monotonic()
@@ -51,7 +55,8 @@ def fresh_race(path, timeout=120, course_packets=()):
                 if math.hypot(*position) < .1 and math.hypot(*velocity) < .1:
                     course = tuple(course) if client.gates is not None else course_packets
                     return reader, dict(before=before, after=fresh, position_ned_m=position, velocity_ned_m_s=velocity), course
-        raise TimeoutError("native reset did not expose a fresh stationary starting grid")
+        raise TimeoutError(f"native reset stalled: connected={client.connected}, requested={requested is not None}, "
+                           f"accepted={accepted}, fresh={fresh is not None}, packets={packet_counts}")
     except BaseException:
         reader.close()
         raise

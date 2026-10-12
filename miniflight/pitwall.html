@@ -18,7 +18,7 @@
   .chart { height:300px; overflow:hidden; }
   @media(max-width:780px) { body { padding:16px; } main, #diagnostics { grid-template-columns:1fr; } }
 </style>
-<header><h1>Miniflight pitwall</h1><p><span id="source">Waiting for recorded signals</span><br><small id="feed"></small></p></header>
+<header><h1>Miniflight pitwall</h1><p><span id="source">Waiting for recorded signals</span><br><small id="feed"></small><br><span id="note"></span></p></header>
 <section id="summary" aria-label="Flight summary"></section>
 <main aria-label="Performance charts"></main>
 <details><summary>Sensor and rate diagnostics</summary><section id="diagnostics"></section></details>
@@ -32,6 +32,7 @@ async function refresh() {
     if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
     const data = await response.json();
     document.querySelector('#source').textContent = data.title;
+    document.querySelector('#note').textContent = data.note || '';
     const age = data.published_at === undefined ? null : Math.max(0, Date.now()/1000-data.published_at);
     document.querySelector('#feed').textContent = age === null ? 'Recorded snapshot' :
       `${data.completed ? 'Flight completed' : 'Recorded signals'} · observer ${age < 3 ? 'updating' : 'stopped'} · snapshot ${age.toFixed(1)} s ago`;
