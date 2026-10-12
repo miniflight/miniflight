@@ -17,7 +17,7 @@ from target.aigp.native import BASE, RaceStateReader, launch, sha256
 def fresh_race(path, timeout=120, course_packets=()):
     reader, client = RaceStateReader(path, .3), SimulatorClient(camera_port=None)
     requested, accepted, fresh, before, course = None, False, None, None, []
-    packet_counts = {}
+    packet_counts, reset_requests = {}, 0
     deadline, heartbeat_at = time.monotonic() + timeout, 0
     client.open()
     try:
@@ -32,9 +32,12 @@ def fresh_race(path, timeout=120, course_packets=()):
             if client.connected and now >= heartbeat_at:
                 client.heartbeat()
                 heartbeat_at = now + .5
-            if requested is None and client.connected and states:
-                before = asdict(states[-1])  # Drain old observations before requesting reset.
+            if client.connected and states and (requested is None or fresh is None and now-requested >= 1):
+                if requested is None:
+                    before = asdict(states[-1])  # Drain old observations before requesting reset.
                 client.reset()
+                reset_requests += 1
+                accepted = False
                 requested = time.monotonic()
                 continue
             if requested is None:
@@ -54,7 +57,8 @@ def fresh_race(path, timeout=120, course_packets=()):
                 position, velocity = (pose.x, pose.y, pose.z), (pose.vx, pose.vy, pose.vz)
                 if math.hypot(*position) < .1 and math.hypot(*velocity) < .1:
                     course = tuple(course) if client.gates is not None else course_packets
-                    return reader, dict(before=before, after=fresh, position_ned_m=position, velocity_ned_m_s=velocity), course
+                    return reader, dict(before=before, after=fresh, requests=reset_requests,
+                                        position_ned_m=position, velocity_ned_m_s=velocity), course
         raise TimeoutError(f"native reset stalled: connected={client.connected}, requested={requested is not None}, "
                            f"accepted={accepted}, fresh={fresh is not None}, packets={packet_counts}")
     except BaseException:
