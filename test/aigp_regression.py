@@ -16,7 +16,7 @@ from miniflight import BodyRates
 from miniflight.reference import sample_motion
 from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
-from target.aigp.controllers.r1_beautiful import Controller as PIDGates
+from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
 from target.aigp.controllers.r1_motors import Controller as MotorGates
 from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
@@ -28,7 +28,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=()):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
@@ -40,7 +40,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             times = data["times"] if "times" in data else None
             trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
             reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
-        make = lambda: MotorGates(position=PIDGates(reference=trajectory))
+        make = lambda: MotorGates(position=PIDGates(reference=trajectory, config=CONFIG if position_config is None else position_config))
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0

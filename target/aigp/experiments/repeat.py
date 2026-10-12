@@ -9,6 +9,7 @@ import signal
 import time
 
 from miniflight.diagnostics import write_snapshot
+from miniflight.position import PositionConfig
 from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, RaceStateReader, launch, sha256
 
@@ -63,6 +64,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--config", type=Path, help="PositionConfig JSON for this experiment")
     parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
     parser.add_argument("--stop-on-failure", action="store_true")
     args = parser.parse_args()
@@ -72,6 +74,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     native_path, ledger_path = output / "native.jsonl", output / "trials.jsonl"
     reference_hash = sha256(args.reference)
+    position_config = None if args.config is None else PositionConfig(**json.loads(args.config.read_text()))
     def interrupt(signum, frame):
         raise KeyboardInterrupt
     for signum in (signal.SIGTERM, signal.SIGHUP):
@@ -94,7 +97,7 @@ def main():
                 reader, reset, course_packets = fresh_race(native_path, course_packets=course_packets)
                 row["reset"] = reset
                 result = run("r1_motors", trace, camera=True, reference=args.reference, offscreen=True,
-                             attach=True, race_reader=reader, course_packets=course_packets)
+                             attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config)
                 row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
             except BaseException as error:
                 failures += 1
