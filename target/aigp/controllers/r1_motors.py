@@ -11,19 +11,23 @@ from target.aigp.controllers.r1_body_rates import Controller as PositionControll
 class Controller(BaseController[MotorControls]):
     targets = ("vq1.r1",)
 
-    def __init__(self, kp=(.025, .025, .03125), ki=(.2, .2, .25)):
-        self.position = PositionController()
+    def __init__(self, kp=(.025, .025, .03125), ki=(.1, .1, .125), position=None):
+        self.position = PositionController() if position is None else position
+        self.imu = None
         self.kp, self.ki = kp, ki
         self.integral, self.time = (0, 0, 0), None
         self.rate_request = self.gyro = self.torque = self.motor_request = None
 
     def update(self, telemetry, frames, race_state) -> MotorControls | None:
-        if any(packet.data.get_type() == "COLLISION" for packet in telemetry):
-            raise RuntimeError("native collision")
+        for packet in telemetry:
+            if packet.data.get_type() == "COLLISION":
+                raise RuntimeError("native collision")
+            if packet.data.get_type() == "HIGHRES_IMU":
+                self.imu = packet.data
         request = self.position.update(telemetry, frames, race_state)
-        if request is None:
+        if request is None or self.imu is None:
             return None
-        imu = self.position.course.telemetry["HIGHRES_IMU"].data
+        imu = self.imu
         stamp = imu.time_usec * 1e-6
         dt = 0 if self.time is None else stamp - self.time
         if dt > .3:

@@ -30,12 +30,15 @@ Run its recorded six-gate verification from the repository root:
 
 ```sh
 python -m test.aigp_regression r1_motors
+python -m test.aigp_regression r1_motors --reference test/fixtures/vq1_r1_35s.npz
 ```
 
-On VQ1 build 3391 this completed six valid gates in 48.92 native seconds with
-no collisions. All 2,446 flight commands were motor commands; the runner sent
-one zero-thrust body-rate command during cleanup. All 2,745 updates and control
-signals replayed exactly. The run used 50 Hz and a 0.3-second IMU timeout.
+`--reference` uses the saved 35-second position, velocity and acceleration plan
+with the existing PID follower, then our rate PI and mixer.
+
+The check requires six valid gates, no collisions, motor commands throughout
+the flight, and exact command/signal replay. It uses 50 Hz and a 0.3-second IMU
+timeout; the runner sends zero thrust and disarms during cleanup.
 
 Implement `update(telemetry, frames, race_state)` and return a command. Each call receives
 new packets and completed images. The runner handles timing, arming, race finish,
