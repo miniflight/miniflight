@@ -1,13 +1,21 @@
 import unittest
+import json
 from pathlib import Path
 
 import numpy as np
 
 from target.aigp.experiments.plan_motion import plan
-from target.aigp.experiments.plan_race import force_for_motion, integrate_motion
+from target.aigp.experiments.plan_race import force_for_motion, integrate_motion, motion_constraints
 
 
 class MotionPlanningTest(unittest.TestCase):
+    def test_hover_is_feasible_but_fast_motion_exceeds_the_force_budget(self):
+        model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
+        initial, jerk, intervals = np.zeros((3, 3)), np.zeros((2, 3)), np.array([.5, .5])
+        self.assertGreaterEqual(motion_constraints(initial, jerk, intervals, model).min(), 0)
+        initial[1, 0] = 10
+        self.assertLess(motion_constraints(initial, jerk, intervals, model).min(), 0)
+
     def test_required_thrust_balances_gravity_and_directional_resistance(self):
         velocity = np.array([[0, 0, 0], [3, 4, -2]])
         force = force_for_motion(velocity, np.zeros((2, 3)), [.05, .05, .2])

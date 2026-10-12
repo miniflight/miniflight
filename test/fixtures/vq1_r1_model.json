@@ -1,0 +1,192 @@
+{
+  "target": "vq1.r1",
+  "quadratic_drag_per_m": [
+    0.0480034846431955,
+    0.0480034846431955,
+    0.2070171790614305
+  ],
+  "horizontal_force_limit_m_s2": 2.4,
+  "vertical_force_limit_m_s2": 2.7,
+  "horizontal_speed_limit_m_s": 6.7,
+  "vertical_speed_limit_m_s": 2.5,
+  "vertical_acceleration_limit_m_s2": 2.1,
+  "tilt_limit_rad": 0.35,
+  "direction_rate_limit_rad_s": 0.6,
+  "jerk_limit_m_s3": 4,
+  "clearance_halfspan_m": [
+    0.18,
+    0.24
+  ],
+  "gate_half_opening_m": 0.74,
+  "vehicle_enclosing_radius_m": 0.205,
+  "crossing_error_and_reserve_m": [
+    0.355,
+    0.295
+  ],
+  "force_reserve_m_s2": [
+    0.6,
+    0.3
+  ],
+  "control_force_limit_m_s2": 3,
+  "observed_horizontal_speed_max_m_s": 6.781624245484309,
+  "observed_vertical_speed_max_m_s": 2.5345895290374756,
+  "fit_interval_seconds": 0.5,
+  "training": "arm-clock-30-02.jsonl",
+  "thrust_calibration": {
+    "hover": 0.266,
+    "slope_m_s2_per_control": 53.5
+  },
+  "raw_trace_directory": "target/aigp/.runtime/measurements/reliable-launch-20261012",
+  "gate_geometry_source": "target/aigp/.runtime/measurements/gate-geometry-20261011/gate0.json",
+  "body_geometry_source": "body-bounds-04.txt",
+  "body_geometry_sha256": "056255d3e3afb5a9039fa256019a4e406fe259b6e687ba6b4a18f9e7b89564ed",
+  "body_collision_component": "BoxComponent PhysicsComponent; collision enabled 3",
+  "body_world_extent_m": [
+    0.13610479355,
+    0.13010502815,
+    0.07784614563
+  ],
+  "scope": "Local force residual using measured attitude and near-hover thrust calibration. Reserves are planning choices. Rotation is constrained by thrust-direction slew; motor and inertia dynamics are not identified.",
+  "flights": [
+    {
+      "trace": "arm-clock-30-02.jsonl",
+      "trace_sha256": "0e44d38bcca8e87c00f6c071cf0b2f15cbdc610856a2c2899704a9aa1307fb3e",
+      "without_drag_rmse_m_s": [
+        0.9060153868324365,
+        0.03791387125564157,
+        0.3085616692247037
+      ],
+      "with_drag_rmse_m_s": [
+        0.03724588326371716,
+        0.11571274694046496,
+        0.1346655633296335
+      ]
+    },
+    {
+      "trace": "arm-clock-30-03.jsonl",
+      "trace_sha256": "22891d89cb795bf1f231546f064f6cf32de6e0f864fcd442c686589976370efc",
+      "without_drag_rmse_m_s": [
+        0.906247352401563,
+        0.04975856343498248,
+        0.30958212201330754
+      ],
+      "with_drag_rmse_m_s": [
+        0.03873534162726719,
+        0.11270003653587364,
+        0.13501957659828634
+      ]
+    },
+    {
+      "trace": "arm-clock-30-04.jsonl",
+      "trace_sha256": "d946e9ab38dcf60c2509772d8811822366629b4483316297df38034694c45510",
+      "without_drag_rmse_m_s": [
+        0.9057838505195509,
+        0.03783427917381171,
+        0.30897040208939824
+      ],
+      "with_drag_rmse_m_s": [
+        0.03727156173456239,
+        0.11615850351619887,
+        0.13488318024655996
+      ]
+    },
+    {
+      "trace": "arm-clock-30-05.jsonl",
+      "trace_sha256": "7c639fb4f40d8e1febb412c0743f7af5d4460623bfa914b666ec2770c40ab6b9",
+      "without_drag_rmse_m_s": [
+        0.9059729898463589,
+        0.037853605561704584,
+        0.3090835701213806
+      ],
+      "with_drag_rmse_m_s": [
+        0.03716235830542238,
+        0.11619632462877572,
+        0.13488794962631306
+      ]
+    },
+    {
+      "trace": "arm-clock-30-06.jsonl",
+      "trace_sha256": "0523578b05a9f312924273effe3a077a9ecf7d90ede2e1b62fe0e418c0d8d21b",
+      "without_drag_rmse_m_s": [
+        0.90584201126497,
+        0.03828312762363306,
+        0.3091222608347058
+      ],
+      "with_drag_rmse_m_s": [
+        0.03711849524889476,
+        0.11577927083949172,
+        0.1351299942059176
+      ]
+    },
+    {
+      "trace": "arm-clock-30-07.jsonl",
+      "trace_sha256": "c9565a874187c44f0e140c1a303ee8bf03962779214d9299a573e258faa0592a",
+      "without_drag_rmse_m_s": [
+        0.9053229710191383,
+        0.05029164722594985,
+        0.30849206826159264
+      ],
+      "with_drag_rmse_m_s": [
+        0.04212851070246532,
+        0.1111568260258933,
+        0.13535996462793418
+      ]
+    },
+    {
+      "trace": "arm-clock-30-08.jsonl",
+      "trace_sha256": "c63d95432ec8b35f4893017724078e357a4fcd93954690cd2f3f879b98d3d86f",
+      "without_drag_rmse_m_s": [
+        0.9030422096437359,
+        0.05725729486988249,
+        0.30860183478730435
+      ],
+      "with_drag_rmse_m_s": [
+        0.0470137770469942,
+        0.11005474925267839,
+        0.13506535669596692
+      ]
+    },
+    {
+      "trace": "arm-clock-30-09.jsonl",
+      "trace_sha256": "37d0bb11c19d2e57ec653f730954af4ae5d46793427425c80b521e6da80eda27",
+      "without_drag_rmse_m_s": [
+        0.9084291061280239,
+        0.04182336187839241,
+        0.3085833742638785
+      ],
+      "with_drag_rmse_m_s": [
+        0.03802614178255105,
+        0.11422741619413998,
+        0.13529096330107845
+      ]
+    },
+    {
+      "trace": "arm-clock-30-10.jsonl",
+      "trace_sha256": "0b33d5bb65d9f602c9983f4872055214c2b9629b275c3c6f33383ecf25b43f73",
+      "without_drag_rmse_m_s": [
+        0.9075324926222826,
+        0.041937438642400744,
+        0.30866869217955484
+      ],
+      "with_drag_rmse_m_s": [
+        0.03754281655894677,
+        0.11416497471647107,
+        0.1352648410913342
+      ]
+    },
+    {
+      "trace": "arm-clock-30-11.jsonl",
+      "trace_sha256": "a02e7f58cbcbbf0dbdacf0dac8c1b1268c522de156871e7ac7fac87e1a39cacd",
+      "without_drag_rmse_m_s": [
+        0.905909576040782,
+        0.044125280955635615,
+        0.30910814070232495
+      ],
+      "with_drag_rmse_m_s": [
+        0.040148582675814226,
+        0.11324613659983886,
+        0.134519872771666
+      ]
+    }
+  ]
+}
