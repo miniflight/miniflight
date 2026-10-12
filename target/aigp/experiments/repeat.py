@@ -1,11 +1,16 @@
 """Reset the owned native race, then transfer its fresh observation cursor."""
 
 from dataclasses import asdict
+import argparse
+import json
 import math
+from pathlib import Path
+import signal
 import time
 
+from miniflight.diagnostics import write_snapshot
 from target.aigp.client import SimulatorClient
-from target.aigp.native import RaceStateReader
+from target.aigp.native import BASE, RaceStateReader, launch, sha256
 
 
 def fresh_race(path, timeout=120, course_packets=()):
@@ -51,3 +56,64 @@ def fresh_race(path, timeout=120, course_packets=()):
         raise
     finally:
         client.disconnect()
+
+
+def main():
+    from test.aigp_regression import run, stop
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("reference", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
+    parser.add_argument("--stop-on-failure", action="store_true")
+    args = parser.parse_args()
+    if args.count < 0:
+        parser.error("count must be nonnegative")
+    output = args.output or BASE / ".runtime/experiments" / f"repeat-{time.time_ns()}"
+    output.mkdir(parents=True, exist_ok=False)
+    native_path, ledger_path = output / "native.jsonl", output / "trials.jsonl"
+    reference_hash = sha256(args.reference)
+    def interrupt(signum, frame):
+        raise KeyboardInterrupt
+    for signum in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(signum, interrupt)
+    signal.signal(signal.SIGALRM, stop)
+    index, failures, course_packets = 0, 0, ()
+    print(f"Pitwall source: {output / 'current.json'}", flush=True)
+    with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", ("-RenderOffScreen",), race_status_path=native_path) as process:
+        while args.count == 0 or index < args.count:
+            index += 1
+            trace = output / f"trial-{index:05d}.jsonl"
+            row = dict(trial=index, trace=str(trace.resolve()), native_pid=process.pid, native_path=str(native_path.resolve()),
+                       reference_sha256=reference_hash, started_at=time.monotonic())
+            write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
+            reader, interrupted = None, None
+            signal.alarm(210)
+            try:
+                if sha256(args.reference) != reference_hash:
+                    raise ValueError("reference changed during the experiment")
+                reader, reset, course_packets = fresh_race(native_path, course_packets=course_packets)
+                row["reset"] = reset
+                result = run("r1_motors", trace, camera=True, reference=args.reference, offscreen=True,
+                             attach=True, race_reader=reader, course_packets=course_packets)
+                row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
+            except BaseException as error:
+                failures += 1
+                row.update(passed=False, error=dict(type=type(error).__name__, message=str(error)))
+                if not isinstance(error, Exception):
+                    interrupted = error
+            finally:
+                signal.alarm(0)
+                if reader is not None:
+                    reader.close()
+            row["finished_at"] = time.monotonic()
+            ledger.write(json.dumps(row) + "\n")
+            print(json.dumps(row), flush=True)
+            if interrupted is not None:
+                raise interrupted
+            if not row["passed"] and args.stop_on_failure:
+                break
+    return int(failures > 0)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
