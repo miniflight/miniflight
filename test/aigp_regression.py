@@ -9,6 +9,7 @@ import signal
 import subprocess
 import time
 
+import cv2
 import numpy as np
 
 from miniflight import BodyRates
@@ -27,8 +28,9 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False):
     camera = camera or record_frames
+    simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
     if reference is not None:
         if name != "r1_motors":
@@ -51,6 +53,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "target/aigp/experiments/r1_signals.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames,
+                    simulator_args=simulator_args,
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference)),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
@@ -60,7 +63,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"))
         try:
-            result = simulator.rollout()
+            result = simulator.rollout(simulator_args=simulator_args)
         finally:
             record(event="result", connection_closed=not client.connected,
                    race=None if simulator.status is None else asdict(simulator.status),
@@ -74,6 +77,8 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
+    if camera and not cv2.imwrite(str(trace.with_suffix(".frame.png")), frame.bgr):
+        raise OSError("could not save the final native camera image")
     updates = replay(make, trace, signals=signals)
     with trace.open() as source:
         rows = [json.loads(line) for line in source]
@@ -100,13 +105,14 @@ def main():
     parser.add_argument("--camera", action="store_true", help="check native camera delivery and retain frame metadata")
     parser.add_argument("--record-frames", action="store_true", help="enable the camera and store all image pixels for replay")
     parser.add_argument("--reference", type=Path, help="sample saved motion through r1_motors (NPZ states, acceleration_rates, dt)")
+    parser.add_argument("--offscreen", action="store_true", help="render natively without a movable desktop window")
     args = parser.parse_args()
     trace = args.trace or BASE / ".runtime/regressions" / f"{args.controller}-{time.time_ns()}.jsonl"
     for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGALRM):
         signal.signal(signum, stop)
     signal.alarm(210)
     try:
-        run(args.controller, trace, args.camera, args.record_frames, reference=args.reference)
+        run(args.controller, trace, args.camera, args.record_frames, reference=args.reference, offscreen=args.offscreen)
     finally:
         signal.alarm(0)
 
