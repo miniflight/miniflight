@@ -7,9 +7,9 @@ from target.aigp.experiments.plan_motion import plan
 
 
 class MotionPlanningTest(unittest.TestCase):
-    def test_lift_and_gate_constraints_at_both_paces(self):
+    def test_lift_and_gate_constraints_at_each_pace(self):
         with np.load(Path(__file__).parent / "fixtures/vq1_r1_35s.npz") as source:
-            for duration in (35, 32):
+            for duration in (35, 32, 30):
                 result = plan(source, duration)
                 states, jerk, dt = result["states"], result["acceleration_rates"], result["dt"]
                 np.testing.assert_array_equal(states[0], [[0, 0, 0], [0, 0, 0], [0, 0, -2]])

@@ -35,8 +35,15 @@ runs in 32.129–32.171 native seconds, with no collisions and exact command/sig
 replay. The [verification record](../../../test/fixtures/vq1_r1_lift_32s.validation.json)
 retains the configuration and trace hashes, and notes earlier windowed failures.
 
+The 30-second reference then exposed an arming error: the rate integral included
+an IMU interval from before arming. Starting its clock from fresh feedback after
+the accepted arm command gave ten consecutive clean runs in 30.129–30.187 native
+seconds, with unchanged gains and exact command/signal replay. The
+[30-second record](../../../test/fixtures/vq1_r1_lift_30s.validation.json) retains
+all ten traces' hashes and the earlier failed attempt.
+
 ```sh
-python -m test.aigp_regression r1_motors --reference test/fixtures/vq1_r1_lift_32s.npz --offscreen --camera
+python -m test.aigp_regression r1_motors --reference test/fixtures/vq1_r1_lift_30s.npz --offscreen --camera
 ```
 
 Omit `--offscreen` to watch the native window. `--camera` also saves its final

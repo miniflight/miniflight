@@ -8,7 +8,8 @@ from miniflight.reference import sample_motion
 
 class MotionReferenceTest(unittest.TestCase):
     def test_saved_r1_reference_crosses_its_six_gate_centers(self):
-        for name, duration in (("vq1_r1_35s", 35), ("vq1_r1_lift_35s", 35), ("vq1_r1_lift_32s", 32)):
+        for name, duration in (("vq1_r1_35s", 35), ("vq1_r1_lift_35s", 35),
+                               ("vq1_r1_lift_32s", 32), ("vq1_r1_lift_30s", 30)):
             with self.subTest(reference=name), np.load(Path(__file__).parent / f"fixtures/{name}.npz") as plan:
                 states, rates, dt = plan["states"], plan["acceleration_rates"], float(plan["dt"])
                 self.assertEqual(len(plan["gates"]), 6)

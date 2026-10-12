@@ -1,0 +1,93 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "runtime_revision": "5dee3b419b24c7dfe4a133babfa24be8f7374577",
+  "revision_note": "The first trace predates the commit; every recorded source hash matches runtime_revision.",
+  "reference": "vq1_r1_lift_30s.npz",
+  "reference_sha256": "b6d4f88a00feceb93dcac51a06573c85c00611465bb435decd96647aee1af19d",
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "python": "3.11.14",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "os": "macOS-26.3-arm64-arm-64bit",
+  "hardware_model": "Mac16,12",
+  "chip": "Apple M4",
+  "hz": 50,
+  "freshness_timeout_s": 0.3,
+  "simulator_args": [
+    "-RenderOffScreen"
+  ],
+  "render_size": [
+    1280,
+    720
+  ],
+  "camera_size": [
+    640,
+    360
+  ],
+  "initial_reference_acceleration_ned_m_s2": [
+    0,
+    0,
+    -2
+  ],
+  "planning_acceleration_bound_per_axis_m_s2": 2.1,
+  "planning_jerk_bound_per_axis_m_s3": 4,
+  "planner_objective": "minimum absolute jerk; fixed gate centers and crossing fractions",
+  "assertions": [
+    "six valid gates",
+    "zero collisions",
+    "exact command and signal replay",
+    "arm/disarm once",
+    "connection closed",
+    "nonuniform native camera image",
+    "zero initial rate integral and integral time step",
+    "identical recorded runtime inputs"
+  ],
+  "raw_trace_directory": "target/aigp/.runtime/measurements/reliable-launch-20261012",
+  "earlier_30s_attempt": {
+    "clean_runs": 5,
+    "failed_trace": "offscreen-30-06.jsonl",
+    "failure": "launch collision",
+    "observed_error": "rate integral included a 0.135592-second initial IMU gap across arming"
+  },
+  "limitation": "Ten flights validate this native offscreen configuration; they do not establish time optimality or diagnose earlier windowed stalls.",
+  "sources": {
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "570072df8b1df25b003624f197c3374f44dc42c4a01c90f8318344b17563bd7d",
+    "target/aigp/__init__.py": "d5ed3a2981e826f442f45282d8d520b91dfe3834cb64b7881d69d59228b682c5",
+    "target/aigp/controllers/r1_motors.py": "ee89f5ff5316baac4d17873bf8a8033d8fd1801fb195247968912a2201a2e01c",
+    "miniflight/position.py": "2bb9ca7ee3bca2db272aca8a4cdbbba0bef4855e5c39f30b250c0e4d1df82535",
+    "miniflight/reference.py": "04a4cc9d3f2afab397cb50e36664cb32c34ea10e43686c010bb55e6111267586",
+    "miniflight/state.py": "afd1b76744ddffc64a1c428d5a7e1b316c5bb01c3eeeb6906e2c1271063b3d5d",
+    "miniflight/control.py": "d3eb110692bc4bbe7cc9c819f24b08396c38931ba27a4a871e3f8687efd26e39",
+    "miniflight/monitor.py": "3d19d1e99bfbf6bcab976e95a31766f82a6eaa0c9d5fd41edb19639fd24bf3cf",
+    "miniflight/vehicle.py": "443057c3adbded5e860cad5c6d081f3d154fd6170e86406c392df201cbd950f8",
+    "miniflight/__init__.py": "05a325f4acfeea53b5693741b0137ec280687c7d0f951ff53c15f23de9b1c8b2",
+    "common/math.py": "5594f43dbc9610c192ff650b3c92ff9c1203116e5e33e23c6bb91c67f943c0d9",
+    "target/__init__.py": "e66f281dc325c858a1e682e5457dfb7ebee36218fb700c8439462402741ed8b1",
+    "target/aigp/controllers/r1_gates.py": "61b4aac45b2e7b7eec16a88ba494b5324d671f39572c0e9329c0a98249549759",
+    "target/aigp/controllers/r1_body_rates.py": "ab748f64fe3ab184c336d3096a755699d17e927c1700795d2b220ba66833ffda",
+    "target/aigp/controllers/r1_beautiful.py": "f52c34091d2d24fc1d02aa18559aec1ec5c06053ab2cc23175efb4d7f7dd1abc",
+    "target/aigp/controllers/__init__.py": "908f0265bebd34f57291a851c22c75d0b80aa3ee28debdec65c151f0e104c9bd",
+    "target/aigp/simulator.py": "5ecb3c5952ccc52aac54ef3d09f21c79e06e9fe048f26ee7fe190be9e0927487",
+    "target/aigp/client.py": "a95cd10d7459d5d1fc1386c1fa431337e56330395e36c2169f5296d07c1ad339",
+    "target/aigp/native.py": "cd8e3467c18cb913d73ec123e0da2213bd27149f301acc2d78571106cfbac136",
+    "target/aigp/config/vq1/main.lua": "106658709e172f11aaed9168d9658421446f9156a21f142274ee93bee5e3ef90",
+    "target/aigp/config/race.lua": "94ce9143191e3609c6b67ca66385d791e233f049d4e0748d597fcaf5919cbea4",
+    "target/aigp/experiments/recording.py": "7fb6ccbf41aabde360bfcfb56017485c9238d1bd23e109dddd63dceba07b0528",
+    "target/aigp/experiments/r1_signals.py": "9f941c1e4b485f605868e3dc5af3413a6afde7950a257a16a2fd0bec6f425d70",
+    "test/aigp_regression.py": "085c7bfe431fabc2dfb865aa8af8f7aa19b585eb2be8bf45be2a432618370936"
+  },
+  "runs": [
+    {"run":1,"trace":"arm-clock-30-02.jsonl","recorded_revision":"30be25c01ce9cc08d8e1e9dc623b4147eff95eb8","finish_time_s":30.142816544,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1809,"sent":{"MotorControls":1508,"BodyRates":1},"trace_sha256":"0e44d38bcca8e87c00f6c071cf0b2f15cbdc610856a2c2899704a9aa1307fb3e","camera_sha256":"311cac3e344c6e8a244eec5037e9704d1ddb8fd0b51047804ddbc32315131913"},
+    {"run":2,"trace":"arm-clock-30-03.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.177778244,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1819,"sent":{"MotorControls":1507,"BodyRates":1},"trace_sha256":"22891d89cb795bf1f231546f064f6cf32de6e0f864fcd442c686589976370efc","camera_sha256":"8c9877f38216323616a830ead6e6f14e17a431b3312c05980d2af2247f0f8e2f"},
+    {"run":3,"trace":"arm-clock-30-04.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.145671844,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1817,"sent":{"MotorControls":1506,"BodyRates":1},"trace_sha256":"d946e9ab38dcf60c2509772d8811822366629b4483316297df38034694c45510","camera_sha256":"432a045e08c755ccaebde6229b4e6d836b26edbe76290794f0f9b8d5e90e5546"},
+    {"run":4,"trace":"arm-clock-30-05.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.142587662,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1821,"sent":{"MotorControls":1505,"BodyRates":1},"trace_sha256":"7c639fb4f40d8e1febb412c0743f7af5d4460623bfa914b666ec2770c40ab6b9","camera_sha256":"bb3b5ae26816f81f85b089269e84fb1868e185489576dca15f685833073cb3df"},
+    {"run":5,"trace":"arm-clock-30-06.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.162059784,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1817,"sent":{"MotorControls":1508,"BodyRates":1},"trace_sha256":"0523578b05a9f312924273effe3a077a9ecf7d90ede2e1b62fe0e418c0d8d21b","camera_sha256":"23f0b3d58d620c7e55d638ac723edafd8f8aaf3e4f8ed6d9c63bd4d9ade150b1"},
+    {"run":6,"trace":"arm-clock-30-07.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.177930832,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1816,"sent":{"MotorControls":1510,"BodyRates":1},"trace_sha256":"c9565a874187c44f0e140c1a303ee8bf03962779214d9299a573e258faa0592a","camera_sha256":"767b7923ef79060423f97b3659529d5b9f08b9a196670af732b9e67641116bcf"},
+    {"run":7,"trace":"arm-clock-30-08.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.139787674,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1813,"sent":{"MotorControls":1508,"BodyRates":1},"trace_sha256":"c63d95432ec8b35f4893017724078e357a4fcd93954690cd2f3f879b98d3d86f","camera_sha256":"d15aaefd264b621b263f0f55f2c41ff3bff4837fa63ceaa0c7a393e01027c54d"},
+    {"run":8,"trace":"arm-clock-30-09.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.128639221,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1804,"sent":{"MotorControls":1503,"BodyRates":1},"trace_sha256":"37d0bb11c19d2e57ec653f730954af4ae5d46793427425c80b521e6da80eda27","camera_sha256":"aadbd5d5c027a9d23be8aa9f376d68cce2d5aae7522f573225de60238607475a"},
+    {"run":9,"trace":"arm-clock-30-10.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.151992798,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1810,"sent":{"MotorControls":1507,"BodyRates":1},"trace_sha256":"0b33d5bb65d9f602c9983f4872055214c2b9629b275c3c6f33383ecf25b43f73","camera_sha256":"8de35c0595b0be05be580965b8d60e7137b205965cac421f78082124300ce201"},
+    {"run":10,"trace":"arm-clock-30-11.jsonl","recorded_revision":"5dee3b419b24c7dfe4a133babfa24be8f7374577","finish_time_s":30.187063217,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1813,"sent":{"MotorControls":1509,"BodyRates":1},"trace_sha256":"a02e7f58cbcbbf0dbdacf0dac8c1b1268c522de156871e7ac7fac87e1a39cacd","camera_sha256":"4d392be051bad9b241b199376f9ca033180b683652ae4115990fbfa4de2aabe1"}
+  ]
+}
