@@ -9,3 +9,12 @@ def r1_signals(controller):
                 velocity_ref_ned_m_s=controller.target_velocity.v.tolist(),
                 acceleration_ref_ned_m_s2=controller.target_acceleration.v.tolist(),
                 acceleration_request_ned_m_s2=controller.requested_acceleration.v.tolist())
+
+
+def motor_signals(controller):
+    return dict(imu_time_s=controller.time,
+                rate_ref_frd_rad_s=list(controller.rate_request),
+                gyro_frd_rad_s=list(controller.gyro),
+                torque_request_frd=list(controller.torque),
+                integral_effort_frd=list(controller.integral),
+                motor_request=list(controller.motor_request))
