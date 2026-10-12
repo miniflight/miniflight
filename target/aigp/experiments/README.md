@@ -28,6 +28,21 @@ checks the follower; it does not establish the fastest feasible whole pose.
 Search should choose the motion. Geometry, dynamics and measured limits define
 the constraints; a preferred bend shape or gate-specific braking rule does not.
 
+On 2026-10-12, an initial upward reference acceleration of 2 m/s² made the
+vehicle gain height during its initial attitude correction. With the same
+controller gains, the 32-second reference completed ten consecutive offscreen
+runs in 32.129–32.171 native seconds, with no collisions and exact command/signal
+replay. The [verification record](../../../test/fixtures/vq1_r1_lift_32s.validation.json)
+retains the configuration and trace hashes, and notes earlier windowed failures.
+
+```sh
+python -m test.aigp_regression r1_motors --reference test/fixtures/vq1_r1_lift_32s.npz --offscreen --camera
+```
+
+Omit `--offscreen` to watch the native window. `--camera` also saves its final
+image. The optional `planning` extra supports `python -m target.aigp.experiments.plan_motion`;
+this planner still fixes gate centers and crossing fractions and minimizes absolute jerk.
+
 `probe.py` runs bounded body-rate measurements. The command-line example remains
 under `examples/aigp/`:
 

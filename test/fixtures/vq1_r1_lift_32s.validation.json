@@ -1,0 +1,53 @@
+{
+  "target": "vq1.r1",
+  "runtime_revision": "cc78c8a5bfad221f8c90573aaa4c2860aabae852",
+  "reference": "vq1_r1_lift_32s.npz",
+  "reference_sha256": "ffe01ace754127afc9c4b2ac4ac0c66a6a451243ba984e066285e387fb2385b6",
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "python": "3.11.14",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "hz": 50,
+  "freshness_timeout_s": 0.3,
+  "simulator_args": [
+    "-RenderOffScreen"
+  ],
+  "camera_size": [
+    640,
+    360
+  ],
+  "initial_reference_acceleration_ned_m_s2": [
+    0,
+    0,
+    -2
+  ],
+  "planning_acceleration_bound_per_axis_m_s2": 2.1,
+  "planning_jerk_bound_per_axis_m_s3": 4,
+  "planner_objective": "minimum absolute jerk; fixed gate centers and crossing fractions",
+  "assertions": [
+    "six valid gates",
+    "zero collisions",
+    "exact command and signal replay",
+    "arm/disarm once",
+    "connection closed",
+    "nonuniform native camera image"
+  ],
+  "raw_trace_directory": "target/aigp/.runtime/measurements/reliable-launch-20261012",
+  "earlier_windowed_failures": {
+    "startup_without_lua": 1,
+    "native_clock_timeout": 5
+  },
+  "limitation": "This validates this native reference and configuration; it does not prove optimality or diagnose every windowed stall.",
+  "runs": [
+    {"run":1,"trace":"offscreen-32-02.jsonl","finish_time_s":32.134651184,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1904,"sent":{"MotorControls":1607,"BodyRates":1},"trace_sha256":"e00e23bad19fda837bf93eb3f64c1f9f6e3d0fbabe95e599736d8db0cd27f0c8","camera_sha256":"a2fcd3641347d9ec4194e274fd2d13896ca1df16be8ec867a979440496357296"},
+    {"run":2,"trace":"offscreen-32-03.jsonl","finish_time_s":32.143039703,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1911,"sent":{"MotorControls":1609,"BodyRates":1},"trace_sha256":"c2b788e89ded1d308bb1ae336117745b6ed20601c8e5d0ae2d2ddf058bb6141f","camera_sha256":"ed3bf6e59d77fd241b61730f342960aced795da2876d8f726b200c7a61e2a983"},
+    {"run":3,"trace":"offscreen-32-04.jsonl","finish_time_s":32.129905701,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1917,"sent":{"MotorControls":1607,"BodyRates":1},"trace_sha256":"f40259e25df0b6e1f9f58768fa69dcc95c7f660f33480de57421ffa7662d32a3","camera_sha256":"f7b330e4dca1673c5323b608b413e066d104d62787b284b88e09dfc9b8a56631"},
+    {"run":4,"trace":"offscreen-32-05.jsonl","finish_time_s":32.155311584,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1914,"sent":{"MotorControls":1604,"BodyRates":1},"trace_sha256":"3b175e643b87ca11376c4abd36be19b33586d595282831b957c97279759188dd","camera_sha256":"6d5c2a1721356734098cc4f4b8f175f7c70eb69629f910497a2dec77cc9d1a61"},
+    {"run":5,"trace":"offscreen-32-06.jsonl","finish_time_s":32.137908936,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1921,"sent":{"MotorControls":1608,"BodyRates":1},"trace_sha256":"b08fd015540a585cfdf54dd34416960139f3d65bb74770d268c9d9837c33d8ec","camera_sha256":"4f07d2142d63c8c96b1b425db75182dc52c98a8c9a4e641b099c67d9c45ec04f"},
+    {"run":6,"trace":"offscreen-32-07.jsonl","finish_time_s":32.137104034,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1912,"sent":{"MotorControls":1607,"BodyRates":1},"trace_sha256":"a6e9495b6cfd30212a512fb8240f72c4a82d08f1fcd17c5645fa2aa65038dcea","camera_sha256":"3233d151e3b2b8a1cebd11b34b1d33c40fb41eb5a0f0a787981282fb398f722b"},
+    {"run":7,"trace":"offscreen-32-08.jsonl","finish_time_s":32.12859726,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1921,"sent":{"MotorControls":1609,"BodyRates":1},"trace_sha256":"1058b29a85581db8c237fadc96e111c6feb225e743dd64af3db5fcf5426e0b76","camera_sha256":"e461de28c721003b994b3b5f4bf6c4c7d082e1675f2f8fef88e0bafee42685eb"},
+    {"run":8,"trace":"offscreen-32-09.jsonl","finish_time_s":32.171298981,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1916,"sent":{"MotorControls":1608,"BodyRates":1},"trace_sha256":"aa201ba5d84ec6c5fcdb8cc9e5aeee7af4d80526b70735d838cfc2e0eafe0556","camera_sha256":"2a874c1745cef069a5dfdb09c39e41eb3c3976e383cdaa1421501281d4ec068e"},
+    {"run":9,"trace":"offscreen-32-10.jsonl","finish_time_s":32.147010803,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1909,"sent":{"MotorControls":1608,"BodyRates":1},"trace_sha256":"098ab6fd2df4e0f3a02e2b526d2d1e9234605b16923c718e908f5d51e2c893bd","camera_sha256":"131ee824c71439bee2227c411769010a695644b5c02125606f2190a31b092b68"},
+    {"run":10,"trace":"offscreen-32-11.jsonl","finish_time_s":32.154411316,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1908,"sent":{"MotorControls":1608,"BodyRates":1},"trace_sha256":"666eaba701bdb9ee370d90d62abe8f4ddd7d8edbaf7565ccad26db940e135123","camera_sha256":"cd0ab8d5ec885d6eb46b6c7a32f1d58b593efb75707d2f359203fa924ffcd46a"}
+  ]
+}

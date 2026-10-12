@@ -8,13 +8,14 @@ from miniflight.reference import sample_motion
 
 class MotionReferenceTest(unittest.TestCase):
     def test_saved_r1_reference_crosses_its_six_gate_centers(self):
-        with np.load(Path(__file__).parent / "fixtures/vq1_r1_35s.npz") as plan:
-            states, rates, dt = plan["states"], plan["acceleration_rates"], float(plan["dt"])
-            self.assertEqual(len(plan["gates"]), 6)
-            self.assertEqual(len(rates) * dt, 35)
-            for index, center in zip(plan["gates"], plan["points"][1:]):
-                position, _, _ = sample_motion(states, rates, dt, index * dt)
-                np.testing.assert_allclose(position, center, atol=1e-8)
+        for name, duration in (("vq1_r1_35s", 35), ("vq1_r1_lift_35s", 35), ("vq1_r1_lift_32s", 32)):
+            with self.subTest(reference=name), np.load(Path(__file__).parent / f"fixtures/{name}.npz") as plan:
+                states, rates, dt = plan["states"], plan["acceleration_rates"], float(plan["dt"])
+                self.assertEqual(len(plan["gates"]), 6)
+                self.assertEqual(len(rates) * dt, duration)
+                for index, center in zip(plan["gates"], plan["points"][1:]):
+                    position, _, _ = sample_motion(states, rates, dt, index * dt)
+                    np.testing.assert_allclose(position, center, atol=1e-8)
 
     def test_derivatives_and_continuity_through_interval_boundaries(self):
         states = np.array([[[0, 0, 0], [1, 0, 0], [0, 0, 0]],
