@@ -43,3 +43,14 @@ def motion_constraints(initial, jerk, intervals, model):
                  1-down_demand, 1+down_demand, 1-down_speed, 1+down_speed, 1-down_acceleration, 1+down_acceleration,
                  1-np.sum(velocity[:, :2]**2, axis=1)/model["horizontal_speed_limit_m_s"]**2,
                  1-direction_rate_squared/model["direction_rate_limit_rad_s"]**2]
+
+
+def crossing_constraints(states, gates, centers, model):
+    """Plane equality and clearance/direction margins in the measured R1 gate frame."""
+    axes = np.asarray(model["gate_axes_ned"])
+    offsets = (states[gates, 0] - centers) @ axes.T
+    phase_lengths = np.linalg.norm(np.diff(np.vstack((states[0, 0], centers)), axis=0), axis=1)
+    plane_error = offsets[:, 1] / phase_lengths
+    in_plane = offsets[:, (0, 2)] / model["clearance_halfspan_m"]
+    crossing_speed = states[gates, 1] @ axes[1]
+    return plane_error, np.r_[(1-in_plane).ravel(), (1+in_plane).ravel(), crossing_speed]

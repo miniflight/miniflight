@@ -5,10 +5,20 @@ from pathlib import Path
 import numpy as np
 
 from target.aigp.experiments.plan_motion import plan
-from target.aigp.experiments.plan_race import force_for_motion, integrate_motion, motion_constraints
+from target.aigp.experiments.plan_race import crossing_constraints, force_for_motion, integrate_motion, motion_constraints
 
 
 class MotionPlanningTest(unittest.TestCase):
+    def test_crossings_clear_the_opening_and_follow_its_permitted_direction(self):
+        model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
+        with np.load(Path(__file__).parent / "fixtures/vq1_r1_lift_30s.npz") as source:
+            states, gates, centers = source["states"], source["gates"], source["points"][1:]
+            planes, margins = crossing_constraints(states, gates, centers, model)
+            np.testing.assert_allclose(planes, 0, atol=1e-8)
+            self.assertGreaterEqual(margins.min(), 0)
+            states[gates[0], 0, 1] += 1
+            self.assertLess(crossing_constraints(states, gates, centers, model)[1].min(), 0)
+
     def test_hover_is_feasible_but_fast_motion_exceeds_the_force_budget(self):
         model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
         initial, jerk, intervals = np.zeros((3, 3)), np.zeros((2, 3)), np.array([.5, .5])
