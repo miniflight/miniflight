@@ -5,10 +5,19 @@ from pathlib import Path
 import numpy as np
 
 from target.aigp.experiments.plan_motion import plan
-from target.aigp.experiments.plan_race import crossing_constraints, force_for_motion, integrate_motion, motion_constraints
+from target.aigp.experiments.plan_race import crossing_constraints, force_for_motion, integrate_motion, motion_constraints, plan as plan_race
 
 
 class MotionPlanningTest(unittest.TestCase):
+    def test_search_selects_a_shorter_feasible_crossing_time(self):
+        model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
+        reference = dict(states=np.zeros((21, 3, 3)), acceleration_rates=np.zeros((20, 3)),
+                         gates=np.array([20]), points=np.array([[0, 0, 0], [-1, 0, 0]]), dt=.2)
+        result = plan_race(reference, model)
+        self.assertLess(result["times"][-1], 3)
+        self.assertAlmostEqual(result["states"][-1, 0, 0], -1, places=4)
+        self.assertGreaterEqual(result["minimum_margin"], -1e-5)
+
     def test_crossings_clear_the_opening_and_follow_its_permitted_direction(self):
         model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
         with np.load(Path(__file__).parent / "fixtures/vq1_r1_lift_30s.npz") as source:

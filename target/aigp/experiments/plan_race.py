@@ -1,6 +1,7 @@
 """Offline race planning with free crossing positions and interval durations."""
 
 import numpy as np
+from scipy.optimize import minimize
 
 
 def force_for_motion(velocity, acceleration, drag):
@@ -31,6 +32,8 @@ def motion_constraints(initial, jerk, intervals, model):
     _, velocity, acceleration = dense.transpose(1, 0, 2)
     force = force_for_motion(velocity, acceleration, model["quadratic_drag_per_m"])
     horizontal_force_squared = np.sum(force[:, :2]**2, axis=1)
+    force_squared = np.sum(force**2, axis=1)
+    minimum_thrust, maximum_thrust = model["specific_thrust_range_m_s2"]
     force_limit = model["horizontal_force_limit_m_s2"]
     up = -force[:, 2]
     direction = -force / np.maximum(np.linalg.norm(force, axis=1)[:, None], 1e-12)
@@ -38,7 +41,7 @@ def motion_constraints(initial, jerk, intervals, model):
     down_demand = (force[:, 2] + 9.81) / model["vertical_force_limit_m_s2"]
     down_speed = velocity[:, 2] / model["vertical_speed_limit_m_s"]
     down_acceleration = acceleration[:, 2] / model["vertical_acceleration_limit_m_s2"]
-    return np.r_[1-horizontal_force_squared/force_limit**2,
+    return np.r_[force_squared/minimum_thrust**2-1, 1-force_squared/maximum_thrust**2, 1-horizontal_force_squared/force_limit**2,
                  (up**2*np.tan(model["tilt_limit_rad"])**2-horizontal_force_squared)/force_limit**2, up/9.81,
                  1-down_demand, 1+down_demand, 1-down_speed, 1+down_speed, 1-down_acceleration, 1+down_acceleration,
                  1-np.sum(velocity[:, :2]**2, axis=1)/model["horizontal_speed_limit_m_s"]**2,
@@ -54,3 +57,41 @@ def crossing_constraints(states, gates, centers, model):
     in_plane = offsets[:, (0, 2)] / model["clearance_halfspan_m"]
     crossing_speed = states[gates, 1] @ axes[1]
     return plane_error, np.r_[(1-in_plane).ravel(), (1+in_plane).ravel(), crossing_speed]
+
+
+def plan(reference, model, *, callback=None, max_iterations=500):
+    """Minimize duration with SLSQP; gate positions and six phase durations remain free."""
+    initial, seed_jerk = reference["states"][0], reference["acceleration_rates"]
+    gates, centers = reference["gates"], reference["points"][1:]
+    counts = np.diff(np.r_[0, gates])
+    phases = len(gates)
+    seed = np.r_[counts * float(reference["dt"]), seed_jerk.ravel()]
+    def motion(variables):
+        durations, jerk = variables[:phases], variables[phases:].reshape(-1, 3)
+        intervals = np.repeat(durations / counts, counts)
+        states = integrate_motion(initial, jerk, intervals)
+        return states, jerk, intervals
+    def equality(variables):
+        states, _, _ = motion(variables)
+        planes, _ = crossing_constraints(states, gates, centers, model)
+        return np.r_[planes, states[-1, 2]]
+    def inequality(variables):
+        states, jerk, intervals = motion(variables)
+        _, clearance = crossing_constraints(states, gates, centers, model)
+        dynamics = motion_constraints(initial, jerk, intervals, model)
+        departure = model["departure_down_limit_m"] - states[:gates[0]+1, 0, 2]
+        return np.r_[clearance, dynamics, departure]
+    gradient = np.r_[np.ones(phases), np.zeros(seed_jerk.size)]
+    jerk_limit = model["jerk_limit_m_s3"]
+    result = minimize(lambda variables: variables[:phases].sum(), seed, method="SLSQP", jac=lambda _: gradient,
+                      bounds=[(.5, 20)]*phases + [(-jerk_limit, jerk_limit)]*seed_jerk.size,
+                      constraints=[dict(type="eq", fun=equality), dict(type="ineq", fun=inequality)], callback=callback,
+                      options=dict(ftol=1e-6, eps=1e-6, maxiter=max_iterations))
+    equality_error, minimum_margin = abs(equality(result.x)).max(), inequality(result.x).min()
+    if not result.success or equality_error > 1e-5 or minimum_margin < -1e-5:
+        raise ValueError(f"{result.message}; equality {equality_error:g}, margin {minimum_margin:g}")
+    states, jerk, intervals = motion(result.x)
+    times = np.r_[0, np.cumsum(intervals)]
+    return dict(states=states, acceleration_rates=jerk, times=times, dt=intervals.mean(), gates=gates,
+                points=np.vstack((states[0, 0], states[gates, 0])), iterations=result.nit,
+                equality_error=equality_error, minimum_margin=minimum_margin)

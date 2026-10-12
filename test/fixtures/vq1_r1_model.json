@@ -205,5 +205,10 @@
       0,
       1
     ]
-  ]
+  ],
+  "specific_thrust_range_m_s2": [
+    8.754182740098152,
+    13.219658872718618
+  ],
+  "departure_down_limit_m": 0
 }
