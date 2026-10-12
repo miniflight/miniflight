@@ -4,10 +4,15 @@ from pathlib import Path
 import numpy as np
 
 from target.aigp.experiments.plan_motion import plan
-from target.aigp.experiments.plan_race import integrate_motion
+from target.aigp.experiments.plan_race import force_for_motion, integrate_motion
 
 
 class MotionPlanningTest(unittest.TestCase):
+    def test_required_thrust_balances_gravity_and_directional_resistance(self):
+        velocity = np.array([[0, 0, 0], [3, 4, -2]])
+        force = force_for_motion(velocity, np.zeros((2, 3)), [.05, .05, .2])
+        np.testing.assert_allclose(force, [[0, 0, -9.81], [.75, 1, -10.61]])
+
     def test_variable_intervals_integrate_the_same_jerk_exactly(self):
         initial = np.array([[0, 0, 0], [1, 0, 0], [0, 0, 0]])
         states = integrate_motion(initial, np.array([[1, 0, 0], [1, 0, 0]]), [.5, 1.5])
