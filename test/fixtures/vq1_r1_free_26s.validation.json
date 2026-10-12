@@ -1,0 +1,167 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "runtime_revision": "3721a804db581d9aba056e8ca0a76f08ce78c814",
+  "reference": "vq1_r1_free_26s.npz",
+  "reference_sha256": "b3542c775984ddadec6e71f8a11162e7f2195f65167964a703b1360af4c59006",
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "planner_revision": "ba6269f",
+  "generation": {
+    "dt": 0.2172148149202064,
+    "iterations": 296.0,
+    "equality_error": 4.618494733079427e-10,
+    "minimum_margin": -8.895366487848833e-08,
+    "duration": 26.065777790424725,
+    "crossing_times": [
+      5.554516584113625,
+      9.08803887938257,
+      13.257876544534557,
+      18.848683308958623,
+      22.488610320313335,
+      26.065777790424725
+    ],
+    "crossing_points": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        -23.297968749997324,
+        -0.5799023439983517,
+        -1.0456152376865493
+      ],
+      [
+        -46.89374999992481,
+        -2.319990235220825,
+        4.162917211002011
+      ],
+      [
+        -74.5937499997453,
+        1.0200097643302417,
+        12.837585560774917
+      ],
+      [
+        -111.49374999760487,
+        -4.9199902443208146,
+        23.274294922471537
+      ],
+      [
+        -135.4937499940304,
+        -0.9799902491908569,
+        24.5084668043149
+      ],
+      [
+        -159.193749988925,
+        -4.219990255025496,
+        24.65980958142251
+      ]
+    ],
+    "host_seconds": 122.23281787499945,
+    "sources": {
+      "target/aigp/experiments/plan_race.py": "54c497fd9d3034481a6ed7cceee9c7ea41440f068120f9303a851eaed09ce80d",
+      "test/fixtures/vq1_r1_model.json": "0950cbd4c045ac5e4a5e694aa2d3d38c3bc8d14b7a7e861eaad600f8a7b6a755",
+      "test/fixtures/vq1_r1_lift_30s.npz": "b6d4f88a00feceb93dcac51a06573c85c00611465bb435decd96647aee1af19d"
+    },
+    "reference_sha256": "b3542c775984ddadec6e71f8a11162e7f2195f65167964a703b1360af4c59006",
+    "python": "3.11.14",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "solver": "SLSQP; minimum sum of phase durations; local optimum",
+    "solver_options": {
+      "ftol": 1e-06,
+      "eps": 1e-06,
+      "maxiter": 600
+    },
+    "reference_file": "free-crossing-26s.npz",
+    "note": "Added immutable physical gate centers for replanning; all sampled motion arrays are byte-identical to the first native qualification."
+  },
+  "fine_sampling_check": {
+    "duration_s": 26.065777790424725,
+    "iterations": 296,
+    "equality_error": 4.618494733079427e-10,
+    "minimum_margin": -8.895366487848833e-08,
+    "horizontal_force_max_m_s2": 2.400019324324982,
+    "specific_thrust_range_m_s2": [
+      8.825696709135384,
+      11.81
+    ],
+    "tilt_max_rad": 0.273141445005968,
+    "direction_rate_max_rad_s": 0.4431043384830947,
+    "horizontal_speed_max_m_s": 6.700077791421748,
+    "vertical_speed_max_m_s": 2.406302145668187,
+    "crossing_times_s": [
+      5.554516584113625,
+      9.08803887938257,
+      13.257876544534557,
+      18.848683308958623,
+      22.488610320313335,
+      26.065777790424725
+    ]
+  },
+  "hz": 50,
+  "freshness_timeout_s": 0.3,
+  "simulator_args": [
+    "-RenderOffScreen"
+  ],
+  "camera_size": [
+    640,
+    360
+  ],
+  "assertions": [
+    "six valid gates",
+    "zero collisions",
+    "exact command and signal replay",
+    "arm/disarm once",
+    "connection closed",
+    "nonuniform native camera image",
+    "identical runtime inputs"
+  ],
+  "raw_trace_directory": "target/aigp/.runtime/measurements/reliable-launch-20261012",
+  "sources": {
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "570072df8b1df25b003624f197c3374f44dc42c4a01c90f8318344b17563bd7d",
+    "target/aigp/__init__.py": "d5ed3a2981e826f442f45282d8d520b91dfe3834cb64b7881d69d59228b682c5",
+    "target/aigp/controllers/r1_motors.py": "ee89f5ff5316baac4d17873bf8a8033d8fd1801fb195247968912a2201a2e01c",
+    "miniflight/position.py": "2bb9ca7ee3bca2db272aca8a4cdbbba0bef4855e5c39f30b250c0e4d1df82535",
+    "miniflight/reference.py": "44c92a610d9693c56ced19d11a56b9ef4e5d6c770fe647c7b48a507f983f819b",
+    "miniflight/state.py": "afd1b76744ddffc64a1c428d5a7e1b316c5bb01c3eeeb6906e2c1271063b3d5d",
+    "miniflight/control.py": "d3eb110692bc4bbe7cc9c819f24b08396c38931ba27a4a871e3f8687efd26e39",
+    "miniflight/monitor.py": "3d19d1e99bfbf6bcab976e95a31766f82a6eaa0c9d5fd41edb19639fd24bf3cf",
+    "miniflight/vehicle.py": "443057c3adbded5e860cad5c6d081f3d154fd6170e86406c392df201cbd950f8",
+    "miniflight/__init__.py": "05a325f4acfeea53b5693741b0137ec280687c7d0f951ff53c15f23de9b1c8b2",
+    "common/math.py": "5594f43dbc9610c192ff650b3c92ff9c1203116e5e33e23c6bb91c67f943c0d9",
+    "target/__init__.py": "e66f281dc325c858a1e682e5457dfb7ebee36218fb700c8439462402741ed8b1",
+    "target/aigp/controllers/r1_gates.py": "61b4aac45b2e7b7eec16a88ba494b5324d671f39572c0e9329c0a98249549759",
+    "target/aigp/controllers/r1_body_rates.py": "ab748f64fe3ab184c336d3096a755699d17e927c1700795d2b220ba66833ffda",
+    "target/aigp/controllers/r1_beautiful.py": "f52c34091d2d24fc1d02aa18559aec1ec5c06053ab2cc23175efb4d7f7dd1abc",
+    "target/aigp/controllers/__init__.py": "908f0265bebd34f57291a851c22c75d0b80aa3ee28debdec65c151f0e104c9bd",
+    "target/aigp/simulator.py": "5ecb3c5952ccc52aac54ef3d09f21c79e06e9fe048f26ee7fe190be9e0927487",
+    "target/aigp/client.py": "a95cd10d7459d5d1fc1386c1fa431337e56330395e36c2169f5296d07c1ad339",
+    "target/aigp/native.py": "cd8e3467c18cb913d73ec123e0da2213bd27149f301acc2d78571106cfbac136",
+    "target/aigp/config/vq1/main.lua": "106658709e172f11aaed9168d9658421446f9156a21f142274ee93bee5e3ef90",
+    "target/aigp/config/race.lua": "94ce9143191e3609c6b67ca66385d791e233f049d4e0748d597fcaf5919cbea4",
+    "target/aigp/experiments/recording.py": "7fb6ccbf41aabde360bfcfb56017485c9238d1bd23e109dddd63dceba07b0528",
+    "target/aigp/experiments/r1_signals.py": "9f941c1e4b485f605868e3dc5af3413a6afde7950a257a16a2fd0bec6f425d70",
+    "test/aigp_regression.py": "ccf96d6a9e3396a564f8703b12936f00dce1ef3ce2ec7cba39d85160543bf690"
+  },
+  "qualification": {
+    "trace": "free-crossing-26-01.jsonl",
+    "finish_time_s": 26.23699379,
+    "replayed_updates": 1609,
+    "note": "Same sampled arrays before adding immutable gate-center metadata; excluded from the ten-run series."
+  },
+  "limitation": "Local optimum of the fitted point-mass model and chosen planning envelope. Native evidence covers this offscreen configuration; motor/inertia dynamics are not identified.",
+  "runs": [
+    {"run":1,"trace":"free-crossing-26-02.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.237581253,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1615,"sent":{"MotorControls":1313,"BodyRates":1},"trace_sha256":"f0796db7330fee83697207808b5f8bc06da44cce8a89ec251a592fbb6db689c4","camera_sha256":"f8a07f7c6fffa8b5d436b5627dc0aa5cf63d7a38c769b7d9c85a752ecf50c1ca"},
+    {"run":2,"trace":"free-crossing-26-03.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.237724304,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1617,"sent":{"MotorControls":1313,"BodyRates":1},"trace_sha256":"6bae7586075bf46c50ec1d354eddbcacddf58936e6b62c8b883005b441b96362","camera_sha256":"5fc68f567cb9b7a519110da848fe63ccd1e659ba6d660051a1ff9bd9f581f77a"},
+    {"run":3,"trace":"free-crossing-26-04.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.262678146,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1627,"sent":{"MotorControls":1314,"BodyRates":1},"trace_sha256":"26d9fffc3d96888f0a19cc37ffa6a3c9466279a91f17e7ef49c75394b5d7e7d8","camera_sha256":"339f2b034de69db36a1c49f130b1f91deb355bebcde2f8652323524f6a8ea6da"},
+    {"run":4,"trace":"free-crossing-26-05.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.236501694,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1619,"sent":{"MotorControls":1312,"BodyRates":1},"trace_sha256":"e5103f36daf0f9ff888de8b8bc2662ed1e12ce098c9910950ebff96c569d184a","camera_sha256":"f18a80deaeff04466822ef5982ffb67c1f7779b2b159c7f11bb701706ac18f61"},
+    {"run":5,"trace":"free-crossing-26-06.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.235795975,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1612,"sent":{"MotorControls":1312,"BodyRates":1},"trace_sha256":"797731661c6254a0e57c649ef62071f984454b4efc8d218067b1fa5852db54a7","camera_sha256":"30e54b3d6fb2ac11d442d0356afb80cf7119d9fa23143e3688f002e1b05bbcaa"},
+    {"run":6,"trace":"free-crossing-26-07.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.198299408,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1616,"sent":{"MotorControls":1309,"BodyRates":1},"trace_sha256":"46d5e841c5c83e91a619e3738e74716d53bfe712e29e8be44ab369d7d9d52f49","camera_sha256":"676f58979073b70299dc358a7bd5c8b1b27072644d9843942a9e460aed506899"},
+    {"run":7,"trace":"free-crossing-26-08.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.228744507,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1608,"sent":{"MotorControls":1313,"BodyRates":1},"trace_sha256":"ae58a5992e011951afca2993c7efca7c704a5a443d1a98b30909a7f596b59af1","camera_sha256":"5b93042eb5279884ef9f6e40e18bb5a48e89f01d652e7c629738ddecc743ec83"},
+    {"run":8,"trace":"free-crossing-26-09.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.239282608,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1619,"sent":{"MotorControls":1314,"BodyRates":1},"trace_sha256":"ac3620bcf48c35c711b0e5b2858d9e6bcb1f7500b6d5e2ed5eac0da98c2143b8","camera_sha256":"d838d4cc0816521e26e2505f1c01068cc0726148df64074f3c0c795e6575cfc4"},
+    {"run":9,"trace":"free-crossing-26-10.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.248760223,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1620,"sent":{"MotorControls":1313,"BodyRates":1},"trace_sha256":"82c08dcad4f3f4b1003e52f6535df39dd854f87996cd048662c518fdcb7b2513","camera_sha256":"36416dd4af99acd9da8656f04b4c004f60025a559bf4d86631619451ab84c9d4"},
+    {"run":10,"trace":"free-crossing-26-11.jsonl","recorded_revision":"3721a804db581d9aba056e8ca0a76f08ce78c814","finish_time_s":26.220199585,"gates":6,"collisions":0,"connection_closed":true,"replayed_updates":1619,"sent":{"MotorControls":1310,"BodyRates":1},"trace_sha256":"1ef581531bae68c96f738b15af18607ba0bb835f452194f6e2005229e08f2b55","camera_sha256":"0e30d4f3a110655a063ddfd49b950f63e8bb7bc91e9e7d16b51b7040dd3affe5"}
+  ]
+}

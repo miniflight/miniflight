@@ -60,6 +60,13 @@ python -m target.aigp.experiments.plan_race test/fixtures/vq1_r1_lift_30s.npz /t
 
 The model is a local fit; this search produces a candidate for native validation.
 
+The 26.066-second searched reference passed ten consecutive native runs in
+26.198–26.263 seconds, with six valid gates, zero collisions and 16,172 updates
+replayed exactly. Its [validation record](../../../test/fixtures/vq1_r1_free_26s.validation.json)
+retains the measured model, generation and runtime hashes, and all ten results.
+Use `--reference test/fixtures/vq1_r1_free_26s.npz --offscreen --camera` with the
+native regression command above to reproduce the check.
+
 `probe.py` runs bounded body-rate measurements. The command-line example remains
 under `examples/aigp/`:
 

@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -7,6 +8,17 @@ from miniflight.reference import sample_motion
 
 
 class MotionReferenceTest(unittest.TestCase):
+    def test_searched_reference_samples_its_chosen_crossings_inside_the_openings(self):
+        model = json.loads((Path(__file__).parent / "fixtures/vq1_r1_model.json").read_text())
+        with np.load(Path(__file__).parent / "fixtures/vq1_r1_free_26s.npz") as plan:
+            states, rates, times = plan["states"], plan["acceleration_rates"], plan["times"]
+            for index, point in zip(plan["gates"], plan["points"][1:]):
+                position, _, _ = sample_motion(states, rates, float(plan["dt"]), times[index], times=times)
+                np.testing.assert_allclose(position, point, atol=1e-8)
+            offsets = (states[plan["gates"], 0] - plan["gate_centers"]) @ np.asarray(model["gate_axes_ned"]).T
+            np.testing.assert_allclose(offsets[:, 1], 0, atol=1e-6)
+            self.assertTrue(np.all(abs(offsets[:, (0, 2)]) <= np.asarray(model["clearance_halfspan_m"]) + 1e-6))
+
     def test_nonuniform_intervals_keep_position_velocity_and_acceleration(self):
         states = np.array([[[0, 0, 0], [1, 0, 0], [0, 0, 0]],
                            [[25/48, 0, 0], [1.125, 0, 0], [.5, 0, 0]],
