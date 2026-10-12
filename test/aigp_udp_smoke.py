@@ -234,6 +234,12 @@ class UDPSmokeTest(unittest.TestCase):
     def test_motor_command_round_trip_and_replay(self):
         self.round_trip(True, MotorControls((.1, .2, .3, .4)), record_frames=False)
 
+    def test_motor_count_is_rejected_before_transport(self):
+        client = SimulatorClient(camera_port=None)
+        client._boot = time.monotonic()
+        with self.assertRaisesRegex(ValueError, "four motor controls"):
+            client.send(MotorControls((.1, .2, .3)))
+
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
 

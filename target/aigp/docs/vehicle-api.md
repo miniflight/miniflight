@@ -5,6 +5,29 @@ The arena supplies native arrivals through
 `SimulatorClient.send` encodes the returned command. The runner handles arming
 and disarming.
 
+The usual multirotor control boundaries form one signal path. A command can
+enter at any supported boundary; the receiving target runs the stages below it.
+
+```mermaid
+flowchart TD
+    P[Position] -->|position feedback| V[Velocity]
+    V -->|velocity feedback| A[Acceleration and heading]
+    A -->|thrust direction| Q[Attitude and thrust]
+    Q -->|attitude feedback| R[BodyRates / TRPY]
+    R -->|gyro feedback| T[Body torque and thrust]
+    T -->|control allocation| M[MotorControls]
+    M -->|output driver| D[Simulator / PWM / DShot / DroneCAN]
+```
+
+Here TRPY means collective thrust plus FRD roll, pitch and yaw **rates** in
+rad/s: it is already `BodyRates`. Torque is the output of rate feedback.
+Mixing rates directly would skip that feedback loop.
+
+The split depends on the target's supported commands, exposed by `commands`.
+Our current `BodyRates` path leaves rate feedback and allocation inside AIGP.
+The `MotorControls` path lets Miniflight own both. A companion computer or MCU
+can implement several boundaries; the processor name does not select one.
+
 The VQ1 build-3391 native receiver implements six control modes. All six have
 native flight evidence; the acceleration, attitude and motor checks below were
 run on 2026-10-08. The PDF's two named messages omit the direct actuator message.
@@ -16,9 +39,9 @@ run on 2026-10-08. The PDF's two named messages omit the direct actuator message
 | Acceleration, m/s² NED; force, N | same | 3135; force 3647 | raw |
 | Attitude, wxyz quaternion, and thrust 0–1 | `SET_ATTITUDE_TARGET` (82) | 7 | raw |
 | Body rates and thrust 0–1 | same | 144 for native rad/s | `BodyRates`, FRD conversion |
-| Four direct motor controls | `SET_ACTUATOR_CONTROL_TARGET` (139) | none | raw |
+| Four direct motor controls, 0–1 | `SET_ACTUATOR_CONTROL_TARGET` (139) | none | `MotorControls` |
 
-`SimulatorClient.send` exposes the three typed commands; `client.mav` exposes
+`SimulatorClient.send` exposes the four typed commands; `client.mav` exposes
 the raw forms. The runner owns arming, race timing, heartbeats and command cadence.
 The [MAVLink definitions](https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED)
 define the fields; native support was checked separately against the executable.
@@ -50,7 +73,41 @@ active fields and mask; zero-valued coordinates remain active requests.
 `BodyRates` uses the attitude-target encoder. Masks and frame conversions stay
 inside the adapter; `BaseController.update` returns the original command values.
 
+`MotorControls` contains immutable outputs in target motor order. AIGP requires
+exactly four nonreversing values in [0, 1]. The adapter pads the remaining four
+wire channels with zeros. These values are normalized controls, not RPM.
+
+The pure [`mix`](../../../miniflight/mixer.py) function takes collective thrust,
+three normalized FRD torque efforts, and an airframe coefficient matrix:
+
+```python
+from miniflight import MotorControls
+from miniflight.mixer import mix
+from target.aigp import MOTOR_MIX  # measured VQ1 build 3391 order
+
+requested = mix(.265, (.0025, 0, 0), MOTOR_MIX)
+command = MotorControls(requested)
+```
+
+This is a small roll-torque request, not a roll-rate setpoint. `mix` preserves
+outputs outside [0, 1]; `MotorControls` rejects them. A saturation policy must
+resolve such requests explicitly. No force-to-RPM calibration is implied.
+The rate feedback routine and real STM32 sensor/ESC drivers remain to be built.
+
 ## source boundary
+
+[PX4](https://docs.px4.io/main/en/concept/control_allocation) separates rate
+feedback, thrust/torque allocation, and output drivers. Its allocator uses the
+airframe geometry; output mapping assigns each motor to a physical channel.
+[INAV](https://github.com/iNavFlight/inav/blob/master/src/main/fc/fc_core.c)
+likewise calls `pidController`, `mixTable`, then `writeMotors`, with navigation
+and attitude work upstream. The inspected Betaflight path is detailed below.
+
+[DroneCAN ESC messages](https://dronecan.github.io/Specification/7._List_of_standard_data_types/#uavcanequipmentesc)
+sit at the actuator transport boundary. `RawCommand` carries normalized signed
+integer controls; `RPMCommand` carries actual RPM setpoints. An ESC may close
+the speed loop. Neither message supplies the vehicle's attitude/rate controller
+or chooses the motor allocation. Miniflight has no DroneCAN driver yet.
 
 the local betaflight snapshot is release `2026.6.2` at `e0b7bb01b17b21351057e9ead2d1ab39dd44fa16`
 
@@ -86,10 +143,10 @@ the installed VQ1 and VQ2 build 3391 executables were checked against the existi
 
 VQ2 retains the body rate attitude local NED and actuator input handlers
 its attitude local position and odometry output workers are stubs in both R1 and R2
-the client exposes the three existing position velocity and body rate command paths
+the client exposes position, velocity, body rate and individual motor command paths
 it decodes native telemetry
 
-The acceleration, attitude and motor forms still use the
+The acceleration and attitude forms still use the
 [raw wire interface](wiring.md#the-remaining-wire-interface). The 2026-10-08 audit
 traced dispatch at `0x14104bf70`, NED at `0x14104b8f0`, and attitude at
 `0x14104b4f0`. VQ2 has matching NED receiver control flow and constants;
@@ -112,8 +169,25 @@ All completed traces have exact controller replay, one arm/disarm pair and no co
 | Four motor values 0.22 / 0.30 | Reported outputs about 0.22 / 0.30; descent / ascent |
 
 These are measured transients, not exact acceleration tracking. The attitude
-probe covers pitch; complete quaternion axis conversion and motor corner order
-remain uncalibrated. Reported motor values are not labelled RPM.
+probe covers pitch; complete quaternion axis conversion remains uncalibrated.
+
+On 2026-10-12, eight individual motor pulses (±0.005 around settled hover,
+requested duration 0.15 s) established the FRD response below. The corner names
+agree with the vendor's order and the observed roll/pitch torque signs.
+
+| Wire index | Motor | Roll / pitch / yaw response to an increase |
+| --- | --- | --- |
+| 0 | Front left | + / + / − |
+| 1 | Front right | − / + / + |
+| 2 | Rear left | + / − / + |
+| 3 | Rear right | − / − / − |
+
+Six further pulses used `MOTOR_MIX`, with ±0.0025 effort on one axis at a time.
+Each produced the requested rotation sign, predominantly on that axis. The
+individual and mixed runs replayed 934 and 820 updates exactly, with no collisions
+and one arm/disarm pair each. This establishes order and signs near hover, not
+physical torque units or a tuned rate controller. Raw packets, sources, source
+hashes and summaries are in `.runtime/measurements/motors-20261012/`.
 
 the bundled [specification](VQ1-Technical-Specification-00.02.pdf) defines the NED and body frames
 the [vendor controller](reference/PyAIPilotExample-v4/controller.py) defines the build 3390 radian extension
