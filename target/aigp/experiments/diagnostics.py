@@ -8,6 +8,7 @@ from miniflight.diagnostics import chart_data
 
 PANELS = (
     ("Horizontal speed", "m/s", (("Reference", "speed_ref_m_s"), ("Observed", "speed_m_s"))),
+    ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
     ("Position error: reference minus observed", "m", (("North", "north_error_m"), ("East", "east_error_m"), ("Down", "down_error_m"))),
     ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
     ("Sent motor requests", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"))),
@@ -21,7 +22,7 @@ def snapshot(observer, samples, source):
     clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
     reference = (metadata.get("reference") or {}).get("duration_s")
     seconds = lambda value: "—" if value is None else f"{value:.3f} s"
-    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {source.name}",
+    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {source.parent.name}/{source.name}",
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
                          "Collisions": observer.collisions, "Sent motor commands": len(samples)},
@@ -80,6 +81,7 @@ def quantities(signals, position, velocity, motors, pose_age, imu_age, accelerat
     north_error, east_error, down_error = (wanted-actual for wanted, actual in zip(target_position, position, strict=True))
     acceleration = signals["acceleration_request_ned_m_s2"]
     return dict(time_s=signals["reference_time_s"], speed_ref_m_s=math.hypot(*target_velocity[:2]),
+                down_speed_ref_m_s=target_velocity[2], down_speed_m_s=velocity[2],
                 speed_m_s=math.hypot(*velocity[:2]), north_error_m=north_error, east_error_m=east_error, down_error_m=down_error,
                 pitch_ref_rad_s=signals["rate_ref_frd_rad_s"][1], pitch_rad_s=signals["gyro_frd_rad_s"][1],
                 motor_min=min(motors), motor_mean=sum(motors)/len(motors), motor_max=max(motors),
