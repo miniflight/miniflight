@@ -67,6 +67,20 @@ retains the measured model, generation and runtime hashes, and all ten results.
 Use `--reference test/fixtures/vq1_r1_free_26s.npz --offscreen --camera` with the
 native regression command above to reproduce the check.
 
+Start the repeat runner, observer, and local browser server in separate terminals:
+
+```sh
+python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_free_26s.npz --output target/aigp/.runtime/experiments/pitwall --count 10
+python -m target.aigp.experiments.pitwall target/aigp/.runtime/experiments/pitwall/current.json target/aigp/.runtime/experiments/pitwall/view --current
+python -m http.server 8765 --bind 127.0.0.1 --directory target/aigp/.runtime/experiments/pitwall/view
+```
+
+Open `http://127.0.0.1:8765/`. Use a new output directory for each experiment.
+Omit `--count` to repeat until Ctrl+C. Each trial resets the same native process,
+creates a fresh controller, and runs all regression checks. The ledger retains failures.
+The observer reads records in a separate process and publishes complete snapshots;
+the browser displays quantities, source age, and finish times across trials.
+
 `probe.py` runs bounded body-rate measurements. The command-line example remains
 under `examples/aigp/`:
 
