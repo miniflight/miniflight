@@ -28,7 +28,7 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
@@ -48,6 +48,7 @@ class AIGPSimulator:
         self.monitor_path = Path(monitor_path) if monitor_path is not None else BASE / ".runtime/rollouts" / f"{target}-{time.time_ns()}.png"
         self.status = None
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
+        self.race_reader = race_reader
         self.arm_requested = False
         self._send_lock = Lock()  # One MAVLink encoder serves control and heartbeat.
         self._used = False
@@ -63,7 +64,7 @@ class AIGPSimulator:
             self.client.open()
             process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
                                                    race_status_path=self.race_status_path))
-            race_reader = RaceStateReader(self.race_status_path, self.timeout)
+            race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
             cleanup.callback(race_reader.close)
             arrivals, race_arrivals, stopped = Queue(), Queue(), Event()
             def receive():

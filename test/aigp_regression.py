@@ -28,7 +28,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
@@ -39,6 +39,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         with np.load(reference) as data:
             times = data["times"] if "times" in data else None
             trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
+            reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
         make = lambda: MotorGates(position=PIDGates(reference=trajectory))
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
@@ -53,18 +54,20 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "target/aigp/experiments/r1_signals.py", "test/aigp_regression.py")
-    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames,
+    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames, attach=attach,
                     simulator_args=simulator_args,
-                    reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference)),
+                    reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
+    if name == "r1_motors":
+        metadata["controller_config"] = asdict(make().position.config)
     result = None
     with recording(trace, metadata) as record:
         client = RecordedClient(record, camera_port=5600 if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"))
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader)
         try:
-            result = simulator.rollout(simulator_args=simulator_args)
+            result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:
             record(event="result", connection_closed=not client.connected,
                    race=None if simulator.status is None else asdict(simulator.status),

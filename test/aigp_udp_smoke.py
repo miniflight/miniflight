@@ -411,15 +411,17 @@ class UDPSmokeTest(unittest.TestCase):
             client = RecordedClient(record, port=0, camera_port=0)
         worker = threading.Thread(target=serve)
         worker.start()
+        reader = RaceStateReader(native_path)
         try:
             expected = RuntimeError if reset_in_batch else OSError if closed_on_exit else KeyboardInterrupt
             with self.assertRaises(expected):
-                AIGPSimulator(controller, client=client, race_status_path=native_path).rollout(attach=True)
+                AIGPSimulator(controller, client=client, race_status_path=native_path, race_reader=reader).rollout(attach=True)
         finally:
             stop.set()
             worker.join(timeout=2)
             client.disconnect()
         self.assertFalse(worker.is_alive())
+        self.assertTrue(reader.stream.closed)
         self.assertEqual(failures, [])
         drain()
         if reset_in_batch:
