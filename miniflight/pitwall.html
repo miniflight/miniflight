@@ -48,10 +48,10 @@ async function refresh() {
       document.querySelector(chart.detail ? '#diagnostics' : 'main').append(div);
       const traces = chart.series.map((series, i) => ({x:series.x, y:series.y, name:series.label, mode:chart.mode || 'lines', line:{color:colors[i % colors.length], width:1.6}}));
       await Plotly.react(div, traces, {
-        title:{text:chart.title, font:{size:14}}, margin:{l:58,r:20,t:44,b:52},
+        title:{text:chart.title, font:{size:14}}, margin:{l:58,r:20,t:64,b:52},
         paper_bgcolor:'#171d27', plot_bgcolor:'#171d27', font:{color:'#c8d3e2',size:11},
         xaxis:{title:{text:chart.x_label || 'Reference time (s)'},gridcolor:'#293344'}, yaxis:{title:{text:chart.unit},gridcolor:'#293344',zerolinecolor:'#42516a'},
-        legend:{orientation:'h',y:1.02,x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
+        legend:{orientation:'h',y:1.02,yanchor:'bottom',x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
       }, {responsive:true,displaylogo:false});
     }
   } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }
