@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Miniflight pitwall</title>
+<script src="https://cdn.plot.ly/plotly-3.6.0.min.js"></script>
+<style>
+  :root { color-scheme:dark; font:15px system-ui; background:#10141b; color:#e8edf4; }
+  body { max-width:1440px; margin:auto; padding:28px; }
+  h1 { margin:0 0 6px; font-size:27px; font-weight:600; }
+  p, footer { color:#9caabd; line-height:1.6; }
+  #summary, main { display:grid; gap:12px; margin:20px 0; }
+  #summary { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  main { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  article, .chart { background:#171d27; border:1px solid #293344; border-radius:8px; }
+  article { padding:16px; } article small { display:block; color:#9caabd; margin-bottom:8px; }
+  article strong { font-size:24px; font-variant-numeric:tabular-nums; }
+  .chart { height:300px; overflow:hidden; }
+  @media(max-width:780px) { body { padding:16px; } main { grid-template-columns:1fr; } }
+</style>
+<header><h1>Miniflight pitwall</h1><p id="source">Waiting for recorded signals</p></header>
+<section id="summary" aria-label="Flight summary"></section>
+<main aria-label="Performance charts"></main>
+<footer>Time axis: controller reference clock. Native time uses the game clock.<br>Motor values are sent fractions. Missing channels stay blank. Drag to zoom; double-click to reset.</footer>
+<script>
+const colors = ['#64dac3', '#ffb66b', '#b6a1ff'];
+async function refresh() {
+  try {
+    const response = await fetch('./latest.json', {cache:'no-store'});
+    if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
+    const data = await response.json();
+    document.querySelector('#source').textContent = data.title;
+    const summary = document.querySelector('#summary');
+    summary.replaceChildren(...Object.entries(data.summary).map(([label, value]) => {
+      const card = document.createElement('article'), name = document.createElement('small'), number = document.createElement('strong');
+      name.textContent = label; number.textContent = value; card.append(name, number); return card;
+    }));
+    for (const [index, chart] of data.charts.entries()) {
+      const id = `chart-${index}`;
+      let div = document.getElementById(id);
+      if (!div) { div = document.createElement('div'); div.id = id; div.className = 'chart'; document.querySelector('main').append(div); }
+      const traces = chart.series.map((series, i) => ({x:series.x, y:series.y, name:series.label, mode:'lines', line:{color:colors[i % colors.length], width:1.6}}));
+      await Plotly.react(div, traces, {
+        title:{text:chart.title, font:{size:14}}, margin:{l:58,r:20,t:44,b:52},
+        paper_bgcolor:'#171d27', plot_bgcolor:'#171d27', font:{color:'#c8d3e2',size:11},
+        xaxis:{title:{text:'Reference time (s)'},gridcolor:'#293344'}, yaxis:{title:{text:chart.unit},gridcolor:'#293344',zerolinecolor:'#42516a'},
+        legend:{orientation:'h',y:1.02,x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
+      }, {responsive:true,displaylogo:false});
+    }
+  } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }
+  setTimeout(refresh, 1000);
+}
+refresh();
+</script>
+</html>
