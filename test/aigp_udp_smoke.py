@@ -392,7 +392,7 @@ class UDPSmokeTest(unittest.TestCase):
                     client.mav.timesync_send(123456789, 0)
                     client.mav.set_actuator_control_target_send(1234567, 0, *client.target_ids,
                                                                  [.1, .2, .3, .4, 0, 0, 0, 0])
-                    client.mav.command_long_send(*client.target_ids, 31000, 0, 0, 0, 0, 0, 0, 0, 0)
+                    client.reset()
                 if len(observations) == 5:
                     if closed_on_exit:
                         client.connection.close()

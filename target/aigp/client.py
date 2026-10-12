@@ -223,6 +223,10 @@ class SimulatorClient:
     def disarm(self):
         self._set_armed(False)
 
+    def reset(self):
+        """Request native reset; the caller must observe a fresh race afterward."""
+        self.mav.command_long_send(*self.target_ids, 31000, 0, 0, 0, 0, 0, 0, 0, 0)
+
     def _set_armed(self, armed):
         self.mav.command_long_send(*self.target_ids, mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
