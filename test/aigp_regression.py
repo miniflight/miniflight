@@ -28,7 +28,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=()):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
@@ -63,7 +63,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         metadata["controller_config"] = asdict(make().position.config)
     result = None
     with recording(trace, metadata) as record:
-        client = RecordedClient(record, camera_port=5600 if camera else None)
+        client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader)
         try:
