@@ -46,4 +46,17 @@ class VelocityNed:
             raise ValueError("NED setpoints must be finite")
 
 
-Command = BodyRates | PositionNed | VelocityNed
+@dataclass(frozen=True)
+class MotorControls:
+    """Nonreversing motor commands in [0, 1], in the target's motor order; not RPM."""
+
+    outputs: tuple[float, ...]
+
+    def __post_init__(self):
+        outputs = tuple(self.outputs)
+        if not outputs or any(not math.isfinite(v) or not 0 <= v <= 1 for v in outputs):
+            raise ValueError("motor controls must be finite values between 0 and 1")
+        object.__setattr__(self, "outputs", outputs)
+
+
+Command = BodyRates | PositionNed | VelocityNed | MotorControls

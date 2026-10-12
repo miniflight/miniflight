@@ -37,7 +37,7 @@ class Vehicle:
     def validate(self, command: Command) -> None:
         """Check support without sending or arming."""
         if not isinstance(command, Command):
-            raise TypeError("expected BodyRates, PositionNed or VelocityNed")
+            raise TypeError("expected a flight command")
         if type(command) not in self.commands:
             raise NotImplementedError(f"target does not support {type(command).__name__}")
 
