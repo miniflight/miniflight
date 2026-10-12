@@ -67,6 +67,14 @@ retains the measured model, generation and runtime hashes, and all ten results.
 Use `--reference test/fixtures/vq1_r1_free_26s.npz --offscreen --camera` with the
 native regression command above to reproduce the check.
 
+With measured resistance compensation and a 7.0 m/s planning speed cap, the
+25.482-second reference completed ten consecutive reset-and-flight cycles in one
+native process at 25.470–25.518 seconds. All six gates passed without collision;
+14,223 updates replayed exactly. The [record](../../../test/fixtures/vq1_r1_free_25s.validation.json)
+also retains two earlier reset failures. Use `test/fixtures/vq1_r1_free_25s.npz`
+and `--config test/fixtures/vq1_r1_resistance.config.json` with the repeat command
+below. Resistance compensation remains explicit in this configuration.
+
 Start the repeat runner, observer, and local browser server in separate terminals:
 
 ```sh

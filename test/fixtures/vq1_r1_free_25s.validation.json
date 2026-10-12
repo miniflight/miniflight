@@ -1,0 +1,123 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "reference": "vq1_r1_free_25s.npz",
+  "reference_sha256": "a80ad5ba5fa8327e569a52eebf4cc7694df14a117598227bb97ce6b14336c909",
+  "controller_config": {
+    "hover_thrust": 0.266,
+    "thrust_acceleration": 53.5,
+    "position_gain": 1.0,
+    "velocity_gain": 2.0,
+    "attitude_gain": 4.0,
+    "max_speed": 4.0,
+    "max_acceleration": 3.0,
+    "max_tilt": 0.35,
+    "max_rate": 0.75,
+    "resistance_per_m": [
+      0.049741475346260305,
+      0.049741475346260305,
+      0.2070171790614305
+    ]
+  },
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "runtime_revision": "788f7a144a7d6dfb6c99e04f5be5640c1b0a0984",
+  "sources": {
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "570072df8b1df25b003624f197c3374f44dc42c4a01c90f8318344b17563bd7d",
+    "target/aigp/__init__.py": "d5ed3a2981e826f442f45282d8d520b91dfe3834cb64b7881d69d59228b682c5",
+    "target/aigp/controllers/r1_motors.py": "ee89f5ff5316baac4d17873bf8a8033d8fd1801fb195247968912a2201a2e01c",
+    "miniflight/position.py": "9d157d944afae530b9633ae415c59b794888048c8b1455e9b3fb07b8bcd9b5e1",
+    "miniflight/reference.py": "44c92a610d9693c56ced19d11a56b9ef4e5d6c770fe647c7b48a507f983f819b",
+    "miniflight/state.py": "afd1b76744ddffc64a1c428d5a7e1b316c5bb01c3eeeb6906e2c1271063b3d5d",
+    "miniflight/control.py": "d3eb110692bc4bbe7cc9c819f24b08396c38931ba27a4a871e3f8687efd26e39",
+    "miniflight/monitor.py": "3d19d1e99bfbf6bcab976e95a31766f82a6eaa0c9d5fd41edb19639fd24bf3cf",
+    "miniflight/vehicle.py": "443057c3adbded5e860cad5c6d081f3d154fd6170e86406c392df201cbd950f8",
+    "miniflight/__init__.py": "05a325f4acfeea53b5693741b0137ec280687c7d0f951ff53c15f23de9b1c8b2",
+    "common/math.py": "5594f43dbc9610c192ff650b3c92ff9c1203116e5e33e23c6bb91c67f943c0d9",
+    "target/__init__.py": "e66f281dc325c858a1e682e5457dfb7ebee36218fb700c8439462402741ed8b1",
+    "target/aigp/controllers/r1_gates.py": "61b4aac45b2e7b7eec16a88ba494b5324d671f39572c0e9329c0a98249549759",
+    "target/aigp/controllers/r1_body_rates.py": "ab748f64fe3ab184c336d3096a755699d17e927c1700795d2b220ba66833ffda",
+    "target/aigp/controllers/r1_beautiful.py": "2832d0e11a3447236195ec04406e1bc3f3f9968e658aa50d483e3df07b76b493",
+    "target/aigp/controllers/__init__.py": "908f0265bebd34f57291a851c22c75d0b80aa3ee28debdec65c151f0e104c9bd",
+    "target/aigp/simulator.py": "73cc5b3dbc8e9e5044a38a1d7a1ec28df08bd4018aff14dcaf72ec8cdc195809",
+    "target/aigp/client.py": "8838dec97c2eb4117dc0b11ccbd624ce9786f1c4b2def54ddcf01c0c14949de5",
+    "target/aigp/native.py": "cd8e3467c18cb913d73ec123e0da2213bd27149f301acc2d78571106cfbac136",
+    "target/aigp/config/vq1/main.lua": "106658709e172f11aaed9168d9658421446f9156a21f142274ee93bee5e3ef90",
+    "target/aigp/config/race.lua": "94ce9143191e3609c6b67ca66385d791e233f049d4e0748d597fcaf5919cbea4",
+    "target/aigp/experiments/recording.py": "42fa4a05c75456dff6d215eef40fa11040333116689e96bf0255413a2de18133",
+    "target/aigp/experiments/r1_signals.py": "9f941c1e4b485f605868e3dc5af3413a6afde7950a257a16a2fd0bec6f425d70",
+    "test/aigp_regression.py": "71068b64769134c8be7f2bfd69f1c59d4120e389f73d5a81bd53a8f4d4c1a1ab"
+  },
+  "runner_sha256": "afbfa60317f76f96d2daa1dc09f1075fadaa6cb590a4f6575f159c3bba7d775a",
+  "generation": {
+    "duration_s": 25.481832822030217,
+    "iterations": 147,
+    "equality_error": 3.667645076532722e-10,
+    "minimum_margin": -4.0927746480790006e-07,
+    "crossing_times_s": [
+      5.558775123441372,
+      8.995695590543878,
+      13.014830837876614,
+      18.43216953443667,
+      21.982437548524416,
+      25.481832822030217
+    ],
+    "planner_sha256": "83a58f12459a48d9b58539d7386047b796a5447d84b35632876003c893bede03",
+    "seed": "vq1_r1_free_26s.npz",
+    "seed_sha256": "b3542c775984ddadec6e71f8a11162e7f2195f65167964a703b1360af4c59006",
+    "model": "vq1_r1_model.json",
+    "model_sha256": "0950cbd4c045ac5e4a5e694aa2d3d38c3bc8d14b7a7e861eaad600f8a7b6a755",
+    "model_overrides": {
+      "horizontal_speed_limit_m_s": 7.0
+    }
+  },
+  "native_pid": 30581,
+  "raw_trace_directory": "target/aigp/.runtime/measurements/pitwall-20261012/repeat-speed-7-retry",
+  "hz": 50,
+  "freshness_timeout_s": 0.3,
+  "simulator_args": [
+    "-RenderOffScreen"
+  ],
+  "camera_size": [
+    640,
+    360
+  ],
+  "assertions": [
+    "six valid gates",
+    "zero collisions",
+    "exact command and signal replay",
+    "arm/disarm once",
+    "connection closed"
+  ],
+  "limitations": "Local searched plan and chosen envelope; below ten seconds remains unachieved.",
+  "earlier_reset_failures": [
+    {
+      "experiment": "repeat-speed-7-qualify",
+      "trial": 2,
+      "error": {
+        "type": "TimeoutError",
+        "message": "native reset did not expose a fresh stationary starting grid"
+      }
+    },
+    {
+      "experiment": "repeat-speed-7-diagnose",
+      "trial": 2,
+      "error": {
+        "type": "TimeoutError",
+        "message": "native reset stalled: connected=True, requested=True, accepted=True, fresh=False, packets={'HEARTBEAT': 973, 'ODOMETRY': 6913, 'LOCAL_POSITION_NED': 9341, 'ACTUATOR_OUTPUT_STATUS': 9275, 'ATTITUDE': 12226, 'COMMAND_ACK': 1, 'ENCAPSULATED_DATA': 382}"
+      }
+    }
+  ],
+  "runs": [
+    {"trial":1,"finish_time_s":25.485155106,"reset_requests":1,"updates":1449,"sent":{"MotorControls":1275,"BodyRates":1},"trace":"trial-00001.jsonl","trace_sha256":"1f640a0c0c37a290ffe829247e61f2cd9dea66451ee1c5e9a8a7e91df41d4a4c","camera_sha256":"1a10ea986c2afe55e72bb31820030410c15e85f7bde08dce7247fcd0e5d42fc8"},
+    {"trial":2,"finish_time_s":25.507074356,"reset_requests":1,"updates":1398,"sent":{"MotorControls":1265,"BodyRates":1},"trace":"trial-00002.jsonl","trace_sha256":"dd6154363f780eeb5f5509079a9d12286c8c87cf6c72df32ae50c503c16001ca","camera_sha256":"4bcf87e7b9a04ace0af1262efcf2f5922192ad58f1c8f58261010d145bb39a03"},
+    {"trial":3,"finish_time_s":25.480607986,"reset_requests":1,"updates":1425,"sent":{"MotorControls":1274,"BodyRates":1},"trace":"trial-00003.jsonl","trace_sha256":"3d2d41ad2f96f5b1eef3a1deb54485619b9d3aa29ffe6ef8e23493e2755cea01","camera_sha256":"73126e633b92123fc27bc1cf4b35169bc393eebeb77f52b9dc68bcc20e4c8e4b"},
+    {"trial":4,"finish_time_s":25.470291138,"reset_requests":1,"updates":1420,"sent":{"MotorControls":1269,"BodyRates":1},"trace":"trial-00004.jsonl","trace_sha256":"c4daee4eaa49b407d42a0aea1968520d7896c867e8f9fe31b269eef43477c81e","camera_sha256":"12d30b7b437f4f10cd411936c07b89b585dfdf1e2cd0e20c9f2b24fa40a979b5"},
+    {"trial":5,"finish_time_s":25.507894516,"reset_requests":1,"updates":1419,"sent":{"MotorControls":1273,"BodyRates":1},"trace":"trial-00005.jsonl","trace_sha256":"86a681d5c4101e267fc7fb9cd1fa55cc564945150f24a5c3182ad30e456dd737","camera_sha256":"47b84d5415964ad5381de091ae12210763b5ee62f13a934c5656fffe13faba05"},
+    {"trial":6,"finish_time_s":25.51792717,"reset_requests":1,"updates":1425,"sent":{"MotorControls":1273,"BodyRates":1},"trace":"trial-00006.jsonl","trace_sha256":"585074cfe60aee0c1cdb7aa24ff173d2de413500c37ae9181a824d25258339cc","camera_sha256":"04f9c467094f1a2edba395b642bc1265edcb68eaa1f6e0246a86ad1cdd6bb2af"},
+    {"trial":7,"finish_time_s":25.507432938,"reset_requests":1,"updates":1426,"sent":{"MotorControls":1276,"BodyRates":1},"trace":"trial-00007.jsonl","trace_sha256":"3ba40559e4ddaec52dbef9ba20a264c42a532ad86e87ad70663aee8ffbc8f16e","camera_sha256":"9618f6a7de89471fab068d0b143354a986e139fae46f4eabbbd1c8ffd3e56ac9"},
+    {"trial":8,"finish_time_s":25.490520477,"reset_requests":1,"updates":1418,"sent":{"MotorControls":1274,"BodyRates":1},"trace":"trial-00008.jsonl","trace_sha256":"2e00e68dfac3cd4b8ba460de310a149a634c2d08a54e9e16607ec017b88c4dd7","camera_sha256":"1c346f2b02d5c9a7579fa2ca32d8fa44af643907211519bc88109447541d7204"},
+    {"trial":9,"finish_time_s":25.478050232,"reset_requests":1,"updates":1420,"sent":{"MotorControls":1272,"BodyRates":1},"trace":"trial-00009.jsonl","trace_sha256":"19e6b74f81fc47495a5967187f52c12bb05602369afbe31605295820c14de786","camera_sha256":"7f13ea1395d2995f34d4bec167d4c0ba66f19bdeae4e23a0562026b892232d7f"},
+    {"trial":10,"finish_time_s":25.495893478,"reset_requests":1,"updates":1423,"sent":{"MotorControls":1272,"BodyRates":1},"trace":"trial-00010.jsonl","trace_sha256":"57bf30bcfdce25034661b896fef27082aa61939085c4cae10d4eb21ebb5aaccd","camera_sha256":"0ddb39d6ea320940139092adf1ff3ff46b3786edd89b2d96dfc5ba64d9e6666e"}
+  ]
+}
