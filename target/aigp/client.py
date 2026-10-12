@@ -13,7 +13,7 @@ import numpy as np
 from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import BodyRates, Command, Frame, Ned, PositionNed, VelocityNed
+from miniflight import BodyRates, Command, Frame, MotorControls, Ned, PositionNed, VelocityNed
 from target.aigp.controllers import Gate
 
 
@@ -58,7 +58,7 @@ class Packet:
 class SimulatorClient:
     """Receive native packets and send control commands."""
 
-    commands = frozenset((BodyRates, PositionNed, VelocityNed))
+    commands = frozenset((BodyRates, PositionNed, VelocityNed, MotorControls))
 
     def __init__(self, port=14550, camera_port=5600):
         self.port = port
@@ -184,10 +184,11 @@ class SimulatorClient:
             return race
 
     def send(self, command: Command):
-        """Write one NED position, NED velocity, or body-rate-and-thrust command."""
+        """Encode one command at the requested control boundary."""
         if not isinstance(command, Command):
-            raise TypeError("expected BodyRates, PositionNed or VelocityNed")
-        time_ms = int((time.monotonic() - self._boot) * 1000) & 0xffffffff
+            raise TypeError("expected a flight command")
+        elapsed = time.monotonic() - self._boot
+        time_ms = int(elapsed * 1000) & 0xffffffff
         if isinstance(command, BodyRates):
             self.mav.set_attitude_target_send(
                 time_ms, *self.target_ids,
@@ -196,6 +197,11 @@ class SimulatorClient:
                 # The simulator's angular-rate wire axes are opposite to FRD.
                 -command.roll_rate, -command.pitch_rate, -command.yaw_rate, command.thrust,
             )
+        elif isinstance(command, MotorControls):
+            if len(command.outputs) != 4:
+                raise ValueError("AIGP requires four motor controls")
+            self.mav.set_actuator_control_target_send(
+                int(elapsed * 1e6), 0, *self.target_ids, command.outputs + (0.0,) * 4)
         else:
             vector = (command.north, command.east, command.down)
             position = vector if isinstance(command, PositionNed) else (0, 0, 0)

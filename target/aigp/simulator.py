@@ -165,7 +165,7 @@ class AIGPSimulator:
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if type(command) not in self.client.commands:
-                    raise TypeError("expected BodyRates, PositionNed or VelocityNed")
+                    raise TypeError(f"unsupported command: {type(command).__name__}")
                 with self._send_lock:
                     if not self.arm_requested:
                         self.arm_requested = True

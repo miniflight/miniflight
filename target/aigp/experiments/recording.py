@@ -19,7 +19,8 @@ from target.aigp.native import TARGETS, NativeRaceState
 
 
 def command_data(command):
-    return None if command is None else {"kind": type(command).__name__, **asdict(command)}
+    return None if command is None else {"kind": type(command).__name__,
+        **{key: list(value) if isinstance(value, tuple) else value for key, value in asdict(command).items()}}
 
 
 def frame_data(frame, pixels=False):

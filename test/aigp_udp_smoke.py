@@ -27,7 +27,7 @@ from target.aigp.native import RaceStateReader, _stop_process
 from target.aigp.controllers import BaseController
 from target.aigp.client import RaceTelemetry, SimulatorClient, TrackInfo
 from target.aigp.controllers.r1_gates import Controller as Gates, usable_track
-from miniflight import BodyRates, VelocityNed
+from miniflight import BodyRates, MotorControls, VelocityNed
 from target.aigp.client import _Camera as Camera
 from target.aigp.experiments.recording import RecordedClient, RecordedController, read_frame, recording, replay
 from test.aigp_fake_simulator import write_race
@@ -230,6 +230,9 @@ class UDPSmokeTest(unittest.TestCase):
 
     def test_velocity_command_round_trip(self):
         self.round_trip(True, VelocityNed(-1, 0, 0))
+
+    def test_motor_command_round_trip_and_replay(self):
+        self.round_trip(True, MotorControls((.1, .2, .3, .4)), record_frames=False)
 
     def test_closed_transport_reports_cleanup_failure(self):
         self.round_trip(False, closed_on_exit=True)
@@ -472,13 +475,24 @@ class UDPSmokeTest(unittest.TestCase):
         if isinstance(command, BodyRates):
             self.assertEqual(len(rates), 4 if closed_on_exit else 5)
             self.assertAlmostEqual(rates[0].thrust, .4)
-        else:
+        elif isinstance(command, VelocityNed):
             self.assertEqual(len(rates), 1)
             velocities = [m for m in received if m.get_type() == "SET_POSITION_TARGET_LOCAL_NED"]
             self.assertEqual(len(velocities), 4)
             self.assertTrue(all(m.type_mask == 3527 and m.coordinate_frame == 1 and m.target_system == 42
                                 and (m.x, m.y, m.z) == (0, 0, 0) and (m.vx, m.vy, m.vz) == (-1, 0, 0)
                                 for m in velocities))
+        else:
+            self.assertEqual(len(rates), 1)
+            motors = [m for m in received if m.get_type() == "SET_ACTUATOR_CONTROL_TARGET"]
+            self.assertEqual(len(motors), 4)
+            for motor in motors:
+                self.assertEqual((motor.group_mlx, motor.target_system, motor.target_component), (0, 42, 7))
+                self.assertGreater(motor.time_usec, 0)
+                for value, expected in zip(motor.controls, command.outputs + (0,) * 4):
+                    self.assertAlmostEqual(value, expected)
+            observations.clear()
+            self.assertEqual(replay(Controller, trace), 5)
         if not closed_on_exit:
             self.assertEqual(rates[-1].thrust, 0)
         if wire_io:
