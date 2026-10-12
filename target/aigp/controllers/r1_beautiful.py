@@ -2,7 +2,7 @@
 
 from common.math import Vector3D
 from miniflight import BodyRates
-from miniflight.position import PositionConfig, acceleration_control
+from miniflight.position import PositionConfig, acceleration_control, trajectory_acceleration
 from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import gate_target, usable_track
@@ -69,10 +69,9 @@ class Controller(BaseController[BodyRates]):
 
         dt = 0.0 if self.time is None else max(0.0, race_state.time_seconds - self.time)
         self.time = race_state.time_seconds
-        error = self.target - position
-        integral = self.integral + self.ki * dt * error
-        limit = self.config.max_acceleration
-        self.integral = Vector3D(*(max(-limit, min(limit, v)) for v in integral.v))
-        self.requested_acceleration = (self.target_acceleration + self.kp * error + self.integral
-                                       + self.kd * (self.target_velocity - velocity))
+        acceleration, integral = trajectory_acceleration(
+            position.v, velocity.v, (self.target.v, self.target_velocity.v, self.target_acceleration.v), self.integral.v, dt,
+            kp=self.kp, ki=self.ki, kd=self.kd, integral_limit=self.config.max_acceleration)
+        self.integral = Vector3D(*integral)
+        self.requested_acceleration = Vector3D(*acceleration)
         return acceleration_control(self.config, self.requested_acceleration.v, angles, self.target_yaw)

@@ -28,6 +28,21 @@ def _limit(vector, magnitude):
     return tuple(value * scale for value in vector)
 
 
+def trajectory_acceleration(position, velocity, reference, integral, dt, *, kp, ki, kd, integral_limit):
+    """Track (position, velocity, acceleration) in one Cartesian frame, in SI units.
+
+    Return requested acceleration and the next integral contribution (m/s²).
+    The caller owns state, elapsed time, observation freshness and target selection.
+    """
+    target_position, target_velocity, feedforward = reference
+    error = tuple(wanted - actual for wanted, actual in zip(target_position, position, strict=True))
+    integral = tuple(max(-integral_limit, min(integral_limit, previous + ki * dt * e))
+                     for previous, e in zip(integral, error, strict=True))
+    acceleration = tuple(a + kp * e + i + kd * (wanted - actual)
+                         for a, e, i, wanted, actual in zip(feedforward, error, integral, target_velocity, velocity, strict=True))
+    return acceleration, integral
+
+
 def position_control(config: PositionConfig, position: Vector3, velocity: Vector3,
                      attitude: Vector3, target_position: Vector3, target_yaw: float) -> BodyRates:
     """Position PD followed by attitude feedback; SI units and FRD/NED axes."""
