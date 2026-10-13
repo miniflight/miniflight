@@ -3,10 +3,11 @@ local race_path = os.getenv("MINIFLIGHT_RACE_STATUS_FILE")
 if race_path then
     local output = assert(io.open(race_path, "w"))
     local centers_loaded = false
+    local game, player
     local function observe_race()
         ExecuteInGameThread(function()
-            local game = find_object("GameStateRaceBase")
-            local player = controller()
+            if not valid(game) then game = find_object("GameStateRaceBase") end
+            if not valid(player) then player = controller() end
             local state = valid(player) and player.PlayerState or nil
             if valid(game) and valid(state) then
                 if not centers_loaded and track_ready() then
