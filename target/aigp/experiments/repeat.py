@@ -73,6 +73,7 @@ def main():
     parser.add_argument("reference", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--config", type=Path, help="PositionConfig JSON for this experiment")
+    parser.add_argument("--controller", choices=("r1_beautiful", "r1_motors"), default="r1_motors")
     parser.add_argument("--ki", type=float, default=0.0, help="trajectory position integral gain, 1/s³")
     parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
     parser.add_argument("--stop-on-failure", action="store_true")
@@ -107,7 +108,7 @@ def main():
                     raise ValueError("reference changed during the experiment")
                 reader, reset, course_packets = fresh_race(native_path, course_packets=course_packets)
                 row["reset"] = reset
-                result = run("r1_motors", trace, camera=True, reference=args.reference, offscreen=not args.render,
+                result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
                 row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
             except BaseException as error:

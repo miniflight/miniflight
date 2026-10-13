@@ -107,6 +107,8 @@ python -m http.server 8765 --bind 127.0.0.1 --directory target/aigp/.runtime/exp
 Open `http://127.0.0.1:8765/`. Use a new output directory for each experiment.
 Omit `--count` to repeat until Ctrl+C. Each trial resets the same native process,
 creates a fresh controller, and runs all regression checks. The ledger retains failures.
+Use `--controller r1_beautiful` to follow the same reference through native body-rate
+control; `r1_motors` remains the default and uses Python rate PI. Each keeps its existing timeout.
 The observer reads records in a separate process and publishes complete snapshots;
 the browser displays quantities, source age, and finish times across trials.
 

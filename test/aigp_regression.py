@@ -33,8 +33,8 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
     if reference is not None:
-        if name != "r1_motors":
-            raise ValueError("a recorded reference requires r1_motors")
+        if name not in ("r1_beautiful", "r1_motors"):
+            raise ValueError("a recorded reference requires r1_beautiful or r1_motors")
         reference = Path(reference)
         with np.load(reference) as data:
             times = data["times"] if "times" in data else None
@@ -42,11 +42,11 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             rate_reference = partial(sample_values, data["body_rates"], data["body_rate_times"]) if "body_rates" in data else None
             reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
         config = CONFIG if position_config is None else position_config
-        make = lambda: MotorGates(position=PIDGates(reference=trajectory, rate_reference=rate_reference, config=config,
-                                                 kp=config.position_gain * config.velocity_gain, kd=config.velocity_gain,
-                                                 ki=integral_gain))
+        follower = partial(PIDGates, reference=trajectory, rate_reference=rate_reference, config=config,
+                           kp=config.position_gain * config.velocity_gain, kd=config.velocity_gain, ki=integral_gain)
+        make = (lambda: MotorGates(position=follower())) if name == "r1_motors" else follower
         if signals is None:
-            signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
+            signals = r1_signals if name == "r1_beautiful" else lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0
     if name == "r1_motors" and signals is None:
         signals = motor_signals
@@ -63,12 +63,13 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
-    if name == "r1_motors":
+    if name == "r1_motors" or reference is not None:
         controller = make()
-        position = controller.position
+        position = controller.position if name == "r1_motors" else controller
         metadata["controller_config"] = asdict(position.config)
         metadata["trajectory_pid"] = dict(kp=position.kp, ki=position.ki, kd=position.kd)
-        metadata["rate_pid"] = dict(kp=controller.kp, ki=controller.ki)
+        if name == "r1_motors":
+            metadata["rate_pid"] = dict(kp=controller.kp, ki=controller.ki)
     if race_reader is not None:
         metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
     result = None
