@@ -20,7 +20,7 @@ class Handler(SimpleHTTPRequestHandler):
             while True:
                 if path.exists() and (stamp := path.stat().st_mtime_ns) != previous:
                     jpeg, previous = path.read_bytes(), stamp
-                    self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n")
+                    self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n")
                     self.wfile.flush()
                 time.sleep(.01)
         except (BrokenPipeError, ConnectionResetError):

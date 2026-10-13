@@ -47,15 +47,22 @@ async function refresh() {
       if (chart.detail && !document.querySelector('details').open || !chart.series.some(series => series.x.length)) continue;
       const id = `chart-${index}`;
       let div = document.getElementById(id);
-      if (!div) { div = document.createElement('div'); div.id = id; div.className = 'chart'; }
-      document.querySelector(chart.detail ? '#diagnostics' : 'main').append(div);
+      if (!div) { div = document.createElement('div'); div.id = id; div.className = 'chart'; document.querySelector(chart.detail ? '#diagnostics' : 'main').append(div); }
       const traces = chart.series.map((series, i) => ({x:series.x, y:series.y, name:series.label, mode:chart.mode || 'lines', line:{color:colors[i % colors.length], width:1.6}}));
+      const source = chart.x_label === 'Trial' ? `trials:${traces[0].x.at(-1)}` : data.source;
+      if (div.dataset.source === source) {
+        const count = div.data[0].x.length;
+        if (traces[0].x.length > count) await Plotly.extendTraces(div,
+          {x:traces.map(trace => trace.x.slice(count)), y:traces.map(trace => trace.y.slice(count))}, traces.map((_, i) => i));
+        continue;
+      }
       await Plotly.react(div, traces, {
         title:{text:chart.title, font:{size:12}}, margin:{l:44,r:12,t:56,b:38},
         paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#c8d3e2',size:11},
         xaxis:{title:{text:chart.x_label || 'Reference time (s)'},gridcolor:'#293344'}, yaxis:{title:{text:chart.unit},gridcolor:'#293344',zerolinecolor:'#42516a'},
         legend:{orientation:'h',font:{size:10},y:1.02,yanchor:'bottom',x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
       }, {responsive:true,displaylogo:false});
+      div.dataset.source = source;
     }
   } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }
   setTimeout(refresh, 1000);
