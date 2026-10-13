@@ -37,7 +37,7 @@ class Controller(BaseController[PositionNed]):
             if isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
         pose, imu = self.telemetry.get("LOCAL_POSITION_NED"), self.telemetry.get("HIGHRES_IMU")
-        if (pose is None or imu is None or race_state is None or not race_state.started or not usable_track(self.track)
+        if (pose is None or imu is None or race_state is None or not race_state.started or self.track is None
                 or len(race_state.gate_centers) != len(self.track)):
             return None
         motion = pose.data

@@ -2,7 +2,7 @@
 
 import math
 
-from miniflight import BodyRates, Ned
+from miniflight import BodyRates
 from miniflight.position import PositionConfig, position_control
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as GatePlanner
@@ -18,7 +18,6 @@ class Controller(BaseController[BodyRates]):
     def __init__(self, config: PositionConfig = CONFIG):
         self.config = config
         self.course = GatePlanner()
-        self.target_position = None
         self.target_yaw = None
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
@@ -31,7 +30,6 @@ class Controller(BaseController[BodyRates]):
         angles = (attitude.roll, -attitude.pitch, -attitude.yaw)  # Build-3391 wire → FRD/NED, explicit controller math.
         if not all(math.isfinite(v) for v in angles):
             return None
-        self.target_position = Ned(target.north, target.east, target.down)
 
         # Keep the initial heading throughout the course, including gate changes.
         if self.target_yaw is None:
@@ -39,5 +37,5 @@ class Controller(BaseController[BodyRates]):
 
         return position_control(
             self.config, (motion.x, motion.y, motion.z), (motion.vx, motion.vy, motion.vz),
-            angles, self.target_position, self.target_yaw,
+            angles, (target.north, target.east, target.down), self.target_yaw,
         )
