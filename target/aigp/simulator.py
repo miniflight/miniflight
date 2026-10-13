@@ -14,7 +14,7 @@ import sys
 from threading import Event, Lock, Thread
 import time
 
-from miniflight import BodyRates, Motion, Ned, Vehicle
+from miniflight import BodyRates, Motion, Ned, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
@@ -45,7 +45,7 @@ class AIGPSimulator:
         self.timeout = timeout
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
-        self.vehicle = Vehicle(self.client)
+        self.vehicle = vehicle
         self.monitor = Monitor()
         self.monitor_path = Path(monitor_path) if monitor_path is not None else BASE / ".runtime/rollouts" / f"{target}-{time.time_ns()}.png"
         self.status = None
@@ -62,8 +62,9 @@ class AIGPSimulator:
         self._used = True
         with ExitStack() as cleanup:
             cleanup.callback(self.save_monitor)  # Plot only after control, receiver, process and connection stop.
-            cleanup.callback(self.client.disconnect)
-            self.client.open()
+            self.vehicle.bind(self.client)
+            cleanup.callback(self.vehicle.disconnect)
+            self.vehicle.connect()
             process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
                                                    race_status_path=self.race_status_path))
             race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)

@@ -14,6 +14,8 @@ The adapter owns decoding, calibration, freshness checks, startup and shutdown.
 `Vehicle` is the program-facing surface for reading signals and issuing commands.
 `Target` is the backend boundary to extend for hardware and later code generation;
 compiler lowering is not implemented yet. The live AIGP send path uses `Vehicle`.
+Programs use `from miniflight import vehicle`, then operations such as
+`vehicle.body_rates(...)`. Startup binds one Target; shutdown releases it.
 
 Install the [runtime](target/aigp/README.md#setup), then run from the repository root:
 

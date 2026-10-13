@@ -5,7 +5,14 @@ from miniflight.state import Attitude, Frame, Motion, MotorOutputs, Ned, State  
 class Vehicle:
     """Read observations and send commands through one target connection."""
 
-    def __init__(self, target) -> None:
+    def __init__(self, target=None) -> None:
+        self._target = target
+        self._state = None
+
+    def bind(self, target) -> None:
+        """Select the backend once, before running the vehicle program."""
+        if self._target is not None:
+            raise RuntimeError("vehicle already has a target")
         self._target = target
         self._state = None
 
@@ -17,7 +24,7 @@ class Vehicle:
         try:
             self._target.disconnect()
         finally:
-            self._state = None
+            self._target = self._state = None
 
     @property
     def state(self) -> State | None:
@@ -74,3 +81,6 @@ class Vehicle:
         thrust: float,
     ) -> None:
         self.send(BodyRates(roll, pitch, yaw, thrust))
+
+
+vehicle = Vehicle()

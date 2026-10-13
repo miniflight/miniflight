@@ -113,6 +113,9 @@ class SimulatorClient:
             self.disconnect()
             raise
 
+    def connect(self):
+        self.open()
+
     def disconnect(self):
         for sock in (self.connection, self._vision):
             if sock is not None:
