@@ -15,7 +15,7 @@ from threading import Event, Lock, Thread
 import time
 
 from miniflight import BodyRates, Motion, Ned
-from miniflight.loop import ticks
+from miniflight.loop import run
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
 from target.aigp.client import SimulatorClient
@@ -103,7 +103,8 @@ class AIGPSimulator:
             last_imu_at = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
-            for now in ticks(self.hz):
+            def read_signals(now):
+                nonlocal last_imu_at, finish_deadline
                 packets = []
                 while True:
                     try:
@@ -136,27 +137,24 @@ class AIGPSimulator:
                 if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
                     raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {self.status}")
                 if self.controller is None or (finish_deadline is not None and not self.status.completed):
-                    continue
-                try:
-                    command = self.controller.update(
-                        tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
+                    return None
+                return (tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
                         tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None),
                         None if self.status is None else replace(self.status, control_time=time.monotonic()))
-                except StopIteration:
-                    self.read_race(race_arrivals)
-                    return self.status if self.status is not None and self.status.completed else None
+
+            def send_command(command):
                 now = time.monotonic()
                 self.read_race(race_arrivals)  # A slow controller cannot hide a new invalidation.
                 if self.status is not None and self.status.completed:
-                    return self.status
+                    raise StopIteration
                 if self.status is None or not self.status.started:
-                    continue
+                    return
                 if command is None or last_imu_at is None:
                     if self.arm_requested:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
-                    continue
+                    return
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if type(command) not in self.client.commands:
@@ -166,6 +164,12 @@ class AIGPSimulator:
                         self.arm_requested = True
                         self.client.arm()
                     self.client.send(command)
+
+            try:
+                run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz)
+            except StopIteration:
+                self.read_race(race_arrivals)
+                return self.status if self.status is not None and self.status.completed else None
 
     def save_monitor(self):
         self.monitor.save(self.monitor_path.with_suffix(".csv"))
