@@ -77,6 +77,14 @@ below. Resistance compensation remains explicit in this configuration.
 
 Start the repeat runner, observer, and local browser server in separate terminals:
 
+On 2026-10-13, a body-frame resistance fit and revised local thrust calibration
+gave ten clean runs in 18.950–19.028 native seconds, with 10,967 updates replayed
+exactly. PID gains remained 2/0/2; the rate ceiling was 1.25 rad/s. Use
+`test/fixtures/vq1_r1_free_19s.npz` with
+`--config test/fixtures/vq1_r1_body.config.json` in the repeat command below.
+The [record](../../../test/fixtures/vq1_r1_free_19s.validation.json) retains the
+force fit, held-out errors, source hashes, and earlier failed experiments.
+
 ```sh
 python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_free_26s.npz --output target/aigp/.runtime/experiments/pitwall --count 10
 python -m target.aigp.experiments.pitwall target/aigp/.runtime/experiments/pitwall/current.json target/aigp/.runtime/experiments/pitwall/view --current

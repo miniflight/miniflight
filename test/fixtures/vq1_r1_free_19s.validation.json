@@ -1,0 +1,165 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "reference": "vq1_r1_free_19s.npz",
+  "reference_sha256": "33120050a08058aa028f7006b46557b9def35976cc24d16488dda6a331c4a132",
+  "controller_config": {
+    "hover_thrust": 0.2630807493566084,
+    "thrust_acceleration": 43.813566688117064,
+    "position_gain": 1.0,
+    "velocity_gain": 2.0,
+    "attitude_gain": 4.0,
+    "max_speed": 4.0,
+    "max_acceleration": 6.0,
+    "max_tilt": 0.6,
+    "max_rate": 1.25,
+    "resistance_per_m": [
+      0,
+      0,
+      0
+    ],
+    "body_resistance_per_m": [
+      0.04983353819907249,
+      0.04983353819907249,
+      0.06488260570550548
+    ]
+  },
+  "trajectory_pid": {
+    "kp": 2.0,
+    "ki": 0.0,
+    "kd": 2.0
+  },
+  "sources": {
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "570072df8b1df25b003624f197c3374f44dc42c4a01c90f8318344b17563bd7d",
+    "target/aigp/__init__.py": "d5ed3a2981e826f442f45282d8d520b91dfe3834cb64b7881d69d59228b682c5",
+    "target/aigp/controllers/r1_motors.py": "ee89f5ff5316baac4d17873bf8a8033d8fd1801fb195247968912a2201a2e01c",
+    "miniflight/position.py": "58a59d42bf400b93377c7031a04d4c628d030694b50952ee93c9ce426504e34b",
+    "miniflight/reference.py": "44c92a610d9693c56ced19d11a56b9ef4e5d6c770fe647c7b48a507f983f819b",
+    "miniflight/state.py": "afd1b76744ddffc64a1c428d5a7e1b316c5bb01c3eeeb6906e2c1271063b3d5d",
+    "miniflight/control.py": "d3eb110692bc4bbe7cc9c819f24b08396c38931ba27a4a871e3f8687efd26e39",
+    "miniflight/monitor.py": "3d19d1e99bfbf6bcab976e95a31766f82a6eaa0c9d5fd41edb19639fd24bf3cf",
+    "miniflight/vehicle.py": "443057c3adbded5e860cad5c6d081f3d154fd6170e86406c392df201cbd950f8",
+    "miniflight/__init__.py": "05a325f4acfeea53b5693741b0137ec280687c7d0f951ff53c15f23de9b1c8b2",
+    "common/math.py": "5594f43dbc9610c192ff650b3c92ff9c1203116e5e33e23c6bb91c67f943c0d9",
+    "target/__init__.py": "e66f281dc325c858a1e682e5457dfb7ebee36218fb700c8439462402741ed8b1",
+    "target/aigp/controllers/r1_gates.py": "61b4aac45b2e7b7eec16a88ba494b5324d671f39572c0e9329c0a98249549759",
+    "target/aigp/controllers/r1_body_rates.py": "ab748f64fe3ab184c336d3096a755699d17e927c1700795d2b220ba66833ffda",
+    "target/aigp/controllers/r1_beautiful.py": "ecf3612276e1e33406bc3a33643d2d575911d43b80c1048b03f64abdbb291dca",
+    "target/aigp/controllers/__init__.py": "908f0265bebd34f57291a851c22c75d0b80aa3ee28debdec65c151f0e104c9bd",
+    "target/aigp/simulator.py": "73cc5b3dbc8e9e5044a38a1d7a1ec28df08bd4018aff14dcaf72ec8cdc195809",
+    "target/aigp/client.py": "8838dec97c2eb4117dc0b11ccbd624ce9786f1c4b2def54ddcf01c0c14949de5",
+    "target/aigp/native.py": "cd8e3467c18cb913d73ec123e0da2213bd27149f301acc2d78571106cfbac136",
+    "target/aigp/config/vq1/main.lua": "106658709e172f11aaed9168d9658421446f9156a21f142274ee93bee5e3ef90",
+    "target/aigp/config/race.lua": "94ce9143191e3609c6b67ca66385d791e233f049d4e0748d597fcaf5919cbea4",
+    "target/aigp/experiments/recording.py": "42fa4a05c75456dff6d215eef40fa11040333116689e96bf0255413a2de18133",
+    "target/aigp/experiments/r1_signals.py": "9f941c1e4b485f605868e3dc5af3413a6afde7950a257a16a2fd0bec6f425d70",
+    "test/aigp_regression.py": "0b606518b9c51797c1410f121b6707ee32e187af9a65b18365328f5468c3f2db"
+  },
+  "runtime_revision": "cf4c862bc6a3f67537112b43db2be4dd9e0ffa87",
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "native_pid": 46957,
+  "raw_trace_directory": "target/aigp/.runtime/measurements/pitwall-20261013/body-model-rate-19",
+  "generation": {
+    "duration_s": 18.980274635663335,
+    "iterations": 405,
+    "equality_error": 3.787177059442883e-09,
+    "minimum_margin": -4.181436896733004e-07,
+    "crossing_times_s": [
+      4.170199741924545,
+      6.540153053485036,
+      9.977215543176873,
+      14.14831415273297,
+      16.584434919439904,
+      18.980274635663335
+    ]
+  },
+  "force_fit": [
+    {
+      "frame": "world",
+      "lag_s": 0.08,
+      "force_linear": 36.31033505533482,
+      "force_quadratic": 5.391333695512548,
+      "horizontal_resistance_per_m": 0.04743408373052232,
+      "vertical_resistance_per_m": 0.17447255123205885,
+      "train_rmse_m_s": 0.12178375733447387,
+      "heldout_rmse_m_s": [
+        [
+          0.08002952865875021,
+          0.02000633779530334,
+          0.11676051266364917
+        ],
+        [
+          0.18770358608650645,
+          0.02771074442682202,
+          0.2324505771847568
+        ],
+        [
+          0.16442006308614618,
+          0.02970272131465236,
+          0.2372201538890777
+        ]
+      ]
+    },
+    {
+      "frame": "body",
+      "lag_s": 0,
+      "force_linear": 30.764295994662923,
+      "force_quadratic": 24.800884757564926,
+      "horizontal_resistance_per_m": 0.04983353819907249,
+      "vertical_resistance_per_m": 0.06488260570550548,
+      "train_rmse_m_s": 0.04964948655890984,
+      "heldout_rmse_m_s": [
+        [
+          0.016169762656419943,
+          0.019730504828748913,
+          0.07036041326721298
+        ],
+        [
+          0.07064216152327295,
+          0.03591840404054054,
+          0.09385144780803875
+        ],
+        [
+          0.03646504087833735,
+          0.03537812064697854,
+          0.09013527619018984
+        ]
+      ]
+    }
+  ],
+  "fit_training": [
+    "arm-clock-30-02.jsonl",
+    "envelope-10-native/trial-00001.jsonl"
+  ],
+  "fit_validation": [
+    "arm-clock-30-03.jsonl",
+    "envelope-10-integral/trial-00001.jsonl",
+    "envelope-10-integral-02/trial-00001.jsonl"
+  ],
+  "fit_source_sha256": "c9f2d0892d380149e90a445d7d0c059d8e314a46fb997fa719fb2bffe33810ed",
+  "limitations": "Local force fit and linear thrust approximation around hover; faster or more tilted flight requires native validation. Earlier attempts retain gate collisions.",
+  "earlier_failed_experiments": [
+    "envelope-10-native",
+    "envelope-10-integral",
+    "envelope-10-integral-02",
+    "body-model-19-qualify"
+  ],
+  "hz": 50,
+  "freshness_timeout_s": 0.3,
+  "simulator_args": [
+    "-RenderOffScreen"
+  ],
+  "runs": [
+    {"trial":1,"finish_time_s":18.994152069,"replayed_updates":1114,"sent":{"MotorControls":948,"BodyRates":1},"trace":"trial-00001.jsonl","trace_sha256":"49ccede3f3cb70aa966f14aaa6f965b11ad6fac6da671efc805ec1c10eb75f26","camera_sha256":"ae0bb361b1d722353fb691a2953dac581282298cacb988db61fb6ea4e2c83c9c"},
+    {"trial":2,"finish_time_s":19.028261185,"replayed_updates":1095,"sent":{"MotorControls":948,"BodyRates":1},"trace":"trial-00002.jsonl","trace_sha256":"224c61ee6bf0523b02c767fe37e60002044bb5387a8a6e1d97b731b095308cb6","camera_sha256":"6a659e7a48021d744bb1b155bdf49dc6d69249c87d6c21966cf5ac396dc0a3d4"},
+    {"trial":3,"finish_time_s":18.967136383,"replayed_updates":1099,"sent":{"MotorControls":949,"BodyRates":1},"trace":"trial-00003.jsonl","trace_sha256":"9abb414a6fa77a36ecb47d7edf31e098d3a7c311a1c1b3a66403b783e7ebc714","camera_sha256":"786221130b562f16ee3f6c6f872dd5f02a136c5537628287f8e3935ab7a9fbff"},
+    {"trial":4,"finish_time_s":18.996644974,"replayed_updates":1097,"sent":{"MotorControls":950,"BodyRates":1},"trace":"trial-00004.jsonl","trace_sha256":"7f5f32eda405123da09b4685266d078ac71471eb6358dadc7059527152970303","camera_sha256":"3ff6f87712c21a3eee2b2e8f093aaaf36e2ba9e4fa82a7ce07c2c453ff59fe01"},
+    {"trial":5,"finish_time_s":18.965671539,"replayed_updates":1089,"sent":{"MotorControls":945,"BodyRates":1},"trace":"trial-00005.jsonl","trace_sha256":"62ceac9dc3f511456ef9d6e2e29820f9174f446d37cd97d79aa0d6d6117cd037","camera_sha256":"d6d33ae437923d32b922a15dfd7fd42f99fa07d5f867b2c4d932575c6fd637f6"},
+    {"trial":6,"finish_time_s":18.98890686,"replayed_updates":1088,"sent":{"MotorControls":949,"BodyRates":1},"trace":"trial-00006.jsonl","trace_sha256":"06f4b9255166d7c3f746729601372239c8f14019c07e4ab6b70febd5be616571","camera_sha256":"4ab87eaaf387afdd38ac9099f0f3386c706e32b612aa077799a14ee669c30c46"},
+    {"trial":7,"finish_time_s":18.983078003,"replayed_updates":1091,"sent":{"MotorControls":947,"BodyRates":1},"trace":"trial-00007.jsonl","trace_sha256":"d7858cf28576469fbb560e985ffa3cb6c1b9baf8ce501a465d671c8a3f1ecdde","camera_sha256":"a11aaed1c365278f0d5f4a9eee9dc872bd5073fb57790320892b306875d61869"},
+    {"trial":8,"finish_time_s":19.020269394,"replayed_updates":1101,"sent":{"MotorControls":949,"BodyRates":1},"trace":"trial-00008.jsonl","trace_sha256":"0dcc22175f2fa9358d3661dc29906074f8a8f93612a878aa14ecbe33135ff708","camera_sha256":"8996521887fa0f58f79f36124097c355753829e145c3b99153889bca3c88e4e9"},
+    {"trial":9,"finish_time_s":18.993030548,"replayed_updates":1096,"sent":{"MotorControls":949,"BodyRates":1},"trace":"trial-00009.jsonl","trace_sha256":"0b8e0dfb8b4d7c6c2a6c4f0d388afbaa7d5f4885021684b9c67cb5839b953f6e","camera_sha256":"6fe56d7d00e0f32fb88bf219e81f8b570bb8257de423c71980d9e98d314b6311"},
+    {"trial":10,"finish_time_s":18.95000267,"replayed_updates":1097,"sent":{"MotorControls":950,"BodyRates":1},"trace":"trial-00010.jsonl","trace_sha256":"0cdc761f04bdc564de28f5f3e842987b936bc11e0d3a23eab0855af7044a83e5","camera_sha256":"037745b5062cb9e26971b04bbd3284762d2408b1a334b9574b6f84fdf9c46cb2"}
+  ]
+}
