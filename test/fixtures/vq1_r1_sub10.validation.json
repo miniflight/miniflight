@@ -1,0 +1,274 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "scope": "Native direct arena; Training and Qualification event selection unverified.",
+  "reference": "vq1_r1_sub10.npz",
+  "reference_sha256": "5aef6c423abf3d40dfbdf057a19cfc45c1c7e7a1cff7a9ad96df8482e8c0c7f5",
+  "reference_duration_s": 9.819109834645804,
+  "controller_config": {
+    "hover_thrust": 0.26632413404263017,
+    "thrust_acceleration": 50.677711104426166,
+    "position_gain": 1.3333333333333333,
+    "velocity_gain": 3.0,
+    "attitude_gain": 8,
+    "max_speed": 4.0,
+    "max_acceleration": 6.0,
+    "max_tilt": 1.35,
+    "max_rate": 3.0,
+    "resistance_per_m": [
+      0,
+      0,
+      0
+    ],
+    "body_resistance_per_m": [
+      0.04987551091573665,
+      0.04987551091573665,
+      0.04197436534941044
+    ],
+    "thrust_curve": [
+      22.991917337356192,
+      51.97762843873237
+    ],
+    "max_horizontal_acceleration": 26.0
+  },
+  "trajectory_pid": {
+    "kp": 4.0,
+    "ki": 0.0,
+    "kd": 3.0
+  },
+  "rate_pid": {
+    "kp": [
+      0.025,
+      0.025,
+      0.03125
+    ],
+    "ki": [
+      0.1,
+      0.1,
+      0.125
+    ]
+  },
+  "sources": {
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "570072df8b1df25b003624f197c3374f44dc42c4a01c90f8318344b17563bd7d",
+    "target/aigp/__init__.py": "d5ed3a2981e826f442f45282d8d520b91dfe3834cb64b7881d69d59228b682c5",
+    "target/aigp/controllers/r1_motors.py": "ee89f5ff5316baac4d17873bf8a8033d8fd1801fb195247968912a2201a2e01c",
+    "miniflight/position.py": "c86a261915d51e76d58bda48d41795eab8202f72a2fe9e367394e092ad43793d",
+    "miniflight/reference.py": "43b61bc5b248bb703fe1bd4b3baae1a9598ef6f90a891cca9f3ef98ccc7a22ee",
+    "miniflight/state.py": "afd1b76744ddffc64a1c428d5a7e1b316c5bb01c3eeeb6906e2c1271063b3d5d",
+    "miniflight/control.py": "d3eb110692bc4bbe7cc9c819f24b08396c38931ba27a4a871e3f8687efd26e39",
+    "miniflight/monitor.py": "3d19d1e99bfbf6bcab976e95a31766f82a6eaa0c9d5fd41edb19639fd24bf3cf",
+    "miniflight/vehicle.py": "443057c3adbded5e860cad5c6d081f3d154fd6170e86406c392df201cbd950f8",
+    "miniflight/__init__.py": "05a325f4acfeea53b5693741b0137ec280687c7d0f951ff53c15f23de9b1c8b2",
+    "common/math.py": "5594f43dbc9610c192ff650b3c92ff9c1203116e5e33e23c6bb91c67f943c0d9",
+    "target/__init__.py": "e66f281dc325c858a1e682e5457dfb7ebee36218fb700c8439462402741ed8b1",
+    "target/aigp/controllers/r1_gates.py": "61b4aac45b2e7b7eec16a88ba494b5324d671f39572c0e9329c0a98249549759",
+    "target/aigp/controllers/r1_body_rates.py": "ab748f64fe3ab184c336d3096a755699d17e927c1700795d2b220ba66833ffda",
+    "target/aigp/controllers/r1_beautiful.py": "7ff8f87a31d879608c0e5f4c0bef72a62be129da05436218b36a979d02219395",
+    "target/aigp/controllers/__init__.py": "908f0265bebd34f57291a851c22c75d0b80aa3ee28debdec65c151f0e104c9bd",
+    "target/aigp/simulator.py": "73cc5b3dbc8e9e5044a38a1d7a1ec28df08bd4018aff14dcaf72ec8cdc195809",
+    "target/aigp/client.py": "8838dec97c2eb4117dc0b11ccbd624ce9786f1c4b2def54ddcf01c0c14949de5",
+    "target/aigp/native.py": "cd8e3467c18cb913d73ec123e0da2213bd27149f301acc2d78571106cfbac136",
+    "target/aigp/config/vq1/main.lua": "106658709e172f11aaed9168d9658421446f9156a21f142274ee93bee5e3ef90",
+    "target/aigp/config/race.lua": "94ce9143191e3609c6b67ca66385d791e233f049d4e0748d597fcaf5919cbea4",
+    "target/aigp/experiments/recording.py": "42fa4a05c75456dff6d215eef40fa11040333116689e96bf0255413a2de18133",
+    "target/aigp/experiments/r1_signals.py": "9f941c1e4b485f605868e3dc5af3413a6afde7950a257a16a2fd0bec6f425d70",
+    "test/aigp_regression.py": "bce73180807a4f47866867becc0cae7224a3c2867a537a63ff3e7f3825166e0d"
+  },
+  "runtime_revision": "1d42f105480e62e074d3980aef0c1135e91de442",
+  "raw_trace_directory": "target/aigp/.runtime/measurements/pitwall-20261013/sub10-position-4",
+  "native_pid": 54351,
+  "flight_finish_seconds": [
+    9.806962013,
+    9.808766365,
+    9.834532738,
+    9.820902824,
+    9.826091766,
+    9.797389984,
+    9.833228111,
+    9.779809952,
+    9.859733582,
+    9.84396553
+  ],
+  "gates": 6,
+  "collisions": 0,
+  "replayed_updates": 6423,
+  "sent_motor_commands": 4912,
+  "camera_shape": [
+    360,
+    640,
+    3
+  ],
+  "reset_requests": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    37,
+    1,
+    38,
+    1
+  ],
+  "force_fit": {
+    "training": [
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/reliable-launch-20261012/arm-clock-30-02.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/envelope-10-native/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-native/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-attitude-8-original-rate/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-25-rates/trial-00001.jsonl"
+    ],
+    "heldout": [
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/reliable-launch-20261012/arm-clock-30-03.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rate-i-half/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rate-p-double/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rates/trial-00001.jsonl",
+      "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rates/trial-00002.jsonl"
+    ],
+    "models": [
+      {
+        "vertical_law": "quadratic",
+        "lag_s": 0,
+        "coefficients": [
+          22.991917337356192,
+          51.97762843873237,
+          0.04961800445829662,
+          0.0414024712379926
+        ],
+        "weighted_train_rmse": 0.0022861161437912228,
+        "heldout_rmse_m_s": [
+          [
+            0.020169661751259435,
+            0.02157940177397658,
+            0.10944894367842509
+          ],
+          [
+            0.1027543665609575,
+            0.009197753476305878,
+            0.1318715100128872
+          ],
+          [
+            0.09847243868675294,
+            0.008308940813839854,
+            0.1182904707746262
+          ],
+          [
+            0.14584029766694342,
+            0.11671086984244798,
+            0.1175832163825876
+          ],
+          [
+            0.3976123547331022,
+            0.1996798561919226,
+            0.1561149612781354
+          ]
+        ]
+      },
+      {
+        "vertical_law": "linear",
+        "lag_s": 0,
+        "coefficients": [
+          27.80512906980466,
+          41.786660347339634,
+          0.049603457567044894,
+          0.4276940906905321
+        ],
+        "weighted_train_rmse": 0.0031343348742408545,
+        "heldout_rmse_m_s": [
+          [
+            0.04230167929132861,
+            0.01967951612505615,
+            0.17128125046217244
+          ],
+          [
+            0.20047533815717591,
+            0.030024720415800687,
+            0.14701891551062257
+          ],
+          [
+            0.1767753115624051,
+            0.02735200367365435,
+            0.12708300628696215
+          ],
+          [
+            0.17408759181728745,
+            0.13864773075964607,
+            0.17455459149468505
+          ],
+          [
+            0.45385700743396,
+            0.215278371398319,
+            0.19577817805541758
+          ]
+        ]
+      },
+      {
+        "vertical_law": "both",
+        "lag_s": 0,
+        "coefficients": [
+          24.329796664961666,
+          49.98155614451528,
+          0.0496018834171634,
+          0.029140946854967365,
+          0.1412147977640108
+        ],
+        "weighted_train_rmse": 0.0020057843687904006,
+        "heldout_rmse_m_s": [
+          [
+            0.014602503635805668,
+            0.01849932098888024,
+            0.05776488863886104
+          ],
+          [
+            0.08880008951420085,
+            0.00792884359984757,
+            0.11294960448851933
+          ],
+          [
+            0.07939612337366997,
+            0.0069003900982386,
+            0.09610331890220847
+          ],
+          [
+            0.15187812401823547,
+            0.12455922546984904,
+            0.13292510980242384
+          ],
+          [
+            0.42182988048486647,
+            0.2056107595594689,
+            0.16426959023042986
+          ]
+        ]
+      }
+    ]
+  },
+  "generation": {
+    "seed": "body-speed-25-dense.npz",
+    "time_scale": 0.94,
+    "position_unchanged": true,
+    "velocity_scale": 1.0638297872340425,
+    "acceleration_scale": 1.1317338162064283,
+    "jerk_scale": 1.2039721449004557,
+    "rate_vectors": "FRD rad/s from the measured-model thrust direction; fixed heading pi",
+    "fine_check": {
+      "duration_s": 9.819109834645804,
+      "horizontal_speed": 24.55742785118604,
+      "vertical_speed": 6.383080975637522,
+      "horizontal_force": 23.914601210399997,
+      "vertical_force": 5.183824463782481,
+      "force_min": 9.253206337031147,
+      "force_max": 25.885999823511803,
+      "tilt": 1.2620782854178796,
+      "down_max": 24.680001060611144,
+      "force_iteration_error": 0.0005658939788455442,
+      "controller_horizontal_margin": 2.085398789600003,
+      "controller_vertical_margin": 0.8161755362175187
+    }
+  },
+  "retained_failed_experiments": [
+    "body-speed-25-rates",
+    "body-speed-25-native-curve"
+  ]
+}
