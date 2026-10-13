@@ -1,5 +1,6 @@
 """Position feedback, attitude feedback, then native body-rate control."""
 
+import math
 from common.math import Quaternion, Vector3D
 from miniflight import BodyRates
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance, trajectory_acceleration
@@ -51,6 +52,12 @@ class Controller(BaseController[BodyRates]):
         position = Vector3D(motion.x, motion.y, motion.z)
         velocity = Vector3D(motion.vx, motion.vy, motion.vz)
         angles = (orientation.roll, -orientation.pitch, -orientation.yaw)  # Native wire -> FRD/NED.
+        lag = max(0.0, (motion.time_boot_ms - orientation.time_boot_ms) / 1000)
+        gyro = (-orientation.rollspeed, -orientation.pitchspeed, -orientation.yawspeed)
+        speed = math.hypot(*gyro)
+        if lag and speed:
+            rotation = Quaternion.from_euler(*angles) * Quaternion.from_axis_angle(gyro, speed * lag)
+            angles = rotation.to_euler()  # Bring the older attitude to the pose sample time.
 
         index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):

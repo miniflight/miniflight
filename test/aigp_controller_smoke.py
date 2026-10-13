@@ -178,6 +178,19 @@ class ControllerSmokeTest(unittest.TestCase):
         self.assertIsNotNone(controller.update((), (), replace(race, completed=True, time_seconds=101,
                              active_gate_index=1, finish_time_seconds=101, received_at=11)))
 
+    def test_delayed_attitude_matches_the_same_pose_time(self):
+        gate = Gate(0, Ned(2, 0, 0), (1, 0, 0, 0), 2, 2)
+        track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")), 10, TrackInfo(7, (gate,)))
+        race = NativeRaceState(True, True, False, .1, 0, -1, 10, gate_centers=(Ned(2, 0, 0),))
+        motion = Packet(mavlink.MAVLink_local_position_ned_message(1100, 0, 0, 0, 0, 0, 0), 10)
+        commands = []
+        for stamp, roll in ((1000, 0), (1100, .1)):
+            controller = PIDController(reference=lambda t: ((0, 0, 0),) * 3)
+            attitude = Packet(mavlink.MAVLink_attitude_message(stamp, roll, 0, 0, -1, 0, 0), 10)
+            commands.append(controller.update((track, motion, attitude), (), race))
+        for field in ("roll_rate", "pitch_rate", "yaw_rate", "thrust"):
+            self.assertAlmostEqual(getattr(commands[0], field), getattr(commands[1], field))
+
     def test_undefined_gate_approach_stops_before_arming(self):
         for make in (PositionController, RatesController, PIDController, MotorController):
             with self.subTest(controller=make.__module__):
