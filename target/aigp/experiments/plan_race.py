@@ -45,11 +45,12 @@ def motion_constraints(initial, jerk, intervals, model):
     down_demand = (force[:, 2] + 9.81) / model["vertical_force_limit_m_s2"]
     down_speed = velocity[:, 2] / model["vertical_speed_limit_m_s"]
     down_acceleration = acceleration[:, 2] / model["vertical_acceleration_limit_m_s2"]
+    depth_margin = [] if "maximum_down_m" not in model else model["maximum_down_m"] - dense[:, 0, 2]
     return np.r_[force_squared/minimum_thrust**2-1, 1-force_squared/maximum_thrust**2, 1-horizontal_force_squared/force_limit**2,
                  (up**2*np.tan(model["tilt_limit_rad"])**2-horizontal_force_squared)/force_limit**2, up/9.81,
                  1-down_demand, 1+down_demand, 1-down_speed, 1+down_speed, 1-down_acceleration, 1+down_acceleration,
                  1-np.sum(velocity[:, :2]**2, axis=1)/model["horizontal_speed_limit_m_s"]**2,
-                 1-direction_rate_squared/model["direction_rate_limit_rad_s"]**2]
+                 1-direction_rate_squared/model["direction_rate_limit_rad_s"]**2, depth_margin]
 
 
 def crossing_constraints(states, gates, centers, model):
