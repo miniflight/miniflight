@@ -32,12 +32,12 @@ def fresh_race(path, timeout=120, course_packets=()):
             if client.connected and now >= heartbeat_at:
                 client.heartbeat()
                 heartbeat_at = now + .5
-            if client.connected and states and (requested is None or fresh is None and now-requested >= 1):
+            if client.connected and states and (requested is None or (not accepted or fresh is None) and now-requested >= 1):
                 if requested is None:
                     before = asdict(states[-1])  # Drain old observations before requesting reset.
                 client.reset()
                 reset_requests += 1
-                accepted = False
+                accepted, fresh = False, None
                 requested = time.monotonic()
                 continue
             if requested is None:
@@ -49,6 +49,7 @@ def fresh_race(path, timeout=120, course_packets=()):
                         raise RuntimeError("native reset request was rejected")
                     accepted = True
             for state in states:
+                fresh = None
                 if not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds == 0:
                     fresh = asdict(state)
             pose = client.telemetry.get("LOCAL_POSITION_NED")
