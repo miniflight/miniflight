@@ -14,7 +14,7 @@ CONFIG = PositionConfig(hover_thrust=.266, thrust_acceleration=53.5)
 class Controller(BaseController[BodyRates]):
     targets = ("vq1.r1",)
 
-    def __init__(self, kp=2.0, ki=0.0, kd=2.0, exit_distance=1.0, config=CONFIG, reference=None):
+    def __init__(self, kp=2.0, ki=0.0, kd=2.0, exit_distance=1.0, config=CONFIG, reference=None, rate_reference=None):
         self.kp = kp  # 1/s²
         self.ki = ki  # 1/s³
         self.kd = kd  # 1/s
@@ -25,6 +25,7 @@ class Controller(BaseController[BodyRates]):
         self.target_velocity = Vector3D()  # NED m/s.
         self.target_acceleration = Vector3D()  # NED m/s².
         self.reference, self.reference_start = reference, None
+        self.rate_reference = rate_reference  # Saved FRD rad/s, sampled on the same reference clock.
         self.reference_time = self.requested_acceleration = None
         self.time = None
         self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
@@ -81,4 +82,5 @@ class Controller(BaseController[BodyRates]):
         acceleration = tuple(a + r for a, r in zip(acceleration, resistance, strict=True))
         self.integral = Vector3D(*integral)
         self.requested_acceleration = Vector3D(*acceleration)
-        return acceleration_control(self.config, self.requested_acceleration.v, angles, self.target_yaw)
+        feedforward = (0, 0, 0) if self.rate_reference is None else self.rate_reference(self.reference_time)
+        return acceleration_control(self.config, self.requested_acceleration.v, angles, self.target_yaw, rate_feedforward=feedforward)
