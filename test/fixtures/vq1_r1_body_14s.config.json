@@ -1,0 +1,25 @@
+{
+  "hover_thrust": 0.2643622002161037,
+  "thrust_acceleration": 43.38800269411176,
+  "position_gain": 1.0,
+  "velocity_gain": 2.0,
+  "attitude_gain": 8,
+  "max_speed": 4.0,
+  "max_acceleration": 9.5,
+  "max_tilt": 1.0,
+  "max_rate": 3,
+  "resistance_per_m": [
+    0,
+    0,
+    0
+  ],
+  "body_resistance_per_m": [
+    0.04987551091573665,
+    0.04987551091573665,
+    0.04197436534941044
+  ],
+  "thrust_curve": [
+    30.828356467529243,
+    23.754618126788916
+  ]
+}
