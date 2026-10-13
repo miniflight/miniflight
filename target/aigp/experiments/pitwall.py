@@ -14,6 +14,7 @@ def watch(source, output, current=False, once=False):
     output.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(Path(__file__).parents[3] / "miniflight/pitwall.html", output / "index.html")
     reader, trace, ledger, history = None, None, None, []
+    reference = None
     try:
         while True:
             pointer = json.loads(source.read_text()) if current and source.exists() else dict(trace=str(source))
@@ -41,8 +42,8 @@ def watch(source, output, current=False, once=False):
                 if history and history[-1]["trace"] == str(trace) and not history[-1]["passed"]:
                     error = history[-1]["error"]
                     view["note"] = f"Trial failed: {error['type']}: {error['message']}"
-                duration = (observer.metadata.get("reference") or {}).get("duration_s")
-                results = [dict(trial=row["trial"], finish=row.get("finish_time_s"), reference=duration) for row in history[-100:]]
+                reference = (observer.metadata.get("reference") or {}).get("duration_s", reference)
+                results = [dict(trial=row["trial"], finish=row.get("finish_time_s"), reference=reference) for row in history[-100:]]
                 chart, = chart_data(results, [("Native finish across trials", "s", [("Reference", "reference"), ("Clean finish", "finish")])],
                                     x_key="trial", x_label="Trial")
                 chart["mode"] = "lines+markers"
@@ -51,7 +52,7 @@ def watch(source, output, current=False, once=False):
             write_snapshot(output / "latest.json", view)
             if once:
                 return view
-            time.sleep(.5)
+            time.sleep(.05)
     finally:
         if reader is not None:
             reader.close()

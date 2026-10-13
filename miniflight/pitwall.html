@@ -27,11 +27,8 @@
 <script>
 const colors = ['#64dac3', '#ffb66b', '#b6a1ff', '#ff7898'];
 document.querySelector('details').addEventListener('toggle', () => document.querySelectorAll('#diagnostics .chart').forEach(div => Plotly.Plots.resize(div)));
-async function refresh() {
+async function refresh(data) {
   try {
-    const response = await fetch('./latest.json', {cache:'no-store'});
-    if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
-    const data = await response.json();
     document.querySelector('#source').textContent = data.title;
     document.querySelector('#note').textContent = data.note || (data.summary.Commands === 0 ? 'Waiting for control samples · plots hold the last flight' : '');
     const age = data.published_at === undefined ? null : Math.max(0, Date.now()/1000-data.published_at);
@@ -65,8 +62,15 @@ async function refresh() {
       div.dataset.source = source;
     }
   } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }
-  setTimeout(refresh, 1000);
 }
-refresh();
+let latest, drawing = false;
+const signals = new EventSource('./signals');
+signals.onmessage = async event => {
+  latest = JSON.parse(event.data);
+  if (drawing) return;
+  drawing = true;
+  while (latest) { const data = latest; latest = null; await refresh(data); }
+  drawing = false;
+};
 </script>
 </html>

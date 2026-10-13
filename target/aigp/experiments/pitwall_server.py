@@ -9,18 +9,20 @@ import time
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path != "/camera.mjpg":
+        camera = self.path == "/camera.mjpg"
+        if not camera and self.path != "/signals":
             return super().do_GET()
         self.send_response(200)
-        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame" if camera else "text/event-stream")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        path, previous = Path(self.directory) / "frame.jpg", None
+        path, previous = Path(self.directory) / ("frame.jpg" if camera else "latest.json"), None
         try:
             while True:
                 if path.exists() and (stamp := path.stat().st_mtime_ns) != previous:
-                    jpeg, previous = path.read_bytes(), stamp
-                    self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n")
+                    data, previous = path.read_bytes(), stamp
+                    payload = b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(data)).encode() + b"\r\n\r\n" + data + b"\r\n" if camera else b"data: " + data.rstrip() + b"\n\n"
+                    self.wfile.write(payload)
                     self.wfile.flush()
                 time.sleep(.01)
         except (BrokenPipeError, ConnectionResetError):
