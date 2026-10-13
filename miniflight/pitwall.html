@@ -16,11 +16,12 @@
   article { padding:10px; } article small { display:block; color:#9caabd; margin-bottom:4px; }
   article strong { font-size:20px; font-variant-numeric:tabular-nums; }
   .chart { height:250px; overflow:hidden; }
+  #camera { width:100%; height:calc(100% - 26px); object-fit:contain; } .camera small { display:block; padding:8px 12px 0; }
   @media(max-width:780px) { body { padding:16px; } main, #diagnostics { grid-template-columns:1fr; } }
 </style>
 <header><h1>Miniflight pitwall</h1><p><span id="source">Waiting for recorded signals</span><br><small id="feed"></small><br><span id="note"></span></p></header>
 <section id="summary" aria-label="Flight summary"></section>
-<main aria-label="Performance charts"></main>
+<main aria-label="Performance charts"><div class="chart camera"><small id="camera-title">Camera</small><img id="camera" src="./camera.mjpg" alt="AI-GP camera feed"></div></main>
 <details><summary>Sensor and rate diagnostics</summary><section id="diagnostics"></section></details>
 <footer>Flight plots use the controller reference clock. Native finish uses the game clock.<br>Motor requests and reported outputs are fractions. Missing channels stay blank. Drag to zoom; double-click to reset.</footer>
 <script>
@@ -32,8 +33,9 @@ async function refresh() {
     if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
     const data = await response.json();
     document.querySelector('#source').textContent = data.title;
-    document.querySelector('#note').textContent = data.note || '';
+    document.querySelector('#note').textContent = data.note || (data.summary.Commands === 0 ? 'Waiting for control samples · plots hold the last flight' : '');
     const age = data.published_at === undefined ? null : Math.max(0, Date.now()/1000-data.published_at);
+    document.querySelector('#camera-title').textContent = data.flight_active && (age === null || age < 3) ? 'Camera · UDP 5600' : 'Camera · last frame';
     document.querySelector('#feed').textContent = age === null ? 'Recorded snapshot' :
       `${data.completed ? 'Flight completed' : 'Recorded signals'} · observer ${age < 3 ? 'updating' : 'stopped'} · snapshot ${age.toFixed(1)} s ago`;
     const summary = document.querySelector('#summary');
@@ -42,6 +44,7 @@ async function refresh() {
       name.textContent = label; number.textContent = value; card.append(name, number); return card;
     }));
     for (const [index, chart] of data.charts.entries()) {
+      if (chart.detail && !document.querySelector('details').open || !chart.series.some(series => series.x.length)) continue;
       const id = `chart-${index}`;
       let div = document.getElementById(id);
       if (!div) { div = document.createElement('div'); div.id = id; div.className = 'chart'; }

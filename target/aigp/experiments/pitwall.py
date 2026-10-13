@@ -25,6 +25,11 @@ def watch(source, output, current=False, once=False):
                 if reader is not None:
                     reader.close()
                 reader, observer, samples, trace = JsonLines(path), Observe(), [], path
+            frame, camera = trace.with_suffix(".frame.jpg").resolve(), output / "frame.jpg"
+            if frame.exists() and (not camera.is_symlink() or camera.readlink() != frame):
+                temporary = output / "frame.tmp"
+                temporary.symlink_to(frame)
+                temporary.replace(camera)
             samples.extend(sample for row in reader.poll() if (sample := observer.consume(row)) is not None)
             view = snapshot(observer, samples, trace)
             if "ledger" in pointer:

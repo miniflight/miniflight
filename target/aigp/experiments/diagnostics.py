@@ -26,7 +26,8 @@ def snapshot(observer, samples, source):
     clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
     reference = (metadata.get("reference") or {}).get("duration_s")
     seconds = lambda value: "—" if value is None else f"{value:.3f} s"
-    return dict(source=f"{source.parent.name}/{source.name}", title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
+    return dict(source=f"{source.parent.name}/{source.name}", flight_active=bool(metadata) and not observer.finished,
+                title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
                          "Collisions": observer.collisions, "Commands": len(samples)},
@@ -39,6 +40,7 @@ class Observe:
         self.decoder = mavlink.MAVLink(None)
         self.latest, self.metadata, self.pending = {}, {}, None
         self.status, self.collisions = {}, 0
+        self.finished = False
 
     def consume(self, row):
         event, command = row["event"], row.get("command")
@@ -47,6 +49,7 @@ class Observe:
         if event == "telemetry" and row["message"]["mavpackettype"] == "COLLISION":
             self.collisions += 1
         if event == "result":
+            self.finished = True
             self.status = row["race"] or {}
         if event == "update":
             self.status = row["native_race"] or {}
