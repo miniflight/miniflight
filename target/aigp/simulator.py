@@ -15,6 +15,7 @@ from threading import Event, Lock, Thread
 import time
 
 from miniflight import BodyRates, Motion, Ned
+from miniflight.loop import ticks
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
 from target.aigp.client import SimulatorClient
@@ -99,17 +100,10 @@ class AIGPSimulator:
             cleanup.callback(stop_receiver)
             cleanup.callback(self.stop)
             now = time.monotonic()
-            period = 1.0 / self.hz
-            next_tick = now - period
             last_imu_at = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
-            while True:
-                next_tick += period
-                if next_tick < now:
-                    next_tick = now + period
-                time.sleep(max(0.0, next_tick - time.monotonic()))
-                now = time.monotonic()
+            for now in ticks(self.hz):
                 packets = []
                 while True:
                     try:

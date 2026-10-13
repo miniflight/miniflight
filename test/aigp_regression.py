@@ -51,7 +51,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
     if name == "r1_motors" and signals is None:
         signals = motor_signals
     sources = ("miniflight/rate.py", "miniflight/mixer.py", "target/aigp/__init__.py", "target/aigp/controllers/r1_motors.py",
-               "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py",
+               "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py", "miniflight/loop.py",
                "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",

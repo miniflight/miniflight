@@ -155,7 +155,7 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
     root = BASE.parents[1]
     sources = ("target/aigp/simulator.py", "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/experiments/recording.py", "miniflight/vehicle.py",
-               "miniflight/control.py", "miniflight/state.py", "target/aigp/experiments/probe.py",
+               "miniflight/control.py", "miniflight/state.py", "miniflight/loop.py", "target/aigp/experiments/probe.py",
                "target/aigp/experiments/yaw_tracking.py", "examples/aigp/probe_body_rates.py")
     metadata = dict(target="vq1.r1", hz=hz, timeout=.3, duration=duration, yaw_feedback=feedback_config,
                     angular_convention="FRD/NED after AIGP build-3391 wire conversion",
