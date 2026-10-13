@@ -28,7 +28,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
@@ -40,7 +40,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             times = data["times"] if "times" in data else None
             trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
             reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
-        make = lambda: MotorGates(position=PIDGates(reference=trajectory, config=CONFIG if position_config is None else position_config))
+        make = lambda: MotorGates(position=PIDGates(reference=trajectory, config=CONFIG if position_config is None else position_config, ki=integral_gain))
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0
@@ -60,7 +60,9 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
     if name == "r1_motors":
-        metadata["controller_config"] = asdict(make().position.config)
+        position = make().position
+        metadata["controller_config"] = asdict(position.config)
+        metadata["trajectory_pid"] = dict(kp=position.kp, ki=position.ki, kd=position.kd)
     if race_reader is not None:
         metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
     result = None
