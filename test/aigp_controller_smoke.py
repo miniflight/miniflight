@@ -71,6 +71,8 @@ class ControllerSmokeTest(unittest.TestCase):
         updates, _ = self.flight(PIDController, replace_geometry=True, signals=r1_signals)
         samples = [row["signals"] for row in updates if "signals" in row]
         self.assertTrue(samples)
+        self.assertTrue(all(row["native_race"]["received_at"] <= row["native_race"]["control_time"] <= row["host_time"]
+                            for row in updates if row["native_race"] is not None))
         self.assertTrue(all(sample["reference_time_s"] is None for sample in samples))
         self.assertTrue(any(sample["acceleration_request_ned_m_s2"][0] < -CONFIG.max_acceleration
                             for sample in samples))
@@ -156,6 +158,9 @@ class ControllerSmokeTest(unittest.TestCase):
         changed = Packet(mavlink.MAVLink_attitude_message(1100, .1, 0, 0, 0, 0, 0), 10.25)
         self.assertNotEqual(controller.update((changed,), (), replace(race, received_at=10.25)), expected)
         self.assertIs(controller.privileged["ATTITUDE"], changed)
+        # A fresh race receipt does not make an older pose fresh at the control call.
+        with self.assertRaisesRegex(TimeoutError, "privileged pose is stale"):
+            controller.update((), (), replace(race, received_at=10.25, control_time=10.49))
         # Repeated position packets cannot keep a frozen position source fresh.
         with self.assertRaisesRegex(TimeoutError, "privileged pose is stale"):
             controller.update((replace(motion, received_at=10.4), replace(changed, received_at=10.4)),

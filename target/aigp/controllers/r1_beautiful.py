@@ -46,7 +46,8 @@ class Controller(BaseController[BodyRates]):
                 or len(race_state.gate_centers) != len(self.track)):
             return None
         motion, orientation = (self.privileged[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE"))
-        if not race_state.completed and max(race_state.received_at - packet.received_at for packet in (motion, orientation)) > .3:
+        now = race_state.received_at if race_state.control_time is None else race_state.control_time
+        if not race_state.completed and max(now - packet.received_at for packet in (motion, orientation)) > .3:
             raise TimeoutError("privileged pose is stale")
         motion, orientation = motion.data, orientation.data
         position = Vector3D(motion.x, motion.y, motion.z)

@@ -54,12 +54,15 @@ class NativeRaceState:
     finish_time_seconds: float  # Local PlayerStateRaceBase.GetCompletedRaceTotalTime()
     received_at: float  # Host monotonic receipt
     gate_centers: tuple[Ned, ...] = ()  # Native mesh bounds centers, local NED metres, sequential order.
+    control_time: float | None = None  # Host monotonic time of the control call, recorded for replay.
 
     def __post_init__(self):
         if any(type(value) is not bool for value in (self.started, self.valid, self.completed)):
             raise ValueError("native race flags must be booleans")
         if not all(math.isfinite(value) for value in (self.time_seconds, self.finish_time_seconds, self.received_at)):
             raise ValueError("native race clocks must be finite")
+        if self.control_time is not None and (not math.isfinite(self.control_time) or self.control_time < self.received_at):
+            raise ValueError("control time must be finite and follow the race receipt")
         if type(self.active_gate_index) is not int:
             raise ValueError("native gate index must be an integer")
         centers = tuple(Ned(*center) for center in self.gate_centers)

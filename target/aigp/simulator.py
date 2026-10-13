@@ -2,7 +2,7 @@
 
 import argparse
 from contextlib import ExitStack
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import importlib
 import json
 import math
@@ -147,7 +147,7 @@ class AIGPSimulator:
                     command = self.controller.update(
                         tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
                         tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None),
-                        self.status)
+                        None if self.status is None else replace(self.status, control_time=time.monotonic()))
                 except StopIteration:
                     self.read_race(race_arrivals)
                     return self.status if self.status is not None and self.status.completed else None
