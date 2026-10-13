@@ -28,7 +28,7 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, rate_ki=None, rate_kp=None):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     make = CONTROLLERS[name]
@@ -41,13 +41,10 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
             rate_reference = partial(sample_values, data["body_rates"], data["body_rate_times"]) if "body_rates" in data else None
             reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
-        rate_options = {} if rate_ki is None else dict(ki=rate_ki)
-        if rate_kp is not None:
-            rate_options["kp"] = rate_kp
         config = CONFIG if position_config is None else position_config
         make = lambda: MotorGates(position=PIDGates(reference=trajectory, rate_reference=rate_reference, config=config,
                                                  kp=config.position_gain * config.velocity_gain, kd=config.velocity_gain,
-                                                 ki=integral_gain), **rate_options)
+                                                 ki=integral_gain))
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0

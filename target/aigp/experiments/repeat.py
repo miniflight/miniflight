@@ -74,8 +74,6 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--config", type=Path, help="PositionConfig JSON for this experiment")
     parser.add_argument("--ki", type=float, default=0.0, help="trajectory position integral gain, 1/s³")
-    parser.add_argument("--rate-ki", type=float, nargs=3, help="rate integral gains along FRD axes, effort/rad")
-    parser.add_argument("--rate-kp", type=float, nargs=3, help="rate proportional gains along FRD axes, effort/(rad/s)")
     parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
     parser.add_argument("--stop-on-failure", action="store_true")
     parser.add_argument("--render", action="store_true", help="show the simulator window")
@@ -110,7 +108,7 @@ def main():
                 reader, reset, course_packets = fresh_race(native_path, course_packets=course_packets)
                 row["reset"] = reset
                 result = run("r1_motors", trace, camera=True, reference=args.reference, offscreen=not args.render,
-                             attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki, rate_ki=args.rate_ki, rate_kp=args.rate_kp)
+                             attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
                 row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
             except BaseException as error:
                 failures += 1
