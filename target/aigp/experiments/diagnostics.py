@@ -75,7 +75,7 @@ class Observe:
         config = self.metadata.get("controller_config", {})
         sample = quantities(self.pending["signals"], (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
                             row["command"]["outputs"], row["host_time"]-pose_at, row["host_time"]-imu_at,
-                            config.get("max_acceleration"))
+                            config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
         native = self.latest.get("ACTUATOR_OUTPUT_STATUS")
         values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
         sample["motor_reported_mean"] = sum(values)/4 if len(values) == 4 and all(math.isfinite(v) for v in values) else None
