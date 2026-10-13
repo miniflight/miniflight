@@ -20,3 +20,12 @@ def sample_motion(states, acceleration_rates, dt, time, *, times=None):
     return (position + velocity * elapsed + acceleration * elapsed**2 / 2 + rate * elapsed**3 / 6,
             velocity + acceleration * elapsed + rate * elapsed**2 / 2,
             acceleration + rate * elapsed)
+
+
+def sample_values(values, times, time):
+    """Linearly sample vector values at increasing knots; hold either endpoint."""
+    if not math.isfinite(time) or len(times) < 2 or len(values) != len(times):
+        raise ValueError("value sampling requires finite time and matching knots")
+    index = max(0, min(bisect_right(times, time) - 1, len(times) - 2))
+    fraction = max(0.0, min(1.0, (time - times[index]) / (times[index+1] - times[index])))
+    return values[index] + fraction * (values[index+1] - values[index])
