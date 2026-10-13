@@ -24,6 +24,7 @@ class PositionConfig:
     resistance_per_m: Vector3 = (0, 0, 0)  # quadratic resistance in the motion frame, 1/m
     body_resistance_per_m: Vector3 | None = None  # optional resistance along FRD body axes, 1/m
     thrust_curve: tuple[float, float] | None = None  # optional F(u) = linear*u + quadratic*u², m/s²
+    max_horizontal_acceleration: float | None = None  # otherwise use max_acceleration, m/s²
 
 
 def quadratic_resistance(velocity, coefficients):
@@ -77,8 +78,9 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
     the supplied local calibration around hover. The caller owns sample timing,
     freshness, target selection, and any persistent state. No I/O occurs here.
     """
+    horizontal_limit = config.max_acceleration if config.max_horizontal_acceleration is None else config.max_horizontal_acceleration
     parameters = (config.hover_thrust, config.thrust_acceleration, config.attitude_gain,
-                  config.max_acceleration, config.max_tilt, config.max_rate)
+                  config.max_acceleration, horizontal_limit, config.max_tilt, config.max_rate)
     if not all(math.isfinite(value) and value > 0 for value in parameters):
         raise ValueError("position control parameters must be finite and positive")
     if config.hover_thrust >= 1 or config.max_acceleration >= GRAVITY or config.max_tilt >= math.pi / 2:
@@ -92,7 +94,7 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
 
     down = max(-config.max_acceleration, min(config.max_acceleration, acceleration[2]))
     up = GRAVITY - down
-    north, east = _limit(acceleration[:2], min(config.max_acceleration, up * math.tan(config.max_tilt)))
+    north, east = _limit(acceleration[:2], min(horizontal_limit, up * math.tan(config.max_tilt)))
 
     roll, pitch, yaw = attitude
     sr, cr, sp, cp = math.sin(roll), math.cos(roll), math.sin(pitch), math.cos(pitch)
