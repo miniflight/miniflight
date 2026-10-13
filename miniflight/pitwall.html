@@ -5,17 +5,17 @@
 <title>Miniflight pitwall</title>
 <script src="https://cdn.plot.ly/plotly-3.6.0.min.js"></script>
 <style>
-  :root { color-scheme:dark; font:15px system-ui; background:#10141b; color:#e8edf4; }
-  body { max-width:1440px; margin:auto; padding:28px; }
-  h1 { margin:0 0 6px; font-size:27px; font-weight:600; }
-  p, footer { color:#9caabd; line-height:1.6; }
-  #summary, main, #diagnostics { display:grid; gap:12px; margin:20px 0; }
-  #summary { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  :root { color-scheme:dark; font:13px system-ui; background:#000; color:#e8edf4; }
+  body { max-width:1280px; margin:auto; padding:16px; }
+  h1 { margin:0 0 4px; font-size:20px; font-weight:600; }
+  p, footer { color:#9caabd; line-height:1.4; margin:4px 0; }
+  #summary, main, #diagnostics { display:grid; gap:8px; margin:12px 0; }
+  #summary { grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); }
   main, #diagnostics { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  article, .chart { background:#171d27; border:1px solid #293344; border-radius:8px; }
-  article { padding:16px; } article small { display:block; color:#9caabd; margin-bottom:8px; }
-  article strong { font-size:24px; font-variant-numeric:tabular-nums; }
-  .chart { height:300px; overflow:hidden; }
+  article, .chart { background:#000; border:1px solid #202020; border-radius:2px; }
+  article { padding:10px; } article small { display:block; color:#9caabd; margin-bottom:4px; }
+  article strong { font-size:20px; font-variant-numeric:tabular-nums; }
+  .chart { height:250px; overflow:hidden; }
   @media(max-width:780px) { body { padding:16px; } main, #diagnostics { grid-template-columns:1fr; } }
 </style>
 <header><h1>Miniflight pitwall</h1><p><span id="source">Waiting for recorded signals</span><br><small id="feed"></small><br><span id="note"></span></p></header>
@@ -48,10 +48,10 @@ async function refresh() {
       document.querySelector(chart.detail ? '#diagnostics' : 'main').append(div);
       const traces = chart.series.map((series, i) => ({x:series.x, y:series.y, name:series.label, mode:chart.mode || 'lines', line:{color:colors[i % colors.length], width:1.6}}));
       await Plotly.react(div, traces, {
-        title:{text:chart.title, font:{size:14}}, margin:{l:58,r:20,t:64,b:52},
-        paper_bgcolor:'#171d27', plot_bgcolor:'#171d27', font:{color:'#c8d3e2',size:11},
+        title:{text:chart.title, font:{size:12}}, margin:{l:44,r:12,t:56,b:38},
+        paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#c8d3e2',size:11},
         xaxis:{title:{text:chart.x_label || 'Reference time (s)'},gridcolor:'#293344'}, yaxis:{title:{text:chart.unit},gridcolor:'#293344',zerolinecolor:'#42516a'},
-        legend:{orientation:'h',y:1.02,yanchor:'bottom',x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
+        legend:{orientation:'h',font:{size:10},y:1.02,yanchor:'bottom',x:1,xanchor:'right'}, hovermode:'x unified', uirevision:data.source
       }, {responsive:true,displaylogo:false});
     }
   } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }

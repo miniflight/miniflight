@@ -10,7 +10,7 @@ PANELS = (
     ("Horizontal speed", "m/s", (("Reference", "speed_ref_m_s"), ("Observed", "speed_m_s"))),
     ("Position error: reference minus observed", "m", (("North", "north_error_m"), ("East", "east_error_m"), ("Down", "down_error_m"))),
     ("Horizontal acceleration request before limits", "m/s²", (("Requested", "acceleration_request_m_s2"), ("Limit", "acceleration_limit_m_s2"))),
-    ("Sent motor requests and native reported outputs", "fraction", (("Minimum", "motor_min"), ("Mean", "motor_mean"), ("Maximum", "motor_max"), ("Reported mean", "motor_reported_mean"))),
+    ("Motor requests and reported mean", "fraction", (("Min", "motor_min"), ("Mean", "motor_mean"), ("Max", "motor_max"), ("Reported", "motor_reported_mean"))),
 )
 DETAIL_PANELS = (
     ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
@@ -26,10 +26,10 @@ def snapshot(observer, samples, source):
     clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
     reference = (metadata.get("reference") or {}).get("duration_s")
     seconds = lambda value: "—" if value is None else f"{value:.3f} s"
-    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
+    return dict(source=f"{source.parent.name}/{source.name}", title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
-                         "Collisions": observer.collisions, "Sent control commands": len(samples)},
+                         "Collisions": observer.collisions, "Commands": len(samples)},
                 charts=chart_data(samples, PANELS, x_label="Reference time (s)") +
                        [dict(chart, detail=True) for chart in chart_data(samples, DETAIL_PANELS, x_label="Reference time (s)")])
 
