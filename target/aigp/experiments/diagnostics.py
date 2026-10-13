@@ -26,10 +26,10 @@ def snapshot(observer, samples, source):
     clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
     reference = (metadata.get("reference") or {}).get("duration_s")
     seconds = lambda value: "—" if value is None else f"{value:.3f} s"
-    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {source.parent.name}/{source.name}",
+    return dict(source=str(source), title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
-                         "Collisions": observer.collisions, "Sent motor commands": len(samples)},
+                         "Collisions": observer.collisions, "Sent control commands": len(samples)},
                 charts=chart_data(samples, PANELS, x_label="Reference time (s)") +
                        [dict(chart, detail=True) for chart in chart_data(samples, DETAIL_PANELS, x_label="Reference time (s)")])
 
@@ -41,7 +41,7 @@ class Observe:
         self.status, self.collisions = {}, 0
 
     def consume(self, row):
-        event = row["event"]
+        event, command = row["event"], row.get("command")
         if event == "config":
             self.metadata = row["metadata"]
         if event == "telemetry" and row["message"]["mavpackettype"] == "COLLISION":
@@ -66,15 +66,22 @@ class Observe:
                     continue
                 self.latest[kind] = (message, packet["received_at"])
             self.pending = row if "signals" in row else None
-        if event != "sent" or row["command"]["kind"] != "MotorControls" or self.pending is None:
+        if event != "sent" or command["kind"] not in ("MotorControls", "BodyRates") or self.pending is None:
             return None
-        if row["command"] != self.pending["command"]:
+        if command["kind"] == "BodyRates" and command["thrust"] == 0:
+            self.pending = None
+            return None
+        if command != self.pending["command"]:
             raise ValueError("sent command has no matching controller update")
         motion, pose_at = self.latest["LOCAL_POSITION_NED"]
         imu, imu_at = self.latest["HIGHRES_IMU"]
         config = self.metadata.get("controller_config", {})
-        sample = quantities(self.pending["signals"], (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
-                            row["command"]["outputs"], row["host_time"]-pose_at, row["host_time"]-imu_at,
+        signals = self.pending["signals"]
+        if command["kind"] == "BodyRates":
+            signals = dict(signals, rate_ref_frd_rad_s=[command[axis + "_rate"] for axis in ("roll", "pitch", "yaw")],
+                           gyro_frd_rad_s=[-imu.xgyro, -imu.ygyro, -imu.zgyro])
+        sample = quantities(signals, (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
+                            command.get("outputs", ()), row["host_time"]-pose_at, row["host_time"]-imu_at,
                             config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
         native = self.latest.get("ACTUATOR_OUTPUT_STATUS")
         values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
@@ -95,7 +102,7 @@ def quantities(signals, position, velocity, motors, pose_age, imu_age, accelerat
                 down_speed_ref_m_s=target_velocity[2], down_speed_m_s=velocity[2],
                 speed_m_s=math.hypot(*velocity[:2]), north_error_m=north_error, east_error_m=east_error, down_error_m=down_error,
                 pitch_ref_rad_s=signals["rate_ref_frd_rad_s"][1], pitch_rad_s=signals["gyro_frd_rad_s"][1],
-                motor_min=min(motors), motor_mean=sum(motors)/len(motors), motor_max=max(motors),
+                motor_min=min(motors, default=None), motor_mean=sum(motors)/len(motors) if motors else None, motor_max=max(motors, default=None),
                 acceleration_request_m_s2=math.hypot(*acceleration[:2]), acceleration_limit_m_s2=acceleration_limit,
                 roll_ref_rad_s=signals["rate_ref_frd_rad_s"][0], roll_rad_s=signals["gyro_frd_rad_s"][0],
                 pose_age_s=pose_age, imu_age_s=imu_age)
