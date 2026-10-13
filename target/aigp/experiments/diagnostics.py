@@ -17,7 +17,7 @@ DETAIL_PANELS = (
     ("Roll rate in FRD", "rad/s", (("Requested", "roll_ref_rad_s"), ("Observed", "roll_rad_s"))),
     ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
-    ("IMU boot time minus pose boot time", "s", (("Timestamp difference", "pose_clock_gap_s"),)),
+    ("Sensor boot time minus pose boot time", "s", (("IMU", "pose_clock_gap_s"), ("Attitude", "attitude_clock_gap_s"))),
 )
 
 
@@ -53,13 +53,13 @@ class Observe:
             for packet in row["telemetry"]:
                 message, = self.decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
                 kind = message.get_type()
-                if kind not in ("LOCAL_POSITION_NED", "HIGHRES_IMU", "ACTUATOR_OUTPUT_STATUS"):
+                if kind not in ("LOCAL_POSITION_NED", "ATTITUDE", "HIGHRES_IMU", "ACTUATOR_OUTPUT_STATUS"):
                     continue
                 previous = self.latest.get(kind)
-                stamp = message.time_boot_ms if kind == "LOCAL_POSITION_NED" else message.time_usec
+                stamp = message.time_boot_ms if kind in ("LOCAL_POSITION_NED", "ATTITUDE") else message.time_usec
                 if previous is not None:
                     old = previous[0]
-                    old_stamp = old.time_boot_ms if kind == "LOCAL_POSITION_NED" else old.time_usec
+                    old_stamp = old.time_boot_ms if kind in ("LOCAL_POSITION_NED", "ATTITUDE") else old.time_usec
                     if stamp < old_stamp or message.to_dict() == old.to_dict() or kind == "HIGHRES_IMU" and stamp == old_stamp:
                         continue
                 if kind == "HIGHRES_IMU" and not all(math.isfinite(v) for v in (message.xacc,message.yacc,message.zacc,message.xgyro,message.ygyro,message.zgyro)):
@@ -80,6 +80,8 @@ class Observe:
         values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
         sample["motor_reported_mean"] = sum(values)/4 if len(values) == 4 and all(math.isfinite(v) for v in values) else None
         sample["pose_clock_gap_s"] = imu.time_usec/1e6 - motion.time_boot_ms/1e3
+        attitude = self.latest.get("ATTITUDE")
+        sample["attitude_clock_gap_s"] = None if attitude is None else (attitude[0].time_boot_ms - motion.time_boot_ms)/1000
         self.pending = None
         return sample
 
