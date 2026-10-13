@@ -14,6 +14,7 @@ PANELS = (
 )
 DETAIL_PANELS = (
     ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
+    ("Roll rate in FRD", "rad/s", (("Requested", "roll_ref_rad_s"), ("Observed", "roll_rad_s"))),
     ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
     ("IMU boot time minus pose boot time", "s", (("Timestamp difference", "pose_clock_gap_s"),)),
@@ -94,4 +95,5 @@ def quantities(signals, position, velocity, motors, pose_age, imu_age, accelerat
                 pitch_ref_rad_s=signals["rate_ref_frd_rad_s"][1], pitch_rad_s=signals["gyro_frd_rad_s"][1],
                 motor_min=min(motors), motor_mean=sum(motors)/len(motors), motor_max=max(motors),
                 acceleration_request_m_s2=math.hypot(*acceleration[:2]), acceleration_limit_m_s2=acceleration_limit,
+                roll_ref_rad_s=signals["rate_ref_frd_rad_s"][0], roll_rad_s=signals["gyro_frd_rad_s"][0],
                 pose_age_s=pose_age, imu_age_s=imu_age)
