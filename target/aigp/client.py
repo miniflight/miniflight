@@ -296,7 +296,7 @@ class _Camera:
         self.frame = None
         self.started_at = 0.0
         self.chunks = {}
-        self.latest = None
+        self.latest = self.jpeg = None
 
     def receive(self, packet: bytes, now: float):
         if len(packet) < self.HEADER.size:
@@ -329,5 +329,6 @@ class _Camera:
             return
         if bgr is not None:
             bgr.flags.writeable = False
+            self.jpeg = jpeg
             self.latest = Frame(frame_id, timestamp, now, bgr)
             return self.latest

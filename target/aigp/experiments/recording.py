@@ -105,13 +105,18 @@ class RecordedController(BaseController[CommandT]):
 
 
 class RecordedClient(SimulatorClient):
-    def __init__(self, record, port=14550, camera_port=5600, course_packets=()):
+    def __init__(self, record, port=14550, camera_port=5600, course_packets=(), preview=None):
         super().__init__(port=port, camera_port=camera_port)
         self.record = record
         self.course_packets = course_packets  # Immutable course traffic retains its original receipt times.
+        self.preview = None if preview is None else Path(preview)
 
     def poll(self, timeout=0.0):
         packets = super().poll(timeout)
+        if self.preview is not None and any(isinstance(packet.decoded, Frame) for packet in packets):
+            temporary = self.preview.with_suffix(".tmp")
+            temporary.write_bytes(self._camera.jpeg)
+            temporary.replace(self.preview)
         if self.connected and self.course_packets:
             course = tuple(Packet(packet.data, packet.received_at, self._receive(packet.data, packet.received_at))
                            for packet in self.course_packets)

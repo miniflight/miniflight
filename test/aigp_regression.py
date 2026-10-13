@@ -74,7 +74,8 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
     result = None
     with recording(trace, metadata) as record:
-        client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets)
+        client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets,
+                                preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader)
         try:
