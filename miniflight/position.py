@@ -71,7 +71,7 @@ def position_control(config: PositionConfig, position: Vector3, velocity: Vector
 
 
 def acceleration_control(config: PositionConfig, acceleration: Vector3,
-                         attitude: Vector3, target_yaw: float) -> BodyRates:
+                         attitude: Vector3, target_yaw: float, *, rate_feedforward: Vector3 = (0, 0, 0)) -> BodyRates:
     """One attitude-feedback update from desired NED acceleration in m/s².
 
     Attitude is roll/pitch/yaw of FRD body axes relative to local NED. Thrust uses
@@ -86,7 +86,7 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
     if config.hover_thrust >= 1 or config.max_acceleration >= GRAVITY or config.max_tilt >= math.pi / 2:
         raise ValueError("hover thrust, acceleration, or tilt exceeds the upright control range")
 
-    vectors = (acceleration, attitude)
+    vectors = (acceleration, attitude, rate_feedforward)
     if any(len(vector) != 3 for vector in vectors):
         raise ValueError("position control requires three-component vectors")
     if not math.isfinite(target_yaw) or not all(math.isfinite(value) for vector in vectors for value in vector):
@@ -112,9 +112,8 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
     yaw_dot = config.attitude_gain * ((target_yaw - yaw + math.pi) % (2 * math.pi) - math.pi)
 
     # Euler angle derivatives are not body rates when the vehicle is tilted.
-    rates = _limit((roll_dot - sp * yaw_dot,
-                    cr * pitch_dot + sr * cp * yaw_dot,
-                    -sr * pitch_dot + cr * cp * yaw_dot), config.max_rate)
+    feedback = (roll_dot - sp * yaw_dot, cr * pitch_dot + sr * cp * yaw_dot, -sr * pitch_dot + cr * cp * yaw_dot)
+    rates = _limit(tuple(f + r for f, r in zip(feedback, rate_feedforward, strict=True)), config.max_rate)
     thrust = config.hover_thrust + (up / vertical - GRAVITY) / config.thrust_acceleration
     if config.thrust_curve is not None:
         linear, quadratic = config.thrust_curve
