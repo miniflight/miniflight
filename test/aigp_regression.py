@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from miniflight import BodyRates
-from miniflight.reference import sample_motion
+from miniflight.reference import sample_motion, sample_values
 from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
@@ -39,11 +39,12 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         with np.load(reference) as data:
             times = data["times"] if "times" in data else None
             trajectory = partial(sample_motion, data["states"], data["acceleration_rates"], float(data["dt"]), times=times)
+            rate_reference = partial(sample_values, data["body_rates"], data["body_rate_times"]) if "body_rates" in data else None
             reference_duration = float(times[-1]) if times is not None else len(data["acceleration_rates"]) * float(data["dt"])
         rate_options = {} if rate_ki is None else dict(ki=rate_ki)
         if rate_kp is not None:
             rate_options["kp"] = rate_kp
-        make = lambda: MotorGates(position=PIDGates(reference=trajectory, config=CONFIG if position_config is None else position_config, ki=integral_gain), **rate_options)
+        make = lambda: MotorGates(position=PIDGates(reference=trajectory, rate_reference=rate_reference, config=CONFIG if position_config is None else position_config, ki=integral_gain), **rate_options)
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0
