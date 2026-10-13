@@ -129,8 +129,13 @@ class RecordedClient(SimulatorClient):
 
     def _receive(self, message, now):
         decoded = super()._receive(message, now)
-        if (message.get_type() in ("COMMAND_ACK", "COLLISION", "HEARTBEAT")
-                and self._telemetry.get(message.get_type()) is message):
+        kind = message.get_type()
+        if kind in ("HIGHRES_IMU", "LOCAL_POSITION_NED", "ATTITUDE"):
+            self.record(event="sensor", kind=kind, received_at=now,
+                        accepted=getattr(message, "_host_received_at", None) == now,
+                        wire=base64.b64encode(message.get_msgbuf()).decode("ascii"))
+        if (kind in ("COMMAND_ACK", "COLLISION", "HEARTBEAT")
+                and self._telemetry.get(kind) is message):
             self.record(event="telemetry", message=message.to_dict())
         return decoded
 

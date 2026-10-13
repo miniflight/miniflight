@@ -47,6 +47,20 @@ def imu(stamp=1000000):
 
 
 class UDPSmokeTest(unittest.TestCase):
+    def test_sensor_receipts_are_recorded_without_controller_updates(self):
+        rows = []
+        client = RecordedClient(lambda **row: rows.append(row), camera_port=None)
+        client.target_ids = (42, 7)
+        invalid = imu(1000002)
+        invalid.xacc = math.nan
+        wires = []
+        for sample, receipt in ((imu(1000001), 10), (imu(1000001), 10.01), (invalid, 10.02)):
+            wires.append(packet(sample))
+            client._receive(sample, receipt)
+        self.assertEqual([row["accepted"] for row in rows], [True, False, False])
+        self.assertEqual([row["received_at"] for row in rows], [10, 10.01, 10.02])
+        self.assertEqual([base64.b64decode(row["wire"]) for row in rows], wires)
+
     def test_native_centers_are_retained_between_race_observations(self):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         path = Path(directory) / "native.jsonl"
