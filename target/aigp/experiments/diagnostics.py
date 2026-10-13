@@ -7,6 +7,10 @@ from miniflight.diagnostics import chart_data
 
 
 PANELS = (
+    ("Roll rate in FRD", "rad/s", (("Requested", "roll_ref_rad_s"), ("Observed", "roll_rad_s"))),
+    ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
+    ("Yaw rate in FRD", "rad/s", (("Requested", "yaw_ref_rad_s"), ("Observed", "yaw_rad_s"))),
+    ("Collective", "fraction", (("Requested", "collective_request"), ("Reported", "motor_reported_mean"))),
     ("Horizontal speed", "m/s", (("Reference", "speed_ref_m_s"), ("Observed", "speed_m_s"))),
     ("Position error: reference minus observed", "m", (("North", "north_error_m"), ("East", "east_error_m"), ("Down", "down_error_m"))),
     ("Horizontal acceleration request before limits", "m/s²", (("Requested", "acceleration_request_m_s2"), ("Limit", "acceleration_limit_m_s2"))),
@@ -14,8 +18,6 @@ PANELS = (
 )
 DETAIL_PANELS = (
     ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
-    ("Roll rate in FRD", "rad/s", (("Requested", "roll_ref_rad_s"), ("Observed", "roll_rad_s"))),
-    ("Pitch rate in FRD", "rad/s", (("Requested", "pitch_ref_rad_s"), ("Observed", "pitch_rad_s"))),
     ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
     ("Sensor boot time minus pose boot time", "s", (("IMU", "pose_clock_gap_s"), ("Attitude", "attitude_clock_gap_s"))),
 )
@@ -86,6 +88,7 @@ class Observe:
         sample = quantities(signals, (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
                             command.get("outputs", ()), row["host_time"]-pose_at, row["host_time"]-imu_at,
                             config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
+        sample["collective_request"] = command.get("thrust", sample["motor_mean"])
         native = self.latest.get("ACTUATOR_OUTPUT_STATUS")
         values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
         sample["motor_reported_mean"] = sum(values)/4 if len(values) == 4 and all(math.isfinite(v) for v in values) else None
@@ -105,6 +108,7 @@ def quantities(signals, position, velocity, motors, pose_age, imu_age, accelerat
                 down_speed_ref_m_s=target_velocity[2], down_speed_m_s=velocity[2],
                 speed_m_s=math.hypot(*velocity[:2]), north_error_m=north_error, east_error_m=east_error, down_error_m=down_error,
                 pitch_ref_rad_s=signals["rate_ref_frd_rad_s"][1], pitch_rad_s=signals["gyro_frd_rad_s"][1],
+                yaw_ref_rad_s=signals["rate_ref_frd_rad_s"][2], yaw_rad_s=signals["gyro_frd_rad_s"][2],
                 motor_min=min(motors, default=None), motor_mean=sum(motors)/len(motors) if motors else None, motor_max=max(motors, default=None),
                 acceleration_request_m_s2=math.hypot(*acceleration[:2]), acceleration_limit_m_s2=acceleration_limit,
                 roll_ref_rad_s=signals["rate_ref_frd_rad_s"][0], roll_rad_s=signals["gyro_frd_rad_s"][0],
