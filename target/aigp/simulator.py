@@ -14,7 +14,7 @@ import sys
 from threading import Event, Lock, Thread
 import time
 
-from miniflight import BodyRates, Motion, Ned
+from miniflight import BodyRates, Motion, Ned, Vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
@@ -45,6 +45,7 @@ class AIGPSimulator:
         self.timeout = timeout
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
+        self.vehicle = Vehicle(self.client)
         self.monitor = Monitor()
         self.monitor_path = Path(monitor_path) if monitor_path is not None else BASE / ".runtime/rollouts" / f"{target}-{time.time_ns()}.png"
         self.status = None
@@ -157,13 +158,12 @@ class AIGPSimulator:
                     return
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
-                if type(command) not in self.client.commands:
-                    raise TypeError(f"unsupported command: {type(command).__name__}")
                 with self._send_lock:
                     if not self.arm_requested:
+                        self.vehicle.validate(command)
                         self.arm_requested = True
-                        self.client.arm()
-                    self.client.send(command)
+                        self.vehicle.arm()
+                    self.vehicle.send(command)
 
             try:
                 run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz)
@@ -211,9 +211,9 @@ class AIGPSimulator:
         self.arm_requested = False
         with self._send_lock:
             try:
-                self.client.send(BodyRates())
+                self.vehicle.send(BodyRates())
             finally:
-                self.client.disarm()
+                self.vehicle.disarm()
 
 
 def main(argv=None):

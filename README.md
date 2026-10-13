@@ -5,6 +5,16 @@ flight simulator. `r1_beautiful` reads privileged position and attitude, compute
 PID feedback, and sends body rates and thrust. VQ1 controls angular rates,
 motor mixing, and physics.
 
+The core spine is [`run(receive, update, send, hz=50)`](miniflight/loop.py).
+`receive(now)` supplies a tuple of controller inputs, or `None` while waiting.
+`update(*inputs)` computes a command; `send(command)` delivers it at the external
+system's supported control boundary. Inputs retain their own timestamps.
+The adapter owns decoding, calibration, freshness checks, startup and shutdown.
+`target/aigp` supplies that edge; the core loop and numerical routines do not import it.
+`Vehicle` is the program-facing surface for reading signals and issuing commands.
+`Target` is the backend boundary to extend for hardware and later code generation;
+compiler lowering is not implemented yet. The live AIGP send path uses `Vehicle`.
+
 Install the [runtime](target/aigp/README.md#setup), then run from the repository root:
 
 ```sh
