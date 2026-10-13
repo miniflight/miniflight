@@ -27,7 +27,7 @@ class Controller(BaseController[MotorControls]):
             kind = message.get_type()
             if kind == "COLLISION":
                 raise RuntimeError("native collision")
-            if kind == "HIGHRES_IMU" and (self.imu is None or message.time_usec > self.imu.time_usec):
+            if kind == "HIGHRES_IMU" and getattr(message, "_host_received_at", None) == packet.received_at:
                 self.imu, self.imu_received_at = message, packet.received_at
             if kind == "COMMAND_ACK" and message.command == mavlink.MAV_CMD_COMPONENT_ARM_DISARM:
                 if message.result != mavlink.MAV_RESULT_ACCEPTED:

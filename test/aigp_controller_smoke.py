@@ -31,6 +31,10 @@ from test.aigp_udp_smoke import imu
 class ControllerSmokeTest(unittest.TestCase):
     def test_motor_integral_uses_imu_time_and_rejects_long_gaps(self):
         controller = MotorController()
+        client = SimulatorClient(camera_port=None)
+        client.target_ids = (0, 0)
+        def arrival(sample, receipt):
+            return Packet(sample, receipt, client._receive(sample, receipt))
         gate = Gate(0, Ned(2, 0, 0), (1, 0, 0, 0), 2, 2)
         track = Packet(mavlink.MAVLink_encapsulated_data_message(0, bytes([2]).ljust(253, b"\0")),
                        10, TrackInfo(7, (gate,)))
@@ -39,25 +43,29 @@ class ControllerSmokeTest(unittest.TestCase):
                            Packet(mavlink.MAVLink_attitude_message(1000, 0, 0, 0, 0, 0, 0), 10)), (), race)
         sample = imu(1000000)
         sample.xgyro = sample.ygyro = sample.zgyro = 0
-        controller.update((Packet(sample, 10),), (), race)
+        controller.update((arrival(sample, 10),), (), race)
         acknowledgement = mavlink.MAVLink_command_ack_message(mavlink.MAV_CMD_COMPONENT_ARM_DISARM, mavlink.MAV_RESULT_ACCEPTED)
         controller.update((Packet(acknowledgement, 10.01),), (), race)
-        controller.update((Packet(sample, 10.015),), (), race)  # A repeated old IMU cannot seed the new clock.
+        controller.update((arrival(sample, 10.015),), (), race)  # A repeated old IMU cannot seed the new clock.
         self.assertIsNone(controller.time)  # The cached IMU predates the arm acknowledgement.
         for stamp, receipt in ((1135000, 10.02), (1155000, 10.04)):
             sample = imu(stamp)
             sample.xgyro = sample.ygyro = sample.zgyro = 0
-            controller.update((Packet(sample, receipt),), (), race)
+            controller.update((arrival(sample, receipt),), (), race)
             if stamp == 1135000:
                 self.assertEqual(controller.integral, (0, 0, 0))  # Never integrate the pre-arm gap.
         integral = controller.integral
         self.assertLess(integral[1], 0)
+        invalid = imu(1156000)
+        invalid.xacc = float("nan")
+        controller.update((arrival(invalid, 10.05),), (), race)
+        self.assertIs(controller.imu, sample)  # A rejected arrival cannot change the PI's sensor history.
         controller.update((), (), race)
         self.assertEqual(controller.integral, integral)
         sample = imu(1456000)
         sample.xgyro = sample.ygyro = sample.zgyro = 0
         with self.assertRaisesRegex(TimeoutError, "IMU cadence"):
-            controller.update((Packet(sample, 10.341),), (), race)
+            controller.update((arrival(sample, 10.341),), (), race)
 
     def test_recorded_pid_signals_expose_requests_before_clipping(self):
         updates, _ = self.flight(PIDController, replace_geometry=True, signals=r1_signals)
