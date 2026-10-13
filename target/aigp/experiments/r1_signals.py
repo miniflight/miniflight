@@ -8,7 +8,7 @@ def r1_signals(controller):
                 position_ref_ned_m=controller.target.v.tolist(),
                 velocity_ref_ned_m_s=controller.target_velocity.v.tolist(),
                 acceleration_ref_ned_m_s2=controller.target_acceleration.v.tolist(),
-                acceleration_request_ned_m_s2=controller.requested_acceleration.v.tolist())
+                acceleration_request_ned_m_s2=list(controller.requested_acceleration))
 
 
 def motor_signals(controller):

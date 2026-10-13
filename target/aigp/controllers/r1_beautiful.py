@@ -28,7 +28,7 @@ class Controller(BaseController[BodyRates]):
         self.rate_reference = rate_reference  # Saved FRD rad/s, sampled on the same reference clock.
         self.reference_time = self.requested_acceleration = None
         self.time = None
-        self.integral = Vector3D()  # Integral contribution, m/s²; bounded by available acceleration.
+        self.integral = (0, 0, 0)  # Integral contribution, m/s²; bounded by available acceleration.
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
@@ -71,7 +71,7 @@ class Controller(BaseController[BodyRates]):
         dt = 0.0 if self.time is None else max(0.0, race_state.time_seconds - self.time)
         self.time = race_state.time_seconds
         acceleration, integral = trajectory_acceleration(
-            position.v, velocity.v, (self.target.v, self.target_velocity.v, self.target_acceleration.v), self.integral.v, dt,
+            position.v, velocity.v, (self.target.v, self.target_velocity.v, self.target_acceleration.v), self.integral, dt,
             kp=self.kp, ki=self.ki, kd=self.kd, integral_limit=self.config.max_acceleration)
         resistance = quadratic_resistance(velocity.v, self.config.resistance_per_m)
         if self.config.body_resistance_per_m is not None:
@@ -80,7 +80,7 @@ class Controller(BaseController[BodyRates]):
             body_resistance = Vector3D(*quadratic_resistance(body_velocity.v, self.config.body_resistance_per_m))
             resistance = rotation.rotate(body_resistance).v
         acceleration = tuple(a + r for a, r in zip(acceleration, resistance, strict=True))
-        self.integral = Vector3D(*integral)
-        self.requested_acceleration = Vector3D(*acceleration)
+        self.integral = integral
+        self.requested_acceleration = acceleration
         feedforward = (0, 0, 0) if self.rate_reference is None else self.rate_reference(self.reference_time)
-        return acceleration_control(self.config, self.requested_acceleration.v, angles, self.target_yaw, rate_feedforward=feedforward)
+        return acceleration_control(self.config, acceleration, angles, self.target_yaw, rate_feedforward=feedforward)

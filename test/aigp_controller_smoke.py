@@ -171,7 +171,7 @@ class ControllerSmokeTest(unittest.TestCase):
             motion = mavlink.MAVLink_local_position_ned_message(5000 + i, north, 0, 0, 0, 0, 0)
             controller.update((Packet(imu(imu_time), receipt), Packet(motion, receipt)), (),
                               replace(race, time_seconds=native_time, received_at=receipt))
-            self.assertEqual(tuple(controller.integral.v), (integral, 0, 0))
+            self.assertEqual(controller.integral, (integral, 0, 0))
         with self.assertRaisesRegex(TimeoutError, "privileged pose is stale"):
             controller.update((), (), replace(race, time_seconds=101, received_at=10.5))
         # Native completion can arrive after the final sensor packet.
