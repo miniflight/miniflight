@@ -112,6 +112,8 @@
     1
   ],
   "force_fit": {
+    "data_source": "Native reported actuator outputs, pose and attitude aligned by their own boot timestamps.",
+    "integration_window_s": 0.5,
     "training": [
       "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/reliable-launch-20261012/arm-clock-30-02.jsonl",
       "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/envelope-10-native/trial-00001.jsonl",
@@ -126,123 +128,43 @@
       "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rates/trial-00001.jsonl",
       "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/pitwall-20261013/body-speed-15-rates/trial-00002.jsonl"
     ],
-    "models": [
-      {
-        "vertical_law": "quadratic",
-        "lag_s": 0,
-        "coefficients": [
-          22.991917337356192,
-          51.97762843873237,
-          0.04961800445829662,
-          0.0414024712379926
-        ],
-        "weighted_train_rmse": 0.0022861161437912228,
-        "heldout_rmse_m_s": [
-          [
-            0.020169661751259435,
-            0.02157940177397658,
-            0.10944894367842509
-          ],
-          [
-            0.1027543665609575,
-            0.009197753476305878,
-            0.1318715100128872
-          ],
-          [
-            0.09847243868675294,
-            0.008308940813839854,
-            0.1182904707746262
-          ],
-          [
-            0.14584029766694342,
-            0.11671086984244798,
-            0.1175832163825876
-          ],
-          [
-            0.3976123547331022,
-            0.1996798561919226,
-            0.1561149612781354
-          ]
-        ]
-      },
-      {
-        "vertical_law": "linear",
-        "lag_s": 0,
-        "coefficients": [
-          27.80512906980466,
-          41.786660347339634,
-          0.049603457567044894,
-          0.4276940906905321
-        ],
-        "weighted_train_rmse": 0.0031343348742408545,
-        "heldout_rmse_m_s": [
-          [
-            0.04230167929132861,
-            0.01967951612505615,
-            0.17128125046217244
-          ],
-          [
-            0.20047533815717591,
-            0.030024720415800687,
-            0.14701891551062257
-          ],
-          [
-            0.1767753115624051,
-            0.02735200367365435,
-            0.12708300628696215
-          ],
-          [
-            0.17408759181728745,
-            0.13864773075964607,
-            0.17455459149468505
-          ],
-          [
-            0.45385700743396,
-            0.215278371398319,
-            0.19577817805541758
-          ]
-        ]
-      },
-      {
-        "vertical_law": "both",
-        "lag_s": 0,
-        "coefficients": [
-          24.329796664961666,
-          49.98155614451528,
-          0.0496018834171634,
-          0.029140946854967365,
-          0.1412147977640108
-        ],
-        "weighted_train_rmse": 0.0020057843687904006,
-        "heldout_rmse_m_s": [
-          [
-            0.014602503635805668,
-            0.01849932098888024,
-            0.05776488863886104
-          ],
-          [
-            0.08880008951420085,
-            0.00792884359984757,
-            0.11294960448851933
-          ],
-          [
-            0.07939612337366997,
-            0.0069003900982386,
-            0.09610331890220847
-          ],
-          [
-            0.15187812401823547,
-            0.12455922546984904,
-            0.13292510980242384
-          ],
-          [
-            0.42182988048486647,
-            0.2056107595594689,
-            0.16426959023042986
-          ]
-        ]
-      }
-    ]
+    "lag_s": 0,
+    "specific_thrust_m_s2": {
+      "linear": 22.991917337356192,
+      "quadratic": 51.97762843873237
+    },
+    "fitted_body_resistance_per_m": {
+      "horizontal": 0.04961800445829662,
+      "vertical": 0.0414024712379926
+    },
+    "heldout_velocity_change_rmse_ned_m_s": [
+      [
+        0.020169661751259435,
+        0.02157940177397658,
+        0.10944894367842509
+      ],
+      [
+        0.1027543665609575,
+        0.009197753476305878,
+        0.1318715100128872
+      ],
+      [
+        0.09847243868675294,
+        0.008308940813839854,
+        0.1182904707746262
+      ],
+      [
+        0.14584029766694342,
+        0.11671086984244798,
+        0.1175832163825876
+      ],
+      [
+        0.3976123547331022,
+        0.1996798561919226,
+        0.1561149612781354
+      ]
+    ],
+    "applied": "Thrust curve and corresponding local hover calibration. Body resistance coefficients retained from the previous fit."
   },
   "generation": {
     "seed": "body-speed-25-dense.npz",
@@ -270,5 +192,25 @@
   "retained_failed_experiments": [
     "body-speed-25-rates",
     "body-speed-25-native-curve"
-  ]
+  ],
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "cleanup_check": {
+    "raw_trace_directory": "target/aigp/.runtime/measurements/pitwall-20261013/sub10-cleanup-check",
+    "runtime_revision": "fe016d16da5ad77db47275226e253e5948be7148",
+    "source_changes": {
+      "test/aigp_regression.py": "7d5f6524e17027d496ab19d72cfd25488153b01473bc41c2a401e50351eca1d4"
+    },
+    "repeat_source_sha256": "173a8de79745922a1fb235f52a4d6f36f573e4c71e21a06d2840b5aaabf8c111",
+    "flight_finish_seconds": [
+      9.889502525,
+      9.866296768,
+      9.793133736
+    ],
+    "reset_requests": [
+      1,
+      2,
+      1
+    ],
+    "replayed_updates": 1953
+  }
 }

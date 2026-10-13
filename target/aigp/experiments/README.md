@@ -90,10 +90,16 @@ with 8,629 updates replayed exactly. Use `test/fixtures/vq1_r1_free_14s.npz` wit
 [record](../../../test/fixtures/vq1_r1_free_14s.validation.json) retains the fit,
 source hashes, all ten timings and reset counts, and earlier failed experiments.
 
+The 9.819-second reference gave ten clean flights in 9.780–9.860 native seconds,
+with six gates, zero collisions and 6,423 updates replayed exactly. The
+[sub-ten record](../../../test/fixtures/vq1_r1_sub10.validation.json) keeps the
+executed settings, source hashes and timings. Its saved body rates use FRD rad/s;
+position, velocity and acceleration use NED metres and seconds.
+
 Start the repeat runner, observer, and local browser server in separate terminals:
 
 ```sh
-python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_free_26s.npz --output target/aigp/.runtime/experiments/pitwall --count 10
+python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_sub10.npz --config test/fixtures/vq1_r1_sub10.config.json --output target/aigp/.runtime/experiments/pitwall --count 10 --render
 python -m target.aigp.experiments.pitwall target/aigp/.runtime/experiments/pitwall/current.json target/aigp/.runtime/experiments/pitwall/view --current
 python -m http.server 8765 --bind 127.0.0.1 --directory target/aigp/.runtime/experiments/pitwall/view
 ```
