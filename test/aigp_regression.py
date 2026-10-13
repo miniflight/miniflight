@@ -44,7 +44,10 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         rate_options = {} if rate_ki is None else dict(ki=rate_ki)
         if rate_kp is not None:
             rate_options["kp"] = rate_kp
-        make = lambda: MotorGates(position=PIDGates(reference=trajectory, rate_reference=rate_reference, config=CONFIG if position_config is None else position_config, ki=integral_gain), **rate_options)
+        config = CONFIG if position_config is None else position_config
+        make = lambda: MotorGates(position=PIDGates(reference=trajectory, rate_reference=rate_reference, config=config,
+                                                 kp=config.position_gain * config.velocity_gain, kd=config.velocity_gain,
+                                                 ki=integral_gain), **rate_options)
         if signals is None:
             signals = lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     timeout = .3 if name == "r1_motors" else 1.0
