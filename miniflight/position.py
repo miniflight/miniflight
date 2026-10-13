@@ -23,6 +23,7 @@ class PositionConfig:
     max_rate: float = .75  # rad/s, body-rate vector magnitude
     resistance_per_m: Vector3 = (0, 0, 0)  # quadratic resistance in the motion frame, 1/m
     body_resistance_per_m: Vector3 | None = None  # optional resistance along FRD body axes, 1/m
+    thrust_curve: tuple[float, float] | None = None  # optional F(u) = linear*u + quadratic*u², m/s²
 
 
 def quadratic_resistance(velocity, coefficients):
@@ -113,4 +114,10 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
                     cr * pitch_dot + sr * cp * yaw_dot,
                     -sr * pitch_dot + cr * cp * yaw_dot), config.max_rate)
     thrust = config.hover_thrust + (up / vertical - GRAVITY) / config.thrust_acceleration
+    if config.thrust_curve is not None:
+        linear, quadratic = config.thrust_curve
+        if not all(math.isfinite(k) and k >= 0 for k in (linear, quadratic)) or linear + quadratic == 0:
+            raise ValueError("thrust curve requires nonnegative finite coefficients and positive force")
+        force = up / vertical
+        thrust = 2 * force / (linear + math.sqrt(linear * linear + 4 * quadratic * force))
     return BodyRates(*rates, max(0.0, min(1.0, thrust)))
