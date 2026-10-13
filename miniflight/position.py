@@ -22,6 +22,7 @@ class PositionConfig:
     max_tilt: float = .35  # radians from vertical
     max_rate: float = .75  # rad/s, body-rate vector magnitude
     resistance_per_m: Vector3 = (0, 0, 0)  # quadratic resistance in the motion frame, 1/m
+    body_resistance_per_m: Vector3 | None = None  # optional resistance along FRD body axes, 1/m
 
 
 def quadratic_resistance(velocity, coefficients):

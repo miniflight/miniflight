@@ -1,6 +1,6 @@
 """Position feedback, attitude feedback, then native body-rate control."""
 
-from common.math import Vector3D
+from common.math import Quaternion, Vector3D
 from miniflight import BodyRates
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance, trajectory_acceleration
 from target.aigp.client import TrackInfo
@@ -73,6 +73,11 @@ class Controller(BaseController[BodyRates]):
             position.v, velocity.v, (self.target.v, self.target_velocity.v, self.target_acceleration.v), self.integral.v, dt,
             kp=self.kp, ki=self.ki, kd=self.kd, integral_limit=self.config.max_acceleration)
         resistance = quadratic_resistance(velocity.v, self.config.resistance_per_m)
+        if self.config.body_resistance_per_m is not None:
+            rotation = Quaternion.from_euler(*angles)  # FRD body -> NED world.
+            body_velocity = rotation.conjugate().rotate(velocity)
+            body_resistance = Vector3D(*quadratic_resistance(body_velocity.v, self.config.body_resistance_per_m))
+            resistance = rotation.rotate(body_resistance).v
         acceleration = tuple(a + r for a, r in zip(acceleration, resistance, strict=True))
         self.integral = Vector3D(*integral)
         self.requested_acceleration = Vector3D(*acceleration)
