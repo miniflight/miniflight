@@ -32,6 +32,16 @@ def fresh_race(path, timeout=120, course_packets=()):
             if client.connected and now >= heartbeat_at:
                 client.heartbeat()
                 heartbeat_at = now + .5
+            for packet in packets:
+                message = packet.data
+                if requested is not None and message.get_type() == "COMMAND_ACK" and message.command == 31000:
+                    if message.result != 0:
+                        raise RuntimeError("native reset request was rejected")
+                    accepted = True
+            for state in states:
+                fresh = None
+                if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds == 0:
+                    fresh = asdict(state)
             if client.connected and states and (requested is None or (not accepted or fresh is None) and now-requested >= 1):
                 if requested is None:
                     before = asdict(states[-1])  # Drain old observations before requesting reset.
@@ -40,18 +50,6 @@ def fresh_race(path, timeout=120, course_packets=()):
                 accepted, fresh = False, None
                 requested = time.monotonic()
                 continue
-            if requested is None:
-                continue
-            for packet in packets:
-                message = packet.data
-                if message.get_type() == "COMMAND_ACK" and message.command == 31000:
-                    if message.result != 0:
-                        raise RuntimeError("native reset request was rejected")
-                    accepted = True
-            for state in states:
-                fresh = None
-                if not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds == 0:
-                    fresh = asdict(state)
             pose = client.telemetry.get("LOCAL_POSITION_NED")
             if (accepted and fresh is not None and pose is not None and pose._host_received_at > requested
                     and (course_packets or client.gates is not None)):

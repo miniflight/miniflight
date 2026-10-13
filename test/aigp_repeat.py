@@ -14,18 +14,21 @@ class ResetTest(unittest.TestCase):
     def test_applied_reset_with_a_lost_ack_is_retried_before_handoff(self):
         self.check_handoff(drop_ack=True)
 
-    def check_handoff(self, drop_ack):
+    def test_arriving_reply_is_processed_before_the_retry_deadline(self):
+        self.check_handoff(drop_ack=False, late=True)
+
+    def check_handoff(self, drop_ack, late=False):
         clock, client, reader = [0.0], Mock(), Mock()
         client.connected, client.gates = True, None
         ack = SimpleNamespace(get_type=lambda: 'COMMAND_ACK', command=31000, result=0)
         def tick():
-            clock[0] += .2
+            clock[0] += .6 if late else .2
             return clock[0]
         def poll(timeout):
             client.telemetry = {'LOCAL_POSITION_NED': SimpleNamespace(x=0, y=0, z=0, vx=0, vy=0, vz=0, _host_received_at=clock[0])}
             return () if drop_ack and client.reset.call_count == 1 else (Packet(ack, clock[0]),)
         def states():
-            fresh = client.reset.call_count >= (1 if drop_ack else 2)
+            fresh = client.reset.call_count >= (1 if drop_ack or late else 2)
             return (NativeRaceState(started=not fresh, valid=True, completed=not fresh,
                     time_seconds=0 if fresh else 25, active_gate_index=0 if fresh else 6,
                     finish_time_seconds=-1 if fresh else 25, received_at=clock[0]),)
@@ -34,7 +37,7 @@ class ResetTest(unittest.TestCase):
              patch('target.aigp.experiments.repeat.RaceStateReader', return_value=reader), \
              patch('target.aigp.experiments.repeat.time.monotonic', side_effect=tick):
             transferred, reset, course = fresh_race('unused', timeout=10, course_packets=('fixed course',))
-        self.assertEqual(reset['requests'], 2)
+        self.assertEqual(reset['requests'], 1 if late else 2)
         self.assertTrue(reset['before']['completed'])
         self.assertFalse(reset['after']['started'])
         self.assertEqual(reset['after']['time_seconds'], 0)
