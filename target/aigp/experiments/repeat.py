@@ -1,6 +1,7 @@
 """Reset the owned native race, then transfer its fresh observation cursor."""
 
 from dataclasses import asdict
+from contextlib import closing
 import argparse
 import json
 import math
@@ -14,18 +15,15 @@ from target.aigp.native import BASE, RaceStateReader, launch, sha256
 from target.aigp.experiments.recording import RecordedClient, read_course, recording
 
 
-def fresh_race(path, record, timeout=120, course_packets=()):
-    reader, client = RaceStateReader(path, .3), RecordedClient(record, camera_port=None)
+def fresh_race(reader, record, timeout=120, course_packets=()):
+    client = RecordedClient(record, camera_port=None)
     requested, accepted, fresh, before, course = None, False, None, None, []
-    packet_counts, reset_requests = {}, 0
+    reset_requests = 0
     deadline, heartbeat_at = time.monotonic() + timeout, 0
     client.open()
     try:
         while time.monotonic() < deadline:
             packets, states = client.poll(.02), reader.poll()
-            for packet in packets:
-                kind = packet.data.get_type()
-                packet_counts[kind] = packet_counts.get(kind, 0) + 1
             course.extend(packet for packet in packets if packet.data.get_type() == "DATA_TRANSMISSION_HANDSHAKE"
                           or packet.data.get_type() == "ENCAPSULATED_DATA" and packet.data.data[0] == 2)
             now = time.monotonic()
@@ -63,10 +61,7 @@ def fresh_race(path, record, timeout=120, course_packets=()):
                     return reader, dict(before=before, after=fresh, requests=reset_requests,
                                         position_ned_m=position, velocity_ned_m_s=velocity), course
         raise TimeoutError(f"native reset stalled: connected={client.connected}, requested={requested is not None}, "
-                           f"accepted={accepted}, fresh={fresh is not None}, packets={packet_counts}")
-    except BaseException:
-        reader.close()
-        raise
+                           f"accepted={accepted}, fresh={fresh is not None}")
     finally:
         client.disconnect()
 
@@ -104,20 +99,20 @@ def main():
     course_packets = () if args.course_recording is None else read_course(args.course_recording)
     simulator_args = () if args.render else ("-RenderOffScreen",)
     print(f"Pitwall source: {output / 'current.json'}", flush=True)
-    with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", simulator_args, attach=args.attach is not None, race_status_path=native_path) as process:
+    with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", simulator_args, attach=args.attach is not None, race_status_path=native_path) as process, closing(RaceStateReader(native_path, .3)) as reader:
         while args.count == 0 or index < args.count:
             index += 1
             trace = output / f"trial-{index:05d}.jsonl"
             row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
                        reference_sha256=reference_hash, harness_sha256=sha256(Path(__file__)), started_at=time.monotonic())
             write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
-            reader, interrupted = None, None
+            interrupted = None
             signal.alarm(210)
             try:
                 if sha256(args.reference) != reference_hash:
                     raise ValueError("reference changed during the experiment")
                 with recording(trace.with_suffix(".reset.jsonl"), row) as record:
-                    reader, reset, course_packets = fresh_race(native_path, record, course_packets=course_packets)
+                    reader, reset, course_packets = fresh_race(reader, record, course_packets=course_packets)
                 row["reset"] = reset
                 result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
@@ -129,8 +124,6 @@ def main():
                     interrupted = error
             finally:
                 signal.alarm(0)
-                if reader is not None:
-                    reader.close()
             row["finished_at"] = time.monotonic()
             ledger.write(json.dumps(row) + "\n")
             print(json.dumps(row), flush=True)
