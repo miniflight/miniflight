@@ -73,6 +73,20 @@ def read_metadata(path):
     return header["metadata"] if header.get("format") in (1, 2, 3) else header
 
 
+def read_course(path):
+    """Recover the immutable native course transfer from a recorded input batch."""
+    decoder = mavlink.MAVLink(None)
+    with Path(path).open() as source:
+        _read_header(source)
+        telemetry = next(row["telemetry"] for row in map(json.loads, source) if row["event"] == "update")
+    packets = []
+    for data in telemetry:
+        message, = decoder.parse_buffer(base64.b64decode(data["wire"], validate=True))
+        if message.get_type() == "DATA_TRANSMISSION_HANDSHAKE" or message.get_type() == "ENCAPSULATED_DATA" and message.data[0] == 2:
+            packets.append(Packet(message, data["received_at"]))
+    return tuple(packets)
+
+
 class RecordedController(BaseController[CommandT]):
     def __init__(self, create, record, frames=False, signals=None):
         self.create, self.record, self.frames = create, record, frames
