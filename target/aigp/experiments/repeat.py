@@ -67,7 +67,7 @@ def fresh_race(reader, record, timeout=120, course_packets=()):
 
 
 def main():
-    from test.aigp_regression import run, stop
+    from target.aigp.experiments.flight import run, stop
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)
     parser.add_argument("--output", type=Path)
