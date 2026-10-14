@@ -132,6 +132,10 @@ class RecordedClient(SimulatorClient):
         super()._set_armed(armed)
         self.record(event="arm_request", armed=armed)
 
+    def reset(self):
+        super().reset()
+        self.record(event="reset_request")
+
     def _receive(self, message, now):
         decoded = super()._receive(message, now)
         kind = message.get_type()
@@ -139,7 +143,7 @@ class RecordedClient(SimulatorClient):
             self.record(event="sensor", kind=kind, received_at=now,
                         accepted=getattr(message, "_host_received_at", None) == now,
                         wire=base64.b64encode(message.get_msgbuf()).decode("ascii"))
-        if (kind in ("COMMAND_ACK", "COLLISION", "HEARTBEAT")
+        if ((kind in ("COMMAND_ACK", "COLLISION", "HEARTBEAT") or kind == "ENCAPSULATED_DATA" and message.data[0] == 1)
                 and self._telemetry.get(kind) is message):
             self.record(event="telemetry", message=message.to_dict())
         return decoded
