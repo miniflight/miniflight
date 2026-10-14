@@ -77,6 +77,7 @@ class RaceStateReader:
         self.gate_centers = ()
 
     def poll(self):
+        initial = self.stream is None
         if self.stream is None:
             try:
                 if time.time() - self.path.stat().st_mtime > self.timeout:
@@ -95,6 +96,8 @@ class RaceStateReader:
             if "gate_centers" in data:
                 self.gate_centers = data["gate_centers"]
                 continue
+            if initial:
+                states.clear()  # Attach to the latest state, not previous race epochs.
             states.append(NativeRaceState(**data, gate_centers=self.gate_centers, received_at=time.monotonic()))
 
     def close(self):
