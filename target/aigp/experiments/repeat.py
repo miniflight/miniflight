@@ -12,6 +12,7 @@ from miniflight.diagnostics import write_snapshot
 from miniflight.position import PositionConfig
 from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, RaceStateReader, launch, sha256
+from target.aigp.experiments.recording import read_course
 
 
 def fresh_race(path, timeout=120, course_packets=()):
@@ -78,12 +79,17 @@ def main():
     parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
     parser.add_argument("--stop-on-failure", action="store_true")
     parser.add_argument("--render", action="store_true", help="show the simulator window")
+    parser.add_argument("--attach", type=Path, help="use this existing race-status file; keep the simulator running")
+    parser.add_argument("--native-pid", type=int, help="record the process ID of the attached simulator")
+    parser.add_argument("--course-recording", type=Path, help="reuse an immutable native course from this recording")
     args = parser.parse_args()
     if args.count < 0:
         parser.error("count must be nonnegative")
+    if (args.attach is None) != (args.native_pid is None) or args.native_pid is not None and args.native_pid <= 0:
+        parser.error("--attach requires a positive --native-pid")
     output = args.output or BASE / ".runtime/experiments" / f"repeat-{time.time_ns()}"
     output.mkdir(parents=True, exist_ok=False)
-    native_path, ledger_path = output / "native.jsonl", output / "trials.jsonl"
+    native_path, ledger_path = args.attach or output / "native.jsonl", output / "trials.jsonl"
     reference_hash = sha256(args.reference)
     position_config = None if args.config is None else PositionConfig(**json.loads(args.config.read_text()))
     def interrupt(signum, frame):
@@ -91,14 +97,15 @@ def main():
     for signum in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, interrupt)
     signal.signal(signal.SIGALRM, stop)
-    index, failures, course_packets = 0, 0, ()
+    index, failures = 0, 0
+    course_packets = () if args.course_recording is None else read_course(args.course_recording)
     simulator_args = () if args.render else ("-RenderOffScreen",)
     print(f"Pitwall source: {output / 'current.json'}", flush=True)
-    with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", simulator_args, race_status_path=native_path) as process:
+    with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", simulator_args, attach=args.attach is not None, race_status_path=native_path) as process:
         while args.count == 0 or index < args.count:
             index += 1
             trace = output / f"trial-{index:05d}.jsonl"
-            row = dict(trial=index, trace=str(trace.resolve()), native_pid=process.pid, native_path=str(native_path.resolve()),
+            row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
                        reference_sha256=reference_hash, started_at=time.monotonic())
             write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
             reader, interrupted = None, None
