@@ -29,7 +29,7 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
@@ -42,6 +42,7 @@ class AIGPSimulator:
         self.controller = None
         self.target = target
         self.hz = hz
+        self.clock = clock
         self.timeout = timeout
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
@@ -85,7 +86,7 @@ class AIGPSimulator:
                         arrivals.put(packets)
                         for state in race_reader.poll():
                             race_arrivals.put(state)
-                        now = time.monotonic()
+                        now = self.clock.monotonic()
                         if self.client.connected and now >= heartbeat_at:
                             with self._send_lock:
                                 self.client.heartbeat()
@@ -102,7 +103,7 @@ class AIGPSimulator:
             receiver.start()
             cleanup.callback(stop_receiver)
             cleanup.callback(self.stop)
-            now = time.monotonic()
+            now = self.clock.monotonic()
             last_imu_at = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
@@ -121,7 +122,7 @@ class AIGPSimulator:
                     self.controller = self.create_controller()
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
-                now = time.monotonic()
+                now = self.clock.monotonic()
                 self.read_race(race_arrivals)
                 for packet in packets:
                     if (not isinstance(packet.data, bytes) and packet.data.get_type() == "HIGHRES_IMU"
@@ -143,10 +144,10 @@ class AIGPSimulator:
                     return None
                 return (tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
                         tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None),
-                        None if self.status is None else replace(self.status, control_time=time.monotonic()))
+                        None if self.status is None else replace(self.status, control_time=self.clock.monotonic()))
 
             def send_command(command):
-                now = time.monotonic()
+                now = self.clock.monotonic()
                 self.read_race(race_arrivals)  # A slow controller cannot hide a new invalidation.
                 if self.status is not None and self.status.completed:
                     raise StopIteration
@@ -168,7 +169,7 @@ class AIGPSimulator:
                     self.vehicle.send(command)
 
             try:
-                run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz)
+                run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz, clock=self.clock)
             except StopIteration:
                 self.read_race(race_arrivals)
                 return self.status if self.status is not None and self.status.completed else None
@@ -204,7 +205,7 @@ class AIGPSimulator:
             if previous is not None and previous.started and (not state.started or state.active_gate_index < previous.active_gate_index):
                 raise RuntimeError("native race reset during control")
         if (self.status is not None and self.status.started
-                and time.monotonic() - self.status.received_at > self.timeout):
+                and self.clock.monotonic() - self.status.received_at > self.timeout):
             raise TimeoutError("native race state is stale")
 
     def stop(self):
