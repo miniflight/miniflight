@@ -41,7 +41,7 @@ def fresh_race(path, record, timeout=120, course_packets=()):
             for state in states:
                 record(event="race", native_race=asdict(state))
                 fresh = None
-                if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds == 0:
+                if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds <= 0:
                     fresh = asdict(state)
             if client.connected and states and (requested is None or (not accepted or fresh is None) and now-requested >= 1):
                 if requested is None:
@@ -52,7 +52,10 @@ def fresh_race(path, record, timeout=120, course_packets=()):
                 requested = time.monotonic()
                 continue
             pose = client.telemetry.get("LOCAL_POSITION_NED")
-            if (accepted and fresh is not None and pose is not None and pose._host_received_at > requested
+            attitude, race = client.telemetry.get("ATTITUDE"), client.race_telemetry
+            if (accepted and fresh is not None and pose is not None and attitude is not None and race is not None
+                    and min(pose._host_received_at, attitude._host_received_at, race.received_at) > requested
+                    and max(pose.time_boot_ms, attitude.time_boot_ms) <= race.sim_boot_time_ms
                     and (course_packets or client.gates is not None)):
                 position, velocity = (pose.x, pose.y, pose.z), (pose.vx, pose.vy, pose.vz)
                 if math.hypot(*position) < .1 and math.hypot(*velocity) < .1:
