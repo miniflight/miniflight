@@ -26,6 +26,13 @@ Training and Qualification event selection is not implemented.
 and thrust. `zero` sends zero thrust.
 
 `r1_motors` adds our rate PI and mixer, then sends four individual motor controls.
+
+![VQ1 R1 flight in 9.819 seconds](media/vq1-sub10.gif)
+
+One recorded `r1_motors` flight: **9.819 s**, six gates, zero collisions, exact
+command and signal replay. Native camera footage plays at normal speed.
+Continuous flight reliability is still being improved.
+
 Run its recorded six-gate verification from the repository root:
 
 ```sh
