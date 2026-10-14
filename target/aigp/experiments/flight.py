@@ -85,6 +85,10 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                    race=None if simulator.status is None else asdict(simulator.status),
                    executable_sha256=sha256(BASE / ".runtime/vq1" / SHIPPING))
 
+    return check(name, trace, result, client, make, camera, record_frames, signals)
+
+
+def check(name, trace, result, client, make, camera, record_frames, signals):
     if result is None or not result.started or not result.valid or not result.completed or result.active_gate_index != 6:
         raise AssertionError("native R1 did not finish all six gates")
     if client.connected or client.gates is None or len(client.gates) != 6:
