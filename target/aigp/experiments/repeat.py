@@ -10,13 +10,12 @@ import time
 
 from miniflight.diagnostics import write_snapshot
 from miniflight.position import PositionConfig
-from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, RaceStateReader, launch, sha256
-from target.aigp.experiments.recording import read_course
+from target.aigp.experiments.recording import RecordedClient, read_course, recording
 
 
-def fresh_race(path, timeout=120, course_packets=()):
-    reader, client = RaceStateReader(path, .3), SimulatorClient(camera_port=None)
+def fresh_race(path, record, timeout=120, course_packets=()):
+    reader, client = RaceStateReader(path, .3), RecordedClient(record, camera_port=None)
     requested, accepted, fresh, before, course = None, False, None, None, []
     packet_counts, reset_requests = {}, 0
     deadline, heartbeat_at = time.monotonic() + timeout, 0
@@ -40,6 +39,7 @@ def fresh_race(path, timeout=120, course_packets=()):
                         raise RuntimeError("native reset request was rejected")
                     accepted = True
             for state in states:
+                record(event="race", native_race=asdict(state))
                 fresh = None
                 if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds == 0:
                     fresh = asdict(state)
@@ -106,14 +106,15 @@ def main():
             index += 1
             trace = output / f"trial-{index:05d}.jsonl"
             row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
-                       reference_sha256=reference_hash, started_at=time.monotonic())
+                       reference_sha256=reference_hash, harness_sha256=sha256(Path(__file__)), started_at=time.monotonic())
             write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
             reader, interrupted = None, None
             signal.alarm(210)
             try:
                 if sha256(args.reference) != reference_hash:
                     raise ValueError("reference changed during the experiment")
-                reader, reset, course_packets = fresh_race(native_path, course_packets=course_packets)
+                with recording(trace.with_suffix(".reset.jsonl"), row) as record:
+                    reader, reset, course_packets = fresh_race(native_path, record, course_packets=course_packets)
                 row["reset"] = reset
                 result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
