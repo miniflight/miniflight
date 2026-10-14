@@ -68,7 +68,8 @@ class AIGPSimulator:
             process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
                                                    race_status_path=self.race_status_path))
             race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
-            cleanup.callback(race_reader.close)
+            if self.race_reader is None:
+                cleanup.callback(race_reader.close)
             arrivals, race_arrivals, stopped = Queue(), Queue(), Event()
             def receive():
                 heartbeat_at = 0.0
