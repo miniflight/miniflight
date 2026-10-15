@@ -167,6 +167,7 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
             if probe.phase != "done":
                 raise RuntimeError("simulator stopped before all probe trials completed")
         finally:
+            sim.save_monitor()
             executable = BASE / ".runtime/vq1" / SHIPPING
             record(event="result", completed=probe.phase == "done", connection_closed=not client.connected,
                    executable_sha256=sha256(executable) if executable.is_file() else None)

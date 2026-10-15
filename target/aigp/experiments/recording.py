@@ -57,7 +57,11 @@ def recording(path, metadata=None):
                 output.write(line)
 
         record(event="config", format=3, metadata={} if metadata is None else metadata)
-        yield record
+        try:
+            yield record
+        except BaseException as error:
+            record(event="error", error={"type": type(error).__name__, "message": str(error)})
+            raise
 
 
 def _read_header(source):

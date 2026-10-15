@@ -59,7 +59,6 @@ class AIGPSimulator:
             raise RuntimeError("create a fresh controller and simulator for each rollout")
         self._used = True
         with ExitStack() as cleanup:
-            cleanup.callback(self.save_monitor)  # Plot only after control, receiver, process and connection stop.
             self.vehicle.bind(self.client)
             cleanup.callback(self.vehicle.disconnect)
             self.vehicle.connect()
@@ -216,7 +215,10 @@ def main(argv=None):
             if not issubclass(controller, BaseController):
                 parser.error("Controller must inherit BaseController")
             sim = AIGPSimulator(controller, args.target or "vq1.r1", hz, startup_timeout=startup_timeout)
-            sim.rollout(attach=args.attach, simulator_args=simulator_args)
+            try:
+                sim.rollout(attach=args.attach, simulator_args=simulator_args)
+            finally:
+                sim.save_monitor()
         else:
             with launch(args.target, simulator_args) as process:
                 status = process.wait()
