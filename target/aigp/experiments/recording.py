@@ -191,6 +191,8 @@ def replay(create, path, signals=None):
                 stamp = packet["received_at"]
                 telemetry.append(Packet(message, stamp, client._receive(message, stamp)))
             frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
+            if frames:
+                client._camera.latest = frames[-1]
             client.packets = tuple(telemetry)
             vehicle.read(timeout=0)
             try:

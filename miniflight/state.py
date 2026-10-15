@@ -32,6 +32,7 @@ class Attitude:
     roll: float  # radians, FRD body relative to local NED
     pitch: float
     yaw: float
+    angular_velocity: tuple[float, float, float] | None = None  # FRD rad/s on this sample's clock.
 
 
 @dataclass(frozen=True)

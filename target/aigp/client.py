@@ -13,7 +13,7 @@ import numpy as np
 from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import BodyRates, Command, Frame, MotorControls, Ned, PositionNed, State, VelocityNed
+from miniflight import Attitude, BodyRates, Command, Frame, Motion, MotorControls, MotorOutputs, Ned, PositionNed, State, VelocityNed
 from target import Target
 from target.aigp.controllers import Gate
 
@@ -68,6 +68,7 @@ class SimulatorClient(Target):
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
+        self._camera = _Camera()
         self.race_telemetry: RaceTelemetry | None = None
 
     @property
@@ -132,8 +133,21 @@ class SimulatorClient(Target):
         else:
             stamp = imu.time_usec * 1e-6
             dt = 0.0 if self.state is None else stamp - self.state.time
+            motion = self._telemetry.get("LOCAL_POSITION_NED")
+            if motion is not None:
+                motion = Motion(motion.time_boot_ms / 1000, motion._host_received_at,
+                                Ned(motion.x, motion.y, motion.z), Ned(motion.vx, motion.vy, motion.vz))
+            attitude = self._telemetry.get("ATTITUDE")
+            if attitude is not None:
+                attitude = Attitude(attitude.time_boot_ms / 1000, attitude._host_received_at,
+                                    attitude.roll, -attitude.pitch, -attitude.yaw,
+                                    (-attitude.rollspeed, -attitude.pitchspeed, -attitude.yawspeed))
+            motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
+            if motors is not None:
+                motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
             self.state = State(stamp, dt, (imu.xacc, imu.yacc, imu.zacc),
-                               (-imu.xgyro, -imu.ygyro, -imu.zgyro), imu._host_received_at)
+                               (-imu.xgyro, -imu.ygyro, -imu.zgyro), imu._host_received_at,
+                               frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors)
         return self.state
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
