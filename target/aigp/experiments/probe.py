@@ -8,7 +8,7 @@ from statistics import fmean, median, pstdev
 
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import BodyRates, PositionNed
+from miniflight import BodyRates, PositionNed, vehicle
 from target.aigp.controllers import BaseController
 from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, read_metadata, recording, replay as replay_controller
 from target.aigp.native import BASE, SHIPPING, sha256
@@ -43,28 +43,24 @@ class Probe(BaseController[BodyRates | PositionNed]):
         self.trial = 0
         self.phase = "settle"
         self.started_at = self.steady_at = None
-        self.telemetry = {}
         self.time = None
         self.dt = 0
-        self.gyro = (0, 0, 0)
 
     def update(self, telemetry, frames, race_state) -> BodyRates | PositionNed | None:
-        for packet in telemetry:
-            self.telemetry[packet.data.get_type()] = packet.data
-        imu, motion, attitude = (self.telemetry.get(kind) for kind in ("HIGHRES_IMU", "LOCAL_POSITION_NED", "ATTITUDE"))
-        if imu is None or motion is None or attitude is None or race_state is None or not race_state.started:
+        state = vehicle.state
+        if state is None or state.time is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started:
             return None
-        stamp = imu.time_usec * 1e-6
+        stamp = state.time
         self.dt = 0 if self.time is None else stamp - self.time
-        self.time, self.gyro = stamp, (-imu.xgyro, -imu.ygyro, -imu.zgyro)
-        position, velocity = (motion.x, motion.y, motion.z), (motion.vx, motion.vy, motion.vz)
+        self.time = stamp
+        position, velocity = state.motion.position, state.motion.velocity
         if self.target is None:
             north, east, down = position
             self.target = PositionNed(north, east, down - 3)
             self.started_at = stamp
         distance = math.dist(position, (self.target.north, self.target.east, self.target.down))
         speed = math.hypot(*velocity)
-        tilt = max(abs(attitude.roll), abs(attitude.pitch))
+        tilt = max(abs(state.attitude.roll), abs(state.attitude.pitch))
 
         if self.phase == "pulse":
             if distance > 2 or speed > 5 or tilt > .5:
@@ -82,7 +78,7 @@ class Probe(BaseController[BodyRates | PositionNed]):
 
         if stamp - self.started_at > 20:
             raise TimeoutError("position hold did not settle within 20 simulator seconds")
-        if distance < .15 and speed < .15 and tilt < .04 and math.hypot(*self.gyro) < .03:
+        if distance < .15 and speed < .15 and tilt < .04 and math.hypot(*state.gyro) < .03:
             if self.steady_at is None:
                 self.steady_at = stamp
             if stamp - self.steady_at >= .6:
@@ -108,7 +104,7 @@ class TrackedProbe(BaseController[BodyRates | PositionNed]):
         if self.record is not None:
             self.record(event="requested", command=command_data(requested))
         if isinstance(requested, BodyRates):
-            return replace(requested, yaw_rate=self.feedback.update(requested.yaw_rate, self.probe.gyro[2], self.probe.dt))
+            return replace(requested, yaw_rate=self.feedback.update(requested.yaw_rate, vehicle.state.gyro[2], self.probe.dt))
         self.feedback.reset()
         return requested
 

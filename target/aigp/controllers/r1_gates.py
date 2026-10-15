@@ -3,7 +3,7 @@
 import math
 
 from common.math import Vector3D
-from miniflight import Ned, PositionNed
+from miniflight import Ned, PositionNed, vehicle
 from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController
 
@@ -27,22 +27,20 @@ class Controller(BaseController[PositionNed]):
 
     def __init__(self):
         self.track = None
-        self.telemetry = {}
         self.gate = None
         self.target = None
 
     def update(self, telemetry, frames, race_state) -> PositionNed | None:
         for packet in telemetry:
-            self.telemetry[packet.data.get_type()] = packet
             if isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
-        pose, imu = self.telemetry.get("LOCAL_POSITION_NED"), self.telemetry.get("HIGHRES_IMU")
-        if (pose is None or imu is None or race_state is None or not race_state.started or self.track is None
+        state = vehicle.state
+        if (state is None or state.motion is None or state.received_at is None or race_state is None or not race_state.started or self.track is None
                 or len(race_state.gate_centers) != len(self.track)):
             return None
-        motion = pose.data
-        position = Vector3D(motion.x, motion.y, motion.z)
-        if imu.received_at - pose.received_at > 1 or not all(math.isfinite(v) for v in (*position.v, motion.vx, motion.vy, motion.vz)):
+        motion = state.motion
+        position = Vector3D(*motion.position)
+        if state.received_at - motion.received_at > 1 or not all(math.isfinite(v) for v in (*position.v, *motion.velocity)):
             return None
         gates, gate_index = self.track, race_state.active_gate_index
         if not 0 <= gate_index <= len(gates):

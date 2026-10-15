@@ -2,7 +2,7 @@
 
 import math
 
-from miniflight import BodyRates
+from miniflight import BodyRates, vehicle
 from miniflight.position import PositionConfig, position_control
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_gates import Controller as GatePlanner
@@ -22,12 +22,11 @@ class Controller(BaseController[BodyRates]):
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         target = self.course.update(telemetry, frames, race_state)
-        attitude = self.course.telemetry.get("ATTITUDE")
-        imu = self.course.telemetry.get("HIGHRES_IMU")
-        if target is None or attitude is None or imu.received_at - attitude.received_at > 1:
+        state = vehicle.state
+        if target is None or state is None or state.attitude is None or state.received_at is None or state.received_at - state.attitude.received_at > 1:
             return None
-        motion, attitude = self.course.telemetry["LOCAL_POSITION_NED"].data, attitude.data
-        angles = (attitude.roll, -attitude.pitch, -attitude.yaw)  # Build-3391 wire → FRD/NED, explicit controller math.
+        motion, attitude = state.motion, state.attitude
+        angles = (attitude.roll, attitude.pitch, attitude.yaw)
         if not all(math.isfinite(v) for v in angles):
             return None
 
@@ -36,6 +35,6 @@ class Controller(BaseController[BodyRates]):
             self.target_yaw = angles[2]
 
         return position_control(
-            self.config, (motion.x, motion.y, motion.z), (motion.vx, motion.vy, motion.vz),
+            self.config, motion.position, motion.velocity,
             angles, (target.north, target.east, target.down), self.target_yaw,
         )
