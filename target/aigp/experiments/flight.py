@@ -1,6 +1,7 @@
 """Run one complete native VQ1 R1 flight and replay its recorded commands."""
 
 import argparse
+from contextlib import ExitStack, closing
 from dataclasses import asdict
 from functools import partial
 import json
@@ -19,9 +20,10 @@ from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
 from target.aigp.controllers.r1_motors import Controller as MotorGates
-from target.aigp.experiments.recording import RecordedClient, RecordedController, command_data, recording, replay
+from target.aigp.experiments.recording import RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
-from target.aigp.native import BASE, SHIPPING, sha256
+from target.aigp.experiments.process_replay import ProcessClient, RaceReader
+from target.aigp.native import BASE, SHIPPING, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
 
 
@@ -29,9 +31,8 @@ CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_be
 ROOT = BASE.parents[1]
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0):
-    camera = camera or record_frames
-    simulator_args = ("-RenderOffScreen",) if offscreen else ()
+def flight_controller(name, reference=None, position_config=None, integral_gain=0.0):
+    signals, reference_duration = None, None
     make = CONTROLLERS[name]
     if reference is not None:
         if name not in ("r1_beautiful", "r1_motors"):
@@ -46,11 +47,19 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         follower = partial(PIDGates, reference=trajectory, rate_reference=rate_reference, config=config,
                            kp=config.position_gain * config.velocity_gain, kd=config.velocity_gain, ki=integral_gain)
         make = (lambda: MotorGates(position=follower())) if name == "r1_motors" else follower
-        if signals is None:
-            signals = r1_signals if name == "r1_beautiful" else lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
-    timeout = .3 if name == "r1_motors" else 1.0
+        signals = r1_signals if name == "r1_beautiful" else lambda controller: {**r1_signals(controller.position), **motor_signals(controller)}
     if name == "r1_motors" and signals is None:
         signals = motor_signals
+    return make, signals, reference_duration
+
+
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0):
+    camera = camera or record_frames
+    simulator_args = ("-RenderOffScreen",) if offscreen else ()
+    reference = None if reference is None else Path(reference)
+    make, default_signals, reference_duration = flight_controller(name, reference, position_config, integral_gain)
+    signals = default_signals if signals is None else signals
+    timeout = .3 if name == "r1_motors" else 1.0
     sources = ("miniflight/rate.py", "miniflight/mixer.py", "target/aigp/__init__.py", "target/aigp/controllers/r1_motors.py",
                "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py", "miniflight/loop.py",
                "miniflight/vehicle.py", "miniflight/replay.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
@@ -58,9 +67,9 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
                "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
-               "target/aigp/experiments/recording.py", "target/aigp/experiments/r1_signals.py", "target/aigp/experiments/flight.py", "test/aigp_regression.py")
+               "target/aigp/experiments/recording.py", "target/aigp/experiments/process_replay.py", "target/aigp/experiments/r1_signals.py", "target/aigp/experiments/flight.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames, attach=attach,
-                    simulator_args=simulator_args,
+                    simulator_args=simulator_args, process="flight" if attach else None,
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
@@ -74,11 +83,14 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
     if race_reader is not None:
         metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
     result = None
-    with recording(trace, metadata) as record:
-        client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets,
+    with recording(trace, metadata) as record, ExitStack() as cleanup:
+        calls = Calls(record)
+        if race_reader is None:
+            race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), timeout)))
+        client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader, clock=Calls(record))
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls)
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:
