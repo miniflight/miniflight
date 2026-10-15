@@ -71,7 +71,7 @@ class AIGPSimulator:
             race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
             if self.race_reader is None:
                 cleanup.callback(race_reader.close)
-            arrivals, race_arrivals, stopped = Queue(), Queue(), Event()
+            arrivals, stopped = Queue(), Event()
             def receive():
                 heartbeat_at = 0.0
                 try:
@@ -84,8 +84,6 @@ class AIGPSimulator:
                                                             Ned(message.x, message.y, message.z),
                                                             Ned(message.vx, message.vy, message.vz)))
                         arrivals.put(packets)
-                        for state in race_reader.poll():
-                            race_arrivals.put(state)
                         now = self.clock.monotonic()
                         if self.client.connected and now >= heartbeat_at:
                             with self._send_lock:
@@ -93,7 +91,6 @@ class AIGPSimulator:
                             heartbeat_at = now + 0.5
                 except BaseException as error:
                     arrivals.put(error)
-                    race_arrivals.put(error)
             receiver = Thread(target=receive, name="aigp-rx")
             def stop_receiver():
                 stopped.set()
@@ -123,7 +120,7 @@ class AIGPSimulator:
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
                 now = self.clock.monotonic()
-                self.read_race(race_arrivals)
+                self.read_race(race_reader.poll())
                 for packet in packets:
                     if (not isinstance(packet.data, bytes) and packet.data.get_type() == "HIGHRES_IMU"
                             and getattr(packet.data, "_host_received_at", None) == packet.received_at):
@@ -148,7 +145,7 @@ class AIGPSimulator:
 
             def send_command(command):
                 now = self.clock.monotonic()
-                self.read_race(race_arrivals)  # A slow controller cannot hide a new invalidation.
+                self.read_race(race_reader.poll())  # A slow controller cannot hide a new invalidation.
                 if self.status is not None and self.status.completed:
                     raise StopIteration
                 if self.status is None or not self.status.started:
@@ -171,7 +168,7 @@ class AIGPSimulator:
             try:
                 run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz, clock=self.clock)
             except StopIteration:
-                self.read_race(race_arrivals)
+                self.read_race(race_reader.poll())
                 return self.status if self.status is not None and self.status.completed else None
 
     def save_monitor(self):
@@ -195,10 +192,7 @@ class AIGPSimulator:
         print(f"Rollout plot: {self.monitor_path}", flush=True)
 
     def read_race(self, arrivals):
-        while not arrivals.empty():
-            state = arrivals.get_nowait()
-            if isinstance(state, BaseException):
-                raise state
+        for state in arrivals:
             previous, self.status = self.status, state
             if not state.valid:
                 raise RuntimeError(f"native race is invalid: {state}")
