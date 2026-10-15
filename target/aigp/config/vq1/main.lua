@@ -3,11 +3,6 @@ local MASTER_OPTIONS = "game=/Script/DCGame.GameModeRaceBase"
 local LIGHTING_LEVEL = "/Game/levels/MAP_anduril_lighting_DAY"
 local TRACK_LEVEL = "/Game/levels/MAP_anduril_track01"
 
--- Results-grid requests can block the native MAVLink reset handler.
-NotifyOnNewObject("/Script/DCGame.HUDRaceBase", function(hud)
-    hud.ResultsScreenWidgetClass = nil
-end)
-
 local stage = 1
 local running = true
 local master_requested = false
@@ -176,6 +171,11 @@ local function advance()
 
         if valid(game_mode) and valid(game_mode.OpponentsPopup) then
             game_mode.OpponentsPopup:ConfirmPopup()
+            local results = controller():GetHUD().ResultsScreen
+            results.ResultGrid:SetIsEnabled(false) -- Pending grid selections block MAVLink reset.
+            results.ResultGridAlt:SetIsEnabled(false)
+            print("[DirectVQ1] results_grids_enabled=" ..
+                tostring(results.ResultGrid:GetIsEnabled() or results.ResultGridAlt:GetIsEnabled()) .. "\n")
             stage = 8
         end
         return
