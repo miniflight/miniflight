@@ -97,9 +97,9 @@ def replay(path):
         def execute():
             nonlocal reset, course
             _, reset, course = fresh_race(RaceReader(calls), lambda **row: None, course_packets=course, client=client, clock=calls)
-    error = None
+    error, returned = None, None
     try:
-        execute()
+        returned = execute()
     except BaseException as exception:
         error = dict(type=type(exception).__name__, message=str(exception))
     calls.finish()
@@ -108,6 +108,8 @@ def replay(path):
     result = (dict(race=None if simulator.status is None else asdict(simulator.status)) if metadata["process"] == "flight"
               else dict(reset=reset, course=[packet_data(packet) for packet in course]))
     result["connection_closed"] = not client.connected
+    if "returned" in expected:
+        result["returned"] = None if returned is None else asdict(returned)
     if error != expected_error or json.loads(json.dumps(result)) != {key: expected[key] for key in result}:
         raise AssertionError(f"process outcome differs: {error}, result={result}")
     return dict(trace=str(path), calls=calls.count, error=error)

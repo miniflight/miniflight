@@ -96,6 +96,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         finally:
             simulator.save_monitor()
             record(event="result", connection_closed=not client.connected,
+                   returned=None if result is None else asdict(result),
                    race=None if simulator.status is None else asdict(simulator.status),
                    executable_sha256=sha256(BASE / ".runtime/vq1" / SHIPPING))
 
