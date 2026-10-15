@@ -1,7 +1,7 @@
 """Record native arrivals and commands; replay the same controller calls."""
 
 import base64
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 import json
 from pathlib import Path
@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import Frame
+from miniflight import Frame, vehicle
 from target.aigp.client import Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT
 from target.aigp.native import TARGETS, NativeRaceState
@@ -163,13 +163,20 @@ class RecordedClient(SimulatorClient):
         return decoded
 
 
+class _ReplayClient(SimulatorClient):
+    def poll(self, timeout=0.0):
+        return self.packets
+
+
 def replay(create, path, signals=None):
     """Replay native-arrival recordings. Older State snapshots use their old API."""
     updates, terminal, controller = 0, False, None
-    decoder, client = mavlink.MAVLink(None), SimulatorClient(camera_port=None)
-    with Path(path).open() as source:
+    decoder, client = mavlink.MAVLink(None), _ReplayClient(camera_port=None)
+    with Path(path).open() as source, ExitStack() as cleanup:
         if _read_header(source).get("format") != 3:
             raise ValueError("older recordings lack native race state; use their recorded controller API")
+        vehicle.bind(client)
+        cleanup.callback(vehicle.disconnect)
         for line in source:
             row = json.loads(line)
             if row["event"] == "init":
@@ -184,6 +191,8 @@ def replay(create, path, signals=None):
                 stamp = packet["received_at"]
                 telemetry.append(Packet(message, stamp, client._receive(message, stamp)))
             frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
+            client.packets = tuple(telemetry)
+            vehicle.read(timeout=0)
             try:
                 race = row["native_race"]
                 command = controller.update(tuple(telemetry), frames, None if race is None else NativeRaceState(**race))

@@ -1,5 +1,6 @@
 """The actual inputs and output of R1's acceleration law, before command limits."""
 
+from miniflight import vehicle
 
 def r1_signals(controller):
     if controller.requested_acceleration is None:
@@ -12,10 +13,10 @@ def r1_signals(controller):
 
 
 def motor_signals(controller):
-    return dict(imu_time_s=controller.imu.time_usec * 1e-6,
+    return dict(imu_time_s=vehicle.state.time,
                 integral_dt_s=controller.integral_dt,
                 rate_ref_frd_rad_s=list(controller.rate_request),
-                gyro_frd_rad_s=list(controller.gyro),
+                gyro_frd_rad_s=list(vehicle.state.gyro),
                 torque_request_frd=list(controller.torque),
                 integral_effort_frd=list(controller.integral),
                 motor_request=list(controller.motor_request))
