@@ -21,6 +21,10 @@ python simulator.py vq2.r2 --controller zero
 Targets select the build and track. Runs use the direct arena.
 Training and Qualification event selection is not implemented.
 
+The VQ1 arena omits the native results screen: its grid callbacks can block
+an ACKed MAVLink reset. The repeat runner still sends command 31000 and waits
+for fresh native race state and pose before starting the next flight.
+
 `r1_gates` flies six gates using the simulator's position control.
 `r1_body_rates` computes position and attitude control, then sends body rates
 and thrust. `zero` sends zero thrust.
