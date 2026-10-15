@@ -14,6 +14,7 @@ import numpy as np
 
 from miniflight import BodyRates
 from miniflight.reference import sample_motion, sample_values
+from miniflight.replay import Calls
 from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
 from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
@@ -52,7 +53,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         signals = motor_signals
     sources = ("miniflight/rate.py", "miniflight/mixer.py", "target/aigp/__init__.py", "target/aigp/controllers/r1_motors.py",
                "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py", "miniflight/loop.py",
-               "miniflight/vehicle.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
+               "miniflight/vehicle.py", "miniflight/replay.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
                "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
                "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
                "target/aigp/client.py", "target/aigp/native.py",
@@ -77,7 +78,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         client = RecordedClient(record, camera_port=5600 if camera else None, course_packets=course_packets,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader)
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=race_reader, clock=Calls(record))
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:
