@@ -13,7 +13,7 @@ The adapter owns decoding, calibration, freshness checks, startup and shutdown.
 `target/aigp` supplies that edge; the core loop and numerical routines do not import it.
 `Vehicle` is the program-facing surface for reading signals and issuing commands.
 `Target` is the backend boundary to extend for hardware and later code generation;
-compiler lowering is not implemented yet. The live AIGP send path uses `Vehicle`.
+compiler lowering is not implemented yet. The live AIGP receive and send paths use `Vehicle`.
 Programs use `from miniflight import vehicle`, then operations such as
 `vehicle.body_rates(...)`. Startup binds one Target; shutdown releases it.
 
@@ -35,8 +35,10 @@ The controller implements `update(telemetry, frames, race_state)`:
 - `frames`: new camera images. Either tuple can be empty.
 - `race_state`: native GO, validity, gate progress, race time, and gate centers.
 
-It retains the observations it needs and returns a command, or `None` while
-waiting for startup input. The streams have separate clocks.
+The runner calls `vehicle.read()` once per tick. Controllers read `vehicle.state`
+and retain only their own control history, such as integrals. The target decodes
+observations and keeps their separate sample clocks. Return a command, or `None`
+while waiting for required startup input.
 `BodyRates` uses forward/right/down axes, rad/s, and collective thrust in [0, 1].
 Position and velocity commands use north/east/down axes, metres, and m/s.
 

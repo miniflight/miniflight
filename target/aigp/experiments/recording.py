@@ -169,7 +169,7 @@ class _ReplayClient(SimulatorClient):
 
 
 def replay(create, path, signals=None):
-    """Replay native-arrival recordings. Older State snapshots use their old API."""
+    """Replay input batches through Vehicle and controller; runtime lifecycle is not replayed."""
     updates, terminal, controller = 0, False, None
     decoder, client = mavlink.MAVLink(None), _ReplayClient(camera_port=None)
     with Path(path).open() as source, ExitStack() as cleanup:

@@ -93,7 +93,7 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
         raise AssertionError("native R1 did not finish all six gates")
     if client.connected or client.gates is None or len(client.gates) != 6:
         raise AssertionError("native R1 did not expose six gates and close its connection")
-    frame = client._camera.latest
+    frame = None if client.state is None else client.state.frame
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")

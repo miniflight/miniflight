@@ -3,16 +3,25 @@
 Write one file in this directory and export `Controller(BaseController)`:
 
 ```python
-from miniflight import BodyRates
+from miniflight import BodyRates, vehicle
 from target.aigp.controllers import BaseController
 
 class Controller(BaseController[BodyRates]):
     def update(self, telemetry, frames, race_state):
+        if vehicle.state is None or vehicle.state.gyro is None:
+            return None
         return BodyRates()
 ```
 
 Run from `target/aigp`: `python simulator.py vq1.r1 --controller mine`.
 The runner constructs `Controller()` after the native heartbeat.
+
+The runner calls `vehicle.read()` once per tick. Read `vehicle.state` in the
+controller: the target supplies accepted IMU, motion, attitude, motor feedback
+and the latest frame. Motion uses NED; angular observations use FRD. Each sample
+retains its own timestamp. Motor channels and image pixels retain reported values.
+Unavailable samples are `None`; `state.time` and `state.dt` belong to the IMU.
+Keep controller history, such as integrals; do not keep another sensor cache.
 
 `telemetry` is an ordered tuple of new `Packet` arrivals from UDP 14550.
 `packet.data` is the original pymavlink message, with full fields, flags and
@@ -33,7 +42,7 @@ retain the published gate packets unchanged.
 `frames` is a tuple of new complete images from UDP 5600. Each has `id`, device
 `time_ns`, host `received_at` and readonly `bgr` (`uint8[height,width,3]`).
 Either tuple may be empty. Each stream keeps its own timing.
-Store history, convert coordinates, and estimate state in the controller.
+Raw arrivals remain available for AIGP course/lifecycle events and recording.
 
 Inputs are delivered before GO and at native finish. Commands are sent only
 after GO with fresh IMU. Return `BodyRates`, `PositionNed`, `VelocityNed`, `MotorControls`, or `None`

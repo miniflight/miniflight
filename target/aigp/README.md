@@ -47,8 +47,9 @@ The check requires six valid gates, no collisions, motor commands throughout
 the flight, and exact command/signal replay. It uses 50 Hz and a 0.3-second IMU
 timeout; the runner sends zero thrust and disarms during cleanup.
 
-Implement `update(telemetry, frames, race_state)` and return a command. Each call receives
-new packets and completed images. The runner handles timing, arming, race finish,
+Implement `update(telemetry, frames, race_state)` and return a command. Read physical
+observations through `vehicle.state`; AIGP events retain their raw packets.
+The runner handles timing, arming, race finish,
 and shutdown. See the [controller interface](controllers/README.md) and
 [packet formats](docs/wiring.md).
 

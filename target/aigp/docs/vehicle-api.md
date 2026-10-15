@@ -204,7 +204,7 @@ standard message fields are defined by [MAVLink](https://mavlink.io/en/messages/
 
 Live VQ1 build-3391 pulses exposed angular sign differences on the wire.
 The adapter negates all three transmitted body rates. Received fields keep their
-wire signs; controllers apply the input mappings needed by their flight routines.
+wire signs; `Vehicle.state` contains the target's FRD/NED observation mapping.
 `SimulatorClient.telemetry` is a read-only view of the latest original MAVLink
 messages, keyed by message name. A held view follows later packets.
 The [measurements and captured regressions](body-rates.md) establish this conversion

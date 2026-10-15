@@ -93,7 +93,8 @@ pilot together.
 The runner constructs `Controller()` after the native heartbeat.
 
 ```python
-packets = client.poll(timeout=...)
+state = vehicle.read(timeout=0)
+packets = client.packets  # Raw AIGP events and recording inputs.
 telemetry = tuple(p for p in packets if not isinstance(p.data, bytes))
 frames = tuple(p.decoded for p in packets if isinstance(p.data, bytes) and p.decoded is not None)
 command = controller.update(telemetry, frames, race_state)
@@ -113,8 +114,8 @@ read once when the track is ready and kept separate from the course packets.
 frame IDs and original device nanosecond timestamps. Empty tuples mean no new
 arrivals. These two ports do not produce synchronized controller steps.
 
-The controller owns retained observations and any coordinate conversion,
-estimation or geometry interpretation. The runner gates commands on native GO,
+The target decodes and selects observations into `vehicle.state`. The controller
+owns its control history and mission geometry. The runner gates commands on native GO,
 valid IMU receipt and native finish. It passes inputs before GO and at finish.
 
 A native VQ1 build-3391 capture on 2026-10-07 received course packets around

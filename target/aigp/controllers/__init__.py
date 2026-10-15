@@ -25,13 +25,14 @@ class Gate:
 class BaseController(Generic[CommandT]):
     def update(self, telemetry: tuple["Packet", ...], frames: tuple[Frame, ...],
                race_state: "NativeRaceState | None") -> CommandT | None:
-        """Return a command from new arrivals since the previous call.
+        """Read vehicle.state and return a command; AIGP events remain available.
 
         telemetry retains ordered MAVLink packets, full fields and source clocks.
         Packet.decoded contains RaceTelemetry, or TrackInfo when its transfer completes.
         Packet.privileged labels native pose and course traffic.
         frames contains newly completed BGR images, each with its own timestamp.
-        Empty tuples mean no new arrivals. The controller owns retained history.
+        Empty tuples mean no new arrivals. Vehicle exposes the accepted samples;
+        the controller owns control history, such as integrals and references.
         Inputs arrive before GO and at finish; the runner gates command sending.
         race_state contains native GO, validity and separately derived mesh centers;
         None means it is unavailable. Published Gate fields remain unchanged.
