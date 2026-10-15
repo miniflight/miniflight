@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 class Target:
     commands: frozenset[type] = frozenset()
+    state: "State | None" = None
 
     def connect(self) -> None:
         raise NotImplementedError
@@ -15,7 +16,8 @@ class Target:
     def disconnect(self) -> None:
         raise NotImplementedError
 
-    def read(self, timeout=1.0) -> "State":
+    def read(self, timeout=1.0) -> "State | None":
+        """Receive observations and publish state; None means no IMU yet."""
         raise NotImplementedError
 
     def send(self, command: "Command") -> None:

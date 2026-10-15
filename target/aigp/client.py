@@ -13,7 +13,8 @@ import numpy as np
 from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
-from miniflight import BodyRates, Command, Frame, MotorControls, Ned, PositionNed, VelocityNed
+from miniflight import BodyRates, Command, Frame, MotorControls, Ned, PositionNed, State, VelocityNed
+from target import Target
 from target.aigp.controllers import Gate
 
 
@@ -55,7 +56,7 @@ class Packet:
                 or kind == "ENCAPSULATED_DATA" and self.data.data[0] == 2)
 
 
-class SimulatorClient:
+class SimulatorClient(Target):
     """Receive native packets and send control commands."""
 
     commands = frozenset((BodyRates, PositionNed, VelocityNed, MotorControls))
@@ -96,6 +97,7 @@ class SimulatorClient:
         if self.connection is not None:
             raise RuntimeError("client is already open")
         self._telemetry.clear()
+        self.state = None
         self._camera = _Camera()
         self._track = _Track()
         self.race_telemetry = None
@@ -121,6 +123,18 @@ class SimulatorClient:
             if sock is not None:
                 sock.close()
         self.connection = self._vision = self.target_ids = None
+
+    def read(self, timeout=1.0):
+        self.packets = self.poll(timeout)
+        imu = self._telemetry.get("HIGHRES_IMU")
+        if imu is None:
+            self.state = None
+        else:
+            stamp = imu.time_usec * 1e-6
+            dt = 0.0 if self.state is None else stamp - self.state.time
+            self.state = State(stamp, dt, (imu.xacc, imu.yacc, imu.zacc),
+                               (-imu.xgyro, -imu.ygyro, -imu.zgyro), imu._host_received_at)
+        return self.state
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
         if self.connection is None:

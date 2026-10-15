@@ -7,38 +7,34 @@ class Vehicle:
 
     def __init__(self, target=None) -> None:
         self._target = target
-        self._state = None
 
     def bind(self, target) -> None:
         """Select the backend once, before running the vehicle program."""
         if self._target is not None:
             raise RuntimeError("vehicle already has a target")
         self._target = target
-        self._state = None
 
     def connect(self) -> None:
         self._target.connect()
-        self._state = None
 
     def disconnect(self) -> None:
         try:
             self._target.disconnect()
         finally:
-            self._target = self._state = None
+            self._target = None
 
     @property
     def state(self) -> State | None:
-        return self._state
+        return None if self._target is None else self._target.state
 
     @property
     def commands(self) -> frozenset[type]:
         return self._target.commands
 
-    def read(self, timeout=1.0) -> State:
+    def read(self, timeout=1.0) -> State | None:
         state = self._target.read(timeout=timeout)
-        if not isinstance(state, State):
-            raise TypeError("target.read() must return State")
-        self._state = state
+        if state is not None and not isinstance(state, State):
+            raise TypeError("target.read() must return State or None")
         return state
 
     def validate(self, command: Command) -> None:
@@ -55,11 +51,11 @@ class Vehicle:
     @property
     def position(self) -> Ned | None:
         """Cached position; call read() to receive another observation."""
-        return self._state.motion.position if self._state and self._state.motion else None
+        return self.state.motion.position if self.state and self.state.motion else None
 
     @property
     def velocity(self) -> Ned | None:
-        return self._state.motion.velocity if self._state and self._state.motion else None
+        return self.state.motion.velocity if self.state and self.state.motion else None
 
     def arm(self) -> None:
         self._target.arm()
