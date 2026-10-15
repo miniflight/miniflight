@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-from miniflight import BodyRates, Motion, Ned, vehicle
+from miniflight import BodyRates, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController
@@ -77,12 +77,8 @@ class AIGPSimulator:
                 nonlocal finish_deadline, heartbeat_at
                 state = self.vehicle.read(timeout=0)
                 packets = self.client.packets
-                for packet in packets:
-                    message = packet.data
-                    if not isinstance(message, bytes) and message.get_type() == "LOCAL_POSITION_NED":
-                        self.monitor.observe(Motion(message.time_boot_ms / 1000, packet.received_at,
-                                                    Ned(message.x, message.y, message.z),
-                                                    Ned(message.vx, message.vy, message.vz)))
+                if state is not None and state.motion is not None and (not self.monitor.motion or state.motion != self.monitor.motion[-1]):
+                    self.monitor.observe(state.motion)
                 if self.client.connected and now >= heartbeat_at:
                     self.client.heartbeat()
                     heartbeat_at = now + .5
@@ -99,7 +95,7 @@ class AIGPSimulator:
                         raise TimeoutError("race never reported GO before the startup deadline")
                 # IMU loss ends control permanently; only native finish can end the wait.
                 if (self.status is not None and self.status.started and not self.status.completed
-                        and finish_deadline is None and state is not None and now - state.received_at >= self.timeout):
+                        and finish_deadline is None and state is not None and state.received_at is not None and now - state.received_at >= self.timeout):
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
                 if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
@@ -118,7 +114,7 @@ class AIGPSimulator:
                     raise StopIteration
                 if self.status is None or not self.status.started:
                     return
-                if command is None or state is None:
+                if command is None or state is None or state.received_at is None:
                     if self.arm_requested:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:

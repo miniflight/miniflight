@@ -33,7 +33,7 @@ class Controller(BaseController[MotorControls]):
                     self.arm_received_at = packet.received_at
         request = self.position.update(telemetry, frames, race_state)
         state = vehicle.state
-        if request is None or state is None:
+        if request is None or state is None or state.time is None:
             return None
         stamp = state.time
         post_arm_sample = self.arm_received_at is not None and state.received_at > self.arm_received_at

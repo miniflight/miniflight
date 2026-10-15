@@ -1,6 +1,6 @@
 """Receive asynchronous AI-GP packets; read observations and encode commands."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import select
 import socket
@@ -54,6 +54,12 @@ class Packet:
         kind = self.data.get_type()
         return (kind in ("ATTITUDE", "LOCAL_POSITION_NED", "ODOMETRY", "DATA_TRANSMISSION_HANDSHAKE")
                 or kind == "ENCAPSULATED_DATA" and self.data.data[0] == 2)
+
+
+def _newer(previous, sample):
+    if previous is None or (sample.time >= previous.time and replace(sample, received_at=previous.received_at) != previous):
+        return sample
+    return previous
 
 
 class SimulatorClient(Target):
@@ -127,27 +133,29 @@ class SimulatorClient(Target):
 
     def read(self, timeout=1.0):
         self.packets = self.poll(timeout)
+        previous = self.state or State()
+        motion, attitude = previous.motion, previous.attitude
+        for packet in self.packets:
+            message = packet.data
+            if isinstance(message, bytes):
+                continue
+            if message.get_type() == "LOCAL_POSITION_NED":
+                motion = _newer(motion, Motion(message.time_boot_ms / 1000, packet.received_at,
+                                               Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz)))
+            if message.get_type() == "ATTITUDE":
+                attitude = _newer(attitude, Attitude(message.time_boot_ms / 1000, packet.received_at,
+                                                     message.roll, -message.pitch, -message.yaw,
+                                                     (-message.rollspeed, -message.pitchspeed, -message.yawspeed)))
+        motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
+        if motors is not None:
+            motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
+        self.state = State(frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors)
         imu = self._telemetry.get("HIGHRES_IMU")
-        if imu is None:
-            self.state = None
-        else:
+        if imu is not None:
             stamp = imu.time_usec * 1e-6
-            dt = 0.0 if self.state is None else stamp - self.state.time
-            motion = self._telemetry.get("LOCAL_POSITION_NED")
-            if motion is not None:
-                motion = Motion(motion.time_boot_ms / 1000, motion._host_received_at,
-                                Ned(motion.x, motion.y, motion.z), Ned(motion.vx, motion.vy, motion.vz))
-            attitude = self._telemetry.get("ATTITUDE")
-            if attitude is not None:
-                attitude = Attitude(attitude.time_boot_ms / 1000, attitude._host_received_at,
-                                    attitude.roll, -attitude.pitch, -attitude.yaw,
-                                    (-attitude.rollspeed, -attitude.pitchspeed, -attitude.yawspeed))
-            motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
-            if motors is not None:
-                motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
-            self.state = State(stamp, dt, (imu.xacc, imu.yacc, imu.zacc),
-                               (-imu.xgyro, -imu.ygyro, -imu.zgyro), imu._host_received_at,
-                               frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors)
+            dt = 0.0 if previous.time is None else stamp - previous.time
+            self.state = replace(self.state, time=stamp, dt=dt, received_at=imu._host_received_at,
+                                 acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro))
         return self.state
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:

@@ -55,18 +55,18 @@ class Frame:
 
 @dataclass(frozen=True)
 class State:
-    """Latest observations at an IMU update, not a synchronized estimate.
+    """Latest accepted observations, each with its own sample clock.
 
     Device time and host receipt time are separate clocks. Each optional sample
     keeps its own timestamp; dt belongs to the returned IMU observations, not to
     every sensor or control stage. Controller memory is not part of this record.
     """
 
-    time: float  # device IMU timestamp in seconds
-    dt: float  # device seconds since the previous read; first read is zero
-    acceleration: tuple[float, float, float]  # reported FRD body acceleration, m/s²
-    gyro: tuple[float, float, float]  # FRD body angular velocity, rad/s
-    received_at: float  # IMU receipt time, host monotonic seconds
+    time: float | None = None  # device IMU timestamp in seconds
+    dt: float = 0.0  # IMU seconds since the previous read; first read is zero
+    acceleration: tuple[float, float, float] | None = None  # reported FRD body acceleration, m/s²
+    gyro: tuple[float, float, float] | None = None  # FRD body angular velocity, rad/s
+    received_at: float | None = None  # IMU receipt time, host monotonic seconds
     frame: Frame | None = None
     motion: Motion | None = None
     attitude: Attitude | None = None

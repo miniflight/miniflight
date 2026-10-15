@@ -17,7 +17,7 @@ class Target:
         raise NotImplementedError
 
     def read(self, timeout=1.0) -> "State | None":
-        """Receive observations and publish state; None means no IMU yet."""
+        """Receive and publish observations; each sample may be unavailable."""
         raise NotImplementedError
 
     def send(self, command: "Command") -> None:

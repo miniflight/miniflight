@@ -2,7 +2,7 @@
 
 import math
 from common.math import Quaternion, Vector3D
-from miniflight import BodyRates
+from miniflight import BodyRates, vehicle
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance, trajectory_acceleration
 from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController
@@ -20,7 +20,6 @@ class Controller(BaseController[BodyRates]):
         self.ki = ki  # 1/s³
         self.kd = kd  # 1/s
         self.exit_distance, self.config = exit_distance, config
-        self.privileged = {}  # Original labelled pose packets, retained between arrivals.
         self.track = self.gate = None
         self.target = self.target_yaw = None
         self.target_velocity = Vector3D()  # NED m/s.
@@ -33,29 +32,21 @@ class Controller(BaseController[BodyRates]):
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
-            kind = packet.data.get_type()
-            if kind in ("LOCAL_POSITION_NED", "ATTITUDE"):
-                previous = self.privileged.get(kind)
-                if previous is not None and (packet.data.time_boot_ms < previous.data.time_boot_ms
-                                             or packet.data.to_dict() == previous.data.to_dict()):
-                    continue
-                self.privileged[kind] = packet
-            elif isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
+            if isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
-        if (len(self.privileged) != 2 or race_state is None or not race_state.started or self.track is None
+        state = vehicle.state
+        if (state is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started or self.track is None
                 or len(race_state.gate_centers) != len(self.track)):
             return None
-        motion, orientation = (self.privileged[kind] for kind in ("LOCAL_POSITION_NED", "ATTITUDE"))
+        motion, orientation = state.motion, state.attitude
         now = race_state.received_at if race_state.control_time is None else race_state.control_time
-        if not race_state.completed and max(now - packet.received_at for packet in (motion, orientation)) > .3:
+        if not race_state.completed and max(now - sample.received_at for sample in (motion, orientation)) > .3:
             raise TimeoutError("privileged pose is stale")
-        motion, orientation = motion.data, orientation.data
-        position = Vector3D(motion.x, motion.y, motion.z)
-        velocity = Vector3D(motion.vx, motion.vy, motion.vz)
-        angles = (orientation.roll, -orientation.pitch, -orientation.yaw)  # Native wire -> FRD/NED.
-        lag = (motion.time_boot_ms - orientation.time_boot_ms) / 1000
-        gyro = (-orientation.rollspeed, -orientation.pitchspeed, -orientation.yawspeed)
-        speed = math.hypot(*gyro)
+        position, velocity = Vector3D(*motion.position), Vector3D(*motion.velocity)
+        angles = (orientation.roll, orientation.pitch, orientation.yaw)
+        lag = round(motion.time - orientation.time, 3)  # Preserve AIGP's millisecond source resolution.
+        gyro = orientation.angular_velocity
+        speed = 0 if gyro is None else math.hypot(*gyro)
         if lag and speed:
             rotation = Quaternion.from_euler(*angles) * Quaternion.from_axis_angle(gyro, speed * lag)
             angles = rotation.to_euler()  # Express attitude on the pose sample clock.
@@ -68,8 +59,8 @@ class Controller(BaseController[BodyRates]):
             self.gate = (index, race_state.gate_centers[index])
         if self.reference is not None:
             if self.reference_start is None:
-                self.reference_start = motion.time_boot_ms / 1000 - race_state.time_seconds
-            self.reference_time = motion.time_boot_ms / 1000 - self.reference_start  # Pose seconds since native GO.
+                self.reference_start = motion.time - race_state.time_seconds
+            self.reference_time = motion.time - self.reference_start  # Pose seconds since native GO.
             self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(self.reference_time))
         if self.target is None:
             return None
