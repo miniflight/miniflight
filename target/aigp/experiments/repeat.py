@@ -43,7 +43,7 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
                 fresh = None
                 if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds <= 0:
                     fresh = asdict(state)
-            if client.connected and states and (requested is None or (not accepted or fresh is None) and now-requested >= 1):
+            if client.connected and states and (requested is None or not accepted and now-requested >= 1):
                 if requested is None:
                     before = asdict(states[-1])  # Drain old observations before requesting reset.
                 client.reset()
