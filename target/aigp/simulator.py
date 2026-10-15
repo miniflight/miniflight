@@ -7,11 +7,9 @@ import importlib
 import json
 import math
 from pathlib import Path
-from queue import Empty, Queue
 import signal
 import subprocess
 import sys
-from threading import Event, Lock, Thread
 import time
 
 from miniflight import BodyRates, Motion, Ned, vehicle
@@ -53,7 +51,6 @@ class AIGPSimulator:
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
         self.race_reader = race_reader
         self.arm_requested = False
-        self._send_lock = Lock()  # One MAVLink encoder serves control and heartbeat.
         self._used = False
 
     def rollout(self, attach=False, simulator_args=()):
@@ -71,50 +68,24 @@ class AIGPSimulator:
             race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
             if self.race_reader is None:
                 cleanup.callback(race_reader.close)
-            arrivals, stopped = Queue(), Event()
-            def receive():
-                heartbeat_at = 0.0
-                try:
-                    while not stopped.is_set():
-                        packets = self.client.poll(timeout=min(self.timeout, 0.1))
-                        for packet in packets:
-                            message = packet.data
-                            if not isinstance(message, bytes) and message.get_type() == "LOCAL_POSITION_NED":
-                                self.monitor.observe(Motion(message.time_boot_ms / 1000, packet.received_at,
-                                                            Ned(message.x, message.y, message.z),
-                                                            Ned(message.vx, message.vy, message.vz)))
-                        arrivals.put(packets)
-                        now = self.clock.monotonic()
-                        if self.client.connected and now >= heartbeat_at:
-                            with self._send_lock:
-                                self.client.heartbeat()
-                            heartbeat_at = now + 0.5
-                except BaseException as error:
-                    arrivals.put(error)
-            receiver = Thread(target=receive, name="aigp-rx")
-            def stop_receiver():
-                stopped.set()
-                receiver.join(timeout=2)
-                if receiver.is_alive():
-                    raise RuntimeError("native receiver did not stop")
-            receiver.start()
-            cleanup.callback(stop_receiver)
             cleanup.callback(self.stop)
             now = self.clock.monotonic()
+            heartbeat_at = 0.0
             last_imu_at = None
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
             def read_signals(now):
-                nonlocal last_imu_at, finish_deadline
-                packets = []
-                while True:
-                    try:
-                        arrival = arrivals.get_nowait()
-                    except Empty:
-                        break
-                    if isinstance(arrival, BaseException):
-                        raise arrival
-                    packets.extend(arrival)
+                nonlocal last_imu_at, finish_deadline, heartbeat_at
+                packets = self.client.poll()
+                for packet in packets:
+                    message = packet.data
+                    if not isinstance(message, bytes) and message.get_type() == "LOCAL_POSITION_NED":
+                        self.monitor.observe(Motion(message.time_boot_ms / 1000, packet.received_at,
+                                                    Ned(message.x, message.y, message.z),
+                                                    Ned(message.vx, message.vy, message.vz)))
+                if self.client.connected and now >= heartbeat_at:
+                    self.client.heartbeat()
+                    heartbeat_at = now + .5
                 if self.controller is None and self.client.connected:
                     self.controller = self.create_controller()
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
@@ -158,12 +129,11 @@ class AIGPSimulator:
                     return
                 if now - last_imu_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
-                with self._send_lock:
-                    if not self.arm_requested:
-                        self.vehicle.validate(command)
-                        self.arm_requested = True
-                        self.vehicle.arm()
-                    self.vehicle.send(command)
+                if not self.arm_requested:
+                    self.vehicle.validate(command)
+                    self.arm_requested = True
+                    self.vehicle.arm()
+                self.vehicle.send(command)
 
             try:
                 run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz, clock=self.clock)
@@ -206,11 +176,10 @@ class AIGPSimulator:
         if not self.arm_requested:
             return
         self.arm_requested = False
-        with self._send_lock:
-            try:
-                self.vehicle.send(BodyRates())
-            finally:
-                self.vehicle.disarm()
+        try:
+            self.vehicle.send(BodyRates())
+        finally:
+            self.vehicle.disarm()
 
 
 def main(argv=None):
