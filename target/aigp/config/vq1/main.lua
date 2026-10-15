@@ -3,6 +3,11 @@ local MASTER_OPTIONS = "game=/Script/DCGame.GameModeRaceBase"
 local LIGHTING_LEVEL = "/Game/levels/MAP_anduril_lighting_DAY"
 local TRACK_LEVEL = "/Game/levels/MAP_anduril_track01"
 
+-- Results-grid requests can block the native MAVLink reset handler.
+NotifyOnNewObject("/Script/DCGame.HUDRaceBase", function(hud)
+    hud.ResultsScreenWidgetClass = nil
+end)
+
 local stage = 1
 local running = true
 local master_requested = false
