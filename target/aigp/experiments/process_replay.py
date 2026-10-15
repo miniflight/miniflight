@@ -72,34 +72,44 @@ class RaceReader:
 
 def replay(path):
     from target.aigp.experiments.flight import flight_controller
+    from target.aigp.experiments.repeat import fresh_race
     from target.aigp.simulator import AIGPSimulator
     path = Path(path)
     metadata = read_metadata(path)
-    if metadata.get("process") != "flight":
-        raise ValueError("full replay needs a process recording from an attached flight")
-    reference = metadata["reference"]
-    if reference is not None and sha256(Path(reference["path"])) != reference["sha256"]:
-        raise ValueError("recorded reference changed")
-    make, _, _ = flight_controller(metadata["controller"], None if reference is None else reference["path"],
-                                   None if "controller_config" not in metadata else PositionConfig(**metadata["controller_config"]),
-                                   metadata.get("trajectory_pid", {}).get("ki", 0.0))
+    if metadata.get("process") not in ("flight", "reset"):
+        raise ValueError("full replay needs a process recording from an attached flight or reset")
     with path.open() as source:
         rows = [json.loads(line) for line in source]
     calls = Calls(rows=(row for row in rows if row["event"] == "call"))
-    client = ProcessClient(calls, camera_port=5600 if metadata["camera"] else None)
-    simulator = AIGPSimulator(make, metadata["target"], hz=metadata["hz"], timeout=metadata["timeout"],
-                              client=client, race_reader=RaceReader(calls), clock=calls)
+    client = ProcessClient(calls, camera_port=5600 if metadata.get("camera") else None)
+    if metadata["process"] == "flight":
+        reference = metadata["reference"]
+        if reference is not None and sha256(Path(reference["path"])) != reference["sha256"]:
+            raise ValueError("recorded reference changed")
+        make, _, _ = flight_controller(metadata["controller"], None if reference is None else reference["path"],
+                                       None if "controller_config" not in metadata else PositionConfig(**metadata["controller_config"]),
+                                       metadata.get("trajectory_pid", {}).get("ki", 0.0))
+        simulator = AIGPSimulator(make, metadata["target"], hz=metadata["hz"], timeout=metadata["timeout"],
+                                  client=client, race_reader=RaceReader(calls), clock=calls)
+        execute = lambda: simulator.rollout(attach=True)
+    else:
+        reset, course = None, tuple(client.receive(packet) for packet in metadata["course"])
+        def execute():
+            nonlocal reset, course
+            _, reset, course = fresh_race(RaceReader(calls), lambda **row: None, course_packets=course, client=client, clock=calls)
     error = None
     try:
-        simulator.rollout(attach=True)
+        execute()
     except BaseException as exception:
         error = dict(type=type(exception).__name__, message=str(exception))
     calls.finish()
     expected_error = next((row["error"] for row in rows if row["event"] == "error"), None)
-    result = next(row for row in rows if row["event"] == "result")
-    race = None if simulator.status is None else json.loads(json.dumps(asdict(simulator.status)))
-    if (error, race, not client.connected) != (expected_error, result["race"], result["connection_closed"]):
-        raise AssertionError(f"process outcome differs: {error}, race={race}, connected={client.connected}")
+    expected = next(row for row in rows if row["event"] == "result")
+    result = (dict(race=None if simulator.status is None else asdict(simulator.status)) if metadata["process"] == "flight"
+              else dict(reset=reset, course=[packet_data(packet) for packet in course]))
+    result["connection_closed"] = not client.connected
+    if error != expected_error or json.loads(json.dumps(result)) != {key: expected[key] for key in result}:
+        raise AssertionError(f"process outcome differs: {error}, result={result}")
     return dict(trace=str(path), calls=calls.count, error=error)
 
 

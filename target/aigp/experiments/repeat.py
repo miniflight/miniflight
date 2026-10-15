@@ -11,22 +11,24 @@ import time
 
 from miniflight.diagnostics import write_snapshot
 from miniflight.position import PositionConfig
+from miniflight.replay import Calls
 from target.aigp.native import BASE, RaceStateReader, launch, sha256
 from target.aigp.experiments.recording import RecordedClient, read_course, recording
+from target.aigp.experiments.process_replay import ProcessClient, RaceReader, packet_data, replay
 
 
-def fresh_race(reader, record, timeout=120, course_packets=()):
-    client = RecordedClient(record, camera_port=None)
+def fresh_race(reader, record, timeout=120, course_packets=(), client=None, clock=time):
+    client = RecordedClient(record, camera_port=None) if client is None else client
     requested, accepted, fresh, before, course = None, False, None, None, []
     reset_requests = 0
-    deadline, heartbeat_at = time.monotonic() + timeout, 0
+    deadline, heartbeat_at = clock.monotonic() + timeout, 0
     client.open()
     try:
-        while time.monotonic() < deadline:
+        while clock.monotonic() < deadline:
             packets, states = client.poll(.02), reader.poll()
             course.extend(packet for packet in packets if packet.data.get_type() == "DATA_TRANSMISSION_HANDSHAKE"
                           or packet.data.get_type() == "ENCAPSULATED_DATA" and packet.data.data[0] == 2)
-            now = time.monotonic()
+            now = clock.monotonic()
             if client.connected and now >= heartbeat_at:
                 client.heartbeat()
                 heartbeat_at = now + .5
@@ -47,7 +49,7 @@ def fresh_race(reader, record, timeout=120, course_packets=()):
                 client.reset()
                 reset_requests += 1
                 accepted, fresh = False, None
-                requested = time.monotonic()
+                requested = clock.monotonic()
                 continue
             pose = client.telemetry.get("LOCAL_POSITION_NED")
             attitude, race = client.telemetry.get("ATTITUDE"), client.race_telemetry
@@ -111,8 +113,13 @@ def main():
             try:
                 if sha256(args.reference) != reference_hash:
                     raise ValueError("reference changed during the experiment")
-                with recording(trace.with_suffix(".reset.jsonl"), row) as record:
-                    reader, reset, course_packets = fresh_race(reader, record, course_packets=course_packets)
+                with recording(trace.with_suffix(".reset.jsonl"), dict(row, process="reset", course=[packet_data(packet) for packet in course_packets])) as record:
+                    calls, reset = Calls(record), None
+                    client = ProcessClient(calls, camera_port=None)
+                    try:
+                        _, reset, course_packets = fresh_race(RaceReader(calls, reader), record, course_packets=course_packets, client=client, clock=calls)
+                    finally:
+                        record(event="result", reset=reset, course=[packet_data(packet) for packet in course_packets], connection_closed=not client.connected)
                 row["reset"] = reset
                 result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
@@ -124,6 +131,11 @@ def main():
                     interrupted = error
             finally:
                 signal.alarm(0)
+            try:
+                row["replay"] = [replay(path) for path in (trace.with_suffix(".reset.jsonl"), trace) if path.exists()]
+            except BaseException as error:
+                row.update(passed=False, replay_error=dict(type=type(error).__name__, message=str(error)))
+                interrupted = interrupted or error
             row["finished_at"] = time.monotonic()
             ledger.write(json.dumps(row) + "\n")
             print(json.dumps(row), flush=True)
