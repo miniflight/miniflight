@@ -128,6 +128,29 @@ rate loop. See [yaw tracking](../docs/yaw-tracking.md) for measurements and limi
 
 ## recording and replay
 
+The repeat runner records and replays each reset and attached flight, including
+failed attempts. `miniflight.replay.Calls` checks external call order, arguments,
+results and errors, and supplies the recorded clock. AIGP packet codecs and race
+observations stay in `target/aigp/experiments/process_replay.py`.
+
+Replay executes the existing `fresh_race()` and `AIGPSimulator.rollout()` functions.
+The flight still uses `Vehicle.read()` to construct observations and
+`Vehicle.send()` to validate commands. It checks heartbeat, reset, arm, command,
+disconnect and terminal outcomes. Camera input retains the native JPEG datagrams.
+No sockets are opened and no simulator is launched during replay:
+
+```sh
+python -m target.aigp.experiments.process_replay path/to/trial-00001.reset.jsonl path/to/trial-00001.jsonl
+```
+
+Commands are compared at the Target interface, before MAVLink encoding. The
+native physics and launcher are outside this replay. A reproduced crash is a
+matched failure, not a successful flight. The repeat runner keeps that failure
+in its ledger and stops on a replay mismatch.
+
+Older recordings lack complete clock and receive boundaries. They support the
+controller replay below, not exact replay of the original runtime or reset.
+
 `recording.py` can record any controller's inputs and returned commands. It does
 not change the simulator or controller interface:
 

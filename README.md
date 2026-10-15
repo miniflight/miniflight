@@ -13,7 +13,8 @@ The adapter owns decoding, calibration, freshness checks, startup and shutdown.
 `target/aigp` supplies that edge; the core loop and numerical routines do not import it.
 `Vehicle` is the program-facing surface for reading signals and issuing commands.
 `Target` is the backend boundary to extend for hardware and later code generation;
-compiler lowering is not implemented yet. The live AIGP receive and send paths use `Vehicle`.
+compiler lowering is not implemented yet. Live AIGP flights and process replay
+use the same `Vehicle` receive and send path.
 Programs use `from miniflight import vehicle`, then operations such as
 `vehicle.body_rates(...)`. Startup binds one Target; shutdown releases it.
 
