@@ -73,9 +73,10 @@ active fields and mask; zero-valued coordinates remain active requests.
 `BodyRates` uses the attitude-target encoder. Masks and frame conversions stay
 inside the adapter; `BaseController.update` returns the original command values.
 
-`MotorControls` contains immutable outputs in target motor order. AIGP requires
-exactly four nonreversing values in [0, 1]. The adapter pads the remaining four
-wire channels with zeros. These values are normalized controls, not RPM.
+`MotorControls` defines nonreversing normalized commands in [0, 1], in target
+motor order. This is a command contract, not a measured native force limit.
+AIGP uses four outputs; the adapter pads the remaining wire channels with zeros.
+These values are not RPM.
 
 The pure [`mix`](../../../miniflight/mixer.py) function takes collective thrust,
 three normalized FRD torque efforts, and an airframe coefficient matrix:
@@ -90,8 +91,9 @@ command = MotorControls(requested)
 ```
 
 This is a small roll-torque request, not a roll-rate setpoint. `mix` preserves
-outputs outside [0, 1]; `MotorControls` rejects them. A saturation policy must
-resolve such requests explicitly. No force-to-RPM calibration is implied.
+raw requests. `r1_motors` shifts collective into [0, 1], retaining requested motor
+differences. Raw requests and sent commands are recorded separately. A motor
+range wider than 1 still cannot fit. No force-to-RPM calibration is implied.
 [`rate_control`](../../../miniflight/rate.py) supplies PI rate feedback. It takes
 FRD rate error and elapsed device time, returning torque effort and the next
 integral state. [`r1_motors`](../controllers/r1_motors.py) owns that state and
