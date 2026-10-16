@@ -78,9 +78,15 @@ def replay(path):
     metadata = read_metadata(path)
     if metadata.get("process") not in ("flight", "reset"):
         raise ValueError("full replay needs a process recording from an attached flight or reset")
-    with path.open() as source:
-        rows = [json.loads(line) for line in source]
-    calls = Calls(rows=(row for row in rows if row["event"] == "call"))
+    outcome = {}
+    def recorded_calls():
+        with path.open() as source:
+            for row in map(json.loads, source):
+                if row["event"] == "call":
+                    yield row
+                elif row["event"] in ("result", "error"):
+                    outcome.setdefault(row["event"], row)
+    calls = Calls(rows=recorded_calls())
     client = ProcessClient(calls, camera_port=5600 if metadata.get("camera") else None)
     if metadata["process"] == "flight":
         reference = metadata["reference"]
@@ -103,8 +109,8 @@ def replay(path):
     except BaseException as exception:
         error = dict(type=type(exception).__name__, message=str(exception))
     calls.finish()
-    expected_error = next((row["error"] for row in rows if row["event"] == "error"), None)
-    expected = next(row for row in rows if row["event"] == "result")
+    expected_error = outcome.get("error", {}).get("error")
+    expected = outcome["result"]
     result = (dict(race=None if simulator.status is None else asdict(simulator.status)) if metadata["process"] == "flight"
               else dict(reset=reset, course=[packet_data(packet) for packet in course]))
     result["connection_closed"] = not client.connected
