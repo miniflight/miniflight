@@ -18,7 +18,7 @@ class Controller(BaseController[MotorControls]):
         self.arm_received_at = None
         self.kp, self.ki = kp, ki
         self.integral, self.time = (0, 0, 0), None
-        self.rate_request = self.torque = self.motor_request = None
+        self.gyro = self.rate_request = self.torque = self.motor_request = None
 
     def update(self, telemetry, frames, race_state) -> MotorControls | None:
         for packet in telemetry:
@@ -35,14 +35,17 @@ class Controller(BaseController[MotorControls]):
         state = vehicle.state
         if request is None or state is None or state.time is None:
             return None
-        stamp = state.time
-        post_arm_sample = self.arm_received_at is not None and state.received_at > self.arm_received_at
+        stamp, received_at, self.gyro = state.time, state.received_at, state.gyro
+        attitude = state.attitude
+        if attitude is not None and attitude.angular_velocity is not None and attitude.time > stamp:
+            stamp, received_at, self.gyro = attitude.time, attitude.received_at, attitude.angular_velocity
+        post_arm_sample = self.arm_received_at is not None and received_at > self.arm_received_at
         dt = 0 if self.time is None or not post_arm_sample else stamp - self.time
         self.integral_dt = dt
         if dt > .3:
-            raise TimeoutError("rate feedback lost its IMU cadence")
+            raise TimeoutError("rate feedback lost its cadence")
         self.rate_request = (request.roll_rate, request.pitch_rate, request.yaw_rate)
-        self.torque, integral = rate_control(self.kp, self.ki, self.integral, self.rate_request, state.gyro, dt)
+        self.torque, integral = rate_control(self.kp, self.ki, self.integral, self.rate_request, self.gyro, dt)
         self.motor_request = mix(request.thrust, self.torque, MOTOR_MIX)
         command = MotorControls(self.motor_request)
         self.integral, self.time = integral, stamp if post_arm_sample else None

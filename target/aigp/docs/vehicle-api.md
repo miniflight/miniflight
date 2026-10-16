@@ -100,9 +100,11 @@ integral state. [`r1_motors`](../controllers/r1_motors.py) owns that state and
 feeds the result through `mix` and `MotorControls`. Real STM32 sensor/ESC drivers
 remain to be built.
 
-The rate integral starts from the first new IMU sample received after the native
-arm acknowledgement. Pre-arm sample gaps and repeated samples cannot advance
-that clock. Recorded signals retain both the raw IMU time and the integral's dt.
+The rate loop uses the newest gyro sample from `HIGHRES_IMU` or `ATTITUDE`, with
+that sample's device time. Integration starts after the native arm acknowledgement;
+pre-arm gaps and repeated samples cannot advance it. Recorded signals retain the
+IMU time, feedback time, selected gyro and integral dt. Fresher attitude feedback
+is never projected backward to an older pose timestamp.
 
 ## source boundary
 

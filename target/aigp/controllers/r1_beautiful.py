@@ -47,9 +47,9 @@ class Controller(BaseController[BodyRates]):
         lag = round(motion.time - orientation.time, 3)  # Preserve AIGP's millisecond source resolution.
         gyro = orientation.angular_velocity
         speed = 0 if gyro is None else math.hypot(*gyro)
-        if lag and speed:
+        if lag > 0 and speed:
             rotation = Quaternion.from_euler(*angles) * Quaternion.from_axis_angle(gyro, speed * lag)
-            angles = rotation.to_euler()  # Express attitude on the pose sample clock.
+            angles = rotation.to_euler()  # Advance older attitude; never rewind fresher feedback.
 
         index = race_state.active_gate_index
         if not 0 <= index <= len(self.track):
