@@ -98,12 +98,12 @@ def acceleration_control(config: PositionConfig, acceleration: Vector3,
 
     roll, pitch, yaw = attitude
     sr, cr, sp, cp = math.sin(roll), math.cos(roll), math.sin(pitch), math.cos(pitch)
-    sy, cy = math.sin(yaw), math.cos(yaw)
+    sy, cy = math.sin(target_yaw), math.cos(target_yaw)
     vertical = cr * cp
     if vertical <= 0:
         raise ValueError("position control requires an upright vehicle")
 
-    # Express the desired thrust direction in the current heading frame.
+    # Express the desired thrust direction in the commanded heading frame.
     forward, right = cy * north + sy * east, -sy * north + cy * east
     desired_roll = math.atan2(right, math.hypot(up, forward))
     desired_pitch = math.atan2(-forward, up)
