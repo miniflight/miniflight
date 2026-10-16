@@ -8,7 +8,7 @@ def mix(collective, torque, coefficients):
 
     Torque is normalized control effort, not angular rate or N m. Its scale
     and motor order belong to the supplied airframe matrix. Outputs are not
-    clipped: the caller must resolve saturation before sending MotorControls.
+    clipped; the target defines the actuator response and limits.
     """
     request = (collective, *torque)
     rows = tuple(tuple(row) for row in coefficients)

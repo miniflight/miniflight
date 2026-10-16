@@ -44,8 +44,6 @@ class Controller(BaseController[MotorControls]):
         self.rate_request = (request.roll_rate, request.pitch_rate, request.yaw_rate)
         self.torque, integral = rate_control(self.kp, self.ki, self.integral, self.rate_request, state.gyro, dt)
         self.motor_request = mix(request.thrust, self.torque, MOTOR_MIX)
-        # Shift collective into the command range, retaining requested motor differences.
-        shift = max(-min(self.motor_request), min(0.0, 1.0 - max(self.motor_request)))
-        command = MotorControls(tuple(output + shift for output in self.motor_request))
+        command = MotorControls(self.motor_request)
         self.integral, self.time = integral, stamp if post_arm_sample else None
         return command

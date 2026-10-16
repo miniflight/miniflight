@@ -39,7 +39,7 @@ run on 2026-10-08. The PDF's two named messages omit the direct actuator message
 | Acceleration, m/s² NED; force, N | same | 3135; force 3647 | raw |
 | Attitude, wxyz quaternion, and thrust 0–1 | `SET_ATTITUDE_TARGET` (82) | 7 | raw |
 | Body rates and thrust 0–1 | same | 144 for native rad/s | `BodyRates`, FRD conversion |
-| Four direct motor controls, 0–1 | `SET_ACTUATOR_CONTROL_TARGET` (139) | none | `MotorControls` |
+| Four direct motor inputs, native scale | `SET_ACTUATOR_CONTROL_TARGET` (139) | none | `MotorControls` |
 
 `SimulatorClient.send` exposes the four typed commands; `client.mav` exposes
 the raw forms. The runner owns arming, race timing, heartbeats and command cadence.
@@ -73,10 +73,11 @@ active fields and mask; zero-valued coordinates remain active requests.
 `BodyRates` uses the attitude-target encoder. Masks and frame conversions stay
 inside the adapter; `BaseController.update` returns the original command values.
 
-`MotorControls` defines nonreversing normalized commands in [0, 1], in target
-motor order. This is a command contract, not a measured native force limit.
-AIGP uses four outputs; the adapter pads the remaining wire channels with zeros.
-These values are not RPM.
+`MotorControls` carries finite input values in target motor order. The target
+defines their scale and limits. AIGP uses four inputs and pads the remaining
+wire channels with zeros. Airborne build-3391 steps reached reported values
+below zero and above one, with corresponding motion changes. These values are
+not RPM, and the tested input range does not establish a maximum force.
 
 The pure [`mix`](../../../miniflight/mixer.py) function takes collective thrust,
 three normalized FRD torque efforts, and an airframe coefficient matrix:
@@ -91,9 +92,8 @@ command = MotorControls(requested)
 ```
 
 This is a small roll-torque request, not a roll-rate setpoint. `mix` preserves
-raw requests. `r1_motors` shifts collective into [0, 1], retaining requested motor
-differences. Raw requests and sent commands are recorded separately. A motor
-range wider than 1 still cannot fit. No force-to-RPM calibration is implied.
+raw requests; `r1_motors` sends them unchanged. Requests and native output reports
+are recorded separately. No force-to-RPM calibration is implied.
 [`rate_control`](../../../miniflight/rate.py) supplies PI rate feedback. It takes
 FRD rate error and elapsed device time, returning torque effort and the next
 integral state. [`r1_motors`](../controllers/r1_motors.py) owns that state and
