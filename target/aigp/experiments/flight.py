@@ -116,7 +116,7 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
         raise OSError("could not save the final native camera image")
     updates = replay(make, trace, signals=signals)
     with trace.open() as source:
-        rows = [json.loads(line) for line in source]
+        rows = [row for line in source if (row := json.loads(line))["event"] in ("arm_request", "telemetry", "sent")]
     if [row["armed"] for row in rows if row["event"] == "arm_request"] != [True, False]:
         raise AssertionError("native R1 did not arm and disarm once")
     if any(row["event"] == "telemetry" and row["message"]["mavpackettype"] == "COLLISION" for row in rows):
