@@ -170,6 +170,10 @@ local function advance()
         local game_mode = find_object("GameModeRaceBase")
 
         if valid(game_mode) and valid(game_mode.OpponentsPopup) then
+            local system = StaticFindObject("/Script/Engine.Default__KismetSystemLibrary")
+            local vsync = system:GetConsoleVariableIntValue("r.VSync")
+            system:ExecuteConsoleCommand(world(), "r.VSync 0", controller())
+            print("[DirectVQ1] vsync=" .. tostring(vsync) .. "->" .. tostring(system:GetConsoleVariableIntValue("r.VSync")) .. "\n")
             game_mode.OpponentsPopup:ConfirmPopup()
             local results = controller():GetHUD().ResultsScreen
             results.ResultGrid:SetIsEnabled(false) -- Pending grid selections block MAVLink reset.
