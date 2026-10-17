@@ -77,6 +77,7 @@ def main():
     parser.add_argument("--controller", choices=("r1_beautiful", "r1_motors"), default="r1_motors")
     parser.add_argument("--ki", type=float, default=0.0, help="trajectory position integral gain, 1/s³")
     parser.add_argument("--count", type=int, default=0, help="number of trials; zero repeats until interrupted")
+    parser.add_argument("--finish-before", type=float, required=True, help="require a native finish strictly before this race time in seconds")
     parser.add_argument("--stop-on-failure", action="store_true")
     parser.add_argument("--render", action="store_true", help="show the simulator window")
     parser.add_argument("--attach", type=Path, help="use this existing race-status file; keep the simulator running")
@@ -85,6 +86,8 @@ def main():
     args = parser.parse_args()
     if args.count < 0:
         parser.error("count must be nonnegative")
+    if not math.isfinite(args.finish_before) or args.finish_before <= 0:
+        parser.error("finish deadline must be positive and finite")
     if (args.attach is None) != (args.native_pid is None) or args.native_pid is not None and args.native_pid <= 0:
         parser.error("--attach requires a positive --native-pid")
     output = args.output or BASE / ".runtime/experiments" / f"repeat-{time.time_ns()}"
@@ -106,7 +109,7 @@ def main():
             index += 1
             trace = output / f"trial-{index:05d}.jsonl"
             row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
-                       reference_sha256=reference_hash, harness_sha256=sha256(Path(__file__)), started_at=time.monotonic())
+                       reference_sha256=reference_hash, harness_sha256=sha256(Path(__file__)), finish_before_s=args.finish_before, started_at=time.monotonic())
             write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
             interrupted = None
             signal.alarm(210)
@@ -122,7 +125,7 @@ def main():
                         record(event="result", reset=reset, course=[packet_data(packet) for packet in course_packets], connection_closed=not client.connected)
                 row["reset"] = reset
                 result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
-                             attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki)
+                             attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki, finish_before=args.finish_before)
                 row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
             except BaseException as error:
                 failures += 1

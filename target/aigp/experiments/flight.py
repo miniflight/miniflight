@@ -53,7 +53,7 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
     return make, signals, reference_duration
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0):
+def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None):
     camera = camera or record_frames
     simulator_args = ("-RenderOffScreen",) if offscreen else ()
     reference = None if reference is None else Path(reference)
@@ -68,7 +68,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                "target/aigp/client.py", "target/aigp/native.py",
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "target/aigp/experiments/process_replay.py", "target/aigp/experiments/r1_signals.py", "target/aigp/experiments/flight.py", "test/aigp_regression.py")
-    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, camera=camera, recorded_frames=record_frames, attach=attach,
+    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
                     simulator_args=simulator_args, process="flight" if attach else None,
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
@@ -90,7 +90,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls)
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before)
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:
@@ -142,13 +142,14 @@ def main():
     parser.add_argument("--record-frames", action="store_true", help="enable the camera and store all image pixels for replay")
     parser.add_argument("--reference", type=Path, help="sample saved motion through r1_motors (NPZ states, acceleration_rates, dt)")
     parser.add_argument("--offscreen", action="store_true", help="render natively without a movable desktop window")
+    parser.add_argument("--finish-before", type=float, help="require a native finish strictly before this race time in seconds")
     args = parser.parse_args()
     trace = args.trace or BASE / ".runtime/regressions" / f"{args.controller}-{time.time_ns()}.jsonl"
     for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGALRM):
         signal.signal(signum, stop)
     signal.alarm(210)
     try:
-        run(args.controller, trace, args.camera, args.record_frames, reference=args.reference, offscreen=args.offscreen)
+        run(args.controller, trace, args.camera, args.record_frames, reference=args.reference, offscreen=args.offscreen, finish_before=args.finish_before)
     finally:
         signal.alarm(0)
 

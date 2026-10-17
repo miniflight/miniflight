@@ -27,11 +27,13 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time, finish_before=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
             raise ValueError("timeouts must be positive and finite")
+        if finish_before is not None and (not math.isfinite(finish_before) or finish_before <= 0):
+            raise ValueError("finish deadline must be positive and finite")
         if target not in TARGETS:
             raise ValueError(f"unsupported simulator: {target}")
         if target not in getattr(controller, "targets", TARGETS):
@@ -42,6 +44,7 @@ class AIGPSimulator:
         self.hz = hz
         self.clock = clock
         self.timeout = timeout
+        self.finish_before = finish_before
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
         self.vehicle = vehicle
@@ -163,6 +166,10 @@ class AIGPSimulator:
         if (self.status is not None and self.status.started
                 and self.clock.monotonic() - self.status.received_at > self.timeout):
             raise TimeoutError("native race state is stale")
+        if self.status is not None and self.status.started and self.finish_before is not None:
+            race_time = self.status.finish_time_seconds if self.status.completed else self.status.time_seconds
+            if race_time >= self.finish_before or (self.status.completed and race_time < 0):
+                raise TimeoutError(f"native finish must be before {self.finish_before:g}s")
 
     def stop(self):
         if not self.arm_requested:

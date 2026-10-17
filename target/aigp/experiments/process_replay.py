@@ -96,7 +96,7 @@ def replay(path):
                                        None if "controller_config" not in metadata else PositionConfig(**metadata["controller_config"]),
                                        metadata.get("trajectory_pid", {}).get("ki", 0.0))
         simulator = AIGPSimulator(make, metadata["target"], hz=metadata["hz"], timeout=metadata["timeout"],
-                                  client=client, race_reader=RaceReader(calls), clock=calls)
+                                  client=client, race_reader=RaceReader(calls), clock=calls, finish_before=metadata.get("finish_before_s"))
         execute = lambda: simulator.rollout(attach=True)
     else:
         reset, course = None, tuple(client.receive(packet) for packet in metadata["course"])

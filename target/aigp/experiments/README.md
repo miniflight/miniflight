@@ -99,7 +99,7 @@ position, velocity and acceleration use NED metres and seconds.
 Start the repeat runner, observer, and local browser server in separate terminals:
 
 ```sh
-python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_sub10.npz --config test/fixtures/vq1_r1_sub10.config.json --output target/aigp/.runtime/experiments/pitwall --count 10 --render
+python -m target.aigp.experiments.repeat test/fixtures/vq1_r1_sub10.npz --config test/fixtures/vq1_r1_sub10.config.json --output target/aigp/.runtime/experiments/pitwall --count 10 --finish-before 10 --render
 python -m target.aigp.experiments.pitwall target/aigp/.runtime/experiments/pitwall/current.json target/aigp/.runtime/experiments/pitwall/view --current
 python -m http.server 8765 --bind 127.0.0.1 --directory target/aigp/.runtime/experiments/pitwall/view
 ```
@@ -107,6 +107,7 @@ python -m http.server 8765 --bind 127.0.0.1 --directory target/aigp/.runtime/exp
 Open `http://127.0.0.1:8765/`. Use a new output directory for each experiment.
 Omit `--count` to repeat until Ctrl+C. Each trial resets the same native process,
 creates a fresh controller, and runs all regression checks. The ledger retains failures.
+`--finish-before` sets the native race deadline: an unfinished race stops and disarms at the limit; a finish at or above it fails.
 Use `--controller r1_beautiful` to follow the same reference through native body-rate
 control; `r1_motors` remains the default and uses Python rate PI. Each keeps its existing timeout.
 The observer reads records in a separate process and publishes complete snapshots;
