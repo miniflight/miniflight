@@ -207,12 +207,13 @@ def main(argv=None):
     operation.add_argument("--attach", action="store_true", help="control an already running simulator")
     parser.add_argument("--hz", type=float)
     parser.add_argument("--startup-timeout", type=float)
+    parser.add_argument("--record", type=Path, help="record this program run for full process replay")
     argv = list(sys.argv[1:] if argv is None else argv)
     boundary = argv.index("--") if "--" in argv else len(argv)
     args = parser.parse_args(argv[:boundary])
     simulator_args = argv[boundary + 1:]
     if args.prepare:
-        if args.controller or simulator_args or args.hz is not None or args.startup_timeout is not None:
+        if args.controller or simulator_args or args.hz is not None or args.startup_timeout is not None or args.record:
             parser.error("--prepare cannot be combined with run options")
         prepare(args.prepare)
         return 0
@@ -220,8 +221,8 @@ def main(argv=None):
         args.target = "vq1.r1"
     if args.attach and (simulator_args or args.startup_timeout is not None or not args.controller):
         parser.error("--attach requires --controller and no simulator arguments")
-    if not args.controller and (args.hz is not None or args.startup_timeout is not None):
-        parser.error("--hz and --startup-timeout require --controller")
+    if not args.controller and (args.hz is not None or args.startup_timeout is not None or args.record):
+        parser.error("--hz, --startup-timeout and --record require --controller")
     hz = 50.0 if args.hz is None else args.hz
     startup_timeout = 120.0 if args.startup_timeout is None else args.startup_timeout
 
@@ -231,7 +232,12 @@ def main(argv=None):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGHUP, stop)
     try:
-        if args.controller:
+        if args.record:
+            from target.aigp.experiments.flight import rollout
+            print(f"Recording: {args.record}", flush=True)
+            rollout(args.controller, args.record, target=args.target or "vq1.r1", hz=hz, timeout=1,
+                    startup_timeout=startup_timeout, camera=True, attach=args.attach, simulator_args=simulator_args)
+        elif args.controller:
             controller = load_controller(args.controller)
             sim = AIGPSimulator(controller, args.target or "vq1.r1", hz, startup_timeout=startup_timeout)
             try:

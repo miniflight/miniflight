@@ -1,6 +1,7 @@
 # AIGP experiments
 
-These tools are optional. The simulator and gate controllers do not import them.
+These tools are optional. The simulator loads recording tools when `--record` is
+requested; gate controllers do not import them.
 
 The R1 goal is six valid gates, no collision, and a native finish below 10 seconds
 with a computed reference and PID. MPC comes after that.

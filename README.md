@@ -31,6 +31,9 @@ Its [AIGP wrapper](examples/aigp/velocity_ned.py) waits for native GO, then pass
 python3.11 -m target.aigp.simulator vq1.r1 --controller examples.aigp.velocity_ned
 ```
 
+Add `--record /tmp/velocity.jsonl` to retain the native process, packets, commands,
+and result. Replay it with `python3.11 -m target.aigp.experiments.process_replay /tmp/velocity.jsonl`.
+
 Install the [runtime](target/aigp/README.md#setup), then run from the repository root:
 
 ```sh

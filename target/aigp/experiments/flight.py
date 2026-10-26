@@ -1,10 +1,11 @@
-"""Run one complete native VQ1 R1 flight and replay its recorded commands."""
+"""Record native execution and verify the R1 race when requested."""
 
 import argparse
 from contextlib import ExitStack, closing
 from dataclasses import asdict
 from functools import partial
 import json
+import inspect
 from pathlib import Path
 import signal
 import subprocess
@@ -22,7 +23,7 @@ from target.aigp.controllers import load_controller
 from target.aigp.experiments.recording import RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
 from target.aigp.experiments.process_replay import Launcher, ProcessClient, RaceReader
-from target.aigp.native import BASE, SHIPPING, RaceStateReader, sha256
+from target.aigp.native import BASE, SHIPPING, TARGETS, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
 
 
@@ -52,26 +53,27 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
     return make, signals, reference_duration
 
 
-def run(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False, race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None):
+def rollout(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False,
+            race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None, *,
+            target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None):
+    trace = Path(trace)
     camera = camera or record_frames
-    simulator_args = ("-RenderOffScreen",) if offscreen else ()
+    simulator_args = (("-RenderOffScreen",) if offscreen else ()) if simulator_args is None else tuple(simulator_args)
     reference = None if reference is None else Path(reference)
     make, default_signals, reference_duration = flight_controller(name, reference, position_config, integral_gain)
     signals = default_signals if signals is None else signals
-    timeout = .3 if name == "r1_motors" else 1.0
-    sources = ("miniflight/rate.py", "miniflight/mixer.py", "target/aigp/__init__.py", "target/aigp/controllers/r1_motors.py",
-               "miniflight/position.py", "miniflight/reference.py", "miniflight/state.py", "miniflight/control.py", "miniflight/monitor.py", "miniflight/loop.py",
-               "miniflight/vehicle.py", "miniflight/replay.py", "miniflight/__init__.py", "common/math.py", "target/__init__.py",
-               "target/aigp/controllers/r1_gates.py", "target/aigp/controllers/r1_body_rates.py", "target/aigp/controllers/r1_beautiful.py",
-               "target/aigp/controllers/__init__.py", "target/aigp/simulator.py",
-               "target/aigp/client.py", "target/aigp/native.py",
-               "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
-               "target/aigp/experiments/recording.py", "target/aigp/experiments/process_replay.py", "target/aigp/experiments/r1_signals.py", "target/aigp/experiments/flight.py", "test/aigp_regression.py")
-    metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
+    if timeout is None:
+        timeout = .3 if name == "r1_motors" else 1.0
+    sources = subprocess.check_output(["git", "ls-files", "*.py", "*.lua"], cwd=ROOT, text=True).splitlines()
+    metadata = dict(target=target, controller=name, hz=hz, timeout=timeout, startup_timeout_s=startup_timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
                     simulator_args=simulator_args, process="flight", race_status_path=str(trace.with_suffix(".native.jsonl")),
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
+    controller_source = Path(inspect.getfile(load_controller(name))).resolve()
+    key = str(controller_source.relative_to(ROOT)) if controller_source.is_relative_to(ROOT) else str(controller_source)
+    metadata["sources"][key] = sha256(controller_source)
+    executable = BASE / ".runtime" / TARGETS[target][0] / SHIPPING
     if name == "r1_motors" or reference is not None:
         controller = make()
         position = controller.position if name == "r1_motors" else controller
@@ -88,7 +90,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), timeout)))
         client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
-        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
+        simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), target, hz=hz, client=client, timeout=timeout, startup_timeout=startup_timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before, launcher=Launcher(calls))
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
@@ -96,10 +98,15 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
             record(event="result", connection_closed=not client.connected,
                    returned=None if result is None else asdict(result),
                    race=None if simulator.status is None else asdict(simulator.status),
-                   executable_sha256=sha256(BASE / ".runtime/vq1" / SHIPPING))
+                   executable_sha256=sha256(executable) if executable.is_file() else None)
 
     simulator.save_monitor()
-    return check(name, trace, result, client, make, camera, record_frames, signals)
+    return result, simulator, make, signals
+
+
+def run(name, trace, camera=False, record_frames=False, **kwargs):
+    result, simulator, make, signals = rollout(name, trace, camera, record_frames, **kwargs)
+    return check(name, trace, result, simulator.client, make, camera or record_frames, record_frames, signals)
 
 
 def check(name, trace, result, client, make, camera, record_frames, signals):
