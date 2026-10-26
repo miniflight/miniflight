@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import importlib
 from typing import Generic, TypeVar, TYPE_CHECKING
 
 from miniflight import Command, Frame, Ned
@@ -38,3 +39,11 @@ class BaseController(Generic[CommandT]):
         None means it is unavailable. Published Gate fields remain unchanged.
         """
         raise NotImplementedError
+
+
+def load_controller(name):
+    module = name if "." in name else f"target.aigp.controllers.{name}"
+    controller = getattr(importlib.import_module(module), "Controller", None)
+    if not isinstance(controller, type) or not issubclass(controller, BaseController):
+        raise TypeError(f"{module} must export Controller(BaseController)")
+    return controller

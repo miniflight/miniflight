@@ -16,10 +16,9 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import BodyRates
 from miniflight.reference import sample_motion, sample_values
 from miniflight.replay import Calls
-from target.aigp.controllers.r1_body_rates import Controller as BodyRateGates
-from target.aigp.controllers.r1_gates import Controller as PositionGates
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
 from target.aigp.controllers.r1_motors import Controller as MotorGates
+from target.aigp.controllers import load_controller
 from target.aigp.experiments.recording import RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
 from target.aigp.experiments.process_replay import ProcessClient, RaceReader
@@ -27,13 +26,13 @@ from target.aigp.native import BASE, SHIPPING, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
 
 
-CONTROLLERS = {"r1_gates": PositionGates, "r1_body_rates": BodyRateGates, "r1_beautiful": PIDGates, "r1_motors": MotorGates}
+CONTROLLERS = ("r1_gates", "r1_body_rates", "r1_beautiful", "r1_motors")
 ROOT = BASE.parents[1]
 
 
 def flight_controller(name, reference=None, position_config=None, integral_gain=0.0):
     signals, reference_duration = None, None
-    make = CONTROLLERS[name]
+    make = load_controller(name)
     if reference is not None:
         if name not in ("r1_beautiful", "r1_motors"):
             raise ValueError("a recorded reference requires r1_beautiful or r1_motors")

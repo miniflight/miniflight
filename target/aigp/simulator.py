@@ -3,7 +3,6 @@
 import argparse
 from contextlib import ExitStack
 from dataclasses import asdict, replace
-import importlib
 import json
 import math
 from pathlib import Path
@@ -17,7 +16,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import BodyRates, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
-from target.aigp.controllers import BaseController
+from target.aigp.controllers import BaseController, load_controller
 from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, TARGETS, VERSIONS, RaceStateReader, launch, prepare
 
@@ -194,13 +193,11 @@ class AIGPSimulator:
 
 
 def main(argv=None):
-    names = sorted(p.stem for p in (BASE / "controllers").glob("*.py")
-                   if not p.name.startswith("_"))
     parser = argparse.ArgumentParser(prog="simulator.py", allow_abbrev=False,
                                      description="Run a direct AI-GP arena; training/qualification selection is not implemented.")
     operation = parser.add_mutually_exclusive_group(required=True)
     operation.add_argument("target", nargs="?", choices=(*TARGETS, "vq1"))
-    parser.add_argument("--controller", choices=names)
+    parser.add_argument("--controller", help="built-in controller name or importable Python module")
     operation.add_argument("--prepare", choices=VERSIONS, help="extract and configure a simulator without launching it")
     operation.add_argument("--attach", action="store_true", help="control an already running simulator")
     parser.add_argument("--hz", type=float)
@@ -230,9 +227,7 @@ def main(argv=None):
     signal.signal(signal.SIGHUP, stop)
     try:
         if args.controller:
-            controller = importlib.import_module(f"target.aigp.controllers.{args.controller}").Controller
-            if not issubclass(controller, BaseController):
-                parser.error("Controller must inherit BaseController")
+            controller = load_controller(args.controller)
             sim = AIGPSimulator(controller, args.target or "vq1.r1", hz, startup_timeout=startup_timeout)
             try:
                 sim.rollout(attach=args.attach, simulator_args=simulator_args)
@@ -244,7 +239,7 @@ def main(argv=None):
             return status if status >= 0 else 128 - status
     except KeyboardInterrupt:
         return 130
-    except (OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+    except (ImportError, OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
         parser.exit(1, f"{error}\n")
     return 0
 

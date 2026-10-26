@@ -13,8 +13,10 @@ class Controller(BaseController[BodyRates]):
         return BodyRates()
 ```
 
-Run from `target/aigp`: `python simulator.py vq1.r1 --controller mine`.
-The runner constructs `Controller()` after the native heartbeat.
+Run from the repository root with `python -m target.aigp.simulator vq1.r1 --controller mine`.
+The runner also accepts a module outside this directory, for example
+`--controller examples.aigp.velocity_ned`. It constructs `Controller()` after the
+native heartbeat. Recording and process replay use the same module loader.
 
 The runner calls `vehicle.read()` once per tick. Read `vehicle.state` in the
 controller: the target supplies accepted IMU, motion, attitude, motor feedback
