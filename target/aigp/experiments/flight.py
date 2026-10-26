@@ -11,6 +11,7 @@ import subprocess
 import time
 
 import numpy as np
+from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import BodyRates
 from miniflight.reference import sample_motion, sample_values
@@ -114,8 +115,15 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
     updates = replay(make, trace, signals=signals)
     with trace.open() as source:
         rows = [row for line in source if (row := json.loads(line))["event"] in ("arm_request", "telemetry", "sent")]
-    if [row["armed"] for row in rows if row["event"] == "arm_request"] != [True, False]:
-        raise AssertionError("native R1 did not arm and disarm once")
+    requests = [row for row in rows if row["event"] == "arm_request"]
+    if [row["armed"] for row in requests] != [True, False]:
+        raise AssertionError("native R1 did not request arm and disarm once")
+    for index, request in enumerate(requests):
+        until = requests[index+1]["host_time"] if index+1 < len(requests) else float("inf")
+        if not any(row["event"] == "telemetry" and row["message"]["mavpackettype"] == "HEARTBEAT"
+                   and request["host_time"] < row["host_time"] < until
+                   and bool(row["message"]["base_mode"] & mavlink.MAV_MODE_FLAG_SAFETY_ARMED) == request["armed"] for row in rows):
+            raise AssertionError(f"native R1 did not report armed={request['armed']} after the request")
     if any(row["event"] == "telemetry" and row["message"]["mavpackettype"] == "COLLISION" for row in rows):
         raise AssertionError("native R1 reported a collision")
     sent = [row["command"] for row in rows if row["event"] == "sent"]

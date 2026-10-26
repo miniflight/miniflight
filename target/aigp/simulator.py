@@ -12,6 +12,8 @@ import subprocess
 import sys
 import time
 
+from pymavlink.dialects.v20 import common as mavlink
+
 from miniflight import BodyRates, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
@@ -180,7 +182,15 @@ class AIGPSimulator:
         try:
             self.vehicle.send(BodyRates())
         finally:
+            requested_at = self.clock.monotonic()
             self.vehicle.disarm()
+            deadline = requested_at + FINISH_WAIT_SECONDS
+            while self.clock.monotonic() < deadline:
+                self.vehicle.read(timeout=.02)
+                heartbeat = self.client.telemetry.get("HEARTBEAT")
+                if (heartbeat is not None and heartbeat._host_received_at > requested_at
+                        and not heartbeat.base_mode & mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+                    break
 
 
 def main(argv=None):
