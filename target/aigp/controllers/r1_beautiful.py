@@ -32,11 +32,12 @@ class Controller(BaseController[BodyRates]):
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
-            if isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
+            if self.reference is None and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
         state = vehicle.state
-        if (state is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started or self.track is None
-                or len(race_state.gate_centers) != len(self.track)):
+        if state is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started:
+            return None
+        if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):
             return None
         motion, orientation = state.motion, state.attitude
         now = race_state.received_at if race_state.control_time is None else race_state.control_time
@@ -51,13 +52,14 @@ class Controller(BaseController[BodyRates]):
             rotation = Quaternion.from_euler(*angles) * Quaternion.from_axis_angle(gyro, speed * lag)
             angles = rotation.to_euler()  # Advance older attitude; never rewind fresher feedback.
 
-        index = race_state.active_gate_index
-        if not 0 <= index <= len(self.track):
-            raise ValueError("gate index outside the published track")
-        if self.reference is None and index < len(self.track) and (index, race_state.gate_centers[index]) != self.gate:
-            self.target = gate_target(position, index, race_state.gate_centers, self.exit_distance)
-            self.gate = (index, race_state.gate_centers[index])
-        if self.reference is not None:
+        if self.reference is None:
+            index = race_state.active_gate_index
+            if not 0 <= index <= len(self.track):
+                raise ValueError("gate index outside the published track")
+            if index < len(self.track) and (index, race_state.gate_centers[index]) != self.gate:
+                self.target = gate_target(position, index, race_state.gate_centers, self.exit_distance)
+                self.gate = (index, race_state.gate_centers[index])
+        else:
             if self.reference_start is None:
                 self.reference_start = motion.time - race_state.time_seconds
             self.reference_time = motion.time - self.reference_start  # Pose seconds since native GO.
