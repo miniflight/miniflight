@@ -28,7 +28,7 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time, finish_before=None):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time, finish_before=None, launcher=launch):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
@@ -44,6 +44,7 @@ class AIGPSimulator:
         self.target = target
         self.hz = hz
         self.clock = clock
+        self.launcher = launcher
         self.timeout = timeout
         self.finish_before = finish_before
         self.startup_timeout = startup_timeout
@@ -66,7 +67,7 @@ class AIGPSimulator:
             self.vehicle.bind(self.client)
             cleanup.callback(self.vehicle.disconnect)
             self.vehicle.connect()
-            process = cleanup.enter_context(launch(self.target, simulator_args, attach=attach,
+            process = cleanup.enter_context(self.launcher(self.target, simulator_args, attach=attach,
                                                    race_status_path=self.race_status_path))
             race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
             if self.race_reader is None:

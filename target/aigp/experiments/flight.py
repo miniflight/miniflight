@@ -21,7 +21,7 @@ from target.aigp.controllers.r1_motors import Controller as MotorGates
 from target.aigp.controllers import load_controller
 from target.aigp.experiments.recording import RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
-from target.aigp.experiments.process_replay import ProcessClient, RaceReader
+from target.aigp.experiments.process_replay import Launcher, ProcessClient, RaceReader
 from target.aigp.native import BASE, SHIPPING, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
 
@@ -68,7 +68,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
                "target/aigp/config/vq1/main.lua", "target/aigp/config/race.lua",
                "target/aigp/experiments/recording.py", "target/aigp/experiments/process_replay.py", "target/aigp/experiments/r1_signals.py", "target/aigp/experiments/flight.py", "test/aigp_regression.py")
     metadata = dict(target="vq1.r1", controller=name, hz=50, timeout=timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
-                    simulator_args=simulator_args, process="flight" if attach else None,
+                    simulator_args=simulator_args, process="flight", race_status_path=str(trace.with_suffix(".native.jsonl")),
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
@@ -89,7 +89,7 @@ def run(name, trace, camera=False, record_frames=False, signals=None, reference=
         client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), "vq1.r1", client=client, timeout=timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before)
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before, launcher=Launcher(calls))
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:

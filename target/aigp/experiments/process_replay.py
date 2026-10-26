@@ -2,6 +2,7 @@
 
 import base64
 import argparse
+from contextlib import contextmanager, ExitStack
 from dataclasses import asdict
 import json
 from pathlib import Path
@@ -12,13 +13,42 @@ from target.aigp.client import Packet
 from miniflight.position import PositionConfig
 from miniflight.replay import Calls
 from target.aigp.experiments.recording import RecordedClient, command_data, read_metadata
-from target.aigp.native import NativeRaceState, sha256
+from target.aigp.native import NativeRaceState, launch, sha256
 
 
 def packet_data(packet):
     camera = isinstance(packet.data, bytes)
     return dict(camera=camera, received_at=packet.received_at,
                 wire=base64.b64encode(packet.data if camera else packet.data.get_msgbuf()).decode("ascii"))
+
+
+class NativeProcess:
+    def __init__(self, calls, process=None):
+        self.calls, self.process = calls, process
+
+    def poll(self):
+        return self.calls("process.poll", {}, None if self.process is None else self.process.poll)
+
+
+class Launcher:
+    def __init__(self, calls):
+        self.calls = calls
+
+    @contextmanager
+    def __call__(self, target, simulator_args=(), attach=False, race_status_path=None):
+        if attach:
+            with launch(target, simulator_args, attach=True, race_status_path=race_status_path) as process:
+                yield process
+            return
+        cleanup = ExitStack()
+        arguments = dict(target=target, simulator_args=list(simulator_args), race_status_path=str(race_status_path))
+        try:
+            process = self.calls("launch", arguments,
+                                 lambda: cleanup.enter_context(launch(target, simulator_args, race_status_path=race_status_path)),
+                                 encode=lambda process: process.pid)
+            yield NativeProcess(self.calls, process if self.calls.record is not None else None)
+        finally:
+            self.calls("launch.close", {}, cleanup.close)
 
 
 class ProcessClient(RecordedClient):
@@ -77,7 +107,7 @@ def replay(path):
     path = Path(path)
     metadata = read_metadata(path)
     if metadata.get("process") not in ("flight", "reset"):
-        raise ValueError("full replay needs a process recording from an attached flight or reset")
+        raise ValueError("full replay needs a flight or reset process recording")
     outcome = {}
     def recorded_calls():
         with path.open() as source:
@@ -96,8 +126,9 @@ def replay(path):
                                        None if "controller_config" not in metadata else PositionConfig(**metadata["controller_config"]),
                                        metadata.get("trajectory_pid", {}).get("ki", 0.0))
         simulator = AIGPSimulator(make, metadata["target"], hz=metadata["hz"], timeout=metadata["timeout"],
-                                  client=client, race_reader=RaceReader(calls), clock=calls, finish_before=metadata.get("finish_before_s"))
-        execute = lambda: simulator.rollout(attach=True)
+                                  client=client, race_reader=RaceReader(calls), clock=calls, finish_before=metadata.get("finish_before_s"),
+                                  race_status_path=metadata.get("race_status_path"), launcher=Launcher(calls))
+        execute = lambda: simulator.rollout(attach=metadata.get("attach", True), simulator_args=metadata.get("simulator_args", ()))
     else:
         reset, course = None, tuple(client.receive(packet) for packet in metadata["course"])
         def execute():

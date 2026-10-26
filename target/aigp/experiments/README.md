@@ -8,6 +8,8 @@ with a computed reference and PID. MPC comes after that.
 Each experiment asks one question and changes one variable. Retain the initial
 state, reference, configuration, source/binary hashes, raw signals and native
 result. Device time, game time and host receipt time remain separate.
+New flight recordings also capture owned native startup, process exit checks,
+and shutdown. Process replay consumes those results without launching Wine.
 
 | Experiment | Question | Change | Evidence |
 | --- | --- | --- | --- |
