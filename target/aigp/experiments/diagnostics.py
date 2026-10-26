@@ -1,9 +1,8 @@
 """Convert recorded AIGP inputs and sent commands into ordinary SI quantities."""
 
 import math
-import base64
-from pymavlink.dialects.v20 import common as mavlink
 from miniflight.diagnostics import chart_data
+from target.aigp.experiments.recording import ReplayClient
 
 
 PANELS = (
@@ -39,8 +38,8 @@ def snapshot(observer, samples, source):
 
 class Observe:
     def __init__(self):
-        self.decoder = mavlink.MAVLink(None)
-        self.latest, self.metadata, self.pending = {}, {}, None
+        self.client = ReplayClient()
+        self.metadata, self.pending = {}, None
         self.status, self.collisions = {}, 0
         self.finished = False
 
@@ -55,21 +54,8 @@ class Observe:
             self.status = row["race"] or {}
         if event == "update":
             self.status = row["native_race"] or {}
-            for packet in row["telemetry"]:
-                message, = self.decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
-                kind = message.get_type()
-                if kind not in ("LOCAL_POSITION_NED", "ATTITUDE", "HIGHRES_IMU", "ACTUATOR_OUTPUT_STATUS"):
-                    continue
-                previous = self.latest.get(kind)
-                stamp = message.time_boot_ms if kind in ("LOCAL_POSITION_NED", "ATTITUDE") else message.time_usec
-                if previous is not None:
-                    old = previous[0]
-                    old_stamp = old.time_boot_ms if kind in ("LOCAL_POSITION_NED", "ATTITUDE") else old.time_usec
-                    if stamp < old_stamp or message.to_dict() == old.to_dict() or kind == "HIGHRES_IMU" and stamp == old_stamp:
-                        continue
-                if kind == "HIGHRES_IMU" and not all(math.isfinite(v) for v in (message.xacc,message.yacc,message.zacc,message.xgyro,message.ygyro,message.zgyro)):
-                    continue
-                self.latest[kind] = (message, packet["received_at"])
+            self.client.feed(row["telemetry"])
+            self.client.read(timeout=0)
             self.pending = row if "signals" in row else None
         if event != "sent" or command["kind"] not in ("MotorControls", "BodyRates") or self.pending is None:
             return None
@@ -78,23 +64,23 @@ class Observe:
             return None
         if command != self.pending["command"]:
             raise ValueError("sent command has no matching controller update")
-        motion, pose_at = self.latest["LOCAL_POSITION_NED"]
-        imu, imu_at = self.latest["HIGHRES_IMU"]
+        state = self.client.state
+        motion = state.motion
         config = self.metadata.get("controller_config", {})
         signals = self.pending["signals"]
         if command["kind"] == "BodyRates":
             signals = dict(signals, rate_ref_frd_rad_s=[command[axis + "_rate"] for axis in ("roll", "pitch", "yaw")],
-                           gyro_frd_rad_s=[-imu.xgyro, -imu.ygyro, -imu.zgyro])
-        sample = quantities(signals, (motion.x,motion.y,motion.z), (motion.vx,motion.vy,motion.vz),
-                            command.get("outputs", ()), row["host_time"]-pose_at, row["host_time"]-imu_at,
+                           gyro_frd_rad_s=state.gyro)
+        sample = quantities(signals, motion.position, motion.velocity,
+                            command.get("outputs", ()), row["host_time"]-motion.received_at, row["host_time"]-state.received_at,
                             config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
         sample["collective_request"] = command.get("thrust", sample["motor_mean"])
-        native = self.latest.get("ACTUATOR_OUTPUT_STATUS")
-        values = native[0].actuator[:4] if native is not None and native[0].active & 15 == 15 else ()
+        native = state.motors
+        values = native.outputs[:4] if native is not None and native.active & 15 == 15 else ()
         sample["motor_reported_mean"] = sum(values)/4 if len(values) == 4 and all(math.isfinite(v) for v in values) else None
-        sample["pose_clock_gap_s"] = imu.time_usec/1e6 - motion.time_boot_ms/1e3
-        attitude = self.latest.get("ATTITUDE")
-        sample["attitude_clock_gap_s"] = None if attitude is None else (attitude[0].time_boot_ms - motion.time_boot_ms)/1000
+        sample["pose_clock_gap_s"] = state.time - motion.time
+        attitude = state.attitude
+        sample["attitude_clock_gap_s"] = None if attitude is None else attitude.time - motion.time
         self.pending = None
         return sample
 
