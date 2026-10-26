@@ -10,7 +10,6 @@ import signal
 import subprocess
 import time
 
-import cv2
 import numpy as np
 
 from miniflight import BodyRates
@@ -112,8 +111,6 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
-    if camera and not cv2.imwrite(str(trace.with_suffix(".frame.png")), frame.bgr):
-        raise OSError("could not save the final native camera image")
     updates = replay(make, trace, signals=signals)
     with trace.open() as source:
         rows = [row for line in source if (row := json.loads(line))["event"] in ("arm_request", "telemetry", "sent")]
