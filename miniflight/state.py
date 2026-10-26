@@ -17,6 +17,12 @@ class Ned(NamedTuple):
     down: float
 
 
+class RateSample(NamedTuple):
+    time: float  # device seconds
+    received_at: float  # host monotonic seconds
+    gyro: tuple[float, float, float]  # FRD rad/s
+
+
 @dataclass(frozen=True)
 class Motion:
     time: float  # device seconds
@@ -71,3 +77,12 @@ class State:
     motion: Motion | None = None
     attitude: Attitude | None = None
     motors: MotorOutputs | None = None
+
+    @property
+    def rate_feedback(self) -> RateSample | None:
+        """Newest angular velocity, retaining its own sample and receipt clocks."""
+        sample = None if self.time is None or self.received_at is None or self.gyro is None else RateSample(self.time, self.received_at, self.gyro)
+        attitude = self.attitude
+        if attitude is not None and attitude.angular_velocity is not None and (sample is None or attitude.time > sample.time):
+            return RateSample(attitude.time, attitude.received_at, attitude.angular_velocity)
+        return sample

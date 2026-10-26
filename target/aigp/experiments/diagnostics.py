@@ -17,7 +17,7 @@ PANELS = (
 )
 DETAIL_PANELS = (
     ("Vertical velocity: positive down", "m/s", (("Reference", "down_speed_ref_m_s"), ("Observed", "down_speed_m_s"))),
-    ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("IMU", "imu_age_s"))),
+    ("Accepted sample age at command send", "s", (("Pose", "pose_age_s"), ("Rate feedback", "rate_age_s"))),
     ("Sensor boot time minus pose boot time", "s", (("IMU", "pose_clock_gap_s"), ("Attitude", "attitude_clock_gap_s"))),
 )
 
@@ -65,14 +65,15 @@ class Observe:
         if command != self.pending["command"]:
             raise ValueError("sent command has no matching controller update")
         state = self.client.state
+        feedback = state.rate_feedback
         motion = state.motion
         config = self.metadata.get("controller_config", {})
         signals = self.pending["signals"]
         if command["kind"] == "BodyRates":
             signals = dict(signals, rate_ref_frd_rad_s=[command[axis + "_rate"] for axis in ("roll", "pitch", "yaw")],
-                           gyro_frd_rad_s=state.gyro)
+                           gyro_frd_rad_s=feedback.gyro)
         sample = quantities(signals, motion.position, motion.velocity,
-                            command.get("outputs", ()), row["host_time"]-motion.received_at, row["host_time"]-state.received_at,
+                            command.get("outputs", ()), row["host_time"]-motion.received_at, row["host_time"]-feedback.received_at,
                             config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
         sample["collective_request"] = command.get("thrust", sample["motor_mean"])
         native = state.motors
@@ -85,7 +86,7 @@ class Observe:
         return sample
 
 
-def quantities(signals, position, velocity, motors, pose_age, imu_age, acceleration_limit=None):
+def quantities(signals, position, velocity, motors, pose_age, rate_age, acceleration_limit=None):
     target_position = signals["position_ref_ned_m"]
     target_velocity = signals["velocity_ref_ned_m_s"]
     north_error, east_error, down_error = (wanted-actual for wanted, actual in zip(target_position, position, strict=True))
@@ -98,4 +99,4 @@ def quantities(signals, position, velocity, motors, pose_age, imu_age, accelerat
                 motor_min=min(motors, default=None), motor_mean=sum(motors)/len(motors) if motors else None, motor_max=max(motors, default=None),
                 acceleration_request_m_s2=math.hypot(*acceleration[:2]), acceleration_limit_m_s2=acceleration_limit,
                 roll_ref_rad_s=signals["rate_ref_frd_rad_s"][0], roll_rad_s=signals["gyro_frd_rad_s"][0],
-                pose_age_s=pose_age, imu_age_s=imu_age)
+                pose_age_s=pose_age, rate_age_s=rate_age)

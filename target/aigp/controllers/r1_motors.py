@@ -33,12 +33,10 @@ class Controller(BaseController[MotorControls]):
                     self.arm_received_at = packet.received_at
         request = self.position.update(telemetry, frames, race_state)
         state = vehicle.state
-        if request is None or state is None or state.time is None:
+        feedback = None if state is None else state.rate_feedback
+        if request is None or feedback is None:
             return None
-        stamp, received_at, self.gyro = state.time, state.received_at, state.gyro
-        attitude = state.attitude
-        if attitude is not None and attitude.angular_velocity is not None and attitude.time > stamp:
-            stamp, received_at, self.gyro = attitude.time, attitude.received_at, attitude.angular_velocity
+        stamp, received_at, self.gyro = feedback
         post_arm_sample = self.arm_received_at is not None and received_at > self.arm_received_at
         dt = 0 if self.time is None or not post_arm_sample else stamp - self.time
         self.integral_dt = dt

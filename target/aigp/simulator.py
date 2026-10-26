@@ -78,6 +78,7 @@ class AIGPSimulator:
             def read_signals(now):
                 nonlocal finish_deadline, heartbeat_at
                 state = self.vehicle.read(timeout=0)
+                feedback = None if state is None else state.rate_feedback
                 packets = self.client.packets
                 if state is not None and state.motion is not None and (not self.monitor.motion or state.motion != self.monitor.motion[-1]):
                     self.monitor.observe(state.motion)
@@ -95,9 +96,9 @@ class AIGPSimulator:
                 if self.status is None or not self.status.started:
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
-                # IMU loss ends control permanently; only native finish can end the wait.
+                # Rate feedback loss ends control permanently; only native finish can end the wait.
                 if (self.status is not None and self.status.started and not self.status.completed
-                        and finish_deadline is None and state is not None and state.received_at is not None and now - state.received_at >= self.timeout):
+                        and finish_deadline is None and feedback is not None and now - feedback.received_at >= self.timeout):
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
                 if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
@@ -111,18 +112,19 @@ class AIGPSimulator:
             def send_command(command):
                 now = self.clock.monotonic()
                 state = self.vehicle.state
+                feedback = None if state is None else state.rate_feedback
                 self.read_race(race_reader.poll())  # A slow controller cannot hide a new invalidation.
                 if self.status is not None and self.status.completed:
                     raise StopIteration
                 if self.status is None or not self.status.started:
                     return
-                if command is None or state is None or state.received_at is None:
+                if command is None or feedback is None:
                     if self.arm_requested:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
                     return
-                if now - state.received_at > self.timeout:
+                if now - feedback.received_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if not self.arm_requested:
                     self.vehicle.validate(command)
