@@ -16,7 +16,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import BodyRates, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
-from target.aigp.controllers import BaseController, load_controller
+from target.aigp.controllers import BaseController, load_controller, update_controller
 from target.aigp.client import SimulatorClient
 from target.aigp.native import BASE, TARGETS, VERSIONS, RaceStateReader, launch, prepare
 
@@ -134,7 +134,7 @@ class AIGPSimulator:
                 self.vehicle.send(command)
 
             try:
-                run(read_signals, lambda *signals: self.controller.update(*signals), send_command, hz=self.hz, clock=self.clock)
+                run(read_signals, lambda *signals: update_controller(self.controller, *signals), send_command, hz=self.hz, clock=self.clock)
             except StopIteration:
                 self.read_race(race_reader.poll())
                 return self.status if self.status is not None and self.status.completed else None

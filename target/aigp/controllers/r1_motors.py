@@ -24,8 +24,6 @@ class Controller(BaseController[MotorControls]):
         for packet in telemetry:
             message = packet.data
             kind = message.get_type()
-            if kind == "COLLISION":
-                raise RuntimeError("native collision")
             if kind == "COMMAND_ACK" and message.command == mavlink.MAV_CMD_COMPONENT_ARM_DISARM:
                 if message.result != mavlink.MAV_RESULT_ACCEPTED:
                     raise RuntimeError("native arm command was rejected")

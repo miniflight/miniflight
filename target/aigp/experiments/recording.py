@@ -14,7 +14,7 @@ from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Frame, vehicle
 from target.aigp.client import Packet, SimulatorClient
-from target.aigp.controllers import BaseController, CommandT
+from target.aigp.controllers import BaseController, CommandT, update_controller
 from target.aigp.native import TARGETS, NativeRaceState
 
 
@@ -207,7 +207,7 @@ def replay(create, path, signals=None):
             vehicle.read(timeout=0)
             try:
                 race = row["native_race"]
-                command = controller.update(telemetry, frames, None if race is None else NativeRaceState(**race))
+                command = update_controller(controller, telemetry, frames, None if race is None else NativeRaceState(**race))
             except BaseException as error:
                 terminal = True
                 actual = {"error": {"type": type(error).__name__, "message": str(error)}}

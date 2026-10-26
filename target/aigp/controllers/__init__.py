@@ -47,3 +47,9 @@ def load_controller(name):
     if not isinstance(controller, type) or not issubclass(controller, BaseController):
         raise TypeError(f"{module} must export Controller(BaseController)")
     return controller
+
+
+def update_controller(controller, telemetry, frames, race_state):
+    if any(packet.data.get_type() == "COLLISION" for packet in telemetry):
+        raise RuntimeError("native collision")
+    return controller.update(telemetry, frames, race_state)
