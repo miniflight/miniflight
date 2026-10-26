@@ -19,9 +19,11 @@ Programs use `from miniflight import vehicle`, then operations such as
 `vehicle.body_rates(...)`. Startup binds one Target; shutdown releases it.
 
 The [velocity program](examples/velocity_ned.py) reads `State`, keeps its own
-start time, and returns `VelocityNed` commands. After two seconds it requests zero
-velocity and waits for a new motion sample below 0.1 m/s. It must settle within
-five device seconds of starting. It imports no target code.
+start time, and returns `VelocityNed` commands. It first climbs at least one metre
+above its starting position, then requests northward motion for two seconds.
+It finishes after requesting zero velocity and observing a new motion sample
+below 0.1 m/s. The maneuver must complete within eight device seconds.
+It imports no target code.
 Its [AIGP wrapper](examples/aigp/velocity_ned.py) waits for native GO, then passes
 `vehicle.state` to the program:
 
