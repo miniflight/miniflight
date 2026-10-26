@@ -190,6 +190,10 @@ class AIGPSimulator:
                 if (heartbeat is not None and heartbeat._host_received_at > requested_at
                         and not heartbeat.base_mode & mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
                     break
+            else:
+                # Preserve the flight failure if cleanup also loses feedback.
+                if sys.exception() is None or isinstance(sys.exception(), StopIteration):
+                    raise TimeoutError("native disarm was not confirmed")
 
 
 def main(argv=None):

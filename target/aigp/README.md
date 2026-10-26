@@ -50,6 +50,8 @@ with the existing PID follower, then our rate PI and mixer.
 The check requires six valid gates, no collisions, motor commands throughout
 the flight, and exact command/signal replay. It uses 50 Hz and a 0.3-second IMU
 timeout; the runner sends zero thrust and disarms during cleanup.
+Cleanup waits for a newly received disarmed heartbeat. Missing confirmation fails
+an otherwise successful run; an existing flight error is preserved.
 
 Implement `update(telemetry, frames, race_state)` and return a command. Read physical
 observations through `vehicle.state`; AIGP events retain their raw packets.
