@@ -1,6 +1,7 @@
-"""Request -1 m/s north for the first two native race seconds, then zero."""
+"""Start the target-independent velocity program after native GO."""
 
-from miniflight import VelocityNed
+from examples.velocity_ned import Program
+from miniflight import VelocityNed, vehicle
 from target.aigp.controllers import BaseController
 from target.aigp.simulator import AIGPSimulator
 
@@ -8,14 +9,13 @@ from target.aigp.simulator import AIGPSimulator
 class Controller(BaseController[VelocityNed]):
     targets = ("vq1.r1",)
 
+    def __init__(self):
+        self.program = Program()
+
     def update(self, telemetry, frames, race_state) -> VelocityNed | None:
         if race_state is None or not race_state.started:
             return None
-        if race_state.time_seconds < 2:
-            return VelocityNed(-1, 0, 0)
-        if race_state.time_seconds < 3:
-            return VelocityNed(0, 0, 0)
-        raise StopIteration
+        return self.program.update(vehicle.state)
 
 
 if __name__ == "__main__":

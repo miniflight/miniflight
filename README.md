@@ -18,6 +18,15 @@ use the same `Vehicle` receive and send path.
 Programs use `from miniflight import vehicle`, then operations such as
 `vehicle.body_rates(...)`. Startup binds one Target; shutdown releases it.
 
+The [timed velocity program](examples/velocity_ned.py) reads `State`, keeps its
+own start time, and returns `VelocityNed` commands. It imports no target code.
+Its [AIGP wrapper](examples/aigp/velocity_ned.py) waits for native GO, then passes
+`vehicle.state` to the program:
+
+```sh
+python3.11 -m target.aigp.simulator vq1.r1 --controller examples.aigp.velocity_ned
+```
+
 Install the [runtime](target/aigp/README.md#setup), then run from the repository root:
 
 ```sh
