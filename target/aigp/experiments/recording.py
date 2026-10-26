@@ -163,7 +163,22 @@ class RecordedClient(SimulatorClient):
         return decoded
 
 
-class _ReplayClient(SimulatorClient):
+class ReplayClient(SimulatorClient):
+    """Feed recorded packets through the target's observation path without sockets."""
+
+    def __init__(self):
+        super().__init__(camera_port=None)
+        self.decoder = mavlink.MAVLink(None)
+
+    def feed(self, telemetry):
+        packets = []
+        for packet in telemetry:
+            message, = self.decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
+            stamp = packet["received_at"]
+            packets.append(Packet(message, stamp, self._receive(message, stamp)))
+        self.packets = tuple(packets)
+        return self.packets
+
     def poll(self, timeout=0.0):
         return self.packets
 
@@ -171,7 +186,7 @@ class _ReplayClient(SimulatorClient):
 def replay(create, path, signals=None):
     """Replay input batches through Vehicle and controller; runtime lifecycle is not replayed."""
     updates, terminal, controller = 0, False, None
-    decoder, client = mavlink.MAVLink(None), _ReplayClient(camera_port=None)
+    client = ReplayClient()
     with Path(path).open() as source, ExitStack() as cleanup:
         if _read_header(source).get("format") != 3:
             raise ValueError("older recordings lack native race state; use their recorded controller API")
@@ -185,19 +200,14 @@ def replay(create, path, signals=None):
                 continue
             if terminal or controller is None:
                 raise ValueError("controller updates outside its lifetime")
-            telemetry = []
-            for packet in row["telemetry"]:
-                message, = decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
-                stamp = packet["received_at"]
-                telemetry.append(Packet(message, stamp, client._receive(message, stamp)))
+            telemetry = client.feed(row["telemetry"])
             frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
             if frames:
                 client._camera.latest = frames[-1]
-            client.packets = tuple(telemetry)
             vehicle.read(timeout=0)
             try:
                 race = row["native_race"]
-                command = controller.update(tuple(telemetry), frames, None if race is None else NativeRaceState(**race))
+                command = controller.update(telemetry, frames, None if race is None else NativeRaceState(**race))
             except BaseException as error:
                 terminal = True
                 actual = {"error": {"type": type(error).__name__, "message": str(error)}}
