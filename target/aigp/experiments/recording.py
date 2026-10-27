@@ -178,9 +178,13 @@ class ReplayClient(SimulatorClient):
     def feed(self, telemetry):
         packets = []
         for packet in telemetry:
-            message, = self.decoder.parse_buffer(base64.b64decode(packet["wire"], validate=True))
+            wire = base64.b64decode(packet["wire"], validate=True)
             stamp = packet["received_at"]
-            packets.append(Packet(message, stamp, self._receive(message, stamp)))
+            if packet.get("camera", False):
+                packets.append(Packet(wire, stamp, self._camera.receive(wire, stamp)))
+            else:
+                message, = self.decoder.parse_buffer(wire)
+                packets.append(Packet(message, stamp, self._receive(message, stamp)))
         self.packets = tuple(packets)
         return self.packets
 
