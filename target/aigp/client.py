@@ -223,14 +223,17 @@ class SimulatorClient(Target):
             return race
 
     def send(self, command: Command):
-        """Encode one command at the requested control boundary."""
+        self.mav.send(self.encode_command(command, time.monotonic() - self._boot, self.target_ids, self.mav))
+
+    @staticmethod
+    def encode_command(command: Command, elapsed, target_ids, encoder):
+        """Construct the native message without sending it."""
         if not isinstance(command, Command):
             raise TypeError("expected a flight command")
-        elapsed = time.monotonic() - self._boot
         time_ms = int(elapsed * 1000) & 0xffffffff
         if isinstance(command, BodyRates):
-            self.mav.set_attitude_target_send(
-                time_ms, *self.target_ids,
+            return encoder.set_attitude_target_encode(
+                time_ms, *target_ids,
                 mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE | 16,  # AI-GP rad/s extension
                 [1.0, 0.0, 0.0, 0.0],
                 # The simulator's angular-rate wire axes are opposite to FRD.
@@ -239,16 +242,16 @@ class SimulatorClient(Target):
         elif isinstance(command, MotorControls):
             if len(command.outputs) != 4:
                 raise ValueError("AIGP requires four motor controls")
-            self.mav.set_actuator_control_target_send(
-                int(elapsed * 1e6), 0, *self.target_ids, command.outputs + (0.0,) * 4)
+            return encoder.set_actuator_control_target_encode(
+                int(elapsed * 1e6), 0, *target_ids, command.outputs + (0.0,) * 4)
         else:
             vector = (command.north, command.east, command.down)
             position = vector if isinstance(command, PositionNed) else (0, 0, 0)
             velocity = vector if isinstance(command, VelocityNed) else (0, 0, 0)
             # 1 ignores a field: xyz bits 0..2, velocity 3..5, acceleration 6..8, yaw 10..11.
             mask = 0b110111111000 if isinstance(command, PositionNed) else 0b110111000111
-            self.mav.set_position_target_local_ned_send(
-                time_ms, *self.target_ids, mavlink.MAV_FRAME_LOCAL_NED,
+            return encoder.set_position_target_local_ned_encode(
+                time_ms, *target_ids, mavlink.MAV_FRAME_LOCAL_NED,
                 mask, *position, *velocity, 0, 0, 0, 0, 0,
             )
 
