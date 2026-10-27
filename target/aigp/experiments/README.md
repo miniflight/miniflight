@@ -147,9 +147,10 @@ No sockets are opened and no simulator is launched during replay:
 python -m target.aigp.experiments.process_replay path/to/trial-00001.reset.jsonl path/to/trial-00001.jsonl
 ```
 
-Commands are compared at the Target interface, before MAVLink encoding. The
-recorder also retains encoded MAVLink bytes as `outgoing` events. These show
-send attempts, not native receipt; process replay does not compare their bytes.
+Commands are compared at the Target interface and, when `outgoing` records exist,
+through the live command encoder against decoded wire fields. `wire_commands`
+reports that count; transport timestamps and MAVLink envelopes are not compared.
+Outgoing records show send attempts, not native receipt.
 Native physics is outside this replay. A reproduced crash is a
 matched failure, not a successful flight. The repeat runner keeps that failure
 in its ledger and stops on a replay mismatch.

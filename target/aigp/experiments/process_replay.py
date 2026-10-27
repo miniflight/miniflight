@@ -55,6 +55,7 @@ class ProcessClient(RecordedClient):
     def __init__(self, calls, **kwargs):
         super().__init__(calls.record or (lambda **row: None), **kwargs)
         self.calls, self.decoder = calls, mavlink.MAVLink(None)
+        self.outgoing, self.wire_commands = None, 0
 
     def open(self):
         return self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
@@ -73,7 +74,19 @@ class ProcessClient(RecordedClient):
         return self.calls("arm", dict(armed=armed), lambda: super(ProcessClient, self)._set_armed(armed))
 
     def send(self, command):
-        return self.calls("send", command_data(command), lambda: super(ProcessClient, self).send(command))
+        result = self.calls("send", command_data(command), lambda: super(ProcessClient, self).send(command))
+        if self.outgoing is not None:
+            expected, = self.decoder.parse_buffer(base64.b64decode(self.outgoing, validate=True))
+            message = self.encode_command(command, 0, self.target_ids, self.decoder)
+            actual, = self.decoder.parse_buffer(message.pack(self.decoder))
+            # Transport clock and MAVLink envelope are outside command-content replay.
+            contents = [{key: value for key, value in packet.to_dict().items() if key not in ("time_boot_ms", "time_usec")}
+                        for packet in (expected, actual)]
+            if contents[0] != contents[1]:
+                self.calls.mismatch = f"wire command {self.wire_commands}: expected {contents[0]}, got {contents[1]}"
+                raise AssertionError(self.calls.mismatch)
+            self.outgoing, self.wire_commands = None, self.wire_commands + 1
+        return result
 
     def poll(self, timeout=0.0):
         packets = self.calls("poll", dict(timeout=timeout), lambda: super(ProcessClient, self).poll(timeout),
@@ -110,9 +123,18 @@ def replay(path):
         raise ValueError("full replay needs a flight or reset process recording")
     outcome = {}
     def recorded_calls():
+        outgoing, wire_recorded = [], False
         with path.open() as source:
             for row in map(json.loads, source):
+                if row["event"] == "outgoing":
+                    outgoing.append(row["wire"])
+                    wire_recorded = True
                 if row["event"] == "call":
+                    if row["name"] == "send" and "error" not in row and wire_recorded:
+                        if len(outgoing) != 1:
+                            raise AssertionError("recorded send must contain one outgoing packet")
+                        client.outgoing = outgoing[0]
+                    outgoing.clear()
                     yield row
                 elif row["event"] in ("result", "error"):
                     outcome.setdefault(row["event"], row)
@@ -150,7 +172,7 @@ def replay(path):
         result["returned"] = None if returned is None else asdict(returned)
     if error != expected_error or json.loads(json.dumps(result)) != {key: expected[key] for key in result}:
         raise AssertionError(f"process outcome differs: {error}, result={result}")
-    return dict(trace=str(path), calls=calls.count, error=error)
+    return dict(trace=str(path), calls=calls.count, wire_commands=client.wire_commands, error=error)
 
 
 def main():
