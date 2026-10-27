@@ -132,6 +132,19 @@ rate loop. See [yaw tracking](../docs/yaw-tracking.md) for measurements and limi
 
 ## recording and replay
 
+Project privileged VQ1 R1 gate openings onto a camera-enabled process recording:
+
+```sh
+python -m target.aigp.experiments.gate_projection flight.jsonl test/fixtures/vq1_track.json projection.mp4
+```
+
+Requires `ffmpeg`. The video compares raw images with projected openings using
+the PDF camera model and measured gate pivot offset. Cyan is the specified
+1.50 m opening; yellow is the measured 1.48 m opening. Pose is joined by nearest
+host receipt time because camera epoch and pose boot clocks are not synchronized.
+The adjacent JSON retains hashes and receipt gaps. This is a geometry diagnostic,
+not a detector or a pixel-error score.
+
 The repeat runner records and replays each reset and attached flight, including
 failed attempts. `miniflight.replay.Calls` checks external call order, arguments,
 results and errors, and supplies the recorded clock. AIGP packet codecs and race
