@@ -148,7 +148,9 @@ python -m target.aigp.experiments.process_replay path/to/trial-00001.reset.jsonl
 ```
 
 Commands are compared at the Target interface, before MAVLink encoding. The
-native physics and launcher are outside this replay. A reproduced crash is a
+recorder also retains encoded MAVLink bytes as `outgoing` events. These show
+send attempts, not native receipt; process replay does not compare their bytes.
+Native physics is outside this replay. A reproduced crash is a
 matched failure, not a successful flight. The repeat runner keeps that failure
 in its ledger and stops on a replay mismatch.
 

@@ -129,6 +129,11 @@ class RecordedClient(SimulatorClient):
         self.course_packets = course_packets  # Immutable course traffic retains its original receipt times.
         self.preview = None if preview is None else Path(preview)
 
+    def open(self):
+        super().open()
+        self.connection.mav.set_send_callback(lambda message: self.record(
+            event="outgoing", wire=base64.b64encode(message.get_msgbuf()).decode("ascii")))
+
     def poll(self, timeout=0.0):
         packets = super().poll(timeout)
         if self.preview is not None and any(isinstance(packet.decoded, Frame) for packet in packets):
