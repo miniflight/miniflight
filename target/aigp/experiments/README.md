@@ -132,6 +132,11 @@ rate loop. See [yaw tracking](../docs/yaw-tracking.md) for measurements and limi
 
 ## recording and replay
 
+Add `--timesync` to a simulator run with `--record` to capture native clock
+exchanges at the existing heartbeat cadence. Epoch samples and requests replay
+with the same transport calls. Replies provide native epoch time; they do not
+provide a paired pose boot timestamp or establish camera exposure time.
+
 Project privileged VQ1 R1 gate openings onto a camera-enabled process recording:
 
 ```sh

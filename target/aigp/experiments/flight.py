@@ -55,7 +55,7 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
 
 def rollout(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False,
             race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None, *,
-            target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None):
+            target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None, timesync=False):
     trace = Path(trace)
     camera = camera or record_frames
     simulator_args = (("-RenderOffScreen",) if offscreen else ()) if simulator_args is None else tuple(simulator_args)
@@ -66,7 +66,7 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         timeout = .3 if name == "r1_motors" else 1.0
     sources = subprocess.check_output(["git", "ls-files", "*.py", "*.lua"], cwd=ROOT, text=True).splitlines()
     metadata = dict(target=target, controller=name, hz=hz, timeout=timeout, startup_timeout_s=startup_timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
-                    simulator_args=simulator_args, process="flight", race_status_path=str(trace.with_suffix(".native.jsonl")),
+                    simulator_args=simulator_args, timesync=timesync, process="flight", race_status_path=str(trace.with_suffix(".native.jsonl")),
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     sources={path: sha256(ROOT / path) for path in sources})
@@ -88,7 +88,7 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         calls = Calls(record)
         if race_reader is None:
             race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), timeout)))
-        client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets,
+        client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets, timesync=timesync,
                                 preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), target, hz=hz, client=client, timeout=timeout, startup_timeout=startup_timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before, launcher=Launcher(calls))

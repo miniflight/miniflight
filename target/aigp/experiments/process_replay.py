@@ -6,6 +6,7 @@ from contextlib import contextmanager, ExitStack
 from dataclasses import asdict
 import json
 from pathlib import Path
+import time
 
 from pymavlink.dialects.v20 import common as mavlink
 
@@ -52,10 +53,11 @@ class Launcher:
 
 
 class ProcessClient(RecordedClient):
-    def __init__(self, calls, **kwargs):
+    def __init__(self, calls, timesync=False, **kwargs):
         super().__init__(calls.record or (lambda **row: None), **kwargs)
         self.calls, self.decoder = calls, mavlink.MAVLink(None)
         self.outgoing, self.wire_commands = None, 0
+        self.timesync = timesync
 
     def open(self):
         return self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
@@ -65,7 +67,11 @@ class ProcessClient(RecordedClient):
         self.target_ids = None
 
     def heartbeat(self):
-        return self.calls("heartbeat", {}, super().heartbeat)
+        result = self.calls("heartbeat", {}, super().heartbeat)
+        if self.timesync:
+            epoch = self.calls("epoch_ns", {}, time.time_ns)
+            self.calls("timesync", dict(tc1=epoch, ts1=0), lambda: self.mav.timesync_send(epoch, 0))
+        return result
 
     def reset(self):
         return self.calls("reset", {}, super().reset)
@@ -139,7 +145,7 @@ def replay(path):
                 elif row["event"] in ("result", "error"):
                     outcome.setdefault(row["event"], row)
     calls = Calls(rows=recorded_calls())
-    client = ProcessClient(calls, camera_port=5600 if metadata.get("camera") else None)
+    client = ProcessClient(calls, camera_port=5600 if metadata.get("camera") else None, timesync=metadata.get("timesync", False))
     if metadata["process"] == "flight":
         reference = metadata["reference"]
         if reference is not None and sha256(Path(reference["path"])) != reference["sha256"]:

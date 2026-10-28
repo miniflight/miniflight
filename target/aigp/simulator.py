@@ -208,9 +208,12 @@ def main(argv=None):
     parser.add_argument("--hz", type=float)
     parser.add_argument("--startup-timeout", type=float)
     parser.add_argument("--record", type=Path, help="record this program run for full process replay")
+    parser.add_argument("--timesync", action="store_true", help="record native clock exchanges at heartbeat cadence; requires --record")
     argv = list(sys.argv[1:] if argv is None else argv)
     boundary = argv.index("--") if "--" in argv else len(argv)
     args = parser.parse_args(argv[:boundary])
+    if args.timesync and args.record is None:
+        parser.error("--timesync requires --record")
     simulator_args = argv[boundary + 1:]
     if args.prepare:
         if args.controller or simulator_args or args.hz is not None or args.startup_timeout is not None or args.record:
@@ -236,7 +239,7 @@ def main(argv=None):
             from target.aigp.experiments.flight import rollout
             print(f"Recording: {args.record}", flush=True)
             rollout(args.controller, args.record, target=args.target or "vq1.r1", hz=hz, timeout=1,
-                    startup_timeout=startup_timeout, camera=True, attach=args.attach, simulator_args=simulator_args)
+                    startup_timeout=startup_timeout, camera=True, attach=args.attach, simulator_args=simulator_args, timesync=args.timesync)
         elif args.controller:
             controller = load_controller(args.controller)
             sim = AIGPSimulator(controller, args.target or "vq1.r1", hz, startup_timeout=startup_timeout)

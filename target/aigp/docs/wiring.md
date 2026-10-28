@@ -152,6 +152,9 @@ reply = client.telemetry.get("TIMESYNC")  # poll to receive a reply
 A native VQ1 build-3391 check received replies to all 97 requests during a complete
 six-gate run. Each reply echoed the client request timestamp in `ts1` and returned
 the simulator timestamp in `tc1`. The adapter makes no clock adjustment.
+An owned VQ1 build-3391 capture on 2026-10-28 matched 53 of 53 requests: `tc1`
+was epoch nanoseconds, while pose retained boot milliseconds. The reply alone
+does not map camera epoch timestamps to pose boot time.
 
 The [vendor controller](reference/PyAIPilotExample-v4/controller.py) also writes
 `SET_ACTUATOR_CONTROL_TARGET` with eight controls, group 0, and the target IDs,
