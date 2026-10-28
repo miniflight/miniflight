@@ -25,10 +25,10 @@ def observations(path):
                 yield client.read(timeout=0), frames, client.gates
 
 
-def project(gate, motion, attitude, width, height, pivot_to_center):
+def project(gate, motion, attitude, width, height, pivot_to_center, plane_y=0):
     """Gate local X is width, Z is down; camera X is right, Y down, Z forward."""
     corners = np.array([(-width/2, 0, -height/2), (width/2, 0, -height/2),
-                        (width/2, 0, height/2), (-width/2, 0, height/2)]) + pivot_to_center
+                        (width/2, 0, height/2), (-width/2, 0, height/2)]) + pivot_to_center + (0, plane_y, 0)
     world = corners @ Quaternion(*gate.orientation).as_rotation_matrix().T + gate.position
     rotation = Quaternion.from_euler(attitude.roll, attitude.pitch, attitude.yaw).as_rotation_matrix()
     mount = Quaternion.from_euler(0, math.radians(20), 0).as_rotation_matrix()
@@ -65,14 +65,15 @@ def render(trace, geometry_path, output):
                 for width, height, color in ((1.50, 1.50, (255, 255, 0)),
                                              (geometry["opening_width_m"], geometry["opening_height_m"], (0, 255, 255))):
                     for gate in gates:
-                        uv = project(gate, motion, attitude, width, height, geometry["pivot_to_center_local_ned_m"])
-                        if uv is not None and np.max(np.abs(uv)) < 100000:
-                            points = np.round(uv).astype(np.int32)
-                            cv2.polylines(image, [points], True, color, 1, cv2.LINE_AA)
-                            cv2.putText(image, str(gate.id+1), tuple(points[0]), 0, .4, color, 1, cv2.LINE_AA)
+                        for plane_y in (-geometry["frame_depth_m"]/2, geometry["frame_depth_m"]/2):
+                            uv = project(gate, motion, attitude, width, height, geometry["pivot_to_center_local_ned_m"], plane_y)
+                            if uv is not None and np.max(np.abs(uv)) < 100000:
+                                points = np.round(uv).astype(np.int32)
+                                cv2.polylines(image, [points], True, color, 1, cv2.LINE_AA)
+                                cv2.putText(image, str(gate.id+1), tuple(points[0]), 0, .4, color, 1, cv2.LINE_AA)
                 panel = cv2.copyMakeBorder(np.hstack((frame.bgr, image)), 32, 32, 0, 0, cv2.BORDER_CONSTANT)
                 labels = [("Recorded camera", (8, 21)), ("Privileged gate projection", (648, 21)),
-                          (f"Frame {frame.id} | cyan: PDF 1.50 m | yellow: measured 1.48 m | receipt aligned; capture offset unknown", (8, 412))]
+                          (f"Frame {frame.id} | cyan: 1.50 m | yellow: 1.48 m | front/back planes | receipt aligned; capture offset unknown", (8, 412))]
                 for label, origin in labels:
                     cv2.putText(panel, label, origin, 0, .5, (255, 255, 255), 1, cv2.LINE_AA)
                 first_ns = frame.time_ns if first_ns is None else first_ns
@@ -92,7 +93,7 @@ def render(trace, geometry_path, output):
                    alignment="nearest host receipt; camera epoch and pose boot clocks are not synchronized",
                    receipt_gap_p95_ms=(np.percentile(np.abs(gaps), 95, axis=0)*1000).tolist(),
                    camera=dict(fx=320, fy=320, cx=320, cy=180, uptilt_degrees=20),
-                   scope="Projected gate midplanes; no image detections, pixel-error score or parameter fitting.")
+                   scope="Openings projected at measured mesh front/back bounds; no occlusion model or parameter fitting.")
     output.with_suffix(".json").write_text(json.dumps(summary, indent=2)+"\n")
     return summary
 

@@ -140,7 +140,9 @@ python -m target.aigp.experiments.gate_projection flight.jsonl test/fixtures/vq1
 
 Requires `ffmpeg`. The video compares raw images with projected openings using
 the PDF camera model and measured gate pivot offset. Cyan is the specified
-1.50 m opening; yellow is the measured 1.48 m opening. Pose is joined by nearest
+1.50 m opening; yellow is the measured 1.48 m collision opening. Both are drawn
+at the measured mesh front/back bounds (0.1573 m apart), without an occlusion model.
+Pose is joined by nearest
 host receipt time because camera epoch and pose boot clocks are not synchronized.
 The adjacent JSON retains hashes and receipt gaps. This is a geometry diagnostic,
 not a detector or a pixel-error score.
