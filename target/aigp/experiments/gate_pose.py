@@ -18,10 +18,10 @@ def frame_and_opening(contours, hierarchy):
 
 
 def fit_edges(contour, seed):
-    """Fit a supplied aperture contour; the ordered seed only associates its edges.
+    """Fit a supplied contour; the ordered seed only associates its edges.
 
     Return corner intersections and four pixel RMS residuals, or None.
-    This does not identify gates or establish that the contour is an aperture.
+    This does not identify gates or validate which physical edge was measured.
     """
     points = np.asarray(contour, dtype=float).reshape(-1, 2)
     seed = np.asarray(seed, dtype=float)
@@ -49,6 +49,23 @@ def fit_edges(contour, seed):
     if not np.isfinite(corners).all() or not cv2.isContourConvex(corners.astype(np.float32)):
         return None
     return corners, residuals
+
+
+def fit_outline(contour, image_shape):
+    """Fit a fully visible convex envelope using its original contour pixels."""
+    if contour is None:
+        return None
+    x, y, width, height = cv2.boundingRect(contour)
+    if x == 0 or y == 0 or x+width == image_shape[1] or y+height == image_shape[0]:
+        return None
+    hull = cv2.convexHull(contour)
+    points = contour.reshape(-1, 2)
+    boundary = points[[abs(cv2.pointPolygonTest(hull, tuple(map(float, p)), True)) <= 1 for p in points]]
+    seed = cv2.boxPoints(cv2.minAreaRect(hull))
+    if cv2.contourArea(seed, oriented=True) < 0:
+        seed = seed[::-1]
+    seed = np.roll(seed, -np.argmin(seed.sum(axis=1)), axis=0)
+    return fit_edges(boundary, seed)
 
 
 def estimate(corners, side_m, camera_matrix):
