@@ -9,6 +9,8 @@ from target.aigp.controllers import BaseController
 class Controller(BaseController[PositionNed]):
     targets = ("vq1.r1",)
     offset = (2, 0, 2*math.tan(math.radians(20)))
+    max_speed = .001
+    hold_seconds = 3
 
     def __init__(self):
         self.target = self.started = self.steady = None
@@ -30,9 +32,9 @@ class Controller(BaseController[PositionNed]):
             dn, de, dd = self.offset
             self.target = PositionNed(north+dn, east+de, down+dd)
             self.near_gate = True
-        elif self.near_gate and distance < .02 and speed < .001 and state.gyro is not None and math.hypot(*state.gyro) < .001:
+        elif self.near_gate and distance < .02 and speed < self.max_speed and state.gyro is not None and math.hypot(*state.gyro) < .001:
             self.steady = state.time if self.steady is None else self.steady
-            if state.time-self.steady >= 3:
+            if state.time-self.steady >= self.hold_seconds:
                 raise StopIteration
         else:
             self.steady = None
