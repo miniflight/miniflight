@@ -4,6 +4,40 @@ import cv2
 import numpy as np
 
 
+def fit_edges(contour, seed):
+    """Fit a supplied aperture contour; the ordered seed only associates its edges.
+
+    Return corner intersections and four pixel RMS residuals, or None.
+    This does not identify gates or establish that the contour is an aperture.
+    """
+    points = np.asarray(contour, dtype=float).reshape(-1, 2)
+    seed = np.asarray(seed, dtype=float)
+    edges = np.roll(seed, -1, axis=0) - seed
+    lengths = np.linalg.norm(edges, axis=1)
+    if np.any(lengths == 0):
+        return None
+    relative = points[:, None, :] - seed[None, :, :]
+    fraction = np.sum(relative * edges, axis=2) / lengths**2
+    distance = np.abs(relative[:, :, 0]*edges[:, 1] - relative[:, :, 1]*edges[:, 0]) / lengths
+    nearest = np.argmin(distance, axis=1)
+    lines, residuals = [], []
+    for i in range(4):
+        samples = points[(nearest == i) & (fraction[:, i] > .15) & (fraction[:, i] < .85)]
+        if len(samples) < 3:
+            return None
+        vx, vy, x, y = cv2.fitLine(samples.astype(np.float32), cv2.DIST_HUBER, 0, .01, .01).ravel()
+        line = np.array([-vy, vx, vy*x-vx*y], dtype=float)
+        lines.append(line)
+        residuals.append(float(np.sqrt(np.mean((samples @ line[:2] + line[2])**2))))
+    corners = np.array([np.cross(lines[i-1], lines[i]) for i in range(4)])
+    if np.any(np.abs(corners[:, 2]) < 1e-9):
+        return None
+    corners = corners[:, :2] / corners[:, 2:]
+    if not np.isfinite(corners).all() or not cv2.isContourConvex(corners.astype(np.float32)):
+        return None
+    return corners, residuals
+
+
 def estimate(corners, side_m, camera_matrix):
     """Corners are image TL/TR/BR/BL. Camera axes are right, down, forward.
 
