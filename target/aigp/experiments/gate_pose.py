@@ -4,6 +4,19 @@ import cv2
 import numpy as np
 
 
+def frame_and_opening(contours, hierarchy):
+    """Largest outer component and its largest child hole; no other-frame fallback."""
+    if hierarchy is None:
+        return None, None
+    parents = np.flatnonzero(hierarchy[0, :, 3] < 0)
+    if not len(parents):
+        return None, None
+    parent = max(parents, key=lambda i: cv2.contourArea(contours[i]))
+    holes = np.flatnonzero(hierarchy[0, :, 3] == parent)
+    opening = None if not len(holes) else contours[max(holes, key=lambda i: cv2.contourArea(contours[i]))]
+    return contours[parent], opening
+
+
 def fit_edges(contour, seed):
     """Fit a supplied aperture contour; the ordered seed only associates its edges.
 
