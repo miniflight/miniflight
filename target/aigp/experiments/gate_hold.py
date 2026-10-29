@@ -1,4 +1,4 @@
-"""Hold still two metres before gate one for a privileged camera measurement."""
+"""Hold a fixed NED offset from gate one for a privileged camera measurement."""
 
 import math
 
@@ -8,6 +8,7 @@ from target.aigp.controllers import BaseController
 
 class Controller(BaseController[PositionNed]):
     targets = ("vq1.r1",)
+    offset = (2, 0, 2*math.tan(math.radians(20)))
 
     def __init__(self):
         self.target = self.started = self.steady = None
@@ -26,7 +27,8 @@ class Controller(BaseController[PositionNed]):
         distance, speed = math.dist(position, (self.target.north, self.target.east, self.target.down)), math.hypot(*velocity)
         if not self.near_gate and distance < .05 and speed < .1 and race_state.gate_centers:
             north, east, down = race_state.gate_centers[0]
-            self.target = PositionNed(north+2, east, down+2*math.tan(math.radians(20)))
+            dn, de, dd = self.offset
+            self.target = PositionNed(north+dn, east+de, down+dd)
             self.near_gate = True
         elif self.near_gate and distance < .02 and speed < .001 and state.gyro is not None and math.hypot(*state.gyro) < .001:
             self.steady = state.time if self.steady is None else self.steady
