@@ -25,14 +25,19 @@ def observations(path):
                 yield client.read(timeout=0), frames, client.gates
 
 
+def camera_coordinates(points, motion, attitude):
+    """NED point(s) to camera right/down/forward metres, with the specified mount."""
+    rotation = Quaternion.from_euler(attitude.roll, attitude.pitch, attitude.yaw).as_rotation_matrix()
+    mount = Quaternion.from_euler(0, math.radians(20), 0).as_rotation_matrix()
+    return ((np.asarray(points) - motion.position) @ rotation @ mount)[..., (1, 2, 0)]
+
+
 def project(gate, motion, attitude, width, height, pivot_to_center, plane_y=0):
     """Gate local X is width, Z is down; camera X is right, Y down, Z forward."""
     corners = np.array([(-width/2, 0, -height/2), (width/2, 0, -height/2),
                         (width/2, 0, height/2), (-width/2, 0, height/2)]) + pivot_to_center + (0, plane_y, 0)
     world = corners @ Quaternion(*gate.orientation).as_rotation_matrix().T + gate.position
-    rotation = Quaternion.from_euler(attitude.roll, attitude.pitch, attitude.yaw).as_rotation_matrix()
-    mount = Quaternion.from_euler(0, math.radians(20), 0).as_rotation_matrix()
-    camera = ((world - motion.position) @ rotation @ mount)[:, (1, 2, 0)]
+    camera = camera_coordinates(world, motion, attitude)
     return None if np.any(camera[:, 2] <= 0) else 320 * camera[:, :2] / camera[:, 2:] + (320, 180)
 
 
