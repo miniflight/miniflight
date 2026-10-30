@@ -20,9 +20,8 @@ from miniflight.replay import Calls
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
 from target.aigp.controllers.r1_motors import Controller as MotorGates
 from target.aigp.controllers import load_controller
-from target.aigp.experiments.recording import RecordedController, command_data, recording, replay
+from target.aigp.experiments.recording import Launcher, ProcessClient, RaceReader, RecordedController, command_data, recording, replay
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
-from target.aigp.experiments.process_replay import Launcher, ProcessClient, RaceReader
 from target.aigp.native import BASE, SHIPPING, TARGETS, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
 

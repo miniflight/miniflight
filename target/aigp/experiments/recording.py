@@ -15,12 +15,18 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import Frame, vehicle
 from target.aigp.client import Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT, update_controller
-from target.aigp.native import TARGETS, NativeRaceState
+from target.aigp.native import TARGETS, NativeRaceState, launch
 
 
 def command_data(command):
     return None if command is None else {"kind": type(command).__name__,
         **{key: list(value) if isinstance(value, tuple) else value for key, value in asdict(command).items()}}
+
+
+def packet_data(packet):
+    camera = isinstance(packet.data, bytes)
+    return dict(camera=camera, received_at=packet.received_at,
+                wire=base64.b64encode(packet.data if camera else packet.data.get_msgbuf()).decode("ascii"))
 
 
 def frame_data(frame, pixels=False):
@@ -89,6 +95,45 @@ def read_course(path):
         if message.get_type() == "DATA_TRANSMISSION_HANDSHAKE" or message.get_type() == "ENCAPSULATED_DATA" and message.data[0] == 2:
             packets.append(Packet(message, data["received_at"]))
     return tuple(packets)
+
+
+class NativeProcess:
+    def __init__(self, calls, process=None):
+        self.calls, self.process = calls, process
+
+    def poll(self):
+        return self.calls("process.poll", {}, None if self.process is None else self.process.poll)
+
+
+class Launcher:
+    def __init__(self, calls):
+        self.calls = calls
+
+    @contextmanager
+    def __call__(self, target, simulator_args=(), attach=False, race_status_path=None):
+        if attach:
+            with launch(target, simulator_args, attach=True, race_status_path=race_status_path) as process:
+                yield process
+            return
+        cleanup = ExitStack()
+        arguments = dict(target=target, simulator_args=list(simulator_args), race_status_path=str(race_status_path))
+        try:
+            process = self.calls("launch", arguments,
+                                 lambda: cleanup.enter_context(launch(target, simulator_args, race_status_path=race_status_path)),
+                                 encode=lambda process: process.pid)
+            yield NativeProcess(self.calls, process if self.calls.record is not None else None)
+        finally:
+            self.calls("launch.close", {}, cleanup.close)
+
+
+class RaceReader:
+    def __init__(self, calls, reader=None):
+        self.calls, self.reader = calls, reader
+
+    def poll(self):
+        states = self.calls("race", {}, None if self.reader is None else self.reader.poll,
+                            encode=lambda states: [asdict(state) for state in states])
+        return states if self.reader is not None else tuple(NativeRaceState(**state) for state in states)
 
 
 class RecordedController(BaseController[CommandT]):
@@ -175,6 +220,63 @@ class RecordedClient(SimulatorClient):
                 and self._telemetry.get(kind) is message):
             self.record(event="telemetry", message=message.to_dict())
         return decoded
+
+
+class ProcessClient(RecordedClient):
+    def __init__(self, calls, timesync=False, **kwargs):
+        super().__init__(calls.record or (lambda **row: None), **kwargs)
+        self.calls, self.decoder = calls, mavlink.MAVLink(None)
+        self.outgoing, self.wire_commands = None, 0
+        self.timesync = timesync
+
+    def open(self):
+        return self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
+
+    def disconnect(self):
+        self.calls("disconnect", {}, super().disconnect)
+        self.target_ids = None
+
+    def heartbeat(self):
+        result = self.calls("heartbeat", {}, super().heartbeat)
+        if self.timesync:
+            epoch = self.calls("epoch_ns", {}, time.time_ns)
+            self.calls("timesync", dict(tc1=epoch, ts1=0), lambda: self.mav.timesync_send(epoch, 0))
+        return result
+
+    def reset(self):
+        return self.calls("reset", {}, super().reset)
+
+    def _set_armed(self, armed):
+        return self.calls("arm", dict(armed=armed), lambda: super(ProcessClient, self)._set_armed(armed))
+
+    def send(self, command):
+        result = self.calls("send", command_data(command), lambda: super(ProcessClient, self).send(command))
+        if self.outgoing is not None:
+            expected, = self.decoder.parse_buffer(base64.b64decode(self.outgoing, validate=True))
+            message = self.encode_command(command, 0, self.target_ids, self.decoder)
+            actual, = self.decoder.parse_buffer(message.pack(self.decoder))
+            # Transport clock and MAVLink envelope are outside command-content replay.
+            contents = [{key: value for key, value in packet.to_dict().items() if key not in ("time_boot_ms", "time_usec")}
+                        for packet in (expected, actual)]
+            if contents[0] != contents[1]:
+                self.calls.mismatch = f"wire command {self.wire_commands}: expected {contents[0]}, got {contents[1]}"
+                raise AssertionError(self.calls.mismatch)
+            self.outgoing, self.wire_commands = None, self.wire_commands + 1
+        return result
+
+    def poll(self, timeout=0.0):
+        packets = self.calls("poll", dict(timeout=timeout), lambda: super(ProcessClient, self).poll(timeout),
+                             encode=lambda packets: [packet_data(packet) for packet in packets])
+        if self.calls.record is not None:
+            return packets
+        return tuple(self.receive(packet) for packet in packets)
+
+    def receive(self, packet):
+        wire, stamp = base64.b64decode(packet["wire"], validate=True), packet["received_at"]
+        if packet["camera"]:
+            return Packet(wire, stamp, self._camera.receive(wire, stamp))
+        message, = self.decoder.parse_buffer(wire)
+        return Packet(message, stamp, self._receive(message, stamp))
 
 
 class ReplayClient(SimulatorClient):

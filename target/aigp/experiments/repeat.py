@@ -13,8 +13,7 @@ from miniflight.diagnostics import write_snapshot
 from miniflight.position import PositionConfig
 from miniflight.replay import Calls
 from target.aigp.native import BASE, RaceStateReader, launch, sha256
-from target.aigp.experiments.recording import RecordedClient, read_course, recording
-from target.aigp.experiments.process_replay import ProcessClient, RaceReader, packet_data, replay
+from target.aigp.experiments.recording import ProcessClient, RaceReader, RecordedClient, packet_data, read_course, recording
 
 
 def fresh_race(reader, record, timeout=120, course_packets=(), client=None, clock=time):
@@ -70,6 +69,7 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
 
 def main():
     from target.aigp.experiments.flight import run, stop
+    from target.aigp.experiments.process_replay import replay
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)
     parser.add_argument("--output", type=Path)
