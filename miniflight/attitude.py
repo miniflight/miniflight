@@ -35,3 +35,20 @@ def gyro_step(rotation, gyro, dt):
     advanced = rotation * Quaternion.from_axis_angle(gyro, speed * dt)
     advanced.normalize()
     return advanced
+
+
+class GyroAttitude:
+    """Carry a supplied body-to-local rotation through timestamped IMU observations."""
+
+    def __init__(self, rotation, state):
+        if rotation is None or state.time is None or state.gyro is None:
+            raise ValueError("an initial rotation and timestamped gyro are required")
+        self.rotation = rotation
+        self.time, self.gyro = state.time, state.gyro
+
+    def update(self, state):
+        if state.time is None or state.gyro is None or state.time == self.time:
+            return self.rotation
+        self.rotation = gyro_step(self.rotation, self.gyro, state.time - self.time)
+        self.time, self.gyro = state.time, state.gyro
+        return self.rotation
