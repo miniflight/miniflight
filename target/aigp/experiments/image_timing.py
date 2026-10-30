@@ -6,8 +6,10 @@ from target.aigp.experiments.probe import Probe
 
 
 class Controller(Probe):
+    yaw_rate = .25
+
     def __init__(self):
-        super().__init__((BodyRates(yaw_rate=.25, thrust=.266), BodyRates(yaw_rate=-.25, thrust=.266)), duration=1)
+        super().__init__((BodyRates(yaw_rate=self.yaw_rate, thrust=.266), BodyRates(yaw_rate=-self.yaw_rate, thrust=.266)), duration=1)
         self.hold = GateHold()
 
     def update(self, telemetry, frames, race_state):
