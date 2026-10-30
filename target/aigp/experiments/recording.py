@@ -131,6 +131,15 @@ class RecordedClient(SimulatorClient):
 
     def open(self):
         super().open()
+        receive = self.connection.recv
+
+        def receive_datagram(n=None):
+            data = receive(n)
+            if data:
+                self.record(event="mavlink_datagram", wire=base64.b64encode(data).decode("ascii"))
+            return data
+
+        self.connection.recv = receive_datagram
         self.connection.mav.set_send_callback(lambda message: self.record(
             event="outgoing", wire=base64.b64encode(message.get_msgbuf()).decode("ascii")))
 
