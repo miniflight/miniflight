@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import signal
+import shutil
 import time
 
 from miniflight.diagnostics import write_snapshot
@@ -80,6 +81,7 @@ def main():
     parser.add_argument("--finish-before", type=float, required=True, help="require a native finish strictly before this race time in seconds")
     parser.add_argument("--stop-on-failure", action="store_true")
     parser.add_argument("--render", action="store_true", help="show the simulator window")
+    parser.add_argument("--camera", action="store_true", help="record camera packets when the experiment needs images")
     parser.add_argument("--attach", type=Path, help="use this existing race-status file; keep the simulator running")
     parser.add_argument("--native-pid", type=int, help="record the process ID of the attached simulator")
     parser.add_argument("--course-recording", type=Path, help="reuse an immutable native course from this recording")
@@ -100,12 +102,14 @@ def main():
     for signum in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, interrupt)
     signal.signal(signal.SIGALRM, stop)
-    index, failures = 0, 0
+    index, failures, successful = 0, 0, []
     course_packets = () if args.course_recording is None else read_course(args.course_recording)
     simulator_args = () if args.render else ("-RenderOffScreen",)
     print(f"Pitwall source: {output / 'current.json'}", flush=True)
     with ledger_path.open("x", buffering=1) as ledger, launch("vq1.r1", simulator_args, attach=args.attach is not None, race_status_path=native_path) as process, closing(RaceStateReader(native_path, .3)) as reader:
         while args.count == 0 or index < args.count:
+            if shutil.disk_usage(output).free < 5 * 1024**3:
+                raise OSError("Less than 5 GiB free; stopping the recording loop")
             index += 1
             trace = output / f"trial-{index:05d}.jsonl"
             row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
@@ -124,7 +128,7 @@ def main():
                     finally:
                         record(event="result", reset=reset, course=[packet_data(packet) for packet in course_packets], connection_closed=not client.connected)
                 row["reset"] = reset
-                result = run(args.controller, trace, camera=True, reference=args.reference, offscreen=not args.render,
+                result = run(args.controller, trace, camera=True, record_camera=args.camera, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki, finish_before=args.finish_before)
                 row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
             except BaseException as error:
@@ -142,6 +146,12 @@ def main():
             row["finished_at"] = time.monotonic()
             ledger.write(json.dumps(row) + "\n")
             print(json.dumps(row), flush=True)
+            if row["passed"]:
+                successful.append(trace)
+                if len(successful) > 3:
+                    old = successful.pop(0)
+                    for artifact in old.parent.glob(old.stem + ".*"):
+                        artifact.unlink()
             if interrupted is not None:
                 raise interrupted
             if not row["passed"] and args.stop_on_failure:

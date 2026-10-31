@@ -223,11 +223,12 @@ class RecordedClient(SimulatorClient):
 
 
 class ProcessClient(RecordedClient):
-    def __init__(self, calls, timesync=False, **kwargs):
+    def __init__(self, calls, timesync=False, record_camera=True, **kwargs):
         super().__init__(calls.record or (lambda **row: None), **kwargs)
         self.calls, self.decoder = calls, mavlink.MAVLink(None)
         self.outgoing, self.wire_commands = None, 0
         self.timesync = timesync
+        self.record_camera = record_camera
 
     def open(self):
         return self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
@@ -266,7 +267,8 @@ class ProcessClient(RecordedClient):
 
     def poll(self, timeout=0.0):
         packets = self.calls("poll", dict(timeout=timeout), lambda: super(ProcessClient, self).poll(timeout),
-                             encode=lambda packets: [packet_data(packet) for packet in packets])
+                             encode=lambda packets: [packet_data(packet) for packet in packets
+                                                     if self.record_camera or not isinstance(packet.data, bytes)])
         if self.calls.record is not None:
             return packets
         return tuple(self.receive(packet) for packet in packets)
