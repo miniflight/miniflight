@@ -1,4 +1,4 @@
-"""Position feedback with IMU tilt and native yaw, then body-rate control."""
+"""Follow NED targets with IMU attitude registered to one native initial heading."""
 
 from common.math import Quaternion, Vector3D
 from miniflight import BodyRates, vehicle
@@ -28,7 +28,7 @@ class Controller(BaseController[BodyRates]):
         self.rate_reference = rate_reference  # Saved FRD rad/s, sampled on the same reference clock.
         self.reference_time = self.requested_acceleration = None
         self.time = None
-        self.tilt, self.calibration = None, {}
+        self.attitude_estimate, self.calibration = None, {}
         self.integral = (0, 0, 0)  # Integral contribution, m/s²; bounded by available acceleration.
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
@@ -41,25 +41,32 @@ class Controller(BaseController[BodyRates]):
         now = race_state.received_at if race_state.control_time is None else race_state.control_time
         if race_state.started and now - state.received_at > .3:
             raise TimeoutError("IMU is stale")
-        if self.tilt is None:
+        if self.attitude_estimate is None:
             self.calibration[state.time] = (state.received_at, state.acceleration)
             self.calibration = {t: sample for t, sample in self.calibration.items() if sample[0] >= now-1}
             if not race_state.started:
                 return None
             specific_force = tuple(sum(a[i] for _, a in self.calibration.values()) / len(self.calibration) for i in range(3))
-            self.tilt = GyroAttitude(stationary_rotation(specific_force), state)
+            initial_rotation = stationary_rotation(specific_force)
+            if state.attitude is None:
+                return None
+            if now - state.attitude.received_at > .3:
+                raise TimeoutError("initial heading is stale")
+            self.target_yaw = state.attitude.yaw
+            heading_to_ned = Quaternion.from_euler(0, 0, self.target_yaw)
+            initial_rotation = heading_to_ned * initial_rotation
+            self.attitude_estimate = GyroAttitude(initial_rotation, state)
             self.calibration.clear()
-        imu_rotation = self.tilt.update(state)
-        if state.motion is None or state.attitude is None or not race_state.started:
+        imu_rotation = self.attitude_estimate.update(state)
+        if state.motion is None or not race_state.started:
             return None
         if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):
             return None
-        motion, orientation = state.motion, state.attitude
-        if not race_state.completed and max(now - sample.received_at for sample in (motion, orientation)) > .3:
+        motion = state.motion
+        if not race_state.completed and now - motion.received_at > .3:
             raise TimeoutError("privileged pose is stale")
         position, velocity = Vector3D(*motion.position), Vector3D(*motion.velocity)
-        roll, pitch, _ = imu_rotation.to_euler()
-        self.angles = angles = (roll, pitch, orientation.yaw)
+        self.angles = angles = imu_rotation.to_euler()
 
         if self.reference is None:
             index = race_state.active_gate_index
@@ -75,9 +82,6 @@ class Controller(BaseController[BodyRates]):
             self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(self.reference_time))
         if self.target is None:
             return None
-        if self.target_yaw is None:
-            self.target_yaw = angles[2]
-
         dt = 0.0 if self.time is None else max(0.0, race_state.time_seconds - self.time)
         self.time = race_state.time_seconds
         acceleration_request, integral = trajectory_acceleration(

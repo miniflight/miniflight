@@ -61,7 +61,9 @@ Use `AIGPSimulator(Controller, timeout=.3)` for the tested 50 Hz motor path.
 A device-time gap above 0.3 seconds or nonfinite motor output stops the run.
 Motor inputs are not clipped to 0–1; their scale and limits belong to the target.
 `r1_beautiful` uses PID feedback and accepts a timed position/velocity/acceleration
-reference. Without a reference it follows the next gate center.
+reference. It registers one native initial heading, then uses one IMU rotation
+estimate for roll, pitch and yaw. Without a reference it follows the next gate
+center. The reference experiment supplies this follower to `r1_motors`.
 VQ2 needs its own perception and estimation when course/pose streams are blocked.
 
 [Setup](../README.md) · [Native wiring](../docs/wiring.md) · [Recording](../experiments/README.md)

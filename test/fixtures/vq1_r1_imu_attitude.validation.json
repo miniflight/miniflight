@@ -1,0 +1,179 @@
+{
+  "date": "2026-10-31",
+  "target": "vq1.r1",
+  "controller": "r1_motors with r1_beautiful trajectory follower",
+  "initialization": "stationary accelerometer tilt plus one native ATTITUDE.yaw registering the NED reference",
+  "continuous_attitude_source": "one gyro-propagated quaternion; no native ATTITUDE updates enter control after initialization",
+  "remaining_privileged": [
+    "initial heading",
+    "position",
+    "velocity",
+    "course/reference"
+  ],
+  "reference": {
+    "path": "test/fixtures/vq1_r1_sub10.npz",
+    "sha256": "5aef6c423abf3d40dfbdf057a19cfc45c1c7e7a1cff7a9ad96df8482e8c0c7f5"
+  },
+  "configuration": {
+    "path": "test/fixtures/vq1_r1_sub10.config.json",
+    "sha256": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+  },
+  "program_sha256": {
+    "miniflight/attitude.py": "e447b0859620aed519ec5103a81c5869e0468fe104b5e8fc0119376d472a1028",
+    "target/aigp/controllers/r1_beautiful.py": "83809e8e8de8bba9f449c810db87e62f0d08fcd21960b36923e02997fdfe3d85",
+    "target/aigp/experiments/r1_signals.py": "085405b238da449034a6dd823b77da1e19a9af500d03a9bac5e8d2effc14525d"
+  },
+  "pilot": {
+    "attempts": 20,
+    "clean_sub10": 20,
+    "loss": 0.0,
+    "native_pid": 23853,
+    "finish_range_s": [
+      9.68024826,
+      9.829469681
+    ],
+    "wire_commands_replayed": 9783,
+    "failures": [],
+    "outcome_record": {
+      "path": "target/aigp/.runtime/measurements/imu-yaw-20261031/first-result.json",
+      "sha256": "bc58994b2e42547522ca729924d7f82947585ab0db780d84fe3714fd9aa9a2ba"
+    }
+  },
+  "final_program_first20": {
+    "attempts": 20,
+    "clean_sub10": 18,
+    "loss": 0.1,
+    "native_pid": 23853,
+    "finish_range_s": [
+      9.742222786,
+      9.886869431
+    ],
+    "wire_commands_replayed": 9656,
+    "failures": [
+      {
+        "trial": 9,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        }
+      },
+      {
+        "trial": 16,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        }
+      }
+    ],
+    "outcome_record": {
+      "path": "target/aigp/.runtime/measurements/imu-yaw-20261031/unified-first20.json",
+      "sha256": "e2df3a339c415c5d8fed23c6461a2d2e2b7629a1b32a08f79c822aca733ce047"
+    }
+  },
+  "accuracy_metric": "wrapped yaw difference against native ATTITUDE interpolated at IMU device time; retained captures only",
+  "retained_clean_accuracy": {
+    "retained_flights": 3,
+    "scored": 1460,
+    "yaw_mae_deg": 0.7747766545728952,
+    "yaw_p95_deg": 2.5136027799850984,
+    "yaw_max_deg": 3.299798596122639,
+    "unscored": 6
+  },
+  "retained_failed_accuracy": {
+    "retained_flights": 2,
+    "scored": 836,
+    "yaw_mae_deg": 1.269528192857753,
+    "yaw_p95_deg": 2.0654819109708003,
+    "yaw_max_deg": 37.91609451156416,
+    "unscored": 2
+  },
+  "retained_captures": [
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00018.jsonl",
+      "sha256": "2ee272031826835e0f3eea917cd66c7467c41aa58351ef3fefb9e3c31e07a325",
+      "predictions": 485,
+      "scored": 483,
+      "unscored": 2,
+      "yaw_mae_deg": 1.2375375958379355,
+      "yaw_p95_deg": 2.534102871190416,
+      "yaw_max_deg": 2.9117558698076405,
+      "tilt_mae_deg": 1.6586998377569575,
+      "heading_anchor_rad": 3.140718936920166
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00019.jsonl",
+      "sha256": "4ef0f64d6b5204ba88f27a7cd40c596559fe3988f3f2be0acdc1e29032f57cbd",
+      "predictions": 491,
+      "scored": 489,
+      "unscored": 2,
+      "yaw_mae_deg": 1.059204987956418,
+      "yaw_p95_deg": 2.8826693416787097,
+      "yaw_max_deg": 3.299798596122639,
+      "tilt_mae_deg": 0.8755013843919389,
+      "heading_anchor_rad": -3.140805244445801
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00020.jsonl",
+      "sha256": "fd11e1608c5c94d40ca81fd960c392115890764121788ca96470d9a91276caa6",
+      "predictions": 490,
+      "scored": 488,
+      "unscored": 2,
+      "yaw_mae_deg": 0.031745938065606216,
+      "yaw_p95_deg": 0.07082654063396929,
+      "yaw_max_deg": 0.12518526125835525,
+      "tilt_mae_deg": 0.11680185562929002,
+      "heading_anchor_rad": 3.140860080718994
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/continuous-failure-00009.jsonl",
+      "sha256": "c4219223acd9d0c2e44d339d5759225e1e38207d0cc385cf08508c82b8beb29d",
+      "predictions": 488,
+      "scored": 486,
+      "unscored": 2,
+      "yaw_mae_deg": 0.41661013677358616,
+      "yaw_p95_deg": 1.33062173372507,
+      "yaw_max_deg": 1.6825369052425778,
+      "tilt_mae_deg": 0.7301641951716398,
+      "heading_anchor_rad": -3.1407697200775146
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/continuous-failure-00016.jsonl",
+      "sha256": "cb5b4f4fe874fc8e2b525bccebc5712a1492f847583960895e34aeb949a65bd5",
+      "predictions": 350,
+      "scored": 350,
+      "unscored": 0,
+      "yaw_mae_deg": 2.45386583644891,
+      "yaw_p95_deg": 9.844614484163614,
+      "yaw_max_deg": 37.91609451156416,
+      "tilt_mae_deg": 2.5722917745316787,
+      "heading_anchor_rad": 3.141178607940674
+    }
+  ],
+  "input_ablation": {
+    "trace": "/Users/hawking/Desktop/stuff/miniflight/target/aigp/.runtime/measurements/drag-velocity-20261031/new-clean.jsonl",
+    "controller_updates": 624,
+    "attitude_packets_withheld": 385,
+    "commands_identical": true
+  },
+  "final_program_replayed_updates": [
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00018.jsonl",
+      "updates": 598
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00019.jsonl",
+      "updates": 611
+    },
+    {
+      "trace": "target/aigp/.runtime/measurements/imu-yaw-20261031/selected/trial-00020.jsonl",
+      "updates": 661
+    }
+  ],
+  "retention": "routine runner retains three clean captures and every failure; selected clean captures 18-20 were copied before cleanup",
+  "continuation_snapshot": {
+    "attempts": 71,
+    "passed": 64,
+    "collisions": 7,
+    "native_pid": 23853
+  }
+}

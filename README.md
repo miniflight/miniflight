@@ -1,9 +1,11 @@
 # miniflight
 
 Python control routines and vehicle adapters. The current target is the AI-GP
-flight simulator. `r1_beautiful` reads privileged position and attitude, computes
-PID feedback, and sends body rates and thrust. VQ1 controls angular rates,
-motor mixing, and physics.
+flight simulator. `r1_beautiful` initializes attitude from stationary specific
+force and one native heading, then propagates the full rotation with the gyro.
+Position, velocity and course/reference remain privileged. The follower computes
+PID feedback and sends body rates and thrust; VQ1 supplies rate control, mixing
+and physics for that command plane.
 
 The core spine is [`run(receive, update, send, hz=50)`](miniflight/loop.py).
 `receive(now)` supplies a tuple of controller inputs, or `None` while waiting.

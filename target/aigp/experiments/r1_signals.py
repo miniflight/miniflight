@@ -11,8 +11,9 @@ def r1_signals(controller):
                 acceleration_ref_ned_m_s2=controller.target_acceleration.v.tolist(),
                 acceleration_request_ned_m_s2=list(controller.requested_acceleration),
                 attitude_used_rad=list(controller.angles),
-                tilt_time_s=controller.tilt.time,
-                tilt_rotation_wxyz=controller.tilt.rotation.q.tolist())
+                heading_anchor_rad=controller.target_yaw,
+                tilt_time_s=controller.attitude_estimate.time,
+                tilt_rotation_wxyz=controller.attitude_estimate.rotation.q.tolist())
 
 
 def motor_signals(controller):
