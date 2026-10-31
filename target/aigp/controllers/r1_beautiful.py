@@ -46,10 +46,10 @@ class Controller(BaseController[BodyRates]):
             self.calibration = {t: sample for t, sample in self.calibration.items() if sample[0] >= now-1}
             if not race_state.started:
                 return None
-            force = tuple(sum(a[i] for _, a in self.calibration.values()) / len(self.calibration) for i in range(3))
-            self.tilt = GyroAttitude(stationary_rotation(force), state)
+            specific_force = tuple(sum(a[i] for _, a in self.calibration.values()) / len(self.calibration) for i in range(3))
+            self.tilt = GyroAttitude(stationary_rotation(specific_force), state)
             self.calibration.clear()
-        rotation = self.tilt.update(state)
+        imu_rotation = self.tilt.update(state)
         if state.motion is None or state.attitude is None or not race_state.started:
             return None
         if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):
@@ -58,7 +58,7 @@ class Controller(BaseController[BodyRates]):
         if not race_state.completed and max(now - sample.received_at for sample in (motion, orientation)) > .3:
             raise TimeoutError("privileged pose is stale")
         position, velocity = Vector3D(*motion.position), Vector3D(*motion.velocity)
-        roll, pitch, _ = rotation.to_euler()
+        roll, pitch, _ = imu_rotation.to_euler()
         self.angles = angles = (roll, pitch, orientation.yaw)
 
         if self.reference is None:
@@ -80,17 +80,17 @@ class Controller(BaseController[BodyRates]):
 
         dt = 0.0 if self.time is None else max(0.0, race_state.time_seconds - self.time)
         self.time = race_state.time_seconds
-        acceleration, integral = trajectory_acceleration(
+        acceleration_request, integral = trajectory_acceleration(
             position.v, velocity.v, (self.target.v, self.target_velocity.v, self.target_acceleration.v), self.integral, dt,
             kp=self.kp, ki=self.ki, kd=self.kd, integral_limit=self.config.max_acceleration)
-        resistance = quadratic_resistance(velocity.v, self.config.resistance_per_m)
+        drag_compensation = quadratic_resistance(velocity.v, self.config.resistance_per_m)
         if self.config.body_resistance_per_m is not None:
-            rotation = Quaternion.from_euler(*angles)  # FRD body -> NED world.
-            body_velocity = rotation.conjugate().rotate(velocity)
-            body_resistance = Vector3D(*quadratic_resistance(body_velocity.v, self.config.body_resistance_per_m))
-            resistance = rotation.rotate(body_resistance).v
-        acceleration = tuple(a + r for a, r in zip(acceleration, resistance, strict=True))
+            body_to_ned = Quaternion.from_euler(*angles)
+            body_velocity = body_to_ned.conjugate().rotate(velocity)
+            body_drag_compensation = Vector3D(*quadratic_resistance(body_velocity.v, self.config.body_resistance_per_m))
+            drag_compensation = body_to_ned.rotate(body_drag_compensation).v
+        acceleration_request = tuple(a + d for a, d in zip(acceleration_request, drag_compensation, strict=True))
         self.integral = integral
-        self.requested_acceleration = acceleration
+        self.requested_acceleration = acceleration_request
         feedforward = (0, 0, 0) if self.rate_reference is None else self.rate_reference(self.reference_time)
-        return acceleration_control(self.config, acceleration, angles, self.target_yaw, rate_feedforward=feedforward)
+        return acceleration_control(self.config, acceleration_request, angles, self.target_yaw, rate_feedforward=feedforward)
