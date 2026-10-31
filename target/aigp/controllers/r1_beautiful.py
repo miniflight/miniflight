@@ -1,8 +1,8 @@
-"""Position feedback, attitude feedback, then native body-rate control."""
+"""Position feedback with IMU tilt and native yaw, then body-rate control."""
 
-import math
 from common.math import Quaternion, Vector3D
 from miniflight import BodyRates, vehicle
+from miniflight.attitude import GyroAttitude, stationary_rotation
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance, trajectory_acceleration
 from target.aigp.client import TrackInfo
 from target.aigp.controllers import BaseController
@@ -28,6 +28,7 @@ class Controller(BaseController[BodyRates]):
         self.rate_reference = rate_reference  # Saved FRD rad/s, sampled on the same reference clock.
         self.reference_time = self.requested_acceleration = None
         self.time = None
+        self.tilt, self.calibration = None, {}
         self.integral = (0, 0, 0)  # Integral contribution, m/s²; bounded by available acceleration.
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
@@ -35,22 +36,30 @@ class Controller(BaseController[BodyRates]):
             if self.reference is None and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
                 self.track = packet.decoded.gates
         state = vehicle.state
-        if state is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started:
+        if state is None or state.time is None or state.gyro is None or state.acceleration is None or race_state is None:
+            return None
+        now = race_state.received_at if race_state.control_time is None else race_state.control_time
+        if race_state.started and now - state.received_at > .3:
+            raise TimeoutError("IMU is stale")
+        if self.tilt is None:
+            self.calibration[state.time] = (state.received_at, state.acceleration)
+            self.calibration = {t: sample for t, sample in self.calibration.items() if sample[0] >= now-1}
+            if not race_state.started:
+                return None
+            force = tuple(sum(a[i] for _, a in self.calibration.values()) / len(self.calibration) for i in range(3))
+            self.tilt = GyroAttitude(stationary_rotation(force), state)
+            self.calibration.clear()
+        rotation = self.tilt.update(state)
+        if state.motion is None or state.attitude is None or not race_state.started:
             return None
         if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):
             return None
         motion, orientation = state.motion, state.attitude
-        now = race_state.received_at if race_state.control_time is None else race_state.control_time
         if not race_state.completed and max(now - sample.received_at for sample in (motion, orientation)) > .3:
             raise TimeoutError("privileged pose is stale")
         position, velocity = Vector3D(*motion.position), Vector3D(*motion.velocity)
-        angles = (orientation.roll, orientation.pitch, orientation.yaw)
-        lag = round(motion.time - orientation.time, 3)  # Preserve AIGP's millisecond source resolution.
-        gyro = orientation.angular_velocity
-        speed = 0 if gyro is None else math.hypot(*gyro)
-        if lag > 0 and speed:
-            rotation = Quaternion.from_euler(*angles) * Quaternion.from_axis_angle(gyro, speed * lag)
-            angles = rotation.to_euler()  # Advance older attitude; never rewind fresher feedback.
+        roll, pitch, _ = rotation.to_euler()
+        self.angles = angles = (roll, pitch, orientation.yaw)
 
         if self.reference is None:
             index = race_state.active_gate_index

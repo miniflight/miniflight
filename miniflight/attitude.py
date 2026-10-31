@@ -49,6 +49,7 @@ class GyroAttitude:
     def update(self, state):
         if state.time is None or state.gyro is None or state.time == self.time:
             return self.rotation
-        self.rotation = gyro_step(self.rotation, self.gyro, state.time - self.time)
+        gyro = tuple((a + b) / 2 for a, b in zip(self.gyro, state.gyro, strict=True))
+        self.rotation = gyro_step(self.rotation, gyro, state.time - self.time)
         self.time, self.gyro = state.time, state.gyro
         return self.rotation
