@@ -83,8 +83,11 @@ int vio_state(void *observer, double *output) {
     return 0;
   Eigen::Matrix<double, 13, 1> state;
   Eigen::Matrix<double, 12, 12> covariance;
-  if (!o.estimator->get_propagator()->fast_state_propagate(s, o.imu_time, state,
-                                                           covariance))
+  auto propagator = o.estimator->get_propagator();
+  propagator->invalidate_cache();
+  // A fresh cache applies camera-to-IMU offset to both integration endpoints.
+  if (!propagator->fast_state_propagate(
+          s, o.imu_time - s->_calib_dt_CAMtoIMU->value()(0), state, covariance))
     return 0;
   Eigen::Matrix3d R = ov_core::quat_2_Rot(state.head<4>()).transpose();
   Eigen::Vector3d velocity = R * state.segment<3>(7);
