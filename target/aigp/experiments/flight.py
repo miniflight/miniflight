@@ -20,7 +20,7 @@ from miniflight.replay import Calls
 from target.aigp.controllers.r1_beautiful import CONFIG, Controller as PIDGates
 from target.aigp.controllers.r1_motors import Controller as MotorGates
 from target.aigp.controllers import load_controller
-from target.aigp.experiments.recording import Launcher, ProcessClient, RaceReader, RecordedController, command_data, recording, replay
+from target.aigp.experiments.recording import Launcher, ProcessClient, RaceReader, RecordedController, command_data, recording
 from target.aigp.experiments.r1_signals import motor_signals, r1_signals
 from target.aigp.native import BASE, SHIPPING, TARGETS, RaceStateReader, sha256
 from target.aigp.simulator import AIGPSimulator
@@ -104,11 +104,11 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
 
 
 def run(name, trace, camera=False, record_frames=False, **kwargs):
-    result, simulator, make, signals = rollout(name, trace, camera, record_frames, **kwargs)
-    return check(name, trace, result, simulator.client, make, camera or record_frames, record_frames, signals)
+    result, simulator, _, _ = rollout(name, trace, camera, record_frames, **kwargs)
+    return check(name, trace, result, simulator.client, camera or record_frames, record_frames)
 
 
-def check(name, trace, result, client, make, camera, record_frames, signals):
+def check(name, trace, result, client, camera, record_frames):
     if result is None or not result.started or not result.valid or not result.completed or result.active_gate_index != 6:
         raise AssertionError("native R1 did not finish all six gates")
     if client.connected or client.gates is None or len(client.gates) != 6:
@@ -117,7 +117,6 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
     if camera and (frame is None or frame.bgr.shape != (360, 640, 3) or frame.bgr.dtype.name != "uint8"
                    or frame.bgr.flags.writeable):
         raise AssertionError("native R1 did not expose a 640 by 360 BGR camera image")
-    updates = replay(make, trace, signals=signals)
     with trace.open() as source:
         rows = [row for line in source if (row := json.loads(line))["event"] in ("arm_request", "telemetry", "sent")]
     requests = [row for row in rows if row["event"] == "arm_request"]
@@ -135,7 +134,7 @@ def check(name, trace, result, client, make, camera, record_frames, signals):
     if name == "r1_motors" and (len(sent) < 2 or sent[-1] != command_data(BodyRates())
             or any(command["kind"] != "MotorControls" for command in sent[:-1])):
         raise AssertionError("R1 must use only motor commands before the zero-thrust cleanup")
-    print(json.dumps(dict(controller=name, gates=6, replayed_updates=updates,
+    print(json.dumps(dict(controller=name, gates=6, commands=len(sent),
                           frame_shape=None if frame is None else frame.bgr.shape, recorded_frames=record_frames, trace=str(trace))), flush=True)
     return result
 
@@ -160,6 +159,8 @@ def main():
     signal.alarm(210)
     try:
         run(args.controller, trace, args.camera, args.record_frames, reference=args.reference, offscreen=args.offscreen, finish_before=args.finish_before)
+        from target.aigp.experiments.process_replay import replay
+        print(json.dumps(replay(trace)), flush=True)
     finally:
         signal.alarm(0)
 
