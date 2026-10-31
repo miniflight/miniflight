@@ -23,6 +23,13 @@ class RateSample(NamedTuple):
     gyro: tuple[float, float, float]  # FRD rad/s
 
 
+class ImuSample(NamedTuple):
+    time: float  # device seconds
+    received_at: float  # host monotonic seconds
+    acceleration: tuple[float, float, float]  # FRD specific force, m/s²
+    gyro: tuple[float, float, float]  # FRD rad/s from the same measurement
+
+
 @dataclass(frozen=True)
 class Motion:
     time: float  # device seconds
@@ -77,7 +84,7 @@ class State:
     motion: Motion | None = None
     attitude: Attitude | None = None
     motors: MotorOutputs | None = None
-    rate_samples: tuple[RateSample, ...] = ()  # New accepted gyros in this read, in arrival order.
+    imu_samples: tuple[ImuSample, ...] = ()  # New accepted measurements, in arrival order.
 
     @property
     def rate_feedback(self) -> RateSample | None:

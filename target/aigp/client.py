@@ -14,7 +14,7 @@ from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Attitude, BodyRates, Command, Frame, Motion, MotorControls, MotorOutputs, Ned, PositionNed, State, VelocityNed
-from miniflight.state import RateSample
+from miniflight.state import ImuSample
 from target import Target
 from target.aigp.controllers import Gate
 
@@ -45,7 +45,7 @@ class Packet:
 
     data: mavlink.MAVLink_message | bytes
     received_at: float  # host monotonic receipt; device timestamps remain in data
-    decoded: RaceTelemetry | TrackInfo | Frame | RateSample | Motion | Attitude | None = None
+    decoded: RaceTelemetry | TrackInfo | Frame | ImuSample | Motion | Attitude | None = None
 
     @property
     def privileged(self) -> bool:
@@ -63,8 +63,9 @@ def _newer(previous, sample):
     return previous
 
 
-def _rate_sample(imu):
-    return RateSample(imu.time_usec * 1e-6, imu._host_received_at, (-imu.xgyro, -imu.ygyro, -imu.zgyro))
+def _imu_sample(imu):
+    return ImuSample(imu.time_usec * 1e-6, imu._host_received_at,
+                     (imu.xacc, imu.yacc, imu.zacc), (-imu.xgyro, -imu.ygyro, -imu.zgyro))
 
 
 class SimulatorClient(Target):
@@ -148,14 +149,14 @@ class SimulatorClient(Target):
         motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
         if motors is not None:
             motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
-        rates = tuple(packet.decoded for packet in self.packets if isinstance(packet.decoded, RateSample))
-        self.state = State(frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors, rate_samples=rates)
+        samples = tuple(packet.decoded for packet in self.packets if isinstance(packet.decoded, ImuSample))
+        self.state = State(frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors, imu_samples=samples)
         imu = self._telemetry.get("HIGHRES_IMU")
         if imu is not None:
-            sample = rates[-1] if rates else _rate_sample(imu)
+            sample = samples[-1] if samples else _imu_sample(imu)
             dt = 0.0 if previous.time is None else sample.time - previous.time
             self.state = replace(self.state, time=sample.time, dt=dt, received_at=sample.received_at,
-                                 acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=sample.gyro)
+                                 acceleration=sample.acceleration, gyro=sample.gyro)
         return self.state
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
@@ -208,7 +209,7 @@ class SimulatorClient(Target):
         message._host_received_at = now  # Host metadata; MAVLink fields and packet bytes are unchanged.
         self._telemetry[kind] = message
         if kind == "HIGHRES_IMU":
-            return _rate_sample(message)
+            return _imu_sample(message)
         elif kind == "LOCAL_POSITION_NED":
             return Motion(message.time_boot_ms / 1000, now, Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz))
         elif kind == "ATTITUDE":

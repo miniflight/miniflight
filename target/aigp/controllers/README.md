@@ -24,13 +24,13 @@ and the latest frame. Motion uses NED; angular observations use FRD. Each sample
 retains its own timestamp. Motor channels and image pixels retain reported values.
 Unavailable samples are `None`; `state.time` and `state.dt` belong to the IMU.
 Keep controller history, such as integrals; do not keep another sensor cache.
-`state.rate_samples` contains every accepted gyro in this read, in arrival order;
-`state.gyro` remains the latest sample.
+`state.imu_samples` contains every accepted accelerometer/gyro pair in this read,
+in arrival order. `state.acceleration` and `state.gyro` retain the latest pair.
 
 `telemetry` is an ordered tuple of new `Packet` arrivals from UDP 14550.
 `packet.data` is the original pymavlink message, with full fields, flags and
 source timestamps. `packet.received_at` is host monotonic receipt time.
-`packet.decoded` contains a `RateSample`, `Motion`, `Attitude`, wire `RaceTelemetry`,
+`packet.decoded` contains an `ImuSample`, `Motion`, `Attitude`, wire `RaceTelemetry`,
 `TrackInfo(transfer_id, gates)` when a course transfer completes, or `None`.
 Each `Gate` retains the published NED
 mesh pivot, wxyz quaternion and overall dimensions. `packet.privileged` labels pose
