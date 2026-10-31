@@ -69,11 +69,15 @@ class Observe:
         motion = state.motion
         config = self.metadata.get("controller_config", {})
         signals = self.pending["signals"]
+        rate_time = signals.get("rate_time_s", signals.get("tilt_time_s"))
+        rate_sample = next((sample for sample in (feedback, state.attitude)
+                            if sample is not None and sample.time == rate_time), None)
+        rate_age = None if rate_sample is None else row["host_time"]-rate_sample.received_at
         if command["kind"] == "BodyRates":
             signals = dict(signals, rate_ref_frd_rad_s=[command[axis + "_rate"] for axis in ("roll", "pitch", "yaw")],
                            gyro_frd_rad_s=feedback.gyro)
         sample = quantities(signals, motion.position, motion.velocity,
-                            command.get("outputs", ()), row["host_time"]-motion.received_at, row["host_time"]-feedback.received_at,
+                            command.get("outputs", ()), row["host_time"]-motion.received_at, rate_age,
                             config.get("max_horizontal_acceleration") or config.get("max_acceleration"))
         sample["collective_request"] = command.get("thrust", sample["motor_mean"])
         native = state.motors
