@@ -1,0 +1,4 @@
+{
+  "library": "target/aigp/.runtime/openvins-build/libminiflight_vio.dylib",
+  "config": "target/aigp/config/vio/estimator.yaml"
+}
