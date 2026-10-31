@@ -14,6 +14,7 @@ from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Attitude, BodyRates, Command, Frame, Motion, MotorControls, MotorOutputs, Ned, PositionNed, State, VelocityNed
+from miniflight.state import RateSample
 from target import Target
 from target.aigp.controllers import Gate
 
@@ -40,11 +41,11 @@ class TrackInfo:
 
 @dataclass(frozen=True)
 class Packet:
-    """One received MAVLink message or camera datagram; no field or clock conversion."""
+    """Original message or datagram, receipt time, and optional decoded observation."""
 
     data: mavlink.MAVLink_message | bytes
     received_at: float  # host monotonic receipt; device timestamps remain in data
-    decoded: RaceTelemetry | TrackInfo | Frame | None = None
+    decoded: RaceTelemetry | TrackInfo | Frame | RateSample | Motion | Attitude | None = None
 
     @property
     def privileged(self) -> bool:
@@ -60,6 +61,10 @@ def _newer(previous, sample):
     if previous is None or (sample.time >= previous.time and replace(sample, received_at=previous.received_at) != previous):
         return sample
     return previous
+
+
+def _rate_sample(imu):
+    return RateSample(imu.time_usec * 1e-6, imu._host_received_at, (-imu.xgyro, -imu.ygyro, -imu.zgyro))
 
 
 class SimulatorClient(Target):
@@ -136,26 +141,21 @@ class SimulatorClient(Target):
         previous = self.state or State()
         motion, attitude = previous.motion, previous.attitude
         for packet in self.packets:
-            message = packet.data
-            if isinstance(message, bytes):
-                continue
-            if message.get_type() == "LOCAL_POSITION_NED":
-                motion = _newer(motion, Motion(message.time_boot_ms / 1000, packet.received_at,
-                                               Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz)))
-            if message.get_type() == "ATTITUDE":
-                attitude = _newer(attitude, Attitude(message.time_boot_ms / 1000, packet.received_at,
-                                                     message.roll, -message.pitch, -message.yaw,
-                                                     (-message.rollspeed, -message.pitchspeed, -message.yawspeed)))
+            if isinstance(packet.decoded, Motion):
+                motion = _newer(motion, packet.decoded)
+            elif isinstance(packet.decoded, Attitude):
+                attitude = _newer(attitude, packet.decoded)
         motors = self._telemetry.get("ACTUATOR_OUTPUT_STATUS")
         if motors is not None:
             motors = MotorOutputs(motors.time_usec * 1e-6, motors._host_received_at, tuple(motors.actuator), motors.active)
-        self.state = State(frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors)
+        rates = tuple(packet.decoded for packet in self.packets if isinstance(packet.decoded, RateSample))
+        self.state = State(frame=self._camera.latest, motion=motion, attitude=attitude, motors=motors, rate_samples=rates)
         imu = self._telemetry.get("HIGHRES_IMU")
         if imu is not None:
-            stamp = imu.time_usec * 1e-6
-            dt = 0.0 if previous.time is None else stamp - previous.time
-            self.state = replace(self.state, time=stamp, dt=dt, received_at=imu._host_received_at,
-                                 acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=(-imu.xgyro, -imu.ygyro, -imu.zgyro))
+            sample = rates[-1] if rates else _rate_sample(imu)
+            dt = 0.0 if previous.time is None else sample.time - previous.time
+            self.state = replace(self.state, time=sample.time, dt=dt, received_at=sample.received_at,
+                                 acceleration=(imu.xacc, imu.yacc, imu.zacc), gyro=sample.gyro)
         return self.state
 
     def poll(self, timeout=0.0) -> tuple[Packet, ...]:
@@ -207,7 +207,14 @@ class SimulatorClient(Target):
                 return
         message._host_received_at = now  # Host metadata; MAVLink fields and packet bytes are unchanged.
         self._telemetry[kind] = message
-        if kind == "DATA_TRANSMISSION_HANDSHAKE":
+        if kind == "HIGHRES_IMU":
+            return _rate_sample(message)
+        elif kind == "LOCAL_POSITION_NED":
+            return Motion(message.time_boot_ms / 1000, now, Ned(message.x, message.y, message.z), Ned(message.vx, message.vy, message.vz))
+        elif kind == "ATTITUDE":
+            return Attitude(message.time_boot_ms / 1000, now, message.roll, -message.pitch, -message.yaw,
+                            (-message.rollspeed, -message.pitchspeed, -message.yawspeed))
+        elif kind == "DATA_TRANSMISSION_HANDSHAKE":
             # Announcement only: transfer ID, byte count, fragment count.
             self._track.start(message)
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 2:

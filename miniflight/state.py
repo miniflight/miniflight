@@ -77,6 +77,7 @@ class State:
     motion: Motion | None = None
     attitude: Attitude | None = None
     motors: MotorOutputs | None = None
+    rate_samples: tuple[RateSample, ...] = ()  # New accepted gyros in this read, in arrival order.
 
     @property
     def rate_feedback(self) -> RateSample | None:
