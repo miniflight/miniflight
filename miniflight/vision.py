@@ -9,6 +9,7 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
     Inputs are matching N-by-2 undistorted pixel coordinates and a 3-by-3
     pinhole intrinsic matrix. Return (rotation, positive-depth inlier mask),
     or None when no single essential matrix is found. No absolute heading.
+    Distant points remain useful for rotation; no depth cutoff is imposed.
     """
     import cv2
 
@@ -18,7 +19,8 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
                                           prob=.999, threshold=threshold_px)
     if essential is None or essential.shape != (3, 3):
         return None
-    _, rotation, _, mask = cv2.recoverPose(essential, previous, current, intrinsics, mask=mask)
+    _, rotation, _, mask, _ = cv2.recoverPose(
+        essential, previous, current, intrinsics, distanceThresh=np.inf, mask=mask)
     return rotation, mask.ravel() != 0
 
 
