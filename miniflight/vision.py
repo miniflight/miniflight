@@ -3,12 +3,14 @@
 import numpy as np
 
 
-def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
-    """Estimate rotation from previous to current camera, allowing translation.
+def relative_pose(previous, current, intrinsics, threshold_px=1.0):
+    """Estimate X_current = R @ X_previous + t, up to translation scale.
 
     Inputs are matching N-by-2 undistorted pixel coordinates and a 3-by-3
-    pinhole intrinsic matrix. Return (rotation, positive-depth inlier mask),
-    or None when no single essential matrix is found. No absolute heading.
+    pinhole intrinsic matrix. Return (R, unit t, positive-depth inlier mask),
+    or None when no single essential matrix is found. Camera displacement
+    points along -R.T @ t in the previous frame; its magnitude is unknown.
+    Translation is poorly constrained when parallax is small.
     Distant points remain useful for rotation; no depth cutoff is imposed.
     """
     import cv2
@@ -19,9 +21,15 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
                                           prob=.999, threshold=threshold_px)
     if essential is None or essential.shape != (3, 3):
         return None
-    _, rotation, _, mask, _ = cv2.recoverPose(
+    _, rotation, translation, mask, _ = cv2.recoverPose(
         essential, previous, current, intrinsics, distanceThresh=np.inf, mask=mask)
-    return rotation, mask.ravel() != 0
+    return rotation, translation.ravel(), mask.ravel() != 0
+
+
+def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
+    """Return rotation and positive-depth inliers, allowing translation."""
+    pose = relative_pose(previous, current, intrinsics, threshold_px)
+    return None if pose is None else (pose[0], pose[2])
 
 
 def rotation_between_bearings(previous, current):
