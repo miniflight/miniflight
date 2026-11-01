@@ -32,6 +32,18 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
     return None if pose is None else (pose[0], pose[2])
 
 
+def parallax_angles(previous, current, rotation):
+    """Return per-point parallax in radians for matching nonzero N-by-3 rays.
+
+    Rotation maps previous-camera directions into the current camera frame.
+    """
+    previous, current = (np.asarray(rays, dtype=float) for rays in (previous, current))
+    rotated = previous @ rotation.T
+    cross = np.linalg.norm(np.cross(rotated, current), axis=1)
+    dot = np.sum(rotated * current, axis=1)
+    return np.arctan2(cross, dot)
+
+
 def rotation_between_bearings(previous, current):
     """Fit the rotation from previous-camera rays into current-camera rays.
 
