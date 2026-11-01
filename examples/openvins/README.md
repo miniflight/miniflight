@@ -13,7 +13,5 @@ cmake --build target/aigp/.runtime/openvins-build -j2
 ```
 
 OpenVINS source and its license stay in that checkout. No ROS installation is used.
-Camera and IMU calibration must describe the connected sensors. The AIGP example
-is in `target/aigp/config/vio/`; its velocity experiment uses the existing repeat
-runner with `--velocity-estimator target/aigp/config/vio/velocity.json --camera`.
-Camera packets are required to replay this estimator.
+Camera and IMU calibration must describe the connected sensors. An AIGP calibration
+example is in `target/aigp/config/vio/estimator.yaml`.
