@@ -55,9 +55,9 @@ class Controller(BaseController[BodyRates]):
             self.target_yaw = state.attitude.yaw
             heading_to_ned = Quaternion.from_euler(0, 0, self.target_yaw)
             initial_rotation = heading_to_ned * initial_rotation
-            self.attitude_estimate = GyroAttitude(initial_rotation, state)
+            self.attitude_estimate = GyroAttitude(initial_rotation, state.rate_feedback)
             self.calibration.clear()
-        imu_rotation = self.attitude_estimate.update(state)
+        imu_rotation = self.attitude_estimate.update(state.rate_feedback)
         if state.motion is None or not race_state.started:
             return None
         if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):

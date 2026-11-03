@@ -3,6 +3,7 @@
 import math
 
 from common.math import Quaternion
+from miniflight.state import RateSample
 
 
 def stationary_down(acceleration):
@@ -38,18 +39,18 @@ def gyro_step(rotation, gyro, dt):
 
 
 class GyroAttitude:
-    """Carry a supplied body-to-local rotation through timestamped IMU observations."""
+    """Carry a supplied body-to-local rotation through timestamped FRD gyro samples."""
 
-    def __init__(self, rotation, state):
-        if rotation is None or state.time is None or state.gyro is None:
+    def __init__(self, rotation, sample: RateSample):
+        if rotation is None or sample is None or sample.time is None or sample.gyro is None:
             raise ValueError("an initial rotation and timestamped gyro are required")
         self.rotation = rotation
-        self.time, self.gyro = state.time, state.gyro
+        self.time, self.gyro = sample.time, sample.gyro
 
-    def update(self, state):
-        if state.time is None or state.gyro is None or state.time == self.time:
+    def update(self, sample: RateSample | None):
+        if sample is None or sample.time is None or sample.gyro is None or sample.time == self.time:
             return self.rotation
-        gyro = tuple((a + b) / 2 for a, b in zip(self.gyro, state.gyro, strict=True))
-        self.rotation = gyro_step(self.rotation, gyro, state.time - self.time)
-        self.time, self.gyro = state.time, state.gyro
+        gyro = tuple((a + b) / 2 for a, b in zip(self.gyro, sample.gyro, strict=True))
+        self.rotation = gyro_step(self.rotation, gyro, sample.time - self.time)
+        self.time, self.gyro = sample.time, sample.gyro
         return self.rotation
