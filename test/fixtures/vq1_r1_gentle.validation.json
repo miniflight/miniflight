@@ -1,0 +1,86 @@
+{
+  "target": "vq1.r1",
+  "controller": "r1_motors",
+  "reference": "vq1_r1_gentle.npz",
+  "reference_sha256": "be196297cb92e03d5463d4e3e5c2c0b93a799e19f9a8145c5e1879100bc286e0",
+  "config": "vq1_r1_sub10.config.json",
+  "time_scale": 1.5,
+  "duration_s": 14.728664751968706,
+  "source_reference": "vq1_r1_sub10.npz",
+  "source_sha256": "5aef6c423abf3d40dfbdf057a19cfc45c1c7e7a1cff7a9ad96df8482e8c0c7f5",
+  "generation": "Position curve unchanged; velocity /1.5, acceleration /1.5^2, jerk /1.5^3. Body rates recomputed from the existing fitted body resistance model at heading pi.",
+  "baseline_feedforward_reproduction_max_error": 0.0,
+  "retiming_max_error": 5.684341886080802e-14,
+  "runtime_revision": "c3db9b898644209b58ad9da7039cb84afcaa0ad0",
+  "raw_directory": "target/aigp/.runtime/measurements/perception-speed-20261103",
+  "same_native_process": true,
+  "alternating_profiles": true,
+  "resets": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "replayed_wire_commands": 3344,
+  "all_process_replays_exact": true,
+  "comparison": {
+    "fast": {
+      "attempts": 3,
+      "clean_finishes": 2,
+      "finish_times_s": [
+        9.799609184,
+        9.815649033
+      ],
+      "failures": [
+        {
+          "type": "TimeoutError",
+          "message": "native race state is stale"
+        }
+      ],
+      "next_gate_full_fraction": 0.39965986394557823,
+      "longest_next_gate_gaps_s": [
+        2.699701000005005,
+        2.7755250000045626
+      ],
+      "half_second_track_survival_median": 0.12875,
+      "metric_windows": 6,
+      "attempted_metric_windows": 38,
+      "velocity_error_median_m_s": 2.7111879920840543,
+      "velocity_error_p95_m_s": 12.586326629612849
+    },
+    "gentle": {
+      "attempts": 3,
+      "clean_finishes": 2,
+      "finish_times_s": [
+        14.716981888,
+        14.722718239
+      ],
+      "failures": [
+        {
+          "type": "RuntimeError",
+          "message": "native collision"
+        }
+      ],
+      "next_gate_full_fraction": 0.8,
+      "longest_next_gate_gaps_s": [
+        1.142453000007663,
+        1.201662999985274
+      ],
+      "half_second_track_survival_median": 0.4525,
+      "metric_windows": 33,
+      "attempted_metric_windows": 58,
+      "velocity_error_median_m_s": 1.27134266256217,
+      "velocity_error_p95_m_s": 7.4454206507997425
+    }
+  },
+  "limitations": [
+    "Only three attempts per profile",
+    "Field-of-view coverage uses native gate projection, with no occlusion model",
+    "Approximate fixed camera time alignment",
+    "Metric-motion statistics are conditional on the reported available windows",
+    "Metric-motion is offline and still uses the recorded gyro heading seed as a coordinate registration",
+    "No estimated position or velocity entered the controller"
+  ]
+}
