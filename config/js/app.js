@@ -146,6 +146,12 @@ class FlightView {
     this.droneBasis.rotation.set(-pitch * radians, 0, -roll * radians);
   }
 
+  setRecordedRotation([w, x, y, z]) {
+    // FRD body axes map to model +Z, -X, -Y.
+    this.droneBasis.rotation.set(0, 0, 0);
+    this.droneRoot.quaternion.set(-y, -z, x, w);
+  }
+
   setEnabled(enabled) {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
@@ -178,7 +184,7 @@ class FlightView {
     const averageMotor = motorValues.length
       ? motorValues.reduce((sum, value) => sum + value, 0) / motorValues.length
       : 1000;
-    const rotorSpeed = Math.max(0, (averageMotor - 950) / 1000) * 42;
+    const rotorSpeed = telemetry.latest?.health?.armed === true ? Math.max(0, (averageMotor - 950) / 1000) * 42 : 0;
     for (let index = 0; index < this.rotors.length; index += 1) {
       this.rotors[index].rotation.y += rotorSpeed * delta * (index % 2 ? -1 : 1);
     }
@@ -497,6 +503,9 @@ function readinessFor(data) {
   const health = data.health || {};
   const signals = data.signals || {};
 
+  if (data.replay) {
+    return ["waiting", "RELATIVE ROTATION", "Gyro integration from the first recorded frame."];
+  }
   if (finite(data.blackbox?.copied)) {
     return ["waiting", "SAVING BLACKBOX", "Live readings resume after the export."];
   }
@@ -602,6 +611,31 @@ function renderTelemetry(data) {
   $("readiness").dataset.state = readinessState;
   $("readinessTitle").textContent = readinessTitle;
   $("readinessDetail").textContent = readinessDetail;
+
+  const replay = data.replay;
+  $("replayButton").hidden = !replay;
+  $("groundButton").hidden = $("groundState").hidden = $("scopeButton").hidden = !!replay;
+  $("axisConvention").textContent = replay ? "RELATIVE TO FIRST FRAME · FORWARD / RIGHT / DOWN"
+    : "BETAFLIGHT: ROLL → MODEL Z · PITCH → MODEL X · YAW → MODEL Y";
+  $("sensorTitle").textContent = replay ? "Recorded sensors" : "Body sensors · MSP values";
+  $("gyroLabel").textContent = replay ? "Gyroscope · °/s · FRD" : "Gyroscope";
+  if (replay) {
+    if (scopeMode) {
+      scopeMode = false;
+      document.querySelector(".stage").classList.remove("scope-mode");
+      flightView.setEnabled(true);
+      imuScope.setEnabled(false);
+      $("scopeButton").setAttribute("aria-pressed", "false");
+      $("scopeButton").textContent = "IMU SCOPE";
+    }
+    $("linkState").dataset.state = "replay";
+    $("linkText").textContent = `REPLAY · ${replay.name}`;
+    $("stageStatus").textContent = `Recorded gyro · ${replay.time_s.toFixed(2)} / ${replay.duration_s.toFixed(2)} s`;
+    $("replayButton").textContent = replay.playing ? "RESTART" : "PLAY RECORDING";
+    $("controller").textContent = "GyroAttitude";
+    $("controllerMeta").textContent = "Device timestamps · recorded gyro";
+    setVector("gyro", signals.gyro_deg_s, 1);
+  }
 }
 
 function acceptState(data) {
@@ -631,11 +665,12 @@ function acceptState(data) {
     }
     telemetry.lastAttitudeAt = attitudeNow;
     telemetry.lastAttitudeSample = traffic.attitude_samples_total;
-    groundReference.observe(data);
-    flightView.setAttitude(
-      data.signals?.attitude_deg,
-      groundReference.reference,
-    );
+    if (data.signals?.body_to_start_wxyz) {
+      flightView.setRecordedRotation(data.signals.body_to_start_wxyz);
+    } else {
+      groundReference.observe(data);
+      flightView.setAttitude(data.signals?.attitude_deg, groundReference.reference);
+    }
   }
   if (traffic.imu_samples_total !== telemetry.lastImuSample) {
     telemetry.lastImuSample = traffic.imu_samples_total;
@@ -645,6 +680,15 @@ function acceptState(data) {
 
 $("groundButton").addEventListener("click", () => {
   groundReference.start(telemetry.latest);
+});
+
+$("replayButton").addEventListener("click", async () => {
+  try {
+    const response = await fetch("/replay", {method: "POST"});
+    if (!response.ok) throw new Error("Replay unavailable");
+  } catch {
+    $("stageStatus").textContent = "Could not start replay";
+  }
 });
 
 $("scopeButton").addEventListener("click", () => {

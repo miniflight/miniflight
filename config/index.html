@@ -81,7 +81,8 @@
         box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 13%, transparent);
       }
 
-      .link-state[data-state="connecting"] .dot { background: var(--blue); }
+      .link-state[data-state="connecting"] .dot,
+      .link-state[data-state="replay"] .dot { background: var(--blue); }
       .link-state[data-state="offline"] .dot { background: var(--red); }
 
       .layout {
@@ -451,6 +452,7 @@
             <div class="stage-actions">
               <span class="ground-state" id="groundState" data-state="idle" title="Local display reference. This does not change the flight controller.">GROUND · RAW</span>
               <button id="groundButton" type="button" title="Keep the disarmed drone still on a level surface. This changes only the display.">LOCK GROUND</button>
+              <button id="replayButton" type="button" hidden>PLAY RECORDING</button>
               <button class="mode-switch" id="scopeButton" type="button" aria-pressed="false" title="Stop the 3D renderer and show live IMU signals.">IMU SCOPE</button>
               <div class="read-only">READ ONLY</div>
             </div>
@@ -522,8 +524,8 @@
           </section>
 
           <section class="panel">
-            <h2>Body sensors · MSP values</h2>
-            <div class="eyebrow">Gyroscope</div>
+            <h2 id="sensorTitle">Body sensors · MSP values</h2>
+            <div class="eyebrow" id="gyroLabel">Gyroscope</div>
             <div class="signals" id="gyro"></div>
             <div class="eyebrow" style="margin-top: 13px">Accelerometer</div>
             <div class="signals" id="accel"></div>
