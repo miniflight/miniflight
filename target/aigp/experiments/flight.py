@@ -54,12 +54,15 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
 
 def rollout(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False,
             race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None, *,
-            target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None, timesync=False, record_camera=True):
+            target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None, timesync=False, record_camera=True,
+            client_type=ProcessClient, wrap_controller=None):
     trace = Path(trace)
     camera = camera or record_frames
     simulator_args = (("-RenderOffScreen",) if offscreen else ()) if simulator_args is None else tuple(simulator_args)
     reference = None if reference is None else Path(reference)
     make, default_signals, reference_duration = flight_controller(name, reference, position_config, integral_gain)
+    if wrap_controller is not None:
+        make = wrap_controller(make)
     signals = default_signals if signals is None else signals
     if timeout is None:
         timeout = .3 if name == "r1_motors" else 1.0
@@ -87,8 +90,8 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         calls = Calls(record)
         if race_reader is None:
             race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), timeout)))
-        client = ProcessClient(calls, camera_port=5600 if camera else None, course_packets=course_packets, timesync=timesync, record_camera=record_camera,
-                                preview=trace.with_suffix(".frame.jpg") if camera else None)
+        client = client_type(calls, camera_port=5600 if camera else None, course_packets=course_packets, timesync=timesync, record_camera=record_camera,
+                             preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), target, hz=hz, client=client, timeout=timeout, startup_timeout=startup_timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before, launcher=Launcher(calls))
         try:

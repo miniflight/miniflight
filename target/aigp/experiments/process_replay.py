@@ -11,7 +11,7 @@ from target.aigp.experiments.recording import Launcher, ProcessClient, RaceReade
 from target.aigp.native import sha256
 
 
-def replay(path):
+def replay(path, *, client_type=ProcessClient, wrap_controller=None):
     from target.aigp.experiments.flight import flight_controller
     from target.aigp.experiments.repeat import fresh_race
     from target.aigp.simulator import AIGPSimulator
@@ -37,7 +37,7 @@ def replay(path):
                 elif row["event"] in ("result", "error"):
                     outcome.setdefault(row["event"], row)
     calls = Calls(rows=recorded_calls())
-    client = ProcessClient(calls, camera_port=5600 if metadata.get("camera") else None, timesync=metadata.get("timesync", False))
+    client = client_type(calls, camera_port=5600 if metadata.get("camera") else None, timesync=metadata.get("timesync", False))
     if metadata["process"] == "flight":
         reference = metadata["reference"]
         if reference is not None and sha256(Path(reference["path"])) != reference["sha256"]:
@@ -45,6 +45,8 @@ def replay(path):
         make, _, _ = flight_controller(metadata["controller"], None if reference is None else reference["path"],
                                        None if "controller_config" not in metadata else PositionConfig(**metadata["controller_config"]),
                                        metadata.get("trajectory_pid", {}).get("ki", 0.0))
+        if wrap_controller is not None:
+            make = wrap_controller(make)
         simulator = AIGPSimulator(make, metadata["target"], hz=metadata["hz"], timeout=metadata["timeout"],
                                   client=client, race_reader=RaceReader(calls), clock=calls, finish_before=metadata.get("finish_before_s"),
                                   race_status_path=metadata.get("race_status_path"), launcher=Launcher(calls),
