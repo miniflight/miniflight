@@ -11,10 +11,13 @@ class ProducerImuClient(ProcessClient):
         self.producer_read = producer_read
 
     def read(self, timeout=1.0):
+        clock = None if self.state is None else self.state.imu_increment_clock
         state = super().read(timeout)
         batch = self.calls("producer_imu", {}, self.producer_read)
         # Producer rows carry raw AIGP gyro signs, as on the UDP stream.
         increments = tuple(ImuIncrement(row[0]*1e-6, row[2], tuple(row[4:7]), tuple(-g for g in row[7:10]))
                            for row in batch["rows"])
-        self.state = replace(state, imu_increments=increments)
+        if increments:
+            clock = increments[-1].time, batch.get("published_ns", batch["read_ns"])*1e-9
+        self.state = replace(state, imu_increments=increments, imu_increment_clock=clock)
         return self.state

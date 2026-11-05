@@ -95,6 +95,7 @@ class State:
     motors: MotorOutputs | None = None
     imu_samples: tuple[ImuSample, ...] = ()  # New accepted measurements, in arrival order.
     imu_increments: tuple[ImuIncrement, ...] = ()  # New measured integration intervals.
+    imu_increment_clock: tuple[float, float] | None = None  # Latest increment's device and host seconds.
 
     @property
     def rate_feedback(self) -> RateSample | None:
