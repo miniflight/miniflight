@@ -20,3 +20,25 @@ def gyro_rows(path):
                 raise ValueError(f"Invalid gyro row at iteration {iteration}")
             yield iteration, time_us, gyro
             previous = iteration, time_us
+
+
+def attitude_rows(path):
+    """Yield relative time, loop index, FRD gyro deg/s and body-to-start quaternion."""
+    from common.math import Quaternion
+    from miniflight.attitude import GyroAttitude
+    from miniflight.state import RateSample
+
+    observer = None
+    for iteration, time_us, (x, y, z) in gyro_rows(path):
+        if observer is None:
+            origin, previous = time_us, iteration-1
+        if iteration != previous+1:
+            raise ValueError(f"Missing loop iterations before {iteration}")
+        # Betaflight's FLU body axes become Miniflight's forward/right/down axes.
+        gyro = (x, -y, -z)
+        sample = RateSample((time_us-origin)*1e-6, 0., tuple(math.radians(v) for v in gyro))
+        if observer is None:
+            observer = GyroAttitude(Quaternion(), sample)
+        rotation = observer.update(sample)
+        yield sample.time, iteration, gyro, tuple(rotation.q)
+        previous = iteration
