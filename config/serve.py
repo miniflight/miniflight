@@ -1,9 +1,11 @@
-"""Serve the Miniflight bench view from one Python USB connection."""
+"""Serve live controller data or recorded gyro in the Miniflight bench view."""
 import argparse
+from bisect import bisect_right
 from contextlib import contextmanager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import math
 from pathlib import Path
 import struct
 import threading
@@ -22,6 +24,8 @@ class Bench:
         self.usb = threading.Lock()
         self.saving = threading.Lock()
         self.link = None
+        self.replay_name = None
+        self.restart = threading.Event()
         self.publish(dict(connection=dict(state="waiting_usb")))
 
     def publish(self, state):
@@ -73,6 +77,29 @@ class Bench:
                 self.link = link
             self.stop.wait(.015)
 
+    def playback(self, frames):
+        from common.math import Quaternion
+        times = [row[0] for row in frames]
+        duration = times[-1]
+        started = None
+        previous = None
+        while not self.stop.is_set():
+            if self.restart.is_set():
+                self.restart.clear()
+                started, previous = time.monotonic(), None
+            elapsed = 0 if started is None else min(time.monotonic()-started, duration)
+            index = max(0, bisect_right(times, elapsed)-1)
+            playing = started is not None and elapsed < duration
+            if previous != (index, playing):
+                stamp, _, gyro, quaternion = frames[index]
+                self.publish(dict(connection=dict(state="replay"),
+                                  replay=dict(name=self.replay_name, time_s=stamp, duration_s=duration, playing=playing),
+                                  signals=dict(attitude_deg=[math.degrees(v) for v in Quaternion(*quaternion).to_euler()],
+                                               gyro_deg_s=gyro, body_to_start_wxyz=quaternion),
+                                  traffic=dict(attitude_samples_total=index, imu_samples_total=index)))
+                previous = index, playing
+            self.stop.wait(.02)
+
     @contextmanager
     def blackbox_export(self):
         if not self.saving.acquire(blocking=False):
@@ -109,11 +136,16 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=HERE, **kwargs)
 
     def do_POST(self):
-        if self.path != "/blackbox":
-            self.send_error(404)
-            return
         if self.headers.get("Origin") != f"http://127.0.0.1:{self.server.server_port}":
             self.send_error(403)
+            return
+        if self.path == "/replay" and self.bench.replay_name is not None:
+            self.bench.restart.set()
+            self.send_response(204)
+            self.end_headers()
+            return
+        if self.path != "/blackbox":
+            self.send_error(404)
             return
         started = False
         try:
@@ -159,12 +191,25 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", help="USB serial device path")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--device", help="USB serial device path")
+    source.add_argument("--replay", type=Path, help="blackbox_decode CSV with us timestamps and deg/s gyro")
     parser.add_argument("--port", type=int, default=8002)
     args = parser.parse_args()
     bench = Bench(args.device)
+    target = bench.run
+    if args.replay:
+        from target.betaflight.log import attitude_rows
+        try:
+            frames = list(attitude_rows(args.replay))
+            if not frames:
+                raise ValueError("The recording is empty")
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+        bench.replay_name = args.replay.name
+        target = partial(bench.playback, frames)
     with ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, bench=bench)) as server:
-        worker = threading.Thread(target=bench.run, daemon=True)
+        worker = threading.Thread(target=target, daemon=True)
         worker.start()
         print(f"Miniflight is at http://127.0.0.1:{server.server_port}/", flush=True)
         try:
