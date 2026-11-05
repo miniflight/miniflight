@@ -30,6 +30,15 @@ class ImuSample(NamedTuple):
     gyro: tuple[float, float, float]  # FRD rad/s from the same measurement
 
 
+class ImuIncrement(NamedTuple):
+    """IMU measurements accompanied by their actual integration interval."""
+
+    time: float  # device seconds at the end of the interval
+    dt: float  # integration seconds, independent of publication cadence
+    acceleration: tuple[float, float, float]  # FRD specific force, m/s²
+    gyro: tuple[float, float, float]  # FRD rad/s
+
+
 @dataclass(frozen=True)
 class Motion:
     time: float  # device seconds
@@ -85,6 +94,7 @@ class State:
     attitude: Attitude | None = None
     motors: MotorOutputs | None = None
     imu_samples: tuple[ImuSample, ...] = ()  # New accepted measurements, in arrival order.
+    imu_increments: tuple[ImuIncrement, ...] = ()  # New measured integration intervals.
 
     @property
     def rate_feedback(self) -> RateSample | None:
