@@ -281,7 +281,7 @@ class GroundReference {
 
     const gyroPeak = Math.max(...gyro.map(Math.abs));
     if (gyroPeak > 8) {
-      this.waitForStill(`MOTION ${gyroPeak.toFixed(0)} dps`);
+      this.waitForStill(`MOTION ${gyroPeak.toFixed(0)} COUNTS`);
       return;
     }
 
@@ -497,6 +497,9 @@ function readinessFor(data) {
   const health = data.health || {};
   const signals = data.signals || {};
 
+  if (finite(data.blackbox?.copied)) {
+    return ["waiting", "SAVING BLACKBOX", "Live readings resume after the export."];
+  }
   if (connection.state !== "live") {
     return ["waiting", "CONNECT USB", "Waiting for live controller data."];
   }
@@ -565,6 +568,13 @@ function renderTelemetry(data) {
   $("cpu").textContent = formatted(health.cpu_load_percent, "%");
   $("i2c").textContent = plain(health.i2c_errors);
   $("sensors").textContent = health.sensors?.length ? health.sensors.join(" · ") : "—";
+  const box = data.blackbox;
+  const copying = finite(box?.copied);
+  $("blackboxSize").textContent = box?.ready
+    ? `${(box.used / 1048576).toFixed(1)} / ${(box.capacity / 1048576).toFixed(1)} MiB` : "—";
+  $("blackboxButton").disabled = !box?.ready || !box.used || copying || savingBlackbox || state !== "live";
+  $("blackboxButton").textContent = copying
+    ? `SAVING ${Math.round(100 * box.copied / box.used)}%` : "SAVE BLACKBOX";
 
   $("voltage").textContent = formatted(signals.battery_v, " V");
   $("current").textContent = formatted(signals.current_a, " A", 2);
@@ -648,11 +658,32 @@ $("scopeButton").addEventListener("click", () => {
   if (telemetry.latest) renderTelemetry(telemetry.latest);
 });
 
+let savingBlackbox = false;
+$("blackboxButton").addEventListener("click", async () => {
+  savingBlackbox = $("blackboxButton").disabled = true;
+  $("blackboxStatus").textContent = "Reading flash…";
+  try {
+    const response = await fetch("/blackbox", {method: "POST"});
+    if (!response.ok) throw new Error("Export failed");
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    Object.assign(link, {href: url, download: "miniflight-blackbox.bbl"});
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $("blackboxStatus").textContent = "Download ready";
+  } catch {
+    $("blackboxStatus").textContent = "Could not save Blackbox";
+  } finally {
+    savingBlackbox = false;
+  }
+});
+
 const events = new EventSource("/events");
 events.addEventListener("state", (event) => {
   acceptState(JSON.parse(event.data));
 });
 events.onerror = () => {
+  telemetry.latest = null;
   $("linkState").dataset.state = "connecting";
   $("linkText").textContent = "CONNECTING · LOCALHOST";
 };
