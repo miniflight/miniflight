@@ -7,9 +7,9 @@ import time
 
 API_VERSION, FC_VARIANT, FC_VERSION, BOARD_INFO = 1, 2, 3, 4
 STATUS, RAW_IMU, MOTOR, ATTITUDE, ALTITUDE, ANALOG, BOX_IDS = 101, 102, 104, 108, 109, 110, 119
-FLASH_SUMMARY = 70
+FLASH_SUMMARY, FLASH_READ = 70, 71
 READS = frozenset((API_VERSION, FC_VARIANT, FC_VERSION, BOARD_INFO, STATUS, RAW_IMU, MOTOR,
-                   ATTITUDE, ALTITUDE, ANALOG, BOX_IDS, FLASH_SUMMARY))
+                   ATTITUDE, ALTITUDE, ANALOG, BOX_IDS, FLASH_SUMMARY, FLASH_READ))
 
 
 def checksum(data):
@@ -28,13 +28,18 @@ def pop_reply(buffer):
         del buffer[:min(starts)]
         if len(buffer) < 6:
             return None
-        end = 6 + buffer[3]
+        length, start = buffer[3], 5
+        if length == 255:
+            if len(buffer) < 7:
+                return None
+            length, start = int.from_bytes(buffer[5:7], "little"), 7
+        end = start + length + 1
         if len(buffer) < end:
             return None
         frame = bytes(buffer[:end])
         del buffer[:end]
         if checksum(frame[3:-1]) == frame[-1]:
-            return frame[2] == ord(">"), frame[4], frame[5:-1]
+            return frame[2] == ord(">"), frame[4], frame[start:-1]
 
 
 class MSP:
@@ -42,10 +47,13 @@ class MSP:
         self.fd = fd
         self.buffer = bytearray()
 
-    def read(self, command, timeout=.3):
+    def read(self, command, timeout=.3, *, payload=b""):
         if command not in READS:
             raise ValueError(f"Unsupported MSP read command {command}")
-        request = b"$M<" + bytes((0, command, command))
+        if command == FLASH_READ and len(payload) != 7 or command != FLASH_READ and payload:
+            raise ValueError(f"Invalid MSP {command} request length")
+        body = bytes((len(payload), command)) + payload
+        request = b"$M<" + body + bytes((checksum(body),))
         if os.write(self.fd, request) != len(request):
             raise OSError("Incomplete MSP request")
         deadline = time.monotonic() + timeout
