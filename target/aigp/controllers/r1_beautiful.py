@@ -37,6 +37,14 @@ class Controller(BaseController[BodyRates]):
     def feedback_position(self, state):
         return Vector3D(*state.motion.position)
 
+    def feedback_time(self, state, now, completed):
+        motion = state.motion
+        if motion is None:
+            return None
+        if not completed and now - motion.received_at > .3:
+            raise TimeoutError("privileged pose is stale")
+        return motion.time
+
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
             if self.reference is None and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
@@ -64,13 +72,13 @@ class Controller(BaseController[BodyRates]):
             self.attitude_estimate = GyroAttitude(initial_rotation, state.rate_feedback)
             self.calibration.clear()
         imu_rotation = self.attitude_estimate.update(state.rate_feedback)
-        if state.motion is None or not race_state.started:
+        if not race_state.started:
             return None
         if self.reference is None and (self.track is None or len(race_state.gate_centers) != len(self.track)):
             return None
-        motion = state.motion
-        if not race_state.completed and now - motion.received_at > .3:
-            raise TimeoutError("privileged pose is stale")
+        stamp = self.feedback_time(state, now, race_state.completed)
+        if stamp is None:
+            return None
         velocity = self.feedback_velocity(state, imu_rotation)
         position = self.feedback_position(state)
         self.angles = angles = imu_rotation.to_euler()
@@ -84,8 +92,8 @@ class Controller(BaseController[BodyRates]):
                 self.gate = (index, race_state.gate_centers[index])
         else:
             if self.reference_start is None:
-                self.reference_start = motion.time - race_state.time_seconds
-            self.reference_time = motion.time - self.reference_start  # Pose seconds since native GO.
+                self.reference_start = stamp - race_state.time_seconds
+            self.reference_time = stamp - self.reference_start
             self.target, self.target_velocity, self.target_acceleration = (Vector3D(*v) for v in self.reference(self.reference_time))
         if self.target is None:
             return None
