@@ -34,6 +34,9 @@ class Controller(BaseController[BodyRates]):
     def feedback_velocity(self, state, rotation):
         return Vector3D(*state.motion.velocity)
 
+    def feedback_position(self, state):
+        return Vector3D(*state.motion.position)
+
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         for packet in telemetry:
             if self.reference is None and isinstance(packet.decoded, TrackInfo) and usable_track(packet.decoded.gates):
@@ -68,7 +71,8 @@ class Controller(BaseController[BodyRates]):
         motion = state.motion
         if not race_state.completed and now - motion.received_at > .3:
             raise TimeoutError("privileged pose is stale")
-        position, velocity = Vector3D(*motion.position), self.feedback_velocity(state, imu_rotation)
+        velocity = self.feedback_velocity(state, imu_rotation)
+        position = self.feedback_position(state)
         self.angles = angles = imu_rotation.to_euler()
 
         if self.reference is None:
