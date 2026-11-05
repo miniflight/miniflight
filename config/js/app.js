@@ -110,16 +110,17 @@ class FlightView {
   }
 
   async loadModel() {
-    const gltf = await new GLTFLoader().loadAsync("/data/CesiumDrone.glb");
+    const gltf = await new GLTFLoader().loadAsync("/data/whoop.glb");
     const model = gltf.scene;
+    model.rotation.y = Math.PI;
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const scale = 3.2 / Math.max(size.x, size.y, size.z);
-    model.position.sub(center);
+    model.position.sub(center.multiplyScalar(scale));
     model.scale.setScalar(scale);
-    model.rotation.y = Math.PI;
     model.traverse((node) => {
+      if (node.name.startsWith("propeller-")) this.rotors.push(node);
       if (!node.isMesh) return;
       node.castShadow = false;
       node.receiveShadow = false;
@@ -127,7 +128,6 @@ class FlightView {
         node.material.envMapIntensity = 0.8;
         node.material.needsUpdate = true;
       }
-      if (/prop|rotor|blade/i.test(node.name)) this.rotors.push(node);
     });
     this.droneBasis.add(model);
   }
