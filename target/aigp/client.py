@@ -1,6 +1,7 @@
 """Receive asynchronous AI-GP packets; read observations and encode commands."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from enum import Enum, auto
 import math
 import select
 import socket
@@ -14,7 +15,7 @@ from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Attitude, BodyRates, Command, Frame, Motion, MotorControls, MotorOutputs, Ned, PositionNed, State, VelocityNed
-from miniflight.state import ImuSample
+from miniflight.state import ImuSample, SampleOrder, sample_order
 from target import Target
 from target.aigp.controllers import Gate
 
@@ -58,7 +59,10 @@ class Packet:
 
 
 def _newer(previous, sample):
-    if previous is None or (sample.time >= previous.time and replace(sample, received_at=previous.received_at) != previous):
+    order = sample_order(None if previous is None else previous.time, sample.time)
+    if order in (SampleOrder.FIRST, SampleOrder.ADVANCING):
+        return sample
+    if order is SampleOrder.REPEATED and replace(sample, received_at=previous.received_at) != previous:
         return sample
     return previous
 
@@ -66,6 +70,22 @@ def _newer(previous, sample):
 def _imu_sample(imu):
     return ImuSample(imu.time_usec * 1e-6, imu._host_received_at,
                      (imu.xacc, imu.yacc, imu.zacc), (-imu.xgyro, -imu.ygyro, -imu.zgyro))
+
+
+class ConnectionPhase(Enum):
+    CLOSED = auto()
+    WAITING_FOR_HEARTBEAT = auto()
+    IDENTIFIED = auto()
+
+
+@dataclass
+class HeartbeatCadence:
+    due_at: float = 0.0
+
+    def send_if_due(self, client, now):
+        if client.connected and now >= self.due_at:
+            client.heartbeat()
+            self.due_at = now + .5
 
 
 class SimulatorClient(Target):
@@ -77,6 +97,7 @@ class SimulatorClient(Target):
         self.port = port
         self.camera_port = camera_port
         self.connection = self._vision = self.target_ids = None
+        self.phase = ConnectionPhase.CLOSED
         self._telemetry = {}
         self.telemetry = MappingProxyType(self._telemetry)  # Message name → latest raw MAVLink packet.
         self._track = _Track()
@@ -85,7 +106,7 @@ class SimulatorClient(Target):
 
     @property
     def connected(self):
-        return self.target_ids is not None
+        return self.phase is ConnectionPhase.IDENTIFIED
 
     @property
     def mav(self):
@@ -105,15 +126,19 @@ class SimulatorClient(Target):
         """Host monotonic receipt of that complete transfer, or None. Does not poll."""
         return self._track.received_at
 
-    def open(self):
-        """Reserve the UDP ports without waiting for or commanding the simulator."""
-        if self.connection is not None:
+    def _begin_session(self):
+        if self.phase is not ConnectionPhase.CLOSED:
             raise RuntimeError("client is already open")
         self._telemetry.clear()
         self.state = None
         self._camera = _Camera()
         self._track = _Track()
         self.race_telemetry = None
+        self.phase = ConnectionPhase.WAITING_FOR_HEARTBEAT
+
+    def open(self):
+        """Reserve the UDP ports without waiting for or commanding the simulator."""
+        self._begin_session()
         self._boot = time.monotonic()
         try:
             self.connection = mavutil.mavlink_connection(
@@ -132,10 +157,15 @@ class SimulatorClient(Target):
         self.open()
 
     def disconnect(self):
-        for sock in (self.connection, self._vision):
-            if sock is not None:
-                sock.close()
+        connection, vision = self.connection, self._vision
         self.connection = self._vision = self.target_ids = None
+        self.phase = ConnectionPhase.CLOSED
+        try:
+            if connection is not None:
+                connection.close()
+        finally:
+            if vision is not None:
+                vision.close()
 
     def read(self, timeout=1.0):
         self.packets = self.poll(timeout)
@@ -171,7 +201,7 @@ class SimulatorClient(Target):
             if message is not None:
                 now = time.monotonic()
                 decoded = self._receive(message, now)
-                if (message.get_type() != "BAD_DATA" and self.target_ids is not None
+                if (message.get_type() != "BAD_DATA" and self.connected
                         and message.get_srcSystem() == self.target_ids[0]):
                     arrivals.append(Packet(message, now, decoded))
                 timeout = 0.0
@@ -187,15 +217,16 @@ class SimulatorClient(Target):
 
     def _receive(self, message, now):
         kind = message.get_type()
-        if kind == "BAD_DATA":
+        if kind == "BAD_DATA" or self.phase is ConnectionPhase.CLOSED:
             return
         source = (message.get_srcSystem(), message.get_srcComponent())
-        if self.target_ids is None:
+        if self.phase is ConnectionPhase.WAITING_FOR_HEARTBEAT:
             if kind != "HEARTBEAT":
                 return
             self.target_ids = source
             if self.connection is not None:
                 self.connection.target_system, self.connection.target_component = source
+            self.phase = ConnectionPhase.IDENTIFIED
         if source[0] != self.target_ids[0]:
             return
         if kind == "HIGHRES_IMU":
@@ -204,7 +235,8 @@ class SimulatorClient(Target):
             if not all(math.isfinite(v) for v in values):
                 return
             previous = self._telemetry.get(kind)
-            if previous is not None and message.time_usec <= previous.time_usec:
+            order = sample_order(None if previous is None else previous.time_usec, message.time_usec)
+            if order in (SampleOrder.REPEATED, SampleOrder.REGRESSED):
                 return
         message._host_received_at = now  # Host metadata; MAVLink fields and packet bytes are unchanged.
         self._telemetry[kind] = message
@@ -224,7 +256,9 @@ class SimulatorClient(Target):
         elif kind == "ENCAPSULATED_DATA" and message.data[0] == 1:
             # Native boot/start/finish/gate values, not an IMU or host tick.
             race = RaceTelemetry(*struct.unpack_from("<BQqqIq", bytes(message.data))[1:], received_at=now)
-            if self.race_telemetry is not None and race.sim_boot_time_ms < self.race_telemetry.sim_boot_time_ms:
+            previous = self.race_telemetry
+            boot = sample_order(None if previous is None else previous.sim_boot_time_ms, race.sim_boot_time_ms)
+            if boot is SampleOrder.REGRESSED:
                 # A restarted source clock cannot inherit the previous IMU watermark.
                 self._telemetry.pop("HIGHRES_IMU", None)
             self.race_telemetry = race
@@ -282,6 +316,17 @@ class SimulatorClient(Target):
                                     0, int(armed), 0, 0, 0, 0, 0, 0)
 
 
+class AssemblyPhase(Enum):
+    IDLE = auto()
+    COLLECTING = auto()
+
+
+@dataclass
+class _CourseTransfer:
+    announcement: tuple[int, int, int]  # transfer ID, bytes, fragments
+    chunks: dict[int, bytes] = field(default_factory=dict)
+
+
 class _Track:
     """Handshake → indexed fragments → complete course; never expire it per tick."""
 
@@ -290,8 +335,7 @@ class _Track:
     MAX_GATES = 1024
 
     def __init__(self):
-        self.transfer = None
-        self.chunks = {}
+        self.transfer: _CourseTransfer | None = None
         self.gates = None
         self.received_at = None
 
@@ -300,26 +344,30 @@ class _Track:
         if (not 2 <= size <= 2 + self.MAX_GATES * self.GATE.size
                 or packets != (size + self.CHUNK_BYTES - 1) // self.CHUNK_BYTES):
             return
-        transfer = (message.width, size, packets)  # width carries the vendor's transfer ID.
-        if transfer != self.transfer:
-            self.transfer = transfer
-            self.chunks = {}
+        announcement = (message.width, size, packets)  # width carries the vendor's transfer ID.
+        if self.transfer is None or self.transfer.announcement != announcement:
+            self.transfer = _CourseTransfer(announcement)
+
+    @property
+    def phase(self):
+        return AssemblyPhase.IDLE if self.transfer is None else AssemblyPhase.COLLECTING
 
     def receive(self, message, now):
-        if self.transfer is None:
+        if self.phase is AssemblyPhase.IDLE:
             return
+        transfer = self.transfer
         payload = bytes(message.data)
-        transfer_id, size, packets = self.transfer
+        transfer_id, size, packets = transfer.announcement
         if struct.unpack_from("<H", payload, 1)[0] != transfer_id:
             return
         index = message.seqnr
         if not 0 <= index < packets:
             return
-        self.chunks[index] = payload[3:]
-        if len(self.chunks) != packets:
+        transfer.chunks[index] = payload[3:]
+        if len(transfer.chunks) != packets:
             return
-        data = b"".join(self.chunks[i] for i in range(packets))[:size]
-        self.transfer, self.chunks = None, {}
+        data = b"".join(transfer.chunks[i] for i in range(packets))[:size]
+        self.transfer = None
         count, = struct.unpack_from("<H", data)
         if not 0 <= count <= self.MAX_GATES or len(data) != 2 + count * self.GATE.size:
             return
@@ -332,6 +380,13 @@ class _Track:
         return TrackInfo(transfer_id, gates)
 
 
+@dataclass
+class _FrameTransfer:
+    header: tuple[int, int, int, int]  # frame ID, fragments, bytes, device timestamp
+    opened_at: float
+    chunks: dict[int, bytes] = field(default_factory=dict)
+
+
 class _Camera:
     """Assemble the simulator's UDP JPEG packets; discard incomplete frames."""
 
@@ -340,10 +395,12 @@ class _Camera:
     MAX_AGE = 0.5
 
     def __init__(self):
-        self.frame = None
-        self.started_at = 0.0
-        self.chunks = {}
+        self.transfer: _FrameTransfer | None = None
         self.latest = self.jpeg = None
+
+    @property
+    def phase(self):
+        return AssemblyPhase.IDLE if self.transfer is None else AssemblyPhase.COLLECTING
 
     def receive(self, packet: bytes, now: float):
         if len(packet) < self.HEADER.size:
@@ -355,19 +412,20 @@ class _Camera:
             return
         if self.latest is not None and timestamp <= self.latest.time_ns:
             return
-        frame = (frame_id, count, size, timestamp)
-        if self.frame is None or timestamp > self.frame[3] or now - self.started_at > self.MAX_AGE:
-            self.frame, self.started_at, self.chunks = frame, now, {}
-        if frame != self.frame:
+        header = (frame_id, count, size, timestamp)
+        transfer = self.transfer
+        if self.phase is AssemblyPhase.IDLE or timestamp > transfer.header[3] or now - transfer.opened_at > self.MAX_AGE:
+            self.transfer = transfer = _FrameTransfer(header, now)
+        if header != transfer.header:
             return
-        self.chunks[index] = payload
-        if sum(map(len, self.chunks.values())) > size:
-            self.frame, self.chunks = None, {}
+        transfer.chunks[index] = payload
+        if sum(map(len, transfer.chunks.values())) > size:
+            self.transfer = None
             return
-        if len(self.chunks) != count:
+        if len(transfer.chunks) != count:
             return
-        jpeg = b"".join(self.chunks[i] for i in range(count))
-        self.frame, self.chunks = None, {}
+        jpeg = b"".join(transfer.chunks[i] for i in range(count))
+        self.transfer = None
         if len(jpeg) != size:
             return
         try:

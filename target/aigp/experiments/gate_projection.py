@@ -1,6 +1,7 @@
 """Project privileged VQ1 gate geometry onto recorded camera frames."""
 
 import argparse
+from enum import Enum, auto
 import json
 import math
 from pathlib import Path
@@ -41,6 +42,11 @@ def project(gate, motion, attitude, width, height, pivot_to_center, plane_y=0):
     return None if np.any(camera[:, 2] <= 0) else 320 * camera[:, :2] / camera[:, 2:] + (320, 180)
 
 
+class VideoPhase(Enum):
+    WAITING_FOR_FRAME = auto()
+    HOLDING_FRAME = auto()
+
+
 def render(trace, geometry_path, output):
     if read_metadata(trace)["target"] != "vq1.r1":
         raise ValueError("the measured geometry belongs to VQ1 R1")
@@ -58,6 +64,7 @@ def render(trace, geometry_path, output):
                "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output)]
     output.parent.mkdir(parents=True, exist_ok=True)
     gaps, first_ns, previous, previous_tick, decoded = [], None, None, 0, 0
+    phase = VideoPhase.WAITING_FOR_FRAME
     with subprocess.Popen(command, stdin=subprocess.PIPE) as writer:
         for _, frames, _ in observations(trace):
             for frame in frames:
@@ -81,13 +88,15 @@ def render(trace, geometry_path, output):
                           (f"Frame {frame.id} | cyan: 1.50 m | yellow: 1.48 m | front/back planes | receipt aligned; capture offset unknown", (8, 412))]
                 for label, origin in labels:
                     cv2.putText(panel, label, origin, 0, .5, (255, 255, 255), 1, cv2.LINE_AA)
-                first_ns = frame.time_ns if first_ns is None else first_ns
+                if phase is VideoPhase.WAITING_FOR_FRAME:
+                    first_ns = frame.time_ns
                 tick = round((frame.time_ns-first_ns)*30/1e9)
-                if previous is not None:
+                if phase is VideoPhase.HOLDING_FRAME:
                     for _ in range(tick-previous_tick):
                         writer.stdin.write(previous.tobytes())
                 previous, previous_tick, decoded = panel, tick, decoded+1
-        if previous is not None:
+                phase = VideoPhase.HOLDING_FRAME
+        if phase is VideoPhase.HOLDING_FRAME:
             writer.stdin.write(previous.tobytes())
         writer.stdin.close()
     if writer.returncode:

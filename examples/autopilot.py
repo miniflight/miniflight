@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from enum import Enum, auto
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from gymnasium import Env
@@ -72,6 +73,11 @@ class ActorCritic(nn.Module):
         
         return action_mean_scaled, value
 
+class BatchPhase(Enum):
+    COLLECTING = auto()
+    READY_TO_UPDATE = auto()
+
+
 class Memory:
     def __init__(self):
         self.states = []
@@ -86,6 +92,9 @@ class Memory:
         del self.logprobs[:]
         del self.rewards[:]
         del self.is_terminals[:]
+
+    def phase(self, batch_steps):
+        return BatchPhase.READY_TO_UPDATE if len(self.rewards) >= batch_steps else BatchPhase.COLLECTING
 
 class PPO:
     def __init__(self, actor_critic, lr, gamma, lamda, K_epochs, eps_clip, action_std, ppo_loss_coef, critic_loss_coef, entropy_coef, batch_size):
@@ -197,7 +206,8 @@ class PPO:
                 self.optimizer.step()
 
 def train(max_episodes, max_timesteps, update_timestep, log_interval, state_dim, action_dim, hidden_dim, lr, gamma, K_epochs, eps_clip, action_std, gae_lambda, ppo_loss_coef, critic_loss_coef, entropy_coef, batch_size):
-    timestep = 0
+    if update_timestep <= 0:
+        raise ValueError("update_timestep must be positive")
     actor_critic = ActorCritic(state_dim, action_dim, hidden_dim)
     ppo = PPO(actor_critic, lr, gamma, gae_lambda, K_epochs, eps_clip, action_std, ppo_loss_coef, critic_loss_coef, entropy_coef, batch_size)
     memory = Memory()
@@ -215,8 +225,6 @@ def train(max_episodes, max_timesteps, update_timestep, log_interval, state_dim,
         state, _ = env.reset()
         total_reward = 0
         for t in range(max_timesteps):
-            timestep += 1
-
             action = ppo.select_action(state, memory)
             next_state, reward, done, trunc, _ = env.step(action)
 
@@ -224,10 +232,9 @@ def train(max_episodes, max_timesteps, update_timestep, log_interval, state_dim,
             total_reward += reward
             memory.is_terminals.append(done or trunc)
 
-            if timestep % update_timestep == 0:
+            if memory.phase(update_timestep) is BatchPhase.READY_TO_UPDATE:
                 ppo.update(memory)
                 memory.clear_memory()
-                timestep = 0
 
             state = next_state
             if done or trunc:
@@ -253,6 +260,12 @@ def train(max_episodes, max_timesteps, update_timestep, log_interval, state_dim,
     plt.ioff()
     plt.show()
 
+class EpisodePhase(Enum):
+    ACTIVE = auto()
+    TERMINATED = auto()
+    TRUNCATED = auto()
+
+
 class ContinuousPathfindingEnv(Env):
     def __init__(self, grid_size=1000, num_obstacles=10, render_mode='human'):
         self.grid_size = grid_size
@@ -265,8 +278,7 @@ class ContinuousPathfindingEnv(Env):
         self.end = np.array([self.grid_size / 2, self.grid_size / 2])  # Set end point to the origin
 
         self.current_position = np.array(self.start)
-        self.done = False
-        self.trunc = False
+        self.phase = EpisodePhase.ACTIVE
         self.max_steps = 1000
         self.steps_taken = 0
 
@@ -346,13 +358,20 @@ class ContinuousPathfindingEnv(Env):
             point = self._generate_random_point()
         return point
 
+    @property
+    def done(self):
+        return self.phase is EpisodePhase.TERMINATED
+
+    @property
+    def trunc(self):
+        return self.phase is EpisodePhase.TRUNCATED
+
     def reset(self):
         self.obstacles = self._generate_obstacles()
         self.start = self._generate_valid_point()
         self.end = np.array([self.grid_size / 2, self.grid_size / 2])  # Set end point to the origin
         self.current_position = np.array(self.start)
-        self.done = False
-        self.trunc = False
+        self.phase = EpisodePhase.ACTIVE
         self.steps_taken = 0
         self.positions = [self.current_position.copy()]
 
@@ -363,7 +382,7 @@ class ContinuousPathfindingEnv(Env):
         return state, {}
 
     def step(self, action):
-        if self.done or self.trunc:
+        if self.phase is not EpisodePhase.ACTIVE:
             return np.concatenate((self.current_position, self.end)), 0.0, self.done, self.trunc, {}
 
         # Apply the action to update the current position
@@ -391,13 +410,13 @@ class ContinuousPathfindingEnv(Env):
     def _check_termination(self):
         if not (0 <= self.current_position[0] <= self.grid_size and 0 <= self.current_position[1] <= self.grid_size):
             self.current_position = np.clip(self.current_position, 0, self.grid_size)
-            self.done = True
+            self.phase = EpisodePhase.TERMINATED
         elif self._point_inside_obstacles(self.current_position):
-            self.done = True
+            self.phase = EpisodePhase.TERMINATED
         elif np.linalg.norm(self.current_position - self.end) < 20.0:
-            self.done = True
+            self.phase = EpisodePhase.TERMINATED
         elif self.steps_taken >= self.max_steps:
-            self.trunc = True
+            self.phase = EpisodePhase.TRUNCATED
 
     def _calculate_reward(self):
         reward = 0 # Penalty for each time step

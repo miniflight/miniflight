@@ -1,6 +1,13 @@
 """Experimental gyro correction for the sustained VQ1 yaw-rate probe."""
 
 import math
+from enum import Enum, auto
+
+
+class YawPhase(Enum):
+    WAITING_FOR_REFERENCE = auto()
+    SETTLING = auto()
+    TRACKING = auto()
 
 
 class YawRateFeedback:
@@ -19,11 +26,10 @@ class YawRateFeedback:
             raise ValueError("yaw feedback parameters must be finite and positive")
         self.gain, self.max_correction, self.max_rate = gain, max_correction, max_rate
         self.settle_time, self.step_threshold = settle_time, step_threshold
-        self.correction = 0.0
-        self._previous_requested = None
-        self._settling = 0.0
+        self.reset()
 
     def reset(self):
+        self.phase = YawPhase.WAITING_FOR_REFERENCE
         self.correction = 0.0
         self._previous_requested = None
         self._settling = 0.0
@@ -34,10 +40,15 @@ class YawRateFeedback:
         valid_interval = 0 < dt <= .1
         if requested == 0 or not valid_interval:
             self.reset()
-        elif self._previous_requested is None or abs(requested - self._previous_requested) > self.step_threshold:
+            if valid_interval:
+                self.phase = YawPhase.TRACKING
+        elif self.phase is YawPhase.WAITING_FOR_REFERENCE or abs(requested - self._previous_requested) > self.step_threshold:
+            self.phase = YawPhase.SETTLING
             self._settling = self.settle_time
-        elif self._settling > 0:
+        elif self.phase is YawPhase.SETTLING:
             self._settling = max(0.0, self._settling - dt)
+            if self._settling == 0:
+                self.phase = YawPhase.TRACKING
         else:
             # The new request has not been sent yet. Integrate error against the
             # reference that was active during the elapsed sensor interval.

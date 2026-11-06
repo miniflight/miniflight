@@ -28,13 +28,7 @@ if not arena then
     error("MINIFLIGHT_VQ2_MODE must be r1 or r2")
 end
 
-local stage = 1
-local running = true
-local master_requested = false
-local lighting_requested = false
-local track_requested = false
-local track_finished = false
-local start_requested = false
+local stage = "load_master"
 
 local function valid(object)
     return object and object:IsValid()
@@ -107,18 +101,18 @@ local function race_started()
 end
 
 local function advance()
-    if stage == 1 then
+    if stage == "load_master" or stage == "wait_for_master" then
         local loaded_world = world()
 
         if valid(loaded_world) and valid(controller()) then
             print("[DirectVQ2] mode=" .. requested_mode .. "\n")
             print("[DirectVQ2] environment_present="
                 .. tostring(level_loaded(arena.environment_name)) .. "\n")
-            stage = 2
+            stage = "load_lighting"
             return
         end
 
-        if not master_requested then
+        if stage == "load_master" then
             local current_world = find_object("World", "/Game/")
 
             if valid(current_world) and valid(gameplay_statics()) then
@@ -128,62 +122,62 @@ local function advance()
                     true,
                     MASTER_OPTIONS
                 )
-                master_requested = true
+                stage = "wait_for_master"
             end
         end
         return
     end
 
-    if stage == 2 then
+    if stage == "load_lighting" or stage == "wait_for_lighting" then
         if level_loaded(arena.lighting_name) then
             print("[DirectVQ2] lighting_loaded=true\n")
-            stage = 3
-        elseif not lighting_requested and valid(world()) then
+            stage = "notify_lighting_loaded"
+        elseif stage == "load_lighting" and valid(world()) then
             print("[DirectVQ2] loading_lighting=" .. arena.lighting .. "\n")
             stream_level(arena.lighting)
-            lighting_requested = true
+            stage = "wait_for_lighting"
         end
         return
     end
 
-    if stage == 3 then
+    if stage == "notify_lighting_loaded" then
         local manager = find_object("MapLoadingManager")
 
         if valid(manager) then
             manager:OnLightingLevelLoaded()
             print("[DirectVQ2] lighting_callback=true\n")
-            stage = 4
+            stage = "load_track"
         end
         return
     end
 
-    if stage == 4 then
+    if stage == "load_track" or stage == "wait_for_track" then
         if level_loaded(arena.track_name) then
             print("[DirectVQ2] track_loaded=true\n")
-            stage = 5
-        elseif not track_requested and valid(world()) then
+            stage = "notify_track_loaded"
+        elseif stage == "load_track" and valid(world()) then
             print("[DirectVQ2] loading_track=" .. arena.track .. "\n")
             stream_level(arena.track)
-            track_requested = true
+            stage = "wait_for_track"
         end
         return
     end
 
-    if stage == 5 then
+    if stage == "notify_track_loaded" or stage == "wait_for_track_ready" then
         local manager = find_object("MapLoadingManager")
 
-        if not track_finished and valid(manager) then
+        if stage == "notify_track_loaded" and valid(manager) then
             manager:OnTrackLevelLoaded()
             print("[DirectVQ2] track_callback=true\n")
-            track_finished = true
-        elseif track_finished and track_ready() then
+            stage = "wait_for_track_ready"
+        elseif stage == "wait_for_track_ready" and track_ready() then
             print("[DirectVQ2] track_ready=true\n")
-            stage = 6
+            stage = "assign_grid"
         end
         return
     end
 
-    if stage == 6 then
+    if stage == "assign_grid" then
         local game_state = find_object("GameStateRaceBase")
         local player_state = find_object("PlayerStateRaceBase")
 
@@ -199,30 +193,31 @@ local function advance()
             if player_state.StartingGridSlot >= 0 then
                 print("[DirectVQ2] grid_slot="
                     .. tostring(player_state.StartingGridSlot) .. "\n")
-                stage = 7
+                stage = "confirm_opponents"
             end
         end
         return
     end
 
-    if stage == 7 then
+    if stage == "confirm_opponents" then
         local game_mode = find_object("GameModeRaceBase")
 
         if valid(game_mode) and valid(game_mode.OpponentsPopup) then
             game_mode.OpponentsPopup:ConfirmPopup()
             print("[DirectVQ2] opponents_confirmed=true\n")
-            stage = 8
+            stage = "start_race"
         end
         return
     end
 
+    if stage == "ready" or stage == "failed" then return end
     if race_started() then
         print("[DirectVQ2] physics_ready=true mode=" .. requested_mode .. "\n")
-        running = false
-    elseif not start_requested and valid(controller()) then
+        stage = "ready"
+    elseif stage == "start_race" and valid(controller()) then
         controller():ServerForceStartRaceWithoutRaceVerification()
         print("[DirectVQ2] force_start_requested=true\n")
-        start_requested = true
+        stage = "wait_for_go"
     end
 end
 
@@ -232,10 +227,10 @@ local function run()
 
         if not ok then
             print("[DirectVQ2] failed: " .. tostring(message) .. "\n")
-            running = false
+            stage = "failed"
         end
 
-        if running then
+        if stage ~= "ready" and stage ~= "failed" then
             ExecuteWithDelay(250, run)
         end
     end)

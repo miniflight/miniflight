@@ -2,9 +2,9 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum, auto
 import fcntl
 import hashlib
-import json
 import math
 import os
 from pathlib import Path
@@ -18,6 +18,7 @@ import tempfile
 import time
 
 from miniflight import Ned
+from miniflight.diagnostics import JsonLines, ReaderPhase
 
 
 BASE = Path(__file__).resolve().parent
@@ -37,6 +38,14 @@ TARGETS = {
     "vq2.r1": ("vq2", "r1", "MAP_anduril_master"),
     "vq2.r2": ("vq2", "r2", "MAP_arsenal_master"),
 }
+
+
+class RacePhase(Enum):
+    UNOBSERVED = auto()
+    WAITING_FOR_GO = auto()
+    RUNNING = auto()
+    FINISHED = auto()
+    INVALID = auto()
 
 
 @dataclass(frozen=True)
@@ -70,39 +79,54 @@ class NativeRaceState:
             raise ValueError("native gate centers must be finite")
         object.__setattr__(self, "gate_centers", centers)
 
+    @property
+    def phase(self):
+        if not self.valid:
+            return RacePhase.INVALID
+        if self.completed:
+            return RacePhase.FINISHED
+        return RacePhase.RUNNING if self.started else RacePhase.WAITING_FOR_GO
 
-class RaceStateReader:
+
+class RaceStateReader(JsonLines):
     def __init__(self, path, timeout=1.0):
-        self.path, self.timeout, self.stream = Path(path), timeout, None
+        super().__init__(path)
+        self.timeout = timeout
         self.gate_centers = ()
 
     def poll(self):
-        initial = self.stream is None
-        if self.stream is None:
+        initial = self.phase is ReaderPhase.WAITING_FOR_FILE
+        if initial:
             try:
                 if time.time() - self.path.stat().st_mtime > self.timeout:
                     return ()  # An old file cannot authorize an attached run.
-                self.stream = self.path.open()
             except FileNotFoundError:
                 return ()
         states = []
-        while True:
-            position = self.stream.tell()
-            line = self.stream.readline()
-            if not line.endswith("\n"):
-                self.stream.seek(position)  # Wait for a complete observation.
-                return tuple(states)
-            data = json.loads(line)
+        for data in self._records():
             if "gate_centers" in data:
                 self.gate_centers = data["gate_centers"]
                 continue
             if initial:
                 states.clear()  # Attach to the latest state, not previous race epochs.
             states.append(NativeRaceState(**data, gate_centers=self.gate_centers, received_at=time.monotonic()))
+        return tuple(states)
 
-    def close(self):
-        if self.stream is not None:
-            self.stream.close()
+
+class InstallPhase(Enum):
+    ABSENT = auto()
+    INCOMPLETE = auto()
+    READY = auto()
+
+
+def _install_phase(sim, stamps):
+    if not sim.exists():
+        return InstallPhase.ABSENT
+    marker = sim / ".installed"
+    if (marker.is_file() and marker.read_text() in stamps
+            and all((sim / path).is_file() for path in REQUIRED)):
+        return InstallPhase.READY
+    return InstallPhase.INCOMPLETE
 
 
 def prepare(version, base=BASE):
@@ -114,12 +138,10 @@ def prepare(version, base=BASE):
     stamp = hashlib.sha256(repr(parts).encode()).hexdigest()
     runtime = base / ".runtime"
     sim = runtime / version
-    marker = sim / ".installed"
-    installed = (marker.is_file() and marker.read_text() in (stamp, legacy_stamp)
-                 and all((sim / path).is_file() for path in REQUIRED))
-    if not installed:
-        if sim.exists():
-            raise FileExistsError(f"Incomplete {sim}; move it aside before preparing again")
+    phase = _install_phase(sim, (stamp, legacy_stamp))
+    if phase is InstallPhase.INCOMPLETE:
+        raise FileExistsError(f"Incomplete {sim}; move it aside before preparing again")
+    if phase is InstallPhase.ABSENT:
         archive = base / "archives" / filename
         if sha256(archive) != expected:
             raise ValueError(f"Checksum mismatch: {filename}")
@@ -213,11 +235,14 @@ def launch(target, simulator_args=(), attach=False, race_status_path=None):
             if stopped.returncode not in (0, 1):  # Wine returns 1 when no server is running.
                 stopped.check_returncode()
 
-        process = None
         try:
             stop_wine()
             print(f"{target}: starting direct arena; no training/qualification event selected", flush=True)
             process = subprocess.Popen(command, cwd=sim, env=env, start_new_session=True)
+        except BaseException:
+            stop_wine()
+            raise
+        try:
             yield process
         finally:
             # Also clean up when Wine starts children but its launcher exits.
@@ -225,12 +250,11 @@ def launch(target, simulator_args=(), attach=False, race_status_path=None):
                 stop_wine()
             finally:
                 _stop_process(process)
-                if process is not None:
-                    print(f"{target}: stopped", flush=True)
+                print(f"{target}: stopped", flush=True)
 
 
 def _stop_process(process):
-    if process is None or process.poll() is not None:
+    if process.poll() is not None:
         return
     process.terminate()
     try:

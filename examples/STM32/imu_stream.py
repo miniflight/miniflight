@@ -2,6 +2,7 @@ import os
 import time
 import termios
 import struct
+from typing import NamedTuple
 
 # top of file
 from collections import deque
@@ -123,6 +124,11 @@ def repr(values):
     ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps = values
     return f"Accel {ax_g:8.4f} {ay_g:8.4f} {az_g:8.4f} | Gyro {gx_dps:8.4f} {gy_dps:8.4f} {gz_dps:8.4f}"
 
+class ImuBias(NamedTuple):
+    acceleration: list[float]
+    gyro: list[float]
+
+
 def measure_bias(fd, samples=200):
     acc_sum = [0, 0, 0]
     gyro_sum = [0, 0, 0]
@@ -137,7 +143,7 @@ def measure_bias(fd, samples=200):
         gyro_sum[2] += gz
     acc_bias = [sum / samples for sum in acc_sum]
     gyro_bias = [sum / samples for sum in gyro_sum]
-    return acc_bias, gyro_bias
+    return ImuBias(acc_bias, gyro_bias)
 
 ACC_LSB_PER_G = 2048.0       # ±16 g range → 2048 counts = 1 g
 GYRO_LSB_PER_DPS = 16.384    # ±2000 °/s range → 16.384 counts = 1 °/s
@@ -155,18 +161,22 @@ def apply_bias_and_scale(values, acc_bias, gyro_bias):
 
     return ax, ay, az, gx, gy, gz
 
+def stream_calibrated(fd, bias: ImuBias):
+    plot = LivePlot()
+    for frame in read_frames(fd):
+        raw = decode_raw_imu(frame)
+        values = apply_bias_and_scale(raw, bias.acceleration, bias.gyro)
+        print(repr(values))
+        plot.update(*values)
+
+
 def main():
     fd = open_serial()
     try:
         print("Hold the craft still while we measure bias...")
-        acc_bias, gyro_bias = measure_bias(fd, samples=200)
-        print("Bias:", acc_bias, gyro_bias)
-        plot = LivePlot()
-        for frame in read_frames(fd):
-            raw = decode_raw_imu(frame)
-            values = apply_bias_and_scale(raw, acc_bias, gyro_bias)
-            print(repr(values))
-            plot.update(*values)
+        bias = measure_bias(fd, samples=200)
+        print("Bias:", *bias)
+        stream_calibrated(fd, bias)
     finally: os.close(fd)
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@
 import argparse
 from bisect import bisect_right
 from contextlib import contextmanager
+from dataclasses import dataclass
+from enum import Enum, StrEnum, auto
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -17,31 +19,82 @@ from target.betaflight import blackbox, msp, telemetry
 HERE = Path(__file__).resolve().parent
 
 
+class LinkPhase(StrEnum):
+    WAITING_USB = "waiting_usb"
+    HANDSHAKE = "handshake"
+    LIVE = "live"
+    RETRYING = "retrying"
+    REPLAY = "replay"
+
+
+class PlaybackPhase(StrEnum):
+    IDLE = "idle"
+    PLAYING = "playing"
+    FINISHED = "finished"
+
+
+class ExportPhase(StrEnum):
+    IDLE = "idle"
+    WAITING_FOR_USB = "waiting_for_usb"
+    STREAMING = "streaming"
+
+
+class ResponsePhase(Enum):
+    PREPARING = auto()
+    STREAMING = auto()
+
+
+@dataclass(frozen=True)
+class Publication:
+    sequence: int
+    state: dict
+    event: bytes
+
+
 class Bench:
-    def __init__(self, device):
+    def __init__(self, device, replay_name=None):
         self.device = device
         self.stop = threading.Event()
         self.usb = threading.Lock()
         self.saving = threading.Lock()
         self.link = None
-        self.replay_name = None
+        self.usb_session = 0
+        self.replay_name = replay_name
         self.restart = threading.Event()
-        self.publish(dict(connection=dict(state="waiting_usb")))
+        self.export_phase = ExportPhase.IDLE
+        self.publication = None
+        self.publish_link(LinkPhase.WAITING_USB)
+
+    @property
+    def link_phase(self):
+        return LinkPhase(self.state["connection"]["state"])
+
+    @property
+    def state(self):
+        return self.publication.state
+
+    @property
+    def event(self):
+        return self.publication.event
+
+    def publish_link(self, phase, **details):
+        self.publish(dict(connection=dict(state=phase, **details)))
 
     def publish(self, state):
-        self.state = state
-        self.event = b"event: state\ndata: " + json.dumps(state).encode() + b"\n\n"
+        sequence = 0 if self.publication is None else self.publication.sequence + 1
+        event = b"event: state\ndata: " + json.dumps(state).encode() + b"\n\n"
+        self.publication = Publication(sequence, state, event)
 
     def run(self):
         while not self.stop.is_set():
             devices = [self.device] if self.device else sorted(Path("/dev").glob("cu.usbmodem*"))
             if len(devices) != 1:
                 message = "Connect the flight controller by USB" if not devices else "Choose a USB port with --device"
-                self.publish(dict(connection=dict(state="waiting_usb", message=message)))
+                self.publish_link(LinkPhase.WAITING_USB, message=message)
             else:
                 device = str(devices[0])
                 try:
-                    self.publish(dict(connection=dict(state="handshake", port=device)))
+                    self.publish_link(LinkPhase.HANDSHAKE, port=device)
                     with msp.connect(device) as link:
                         try:
                             self.monitor(link, device)
@@ -49,11 +102,12 @@ class Bench:
                             with self.usb:
                                 self.link = None
                 except (OSError, ValueError, struct.error) as error:
-                    self.publish(dict(connection=dict(state="retrying", port=device, message=str(error))))
+                    self.publish_link(LinkPhase.RETRYING, port=device, message=str(error))
             self.stop.wait(.5)
 
     def monitor(self, link, device):
         controller, boxes = telemetry.identity(link), link.read(msp.BOX_IDS)
+        self.usb_session += 1
         update_at = started = time.monotonic()
         samples = frames = 0
         while not self.stop.is_set():
@@ -69,7 +123,8 @@ class Bench:
                 frames += 2
                 elapsed = max(time.monotonic()-started, .001)
                 hz = samples/elapsed
-                self.publish(dict(connection=dict(state="live", port=device, last_frame_at_ms=time.time_ns()//1_000_000),
+                self.publish(dict(connection=dict(state=LinkPhase.LIVE, port=device, session=self.usb_session,
+                                                  last_frame_at_ms=time.time_ns()//1_000_000),
                                   controller=controller, health=health, signals=signals, blackbox=flash,
                                   machine=dict(has_imu={"ACC", "GYRO"}.issubset(health["sensors"])),
                                   traffic=dict(attitude_samples_total=samples, imu_samples_total=samples,
@@ -81,52 +136,62 @@ class Bench:
         from common.math import Quaternion
         times = [row[0] for row in frames]
         duration = times[-1]
+        phase = PlaybackPhase.IDLE
+        elapsed = 0.0
         started = None
         previous = None
         while not self.stop.is_set():
             if self.restart.is_set():
                 self.restart.clear()
                 started, previous = time.monotonic(), None
-            elapsed = 0 if started is None else min(time.monotonic()-started, duration)
+                phase = PlaybackPhase.PLAYING
+            if phase is PlaybackPhase.PLAYING:
+                elapsed = min(time.monotonic()-started, duration)
+                if elapsed >= duration:
+                    phase = PlaybackPhase.FINISHED
             index = max(0, bisect_right(times, elapsed)-1)
-            playing = started is not None and elapsed < duration
-            if previous != (index, playing):
+            if previous != (index, phase):
                 stamp, _, gyro, quaternion = frames[index]
-                self.publish(dict(connection=dict(state="replay"),
-                                  replay=dict(name=self.replay_name, time_s=stamp, duration_s=duration, playing=playing),
+                self.publish(dict(connection=dict(state=LinkPhase.REPLAY),
+                                  replay=dict(name=self.replay_name, time_s=stamp, duration_s=duration,
+                                              phase=phase, playing=phase is PlaybackPhase.PLAYING),
                                   signals=dict(attitude_deg=[math.degrees(v) for v in Quaternion(*quaternion).to_euler()],
                                                gyro_deg_s=gyro, body_to_start_wxyz=quaternion),
                                   traffic=dict(attitude_samples_total=index, imu_samples_total=index)))
-                previous = index, playing
+                previous = index, phase
             self.stop.wait(.02)
 
     @contextmanager
     def blackbox_export(self):
         if not self.saving.acquire(blocking=False):
             raise OSError("A Blackbox export is already running")
+        self.export_phase = ExportPhase.WAITING_FOR_USB
         try:
             with self.usb:
-                if self.link is None:
+                link = self.link
+                if self.link_phase is not LinkPhase.LIVE or link is None:
                     raise OSError("Connect a flight controller first")
-                flash = blackbox.summary(self.link)
+                flash = blackbox.summary(link)
                 if not flash["ready"] or not flash["used"]:
                     raise OSError("No Blackbox data is ready to save")
                 state = self.state
-                self.publish({**state, "blackbox": {**flash, "copied": 0}})
+                self.export_phase = ExportPhase.STREAMING
+                self.publish({**state, "blackbox": {**flash, "phase": self.export_phase, "copied": 0}})
                 def chunks():
                     copied = 0
-                    for i, data in enumerate(blackbox.blocks(self.link, flash["used"]), 1):
+                    for i, data in enumerate(blackbox.blocks(link, flash["used"]), 1):
                         if self.stop.is_set():
                             raise InterruptedError("Configurator stopped")
                         copied += len(data)
                         if i % 16 == 0:
-                            self.publish({**state, "blackbox": {**flash, "copied": copied}})
+                            self.publish({**state, "blackbox": {**flash, "phase": self.export_phase, "copied": copied}})
                         yield data
                 try:
                     yield flash["used"], chunks()
                 finally:
                     self.publish({**state, "blackbox": flash})
         finally:
+            self.export_phase = ExportPhase.IDLE
             self.saving.release()
 
 
@@ -147,7 +212,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path != "/blackbox":
             self.send_error(404)
             return
-        started = False
+        phase = ResponsePhase.PREPARING
         try:
             with self.bench.blackbox_export() as (size, chunks):
                 self.connection.settimeout(5)
@@ -155,12 +220,12 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/octet-stream")
                 self.send_header("Content-Disposition", 'attachment; filename="miniflight-blackbox.bbl"')
                 self.send_header("Content-Length", str(size))
+                phase = ResponsePhase.STREAMING
                 self.end_headers()
-                started = True
                 for chunk in chunks:
                     self.wfile.write(chunk)
         except (OSError, ValueError, struct.error):
-            if started:
+            if phase is ResponsePhase.STREAMING:
                 self.close_connection = True
             else:
                 self.send_error(503, "Blackbox export failed")
@@ -172,14 +237,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            seen = None
+            sent_sequence = -1
             try:
                 while not self.bench.stop.is_set():
-                    event = self.bench.event
-                    if event is not seen:
-                        self.wfile.write(event)
+                    publication = self.bench.publication
+                    if publication.sequence != sent_sequence:
+                        self.wfile.write(publication.event)
                         self.wfile.flush()
-                        seen = event
+                        sent_sequence = publication.sequence
                     self.bench.stop.wait(.025)
             except (BrokenPipeError, ConnectionResetError):
                 pass
@@ -196,7 +261,7 @@ def main():
     source.add_argument("--replay", type=Path, help="blackbox_decode CSV with us timestamps and deg/s gyro")
     parser.add_argument("--port", type=int, default=8002)
     args = parser.parse_args()
-    bench = Bench(args.device)
+    bench = Bench(args.device, replay_name=args.replay.name if args.replay else None)
     target = bench.run
     if args.replay:
         from target.betaflight.log import attitude_rows
@@ -206,7 +271,6 @@ def main():
                 raise ValueError("The recording is empty")
         except (OSError, ValueError) as error:
             parser.error(str(error))
-        bench.replay_name = args.replay.name
         target = partial(bench.playback, frames)
     with ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, bench=bench)) as server:
         worker = threading.Thread(target=target, daemon=True)

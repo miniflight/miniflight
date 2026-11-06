@@ -1,6 +1,7 @@
 """Convert recorded AIGP inputs and sent commands into ordinary SI quantities."""
 
 import math
+from enum import Enum, auto
 from miniflight.diagnostics import chart_data
 from target.aigp.experiments.recording import ReplayClient
 
@@ -22,12 +23,23 @@ DETAIL_PANELS = (
 )
 
 
+class TracePhase(Enum):
+    WAITING_FOR_CONFIG = auto()
+    FOLLOWING = auto()
+    FINISHED = auto()
+
+
+class CommandPair(Enum):
+    WAITING_FOR_UPDATE = auto()
+    WAITING_FOR_SEND = auto()
+
+
 def snapshot(observer, samples, source):
     race, metadata = observer.status, observer.metadata
     clock = race.get("finish_time_seconds") if race.get("completed") else race.get("time_seconds")
     reference = (metadata.get("reference") or {}).get("duration_s")
     seconds = lambda value: "—" if value is None else f"{value:.3f} s"
-    return dict(source=f"{source.parent.name}/{source.name}", flight_active=bool(metadata) and not observer.finished,
+    return dict(source=f"{source.parent.name}/{source.name}", flight_active=observer.phase is TracePhase.FOLLOWING,
                 title=f"{metadata.get('target', 'Waiting')} · {metadata.get('controller', 'unknown')} · {source.parent.name}/{source.name}",
                 summary={"Native finish" if race.get("completed") else "Native clock": seconds(clock),
                          "Reference": seconds(reference), "Gates": race.get("active_gate_index", "—"),
@@ -41,26 +53,37 @@ class Observe:
         self.client = ReplayClient()
         self.metadata, self.pending = {}, None
         self.status, self.collisions = {}, 0
-        self.finished = False
+        self.phase = TracePhase.WAITING_FOR_CONFIG
+        self.pair = CommandPair.WAITING_FOR_UPDATE
+
+    def _clear_pending(self):
+        self.pending = None
+        self.pair = CommandPair.WAITING_FOR_UPDATE
 
     def consume(self, row):
         event, command = row["event"], row.get("command")
         if event == "config":
             self.metadata = row["metadata"]
+            if self.metadata and self.phase is TracePhase.WAITING_FOR_CONFIG:
+                self.phase = TracePhase.FOLLOWING
         if event == "telemetry" and row["message"]["mavpackettype"] == "COLLISION":
             self.collisions += 1
         if event == "result":
-            self.finished = True
+            self.phase = TracePhase.FINISHED
             self.status = row["race"] or {}
         if event == "update":
             self.status = row["native_race"] or {}
             self.client.feed(row["telemetry"])
             self.client.read(timeout=0)
-            self.pending = row if "signals" in row else None
-        if event != "sent" or command["kind"] not in ("MotorControls", "BodyRates") or self.pending is None:
+            if "signals" in row:
+                self.pending = row
+                self.pair = CommandPair.WAITING_FOR_SEND
+            else:
+                self._clear_pending()
+        if event != "sent" or command["kind"] not in ("MotorControls", "BodyRates") or self.pair is not CommandPair.WAITING_FOR_SEND:
             return None
         if command["kind"] == "BodyRates" and command["thrust"] == 0:
-            self.pending = None
+            self._clear_pending()
             return None
         if command != self.pending["command"]:
             raise ValueError("sent command has no matching controller update")
@@ -86,7 +109,7 @@ class Observe:
         sample["pose_clock_gap_s"] = state.time - motion.time
         attitude = state.attitude
         sample["attitude_clock_gap_s"] = None if attitude is None else attitude.time - motion.time
-        self.pending = None
+        self._clear_pending()
         return sample
 
 

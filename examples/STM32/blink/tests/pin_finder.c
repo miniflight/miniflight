@@ -37,33 +37,30 @@ void test_pin(volatile uint32_t *MODER, volatile uint32_t *ODR, int pin) {
     *ODR &= ~(1 << pin);
 }
 
+typedef struct {
+    volatile uint32_t *mode;
+    volatile uint32_t *output;
+    int pin;
+} PinCandidate;
+
+static const PinCandidate candidates[] = {
+    {&GPIOA_MODER, &GPIOA_ODR, 13},
+    {&GPIOC_MODER, &GPIOC_ODR, 13},
+    {&GPIOA_MODER, &GPIOA_ODR, 5},
+    {&GPIOB_MODER, &GPIOB_ODR, 12},
+    {&GPIOB_MODER, &GPIOB_ODR, 13},
+};
+
 void main(void) {
     /* Enable clocks for GPIO A, B, C */
     RCC_AHB1ENR |= (1 << 0) | (1 << 1) | (1 << 2);
     
-    /* Test common LED pins */
-    while(1) {
-        /* Test PA13 (very common for user LED) */
-        test_pin(&GPIOA_MODER, &GPIOA_ODR, 13);
-        delay(2000000);  /* 2 second pause */
-        
-        /* Test PC13 (also common) */
-        test_pin(&GPIOC_MODER, &GPIOC_ODR, 13);
-        delay(2000000);
-        
-        /* Test PA5 */
-        test_pin(&GPIOA_MODER, &GPIOA_ODR, 5);
-        delay(2000000);
-        
-        /* Test PB12 */
-        test_pin(&GPIOB_MODER, &GPIOB_ODR, 12);
-        delay(2000000);
-        
-        /* Test PB13 */
-        test_pin(&GPIOB_MODER, &GPIOB_ODR, 13);
-        delay(2000000);
-        
-        /* Long pause before repeating */
+    for (;;) {
+        for (unsigned i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+            const PinCandidate *candidate = &candidates[i];
+            test_pin(candidate->mode, candidate->output, candidate->pin);
+            delay(2000000);
+        }
         delay(5000000);
     }
 }

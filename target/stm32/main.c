@@ -64,19 +64,19 @@ static inline void rate_keeper_wait(float *last_time) {
     *last_time = target_time;
 }
 
-/* === Main Entry Point === */
-int main(void) {
-    /* Initialize firmware */
-    firmware_init();
-    
-    /* Wait for estimator to initialize */
+static void wait_for_estimator(void) {
     while (!mahony_is_initialized(&estimator)) {
         SensorReadings readings = board_read_sensors();
         mahony_update(&estimator, &readings, DT);
         board_delay_ms(10);
     }
-    
-    /* Main control loop */
+}
+
+/* === Main Entry Point === */
+int main(void) {
+    firmware_init();
+    wait_for_estimator();
+
     float last_time = board_time_seconds();
     while (1) {
         firmware_loop();

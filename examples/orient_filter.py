@@ -23,6 +23,7 @@ import sys
 import termios
 import time
 import glob
+from enum import Enum, auto
 
 # Lazy-import PyBullet renderer and simulation classes; guarded in case dependencies are missing
 try:
@@ -98,6 +99,13 @@ def parse(buf: bytearray):
 
 # -----------------------------------------------------------------------------
 
+class PreviewPhase(Enum):
+    UNAVAILABLE = auto()
+    INITIALIZING = auto()
+    ACTIVE = auto()
+    FAILED = auto()
+
+
 def main():
     dev = sys.argv[1] if len(sys.argv) > 1 else auto_dev()
     baud = int(sys.argv[2]) if len(sys.argv) > 2 else 115200
@@ -113,8 +121,8 @@ def main():
 
     # ------------------------------------------------------------------
     # Initialize visualization if Renderer is available
-    vis_enabled = Renderer is not None
-    if vis_enabled:
+    preview = PreviewPhase.UNAVAILABLE if Renderer is None else PreviewPhase.INITIALIZING
+    if preview is PreviewPhase.INITIALIZING:
         # Build a minimal world with a single quad body for rendering
         world = World(gravity=None, dt=0.01)
         quad = Body()
@@ -125,9 +133,10 @@ def main():
         # Instantiate renderer (PyBullet GUI by default)
         try:
             renderer = Renderer(world, config='X', gui=True)
+            preview = PreviewPhase.ACTIVE
         except Exception as _e:
             print(f"[orient_filter] WARNING: Failed to initialize renderer ({_e}). Disabling visualization.")
-            vis_enabled = False
+            preview = PreviewPhase.FAILED
 
     print("t\troll\tpitch\tyaw\tax\tay\taz\tvx\tvy\tvz\tpx\tpy\tpz")
     next_req = 0.0
@@ -192,7 +201,7 @@ def main():
 
                 # ------------------------------------------------------
                 # Update visualization
-                if vis_enabled:
+                if preview is PreviewPhase.ACTIVE:
                     # Update quad state
                     quad.position = Vector3D(0.0, 0.0, 1.1)
                     quad.velocity = Vector3D(0.0, 0.0, 0.0)
@@ -217,4 +226,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -3,6 +3,7 @@
 import argparse
 from contextlib import ExitStack
 from dataclasses import asdict, replace
+from enum import Enum, auto
 import json
 import math
 from pathlib import Path
@@ -17,11 +18,27 @@ from miniflight import BodyRates, vehicle
 from miniflight.loop import run
 from miniflight.monitor import Monitor
 from target.aigp.controllers import BaseController, load_controller, update_controller
-from target.aigp.client import SimulatorClient
-from target.aigp.native import BASE, TARGETS, VERSIONS, RaceStateReader, launch, prepare
+from target.aigp.client import HeartbeatCadence, SimulatorClient
+from target.aigp.native import BASE, TARGETS, VERSIONS, RacePhase, RaceStateReader, launch, prepare
 
 
 FINISH_WAIT_SECONDS = 5.0
+
+
+class RolloutPhase(Enum):
+    NEW = auto()
+    WAITING_FOR_PEER = auto()
+    CONTROLLER_READY = auto()
+    WAITING_FOR_FINISH = auto()
+    CLOSED = auto()
+
+
+class ArmPhase(Enum):
+    IDLE = auto()
+    ARM_REQUESTED = auto()
+    DISARMING = auto()
+    DISARMED = auto()
+    DISARM_UNCONFIRMED = auto()
 
 
 class AIGPSimulator:
@@ -55,15 +72,16 @@ class AIGPSimulator:
         self.status = None
         self.race_status_path = race_status_path or BASE / ".runtime" / TARGETS[target][0] / "race-status.jsonl"
         self.race_reader = race_reader
-        self.arm_requested = False
-        self._used = False
+        self.arm_phase = ArmPhase.IDLE
+        self.phase = RolloutPhase.NEW
 
     def rollout(self, attach=False, simulator_args=()):
         """Run once; confirmed race status enables control, IMU loss ends it."""
-        if self._used:
+        if self.phase is not RolloutPhase.NEW:
             raise RuntimeError("create a fresh controller and simulator for each rollout")
-        self._used = True
+        self.phase = RolloutPhase.WAITING_FOR_PEER
         with ExitStack() as cleanup:
+            cleanup.callback(setattr, self, "phase", RolloutPhase.CLOSED)
             self.vehicle.bind(self.client)
             cleanup.callback(self.vehicle.disconnect)
             self.vehicle.connect()
@@ -74,38 +92,42 @@ class AIGPSimulator:
                 cleanup.callback(race_reader.close)
             cleanup.callback(self.stop)
             now = self.clock.monotonic()
-            heartbeat_at = 0.0
+            heartbeat = HeartbeatCadence()
             startup_deadline = now + self.startup_timeout
             finish_deadline = None
             def read_signals(now):
-                nonlocal finish_deadline, heartbeat_at
+                nonlocal finish_deadline
                 state = self.vehicle.read(timeout=0)
                 feedback = None if state is None else state.rate_feedback
                 packets = self.client.packets
                 if state is not None and state.motion is not None and (not self.monitor.motion or state.motion != self.monitor.motion[-1]):
                     self.monitor.observe(state.motion)
-                if self.client.connected and now >= heartbeat_at:
-                    self.client.heartbeat()
-                    heartbeat_at = now + .5
-                if self.controller is None and self.client.connected:
+                heartbeat.send_if_due(self.client, now)
+                if self.phase is RolloutPhase.WAITING_FOR_PEER and self.client.connected:
                     self.controller = self.create_controller()
                     if not isinstance(self.controller, BaseController) or self.target not in getattr(self.controller, "targets", TARGETS):
                         raise TypeError("create a BaseController that supports the selected target")
+                    self.phase = RolloutPhase.CONTROLLER_READY
                 now = self.clock.monotonic()
                 self.read_race(race_reader.poll())
-                if (self.status is None or not self.status.completed) and process is not None and (exit_code := process.poll()) is not None:
+                race_phase = self.race_phase
+                if race_phase is not RacePhase.FINISHED and process is not None and (exit_code := process.poll()) is not None:
                     raise RuntimeError(f"simulator exited with status {exit_code}")
-                if self.status is None or not self.status.started:
+                if race_phase in (RacePhase.UNOBSERVED, RacePhase.WAITING_FOR_GO):
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
                 # Rate feedback loss ends control permanently; only native finish can end the wait.
-                if (self.status is not None and self.status.started and not self.status.completed
-                        and finish_deadline is None and feedback is not None and now - feedback.received_at >= self.timeout):
+                if (race_phase is RacePhase.RUNNING
+                        and self.phase is RolloutPhase.CONTROLLER_READY
+                        and feedback is not None and now - feedback.received_at >= self.timeout):
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
-                if finish_deadline is not None and now >= finish_deadline and not self.status.completed:
-                    raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {self.status}")
-                if self.controller is None or (finish_deadline is not None and not self.status.completed):
+                    self.phase = RolloutPhase.WAITING_FOR_FINISH
+                if self.phase is RolloutPhase.WAITING_FOR_FINISH and race_phase is not RacePhase.FINISHED:
+                    if now >= finish_deadline:
+                        raise TimeoutError(f"no fresh IMU; no native finish after {FINISH_WAIT_SECONDS:g}s; last race: {self.status}")
+                    return None
+                if self.phase is RolloutPhase.WAITING_FOR_PEER:
                     return None
                 return (tuple(packet for packet in packets if not isinstance(packet.data, bytes)),
                         tuple(packet.decoded for packet in packets if isinstance(packet.data, bytes) and packet.decoded is not None),
@@ -116,21 +138,21 @@ class AIGPSimulator:
                 state = self.vehicle.state
                 feedback = None if state is None else state.rate_feedback
                 self.read_race(race_reader.poll())  # A slow controller cannot hide a new invalidation.
-                if self.status is not None and self.status.completed:
+                if self.race_phase is RacePhase.FINISHED:
                     raise StopIteration
-                if self.status is None or not self.status.started:
+                if self.race_phase is not RacePhase.RUNNING:
                     return
                 if command is None or feedback is None:
-                    if self.arm_requested:
+                    if self.arm_phase is ArmPhase.ARM_REQUESTED:
                         raise ValueError("controller returned no command after starting")
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
                     return
                 if now - feedback.received_at > self.timeout:
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
-                if not self.arm_requested:
+                if self.arm_phase is ArmPhase.IDLE:
                     self.vehicle.validate(command)
-                    self.arm_requested = True
+                    self.arm_phase = ArmPhase.ARM_REQUESTED
                     self.vehicle.arm()
                 self.vehicle.send(command)
 
@@ -138,7 +160,7 @@ class AIGPSimulator:
                 run(read_signals, lambda *signals: update_controller(self.controller, *signals), send_command, hz=self.hz, clock=self.clock)
             except StopIteration:
                 self.read_race(race_reader.poll())
-                return self.status if self.status is not None and self.status.completed else None
+                return self.status if self.race_phase is RacePhase.FINISHED else None
 
     def save_monitor(self):
         self.monitor.save(self.monitor_path.with_suffix(".csv"))
@@ -160,10 +182,14 @@ class AIGPSimulator:
                           reference_label="Lua mesh bounds centers (privileged)")
         print(f"Rollout plot: {self.monitor_path}", flush=True)
 
+    @property
+    def race_phase(self):
+        return RacePhase.UNOBSERVED if self.status is None else self.status.phase
+
     def read_race(self, arrivals):
         for state in arrivals:
             previous, self.status = self.status, state
-            if not state.valid:
+            if state.phase is RacePhase.INVALID:
                 raise RuntimeError(f"native race is invalid: {state}")
             if previous is not None and previous.started and (not state.started or state.active_gate_index < previous.active_gate_index):
                 raise RuntimeError("native race reset during control")
@@ -176,12 +202,16 @@ class AIGPSimulator:
                 raise TimeoutError(f"native finish must be before {self.finish_before:g}s")
 
     def stop(self):
-        if not self.arm_requested:
+        if self.arm_phase is not ArmPhase.ARM_REQUESTED:
             return
-        self.arm_requested = False
+        self.arm_phase = ArmPhase.DISARMING
         try:
             self.vehicle.send(BodyRates())
         finally:
+            self._disarm()
+
+    def _disarm(self):
+        try:
             requested_at = self.clock.monotonic()
             self.vehicle.disarm()
             deadline = requested_at + FINISH_WAIT_SECONDS
@@ -190,11 +220,15 @@ class AIGPSimulator:
                 heartbeat = self.client.telemetry.get("HEARTBEAT")
                 if (heartbeat is not None and heartbeat._host_received_at > requested_at
                         and not heartbeat.base_mode & mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+                    self.arm_phase = ArmPhase.DISARMED
                     break
             else:
                 # Preserve the flight failure if cleanup also loses feedback.
                 if sys.exception() is None or isinstance(sys.exception(), StopIteration):
                     raise TimeoutError("native disarm was not confirmed")
+        finally:
+            if self.arm_phase is ArmPhase.DISARMING:
+                self.arm_phase = ArmPhase.DISARM_UNCONFIRMED
 
 
 def main(argv=None):

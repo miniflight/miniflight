@@ -193,8 +193,11 @@
       }
 
       .ground-state[data-state="locked"] { color: var(--green); }
-      .ground-state[data-state="collecting"] { color: var(--amber); }
-      .ground-state[data-state="rejected"] { color: var(--red); }
+      .ground-state[data-state="collecting"],
+      .ground-state[data-state="waiting_for_imu"],
+      .ground-state[data-state="waiting_for_stillness"] { color: var(--amber); }
+      .ground-state[data-state="rejected"],
+      .ground-state[data-state="waiting_for_disarm"] { color: var(--red); }
 
       #imuScope {
         position: absolute;

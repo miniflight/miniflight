@@ -10,6 +10,8 @@
 #include <opencv2/core.hpp>
 
 struct Observer {
+  enum class CameraPhase { Empty, WaitingForImu, Ready };
+
   std::unique_ptr<ov_msckf::VioManager> estimator;
   std::deque<ov_core::CameraData> cameras;
   double imu_time = -1;
@@ -25,11 +27,17 @@ struct Observer {
       throw std::runtime_error("invalid VIO configuration");
     estimator = std::make_unique<ov_msckf::VioManager>(options);
   }
+  CameraPhase camera_phase() const {
+    if (cameras.empty())
+      return CameraPhase::Empty;
+    const double required_imu_time =
+        cameras.front().timestamp +
+        estimator->get_state()->_calib_dt_CAMtoIMU->value()(0);
+    return imu_time > required_imu_time ? CameraPhase::Ready
+                                        : CameraPhase::WaitingForImu;
+  }
   void drain() {
-    while (!cameras.empty() &&
-           imu_time >
-               cameras.front().timestamp +
-                   estimator->get_state()->_calib_dt_CAMtoIMU->value()(0)) {
+    while (camera_phase() == CameraPhase::Ready) {
       auto sample = cameras.front();
       cameras.pop_front();
       estimator->feed_measurement_camera(sample);
@@ -78,8 +86,11 @@ int vio_camera(void *observer, double time, const unsigned char *pixels,
 int vio_state(void *observer, double *output) {
   auto &o = *static_cast<Observer *>(observer);
   auto s = o.estimator->get_state();
-  if (s->_timestamp < 0 ||
-      o.imu_time < s->_timestamp + s->_calib_dt_CAMtoIMU->value()(0))
+  if (s->_timestamp < 0)
+    return 0;  // Waiting for estimator initialization.
+  const double camera_time_on_imu_clock =
+      s->_timestamp + s->_calib_dt_CAMtoIMU->value()(0);
+  if (o.imu_time < camera_time_on_imu_clock)
     return 0;
   Eigen::Matrix<double, 13, 1> state;
   Eigen::Matrix<double, 12, 12> covariance;
@@ -92,7 +103,7 @@ int vio_state(void *observer, double *output) {
   Eigen::Matrix3d R = ov_core::quat_2_Rot(state.head<4>()).transpose();
   Eigen::Vector3d velocity = R * state.segment<3>(7);
   output[0] = o.imu_time;
-  output[1] = s->_timestamp + s->_calib_dt_CAMtoIMU->value()(0);
+  output[1] = camera_time_on_imu_clock;
   for (int i = 0; i < 3; i++) {
     output[2 + i] = state(4 + i);
     output[5 + i] = velocity(i);

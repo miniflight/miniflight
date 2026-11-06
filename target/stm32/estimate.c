@@ -20,16 +20,16 @@ void mahony_init(MahonyEstimator *est, float kp, float ki) {
 void mahony_reset(MahonyEstimator *est) {
     est->bias = vec3_new(0, 0, 0);
     est->q = quat_identity();
-    est->initialized = false;
+    est->phase = MAHONY_COLLECTING_GRAVITY;
     est->init_sample_idx = 0;
-    est->has_last_alt = false;
-    est->has_last_state = false;
+    est->altitude_phase = ALTITUDE_WAITING_FOR_BASELINE;
+    est->history = ESTIMATE_NO_HISTORY;
     memset(est->init_samples, 0, sizeof(est->init_samples));
 }
 
 /* Fallback state when we can't estimate */
 static StateEstimate mahony_fallback(MahonyEstimator *est) {
-    if (est->has_last_state) {
+    if (est->history == ESTIMATE_CACHED) {
         return est->last_state;
     }
     
@@ -40,8 +40,8 @@ static StateEstimate mahony_fallback(MahonyEstimator *est) {
     state.angular_velocity = vec3_new(0, 0, 0);
     
     est->last_state = state;
-    est->has_last_state = true;
-    est->has_last_alt = false;
+    est->history = ESTIMATE_CACHED;
+    est->altitude_phase = ALTITUDE_WAITING_FOR_BASELINE;
     
     return state;
 }
@@ -76,7 +76,7 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
     float grav_z = -az / norm;
     
     /* === INITIALIZATION === */
-    if (!est->initialized) {
+    if (est->phase == MAHONY_COLLECTING_GRAVITY) {
         /* Collect samples for stable initialization */
         est->init_samples[est->init_sample_idx][0] = grav_x;
         est->init_samples[est->init_sample_idx][1] = grav_y;
@@ -104,7 +104,7 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
         est->q = quat_from_euler(roll0, pitch0, 0.0f);
         quat_normalize(&est->q);
         
-        est->initialized = true;
+        est->phase = MAHONY_TRACKING;
         est->init_sample_idx = 0;
     }
     
@@ -160,7 +160,7 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
     StateEstimate state;
     
     /* Position / velocity placeholders */
-    if (est->has_last_state) {
+    if (est->history == ESTIMATE_CACHED) {
         state.position = est->last_state.position;
         state.velocity = est->last_state.velocity;
     } else {
@@ -173,12 +173,12 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
         float z = readings->altitude;
         float vz = 0.0f;
         
-        if (est->has_last_alt && dt > 0.0f) {
+        if (est->altitude_phase == ALTITUDE_TRACKING && dt > 0.0f) {
             vz = (z - est->last_alt) / dt;
         }
         
         est->last_alt = z;
-        est->has_last_alt = true;
+        est->altitude_phase = ALTITUDE_TRACKING;
         
         state.position = vec3_new(0, 0, z);
         state.velocity = vec3_new(0, 0, vz);
@@ -188,7 +188,7 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
     state.angular_velocity = vec3_new(sample->gyro[0], sample->gyro[1], sample->gyro[2]);
     
     est->last_state = state;
-    est->has_last_state = true;
+    est->history = ESTIMATE_CACHED;
     
     return state;
 }

@@ -3,7 +3,7 @@
 import math
 
 from common.math import Quaternion
-from miniflight.state import RateSample
+from miniflight.state import RateSample, SampleOrder, sample_order
 
 
 def stationary_down(acceleration):
@@ -48,7 +48,9 @@ class GyroAttitude:
         self.time, self.gyro = sample.time, sample.gyro
 
     def update(self, sample: RateSample | None):
-        if sample is None or sample.time is None or sample.gyro is None or sample.time == self.time:
+        if sample is None or sample.time is None or sample.gyro is None:
+            return self.rotation
+        if sample_order(self.time, sample.time) is SampleOrder.REPEATED:
             return self.rotation
         gyro = tuple((a + b) / 2 for a, b in zip(self.gyro, sample.gyro, strict=True))
         self.rotation = gyro_step(self.rotation, gyro, sample.time - self.time)

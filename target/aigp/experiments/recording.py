@@ -3,6 +3,7 @@
 import base64
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
+from enum import Enum, auto
 import json
 from pathlib import Path
 from threading import Lock
@@ -13,7 +14,7 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Frame, vehicle
-from target.aigp.client import Packet, SimulatorClient
+from target.aigp.client import ConnectionPhase, Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT, update_controller
 from target.aigp.native import TARGETS, NativeRaceState, launch
 
@@ -136,11 +137,18 @@ class RaceReader:
         return states if self.reader is not None else tuple(NativeRaceState(**state) for state in states)
 
 
+class ControllerPhase(Enum):
+    WAITING_FOR_INIT = auto()
+    READY = auto()
+    TERMINAL = auto()
+
+
 class RecordedController(BaseController[CommandT]):
     def __init__(self, create, record, frames=False, signals=None):
         self.create, self.record, self.frames = create, record, frames
         self.signals = signals
         self.controller = None
+        self.phase = ControllerPhase.WAITING_FOR_INIT
 
     @property
     def targets(self):
@@ -148,10 +156,13 @@ class RecordedController(BaseController[CommandT]):
 
     def __call__(self):
         self.controller = self.create()
+        self.phase = ControllerPhase.READY
         self.record(event="init")
         return self
 
     def update(self, telemetry, frames, race_state) -> CommandT | None:
+        if self.phase is not ControllerPhase.READY:
+            raise RuntimeError("controller updates outside its lifetime")
         row = dict(event="update", telemetry=[dict(received_at=packet.received_at,
                    wire=base64.b64encode(packet.data.get_msgbuf()).decode("ascii")) for packet in telemetry],
                    frames=[frame_data(frame, self.frames) for frame in frames],
@@ -159,6 +170,7 @@ class RecordedController(BaseController[CommandT]):
         try:
             command = self.controller.update(telemetry, frames, race_state)
         except BaseException as error:
+            self.phase = ControllerPhase.TERMINAL
             self.record(**row, error={"type": type(error).__name__, "message": str(error)})
             raise
         if command is not None and self.signals is not None:
@@ -167,11 +179,18 @@ class RecordedController(BaseController[CommandT]):
         return command
 
 
+class CourseInjection(Enum):
+    EMPTY = auto()
+    WAITING_FOR_PEER = auto()
+    DELIVERED = auto()
+
+
 class RecordedClient(SimulatorClient):
     def __init__(self, record, port=14550, camera_port=5600, course_packets=(), preview=None):
         super().__init__(port=port, camera_port=camera_port)
         self.record = record
         self.course_packets = course_packets  # Immutable course traffic retains its original receipt times.
+        self.course_injection = CourseInjection.WAITING_FOR_PEER if course_packets else CourseInjection.EMPTY
         self.preview = None if preview is None else Path(preview)
 
     def open(self):
@@ -194,10 +213,11 @@ class RecordedClient(SimulatorClient):
             temporary = self.preview.with_suffix(".tmp")
             temporary.write_bytes(self._camera.jpeg)
             temporary.replace(self.preview)
-        if self.connected and self.course_packets:
+        if self.connected and self.course_injection is CourseInjection.WAITING_FOR_PEER:
             course = tuple(Packet(packet.data, packet.received_at, self._receive(packet.data, packet.received_at))
                            for packet in self.course_packets)
             self.course_packets = ()
+            self.course_injection = CourseInjection.DELIVERED
             return packets + course
         return packets
 
@@ -222,20 +242,30 @@ class RecordedClient(SimulatorClient):
         return decoded
 
 
+class WirePairing(Enum):
+    IDLE = auto()
+    EXPECTING_SEND = auto()
+
+
 class ProcessClient(RecordedClient):
     def __init__(self, calls, timesync=False, record_camera=True, **kwargs):
         super().__init__(calls.record or (lambda **row: None), **kwargs)
         self.calls, self.decoder = calls, mavlink.MAVLink(None)
-        self.outgoing, self.wire_commands = None, 0
+        self.wire_phase = WirePairing.IDLE
+        self.expected_wire, self.wire_commands = None, 0
         self.timesync = timesync
         self.record_camera = record_camera
 
     def open(self):
-        return self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
+        result = self.calls("open", dict(port=self.port, camera_port=self.camera_port), super().open)
+        if self.calls.record is None:
+            self._begin_session()
+        return result
 
     def disconnect(self):
         self.calls("disconnect", {}, super().disconnect)
-        self.target_ids = None
+        if self.calls.record is None:
+            super().disconnect()
 
     def heartbeat(self):
         result = self.calls("heartbeat", {}, super().heartbeat)
@@ -250,19 +280,26 @@ class ProcessClient(RecordedClient):
     def _set_armed(self, armed):
         return self.calls("arm", dict(armed=armed), lambda: super(ProcessClient, self)._set_armed(armed))
 
+    def expect_wire_command(self, wire):
+        if self.wire_phase is WirePairing.EXPECTING_SEND:
+            self.calls.reject("previous wire command is still pending")
+        self.expected_wire = wire
+        self.wire_phase = WirePairing.EXPECTING_SEND
+
     def send(self, command):
         result = self.calls("send", command_data(command), lambda: super(ProcessClient, self).send(command))
-        if self.outgoing is not None:
-            expected, = self.decoder.parse_buffer(base64.b64decode(self.outgoing, validate=True))
+        if self.wire_phase is WirePairing.EXPECTING_SEND:
+            expected, = self.decoder.parse_buffer(base64.b64decode(self.expected_wire, validate=True))
             message = self.encode_command(command, 0, self.target_ids, self.decoder)
             actual, = self.decoder.parse_buffer(message.pack(self.decoder))
             # Transport clock and MAVLink envelope are outside command-content replay.
             contents = [{key: value for key, value in packet.to_dict().items() if key not in ("time_boot_ms", "time_usec")}
                         for packet in (expected, actual)]
             if contents[0] != contents[1]:
-                self.calls.mismatch = f"wire command {self.wire_commands}: expected {contents[0]}, got {contents[1]}"
-                raise AssertionError(self.calls.mismatch)
-            self.outgoing, self.wire_commands = None, self.wire_commands + 1
+                self.calls.reject(f"wire command {self.wire_commands}: expected {contents[0]}, got {contents[1]}")
+            self.expected_wire = None
+            self.wire_phase = WirePairing.IDLE
+            self.wire_commands += 1
         return result
 
     def poll(self, timeout=0.0):
@@ -271,6 +308,8 @@ class ProcessClient(RecordedClient):
                                                      if self.record_camera or not isinstance(packet.data, bytes)])
         if self.calls.record is not None:
             return packets
+        if self.phase is ConnectionPhase.CLOSED:
+            self._begin_session()
         return tuple(self.receive(packet) for packet in packets)
 
     def receive(self, packet):
@@ -289,6 +328,8 @@ class ReplayClient(SimulatorClient):
         self.decoder = mavlink.MAVLink(None)
 
     def feed(self, telemetry):
+        if self.phase is ConnectionPhase.CLOSED:
+            self._begin_session()
         packets = []
         for packet in telemetry:
             wire = base64.b64decode(packet["wire"], validate=True)
@@ -307,7 +348,7 @@ class ReplayClient(SimulatorClient):
 
 def replay(create, path, signals=None):
     """Replay input batches through Vehicle and controller; runtime lifecycle is not replayed."""
-    updates, terminal, controller = 0, False, None
+    updates, phase, controller = 0, ControllerPhase.WAITING_FOR_INIT, None
     client = ReplayClient()
     with Path(path).open() as source, ExitStack() as cleanup:
         if _read_header(source).get("format") != 3:
@@ -318,9 +359,11 @@ def replay(create, path, signals=None):
             row = json.loads(line)
             if row["event"] == "init":
                 controller = create()
+                if phase is not ControllerPhase.TERMINAL:
+                    phase = ControllerPhase.READY
             if row["event"] != "update":
                 continue
-            if terminal or controller is None:
+            if phase is not ControllerPhase.READY:
                 raise ValueError("controller updates outside its lifetime")
             telemetry = client.feed(row["telemetry"])
             frames = tuple(frame for data in row["frames"] if (frame := read_frame(data)) is not None)
@@ -331,7 +374,7 @@ def replay(create, path, signals=None):
                 race = row["native_race"]
                 command = update_controller(controller, telemetry, frames, None if race is None else NativeRaceState(**race))
             except BaseException as error:
-                terminal = True
+                phase = ControllerPhase.TERMINAL
                 actual = {"error": {"type": type(error).__name__, "message": str(error)}}
             else:
                 actual = {"command": command_data(command)}

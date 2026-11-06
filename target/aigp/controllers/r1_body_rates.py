@@ -1,6 +1,7 @@
 """Follow the published VQ1 gates with Python position feedback and body-rate commands."""
 
 import math
+from enum import Enum, auto
 
 from miniflight import BodyRates, vehicle
 from miniflight.position import PositionConfig, position_control
@@ -12,6 +13,11 @@ from target.aigp.controllers.r1_gates import Controller as GatePlanner
 CONFIG = PositionConfig(hover_thrust=.266, thrust_acceleration=53.5)
 
 
+class HeadingPhase(Enum):
+    ACQUIRING = auto()
+    HOLDING = auto()
+
+
 class Controller(BaseController[BodyRates]):
     targets = ("vq1.r1",)
 
@@ -19,6 +25,7 @@ class Controller(BaseController[BodyRates]):
         self.config = config
         self.course = GatePlanner()
         self.target_yaw = None
+        self.heading_phase = HeadingPhase.ACQUIRING
 
     def update(self, telemetry, frames, race_state) -> BodyRates | None:
         target = self.course.update(telemetry, frames, race_state)
@@ -31,8 +38,9 @@ class Controller(BaseController[BodyRates]):
             return None
 
         # Keep the initial heading throughout the course, including gate changes.
-        if self.target_yaw is None:
+        if self.heading_phase is HeadingPhase.ACQUIRING:
             self.target_yaw = angles[2]
+            self.heading_phase = HeadingPhase.HOLDING
 
         return position_control(
             self.config, motion.position, motion.velocity,

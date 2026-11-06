@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 from contextlib import closing
+from enum import Enum, auto
 import argparse
 import json
 import math
@@ -13,15 +14,33 @@ import time
 from miniflight.diagnostics import write_snapshot
 from miniflight.position import PositionConfig
 from miniflight.replay import Calls
-from target.aigp.native import BASE, RaceStateReader, launch, sha256
+from target.aigp.client import HeartbeatCadence
+from target.aigp.native import BASE, RacePhase, RaceStateReader, launch, sha256
 from target.aigp.experiments.recording import ProcessClient, RaceReader, RecordedClient, packet_data, read_course, recording
+
+
+class ResetPhase(Enum):
+    WAITING_FOR_PEER_AND_RACE = auto()
+    WAITING_FOR_ACK = auto()
+    WAITING_FOR_FRESH_STATE = auto()
+
+
+class TrialPhase(Enum):
+    RESETTING = auto()
+    FLYING = auto()
+    VERIFYING = auto()
+    PASSED = auto()
+    FAILED = auto()
+    INTERRUPTED = auto()
 
 
 def fresh_race(reader, record, timeout=120, course_packets=(), client=None, clock=time):
     client = RecordedClient(record, camera_port=None) if client is None else client
-    requested, accepted, fresh, before, course = None, False, None, None, []
+    phase = ResetPhase.WAITING_FOR_PEER_AND_RACE
+    requested, fresh, before, course = None, None, None, []
     reset_requests = 0
-    deadline, heartbeat_at = clock.monotonic() + timeout, 0
+    deadline = clock.monotonic() + timeout
+    heartbeat = HeartbeatCadence()
     client.open()
     try:
         while clock.monotonic() < deadline:
@@ -29,31 +48,33 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
             course.extend(packet for packet in packets if packet.data.get_type() == "DATA_TRANSMISSION_HANDSHAKE"
                           or packet.data.get_type() == "ENCAPSULATED_DATA" and packet.data.data[0] == 2)
             now = clock.monotonic()
-            if client.connected and now >= heartbeat_at:
-                client.heartbeat()
-                heartbeat_at = now + .5
+            heartbeat.send_if_due(client, now)
             for packet in packets:
                 message = packet.data
-                if requested is not None and message.get_type() == "COMMAND_ACK" and message.command == 31000:
+                if phase is not ResetPhase.WAITING_FOR_PEER_AND_RACE and message.get_type() == "COMMAND_ACK" and message.command == 31000:
                     if message.result != 0:
                         raise RuntimeError("native reset request was rejected")
-                    accepted = True
+                    phase = ResetPhase.WAITING_FOR_FRESH_STATE
             for state in states:
                 record(event="race", native_race=asdict(state))
                 fresh = None
-                if requested is not None and not state.started and state.valid and not state.completed and state.active_gate_index == 0 and state.time_seconds <= 0:
+                if (phase is not ResetPhase.WAITING_FOR_PEER_AND_RACE
+                        and state.phase is RacePhase.WAITING_FOR_GO and state.active_gate_index == 0 and state.time_seconds <= 0):
                     fresh = asdict(state)
-            if client.connected and states and (requested is None or not accepted and now-requested >= 1):
-                if requested is None:
+            first_request = phase is ResetPhase.WAITING_FOR_PEER_AND_RACE
+            retry = phase is ResetPhase.WAITING_FOR_ACK and now-requested >= 1
+            if client.connected and states and (first_request or retry):
+                if first_request:
                     before = asdict(states[-1])  # Drain old observations before requesting reset.
                 client.reset()
                 reset_requests += 1
-                accepted, fresh = False, None
+                phase, fresh = ResetPhase.WAITING_FOR_ACK, None
                 requested = clock.monotonic()
                 continue
             pose = client.telemetry.get("LOCAL_POSITION_NED")
             attitude, race = client.telemetry.get("ATTITUDE"), client.race_telemetry
-            if (accepted and fresh is not None and pose is not None and attitude is not None and race is not None
+            if (phase is ResetPhase.WAITING_FOR_FRESH_STATE and fresh is not None
+                    and pose is not None and attitude is not None and race is not None
                     and min(pose._host_received_at, attitude._host_received_at, race.received_at) > requested
                     and max(pose.time_boot_ms, attitude.time_boot_ms) <= race.sim_boot_time_ms
                     and (course_packets or client.gates is not None)):
@@ -62,8 +83,8 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
                     course = tuple(course) if client.gates is not None else course_packets
                     return reader, dict(before=before, after=fresh, requests=reset_requests,
                                         position_ned_m=position, velocity_ned_m_s=velocity), course
-        raise TimeoutError(f"native reset stalled: connected={client.connected}, requested={requested is not None}, "
-                           f"accepted={accepted}, fresh={fresh is not None}")
+        raise TimeoutError(f"native reset stalled: connected={client.connected}, requested={phase is not ResetPhase.WAITING_FOR_PEER_AND_RACE}, "
+                           f"accepted={phase is ResetPhase.WAITING_FOR_FRESH_STATE}, fresh={fresh is not None}")
     finally:
         client.disconnect()
 
@@ -115,6 +136,7 @@ def main():
             row = dict(trial=index, trace=str(trace.resolve()), native_pid=args.native_pid if process is None else process.pid, native_path=str(native_path.resolve()),
                        reference_sha256=reference_hash, harness_sha256=sha256(Path(__file__)), finish_before_s=args.finish_before, started_at=time.monotonic())
             write_snapshot(output / "current.json", dict(trace=row["trace"], ledger=str(ledger_path.resolve())))
+            phase = TrialPhase.RESETTING
             interrupted = None
             signal.alarm(210)
             try:
@@ -128,33 +150,44 @@ def main():
                     finally:
                         record(event="result", reset=reset, course=[packet_data(packet) for packet in course_packets], connection_closed=not client.connected)
                 row["reset"] = reset
+                phase = TrialPhase.FLYING
                 result = run(args.controller, trace, camera=True, record_camera=args.camera, reference=args.reference, offscreen=not args.render,
                              attach=True, race_reader=reader, course_packets=course_packets, position_config=position_config, integral_gain=args.ki, finish_before=args.finish_before)
-                row.update(passed=True, finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
+                row.update(finish_time_s=result.finish_time_seconds, gates=result.active_gate_index)
+                phase = TrialPhase.VERIFYING
             except BaseException as error:
                 failures += 1
-                row.update(passed=False, error=dict(type=type(error).__name__, message=str(error)))
-                if not isinstance(error, Exception):
+                row.update(failed_phase=phase.name.lower(), error=dict(type=type(error).__name__, message=str(error)))
+                if isinstance(error, Exception):
+                    phase = TrialPhase.FAILED
+                else:
+                    phase = TrialPhase.INTERRUPTED
                     interrupted = error
             finally:
                 signal.alarm(0)
             try:
                 row["replay"] = [replay(path) for path in (trace.with_suffix(".reset.jsonl"), trace) if path.exists()]
             except BaseException as error:
-                row.update(passed=False, replay_error=dict(type=type(error).__name__, message=str(error)))
+                row.update(replay_error=dict(type=type(error).__name__, message=str(error)))
+                row.setdefault("failed_phase", "verifying")
+                phase = TrialPhase.INTERRUPTED
                 interrupted = interrupted or error
+            else:
+                if phase is TrialPhase.VERIFYING:
+                    phase = TrialPhase.PASSED
+            row["passed"] = phase is TrialPhase.PASSED
             row["finished_at"] = time.monotonic()
             ledger.write(json.dumps(row) + "\n")
             print(json.dumps(row), flush=True)
-            if row["passed"]:
+            if phase is TrialPhase.PASSED:
                 successful.append(trace)
                 if len(successful) > 3:
                     old = successful.pop(0)
                     for artifact in old.parent.glob(old.stem + ".*"):
                         artifact.unlink()
-            if interrupted is not None:
+            if phase is TrialPhase.INTERRUPTED:
                 raise interrupted
-            if not row["passed"] and args.stop_on_failure:
+            if phase is TrialPhase.FAILED and args.stop_on_failure:
                 break
     return int(failures > 0)
 

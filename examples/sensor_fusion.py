@@ -1,10 +1,23 @@
 import numpy as np
-
-from sim import Vector3D, Quaternion, Body, World, Renderer
+from enum import Enum, auto
 
 #!/usr/bin/env python
 
 import serial, time, struct
+
+
+class ReplyPhase(Enum):
+    IDLE = auto()
+    WAITING_FOR_HEADER = auto()
+    READING_PAYLOAD = auto()
+
+
+class VtxPhase(Enum):
+    READING_CURRENT = auto()
+    WRITING = auto()
+    REOPENING = auto()
+    VERIFYING = auto()
+    MATCHED = auto()
 
 
 class MultiWii:
@@ -67,6 +80,7 @@ class MultiWii:
         self.temp2 = ();
         self.elapsed = 0
         self.PRINT = 1
+        self.reply_phase = ReplyPhase.IDLE
 
         self.ser = serial.Serial()
         self.ser.port = serPort
@@ -131,14 +145,7 @@ class MultiWii:
             b = None
             b = self.ser.write(struct.pack('<3c2B%dHB' % len(data), *total_data))
             
-            while True:
-                header = self.ser.read().decode('utf-8')
-                if header == '$':
-                    header = header+self.ser.read(2).decode('utf-8')
-                    break
-            datalength = struct.unpack('<b', self.ser.read())[0]
-            code = struct.unpack('<b', self.ser.read())
-            data = self.ser.read(datalength)
+            datalength, data = self._read_reply()
             temp = struct.unpack('<'+'h'*int(datalength/2),data)
             self.ser.flushInput()
             self.ser.flushOutput()
@@ -195,39 +202,50 @@ class MultiWii:
         self.sendCMD(0,MultiWii.EEPROM_WRITE,[])
 
     def setVTX(self,band,channel,power):
-        band_channel = ((band-1) << 3)|(channel-1)
-        t = None
-        while t == None :
-            t = self.getData(MultiWii.VTX_CONFIG)
-        different = (self.vtxConfig['band'] != band) | (self.vtxConfig['channel'] != channel) | (self.vtxConfig['power'] != power)
-        data = [band_channel,power,self.vtxConfig['pit']]
-        while different :
-            self.sendCMD(4,MultiWii.VTX_SET_CONFIG,data, 'H2B')
-            time.sleep(1)
-            self.sendCMD(0,MultiWii.EEPROM_WRITE,[],'')
-            self.ser.close()
-            time.sleep(3)
-            self.ser.open()
-            time.sleep(3)
-            t = None
-            while t == None :
-                t = self.getData(MultiWii.VTX_CONFIG)
-            print(t)
-            different = (self.vtxConfig['band'] != band) | (self.vtxConfig['channel'] != channel) | (self.vtxConfig['power'] != power)
+        band_channel = ((band-1) << 3) | (channel-1)
+        phase = VtxPhase.READING_CURRENT
+        while phase is not VtxPhase.MATCHED:
+            if phase in (VtxPhase.READING_CURRENT, VtxPhase.VERIFYING):
+                reply = self.getData(MultiWii.VTX_CONFIG)
+                if reply is None:
+                    continue
+                if phase is VtxPhase.READING_CURRENT:
+                    data = [band_channel, power, self.vtxConfig['pit']]
+                else:
+                    print(reply)
+                actual = tuple(self.vtxConfig[key] for key in ('band', 'channel', 'power'))
+                phase = VtxPhase.MATCHED if actual == (band, channel, power) else VtxPhase.WRITING
+            if phase is VtxPhase.WRITING:
+                self.sendCMD(4, MultiWii.VTX_SET_CONFIG, data, 'H2B')
+                time.sleep(1)
+                self.sendCMD(0, MultiWii.EEPROM_WRITE, [], '')
+                phase = VtxPhase.REOPENING
+            if phase is VtxPhase.REOPENING:
+                self.ser.close()
+                time.sleep(3)
+                self.ser.open()
+                time.sleep(3)
+                phase = VtxPhase.VERIFYING
+
+    def _read_reply(self):
+        self.reply_phase = ReplyPhase.WAITING_FOR_HEADER
+        try:
+            while self.reply_phase is ReplyPhase.WAITING_FOR_HEADER:
+                if self.ser.read().decode('utf-8') == '$':
+                    self.ser.read(2).decode('utf-8')
+                    self.reply_phase = ReplyPhase.READING_PAYLOAD
+            length = struct.unpack('<b', self.ser.read())[0]
+            struct.unpack('<b', self.ser.read())
+            return length, self.ser.read(length)
+        finally:
+            self.reply_phase = ReplyPhase.IDLE
 
     """Function to receive a data packet from the board"""
     def getData(self, cmd):
         try:
             start = time.time()
             self.sendCMD(0,cmd,[],'')
-            while True:
-                header = self.ser.read().decode('utf-8')
-                if header == '$':
-                    header = header+self.ser.read(2).decode('utf-8')
-                    break
-            datalength = struct.unpack('<b', self.ser.read())[0]
-            code = struct.unpack('<b', self.ser.read())
-            data = self.ser.read(datalength)
+            datalength, data = self._read_reply()
             
             self.ser.flushInput()
             self.ser.flushOutput()
@@ -324,18 +342,11 @@ class MultiWii:
     def getDataInf(self, cmd):
         while True:
             try:
-                start = time.clock()
-                self.sendCMD(0,cmd,[])
-                while True:
-                    header = self.ser.read().decode('utf-8')
-                    if header == '$':
-                        header = header+self.ser.read(2).decode('utf-8')
-                        break
-                datalength = struct.unpack('<b', self.ser.read())[0]
-                code = struct.unpack('<b', self.ser.read())
-                data = self.ser.read(datalength)
+                start = time.monotonic()
+                self.sendCMD(0,cmd,[],'')
+                datalength, data = self._read_reply()
                 temp = struct.unpack('<'+'h'*int(datalength/2),data)
-                elapsed = time.clock() - start
+                elapsed = time.monotonic() - start
                 self.ser.flushInput()
                 self.ser.flushOutput()
                 if cmd == MultiWii.ATTITUDE:
@@ -375,28 +386,14 @@ class MultiWii:
     def getData2cmd(self, cmd):
         try:
             start = time.time()
-            self.sendCMD(0,self.ATTITUDE,[])
-            while True:
-                header = self.ser.read().decode('utf-8')
-                if header == '$':
-                    header = header+self.ser.read(2).decode('utf-8')
-                    break
-            datalength = struct.unpack('<b', self.ser.read())[0]
-            code = struct.unpack('<b', self.ser.read())
-            data = self.ser.read(datalength)
+            self.sendCMD(0,self.ATTITUDE,[],'')
+            datalength, data = self._read_reply()
             temp = struct.unpack('<'+'h'*int(datalength/2),data)
             self.ser.flushInput()
             self.ser.flushOutput()
 
-            self.sendCMD(0,self.RC,[])
-            while True:
-                header = self.ser.read().decode('utf-8')
-                if header == '$':
-                    header = header+self.ser.read(2).decode('utf-8')
-                    break
-            datalength = struct.unpack('<b', self.ser.read())[0]
-            code = struct.unpack('<b', self.ser.read())
-            data = self.ser.read(datalength)
+            self.sendCMD(0,self.RC,[],'')
+            datalength, data = self._read_reply()
             temp2 = struct.unpack('<'+'h'*int(datalength/2),data)
             elapsed = time.time() - start
             self.ser.flushInput()
@@ -418,8 +415,10 @@ class MultiWii:
         except Exception as error: 
             print (error)
 
-serialPort = "/dev/tty.usbmodem0x80000001"
-board = MultiWii(serialPort)
-
-while True:
-	print(board.getData(MultiWii.ATTITUDE))
+if __name__ == '__main__':
+    board = MultiWii("/dev/tty.usbmodem0x80000001")
+    try:
+        while True:
+            print(board.getData(MultiWii.ATTITUDE))
+    finally:
+        board.ser.close()

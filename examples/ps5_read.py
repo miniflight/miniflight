@@ -7,6 +7,7 @@ Pair the controller via Bluetooth before running.
 import hid
 import sys
 import time
+from contextlib import contextmanager
 
 VENDOR_ID = 0x054C
 PRODUCT_ID = 0x0CE6
@@ -69,7 +70,8 @@ def parse_report(data):
     print(f"LX:{lx:3d} LY:{ly:3d} RX:{rx:3d} RY:{ry:3d} Dpad:{dpad} Buttons:{buttons} Touches:{touches}")
 
 
-def main():
+@contextmanager
+def open_controller():
     try:
         h = hid.device()
         h.open(VENDOR_ID, PRODUCT_ID)
@@ -77,21 +79,26 @@ def main():
         print(f"DualSense not found (VID:PID {VENDOR_ID:04x}:{PRODUCT_ID:04x}). Pair via Bluetooth and retry.")
         sys.exit(1)
 
-    print(f"Opened DualSense Wireless Controller ({VENDOR_ID:04x}:{PRODUCT_ID:04x})")
-    print("Reading input reports, press Ctrl+C to exit.")
-
     try:
-        while True:
-            data = h.read(64)
-            if not data:
-                time.sleep(0.01)
-                continue
-            if data[0] == REPORT_ID:
-                parse_report(data)
-    except KeyboardInterrupt:
-        print("Exiting...")
+        yield h
     finally:
         h.close()
+
+
+def main():
+    with open_controller() as controller:
+        print(f"Opened DualSense Wireless Controller ({VENDOR_ID:04x}:{PRODUCT_ID:04x})")
+        print("Reading input reports, press Ctrl+C to exit.")
+        try:
+            while True:
+                data = controller.read(64)
+                if not data:
+                    time.sleep(0.01)
+                    continue
+                if data[0] == REPORT_ID:
+                    parse_report(data)
+        except KeyboardInterrupt:
+            print("Exiting...")
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 """Expose recorded AIGP producer samples at the Vehicle.read boundary."""
 from dataclasses import replace
 
-from miniflight.state import ImuIncrement
+from miniflight.state import ImuClock, ImuIncrement
 from target.aigp.experiments.recording import ProcessClient
 
 
@@ -18,6 +18,6 @@ class ProducerImuClient(ProcessClient):
         increments = tuple(ImuIncrement(row[0]*1e-6, row[2], tuple(row[4:7]), tuple(-g for g in row[7:10]))
                            for row in batch["rows"])
         if increments:
-            clock = increments[-1].time, batch.get("published_ns", batch["read_ns"])*1e-9
+            clock = ImuClock(increments[-1].time, batch.get("published_ns", batch["read_ns"])*1e-9)
         self.state = replace(state, imu_increments=increments, imu_increment_clock=clock)
         return self.state

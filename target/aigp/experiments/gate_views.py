@@ -19,6 +19,5 @@ class Controller(GateHold):
             return super().update(telemetry, frames, race_state)
         except StopIteration:
             self.offset = next(self.offsets)
-            self.near_gate = False
-            self.started, self.steady = vehicle.state.time, None
+            self.stage_from_current_target(vehicle.state.time)
             return super().update(telemetry, frames, race_state)

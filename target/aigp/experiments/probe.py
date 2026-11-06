@@ -1,6 +1,7 @@
 """Bounded AIGP body-rate probes with raw-wire recording and offline replay."""
 
 from dataclasses import asdict, replace
+from enum import Enum, StrEnum, auto
 import json
 import math
 from pathlib import Path
@@ -18,6 +19,15 @@ from target.aigp.experiments.yaw_tracking import YawRateFeedback
 
 def angular_rates(command):
     return command.roll_rate, command.pitch_rate, command.yaw_rate
+
+
+class ProbePhase(StrEnum):
+    WAITING_FOR_FEEDBACK = "waiting_for_feedback"
+    SETTLING = "settle"
+    STEADY = "steady"
+    PULSING = "pulse"
+    CLEARING_RATES = "clearing_rates"
+    DONE = "done"
 
 
 class Probe(BaseController[BodyRates | PositionNed]):
@@ -41,12 +51,18 @@ class Probe(BaseController[BodyRates | PositionNed]):
         self.commands, self.duration = commands, duration
         self.target = None
         self.trial = 0
-        self.phase = "settle"
+        self.phase = ProbePhase.WAITING_FOR_FEEDBACK
         self.started_at = self.steady_at = None
         self.time = None
         self.dt = 0
 
+    def settle_at(self, target, stamp):
+        self.phase = ProbePhase.SETTLING
+        self.target, self.started_at, self.steady_at = target, stamp, None
+
     def update(self, telemetry, frames, race_state) -> BodyRates | PositionNed | None:
+        if self.phase is ProbePhase.DONE:
+            raise StopIteration
         state = vehicle.state
         if state is None or state.time is None or state.motion is None or state.attitude is None or race_state is None or not race_state.started:
             return None
@@ -54,15 +70,14 @@ class Probe(BaseController[BodyRates | PositionNed]):
         self.dt = 0 if self.time is None else stamp - self.time
         self.time = stamp
         position, velocity = state.motion.position, state.motion.velocity
-        if self.target is None:
+        if self.phase is ProbePhase.WAITING_FOR_FEEDBACK:
             north, east, down = position
-            self.target = PositionNed(north, east, down - 3)
-            self.started_at = stamp
+            self.settle_at(PositionNed(north, east, down - 3), stamp)
         distance = math.dist(position, (self.target.north, self.target.east, self.target.down))
         speed = math.hypot(*velocity)
         tilt = max(abs(state.attitude.roll), abs(state.attitude.pitch))
 
-        if self.phase == "pulse":
+        if self.phase in (ProbePhase.PULSING, ProbePhase.CLEARING_RATES):
             if distance > 2 or speed > 5 or tilt > .5:
                 raise RuntimeError("pulse exceeded its motion envelope")
             if stamp - self.started_at < self.duration:
@@ -72,23 +87,26 @@ class Probe(BaseController[BodyRates | PositionNed]):
             if (self.trial < len(self.commands) and any(angular_rates(previous))
                     and not any(angular_rates(self.commands[self.trial]))):
                 # Clear the rate request before handing control back to position mode.
+                self.phase = ProbePhase.CLEARING_RATES
                 self.started_at = stamp
                 return self.commands[self.trial]
-            self.phase, self.started_at, self.steady_at = "settle", stamp, None
+            self.settle_at(self.target, stamp)
 
         if stamp - self.started_at > 20:
             raise TimeoutError("position hold did not settle within 20 simulator seconds")
         if distance < .15 and speed < .15 and tilt < .04 and math.hypot(*state.gyro) < .03:
-            if self.steady_at is None:
+            if self.phase is ProbePhase.SETTLING:
                 self.steady_at = stamp
+                self.phase = ProbePhase.STEADY
             if stamp - self.steady_at >= .6:
                 if self.trial == len(self.commands):
-                    self.phase = "done"
+                    self.phase = ProbePhase.DONE
                     raise StopIteration
-                self.phase, self.started_at = "pulse", stamp
+                self.phase, self.started_at = ProbePhase.PULSING, stamp
                 return self.commands[self.trial]
         else:
             self.steady_at = None
+            self.phase = ProbePhase.SETTLING
         return self.target
 
 
@@ -115,7 +133,7 @@ def replay(path):
     feedback = config.get("yaw_feedback", False)
     controller = TrackedProbe(probe, feedback_config=feedback if isinstance(feedback, dict) else None) if feedback else probe
     updates = replay_controller(lambda: controller, path)
-    return {"updates": updates, "completed": probe.phase == "done"}
+    return {"updates": updates, "completed": probe.phase is ProbePhase.DONE}
 
 
 class DiagnosticClient(RecordedClient):
@@ -164,14 +182,19 @@ def run(path, commands, duration, hz=50, yaw_feedback=False):
         sim = AIGPSimulator(RecordedController(lambda: controller, record), client=client, hz=hz, timeout=.3)
         try:
             sim.rollout()
-            if probe.phase != "done":
+            if probe.phase is not ProbePhase.DONE:
                 raise RuntimeError("simulator stopped before all probe trials completed")
         finally:
             sim.save_monitor()
             executable = BASE / ".runtime/vq1" / SHIPPING
-            record(event="result", completed=probe.phase == "done", connection_closed=not client.connected,
+            record(event="result", completed=probe.phase is ProbePhase.DONE, connection_closed=not client.connected,
                    executable_sha256=sha256(executable) if executable.is_file() else None)
     return replay(path)
+
+
+class SegmentPhase(Enum):
+    BETWEEN_PULSES = auto()
+    IN_PULSE = auto()
 
 
 def analyze_yaw(path, tail_seconds=.5):
@@ -191,6 +214,7 @@ def analyze_yaw(path, tail_seconds=.5):
     tracked = bool(rows[0].get("metadata", {}).get("yaw_feedback", False))
     imu, attitudes, segments, send_times = [], [], [], []
     active = requested = None
+    phase = SegmentPhase.BETWEEN_PULSES
     for row in rows:
         if row["event"] == "requested":
             requested = row["command"]
@@ -215,16 +239,18 @@ def analyze_yaw(path, tail_seconds=.5):
                 if (not is_rate or message.type_mask != 144 or message.body_roll_rate or message.body_pitch_rate
                         or not all(math.isfinite(value) for value in (yaw, thrust, wire_yaw))):
                     raise ValueError("yaw analysis requires yaw-only radians packets")
-            if active is not None and active["key"] != key:
+            if phase is SegmentPhase.IN_PULSE and active["key"] != key:
                 active["end"] = row["host_time"]
                 segments.append(active)
                 active = None
-            if key is not None and active is None:
+                phase = SegmentPhase.BETWEEN_PULSES
+            if key is not None and phase is SegmentPhase.BETWEEN_PULSES:
                 active = dict(key=key, begin=row["host_time"], sent=[])
-            if active is not None:
+                phase = SegmentPhase.IN_PULSE
+            if phase is SegmentPhase.IN_PULSE:
                 active["sent"].append((row["host_time"], wire_yaw))
             send_times.append(row["host_time"])
-    if not segments or active is not None:
+    if not segments or phase is SegmentPhase.IN_PULSE:
         raise ValueError("trace must contain completed yaw steps and raw sensor packets")
     results = []
     for segment in segments:

@@ -1,6 +1,7 @@
 """Optional OpenVINS binding. Inputs are camera images and paired IMU samples."""
 
 import ctypes
+from enum import Enum, auto
 import math
 from pathlib import Path
 from typing import NamedTuple
@@ -14,6 +15,13 @@ from miniflight.state import Attitude, Frame, ImuSample, Motion, Ned
 class Estimate(NamedTuple):
     motion: Motion
     attitude: Attitude
+
+
+class ObserverPhase(Enum):
+    CALIBRATING_CLOCK = auto()
+    WAITING_FOR_ESTIMATE = auto()
+    TRACKING = auto()
+    CLOSED = auto()
 
 
 class OpenVINS:
@@ -38,23 +46,28 @@ class OpenVINS:
         self.lib.vio_camera.restype = ctypes.c_int
         self.lib.vio_state.argtypes, self.lib.vio_state.restype = [pointer, vector], ctypes.c_int
         self.config = str(Path(config).resolve()).encode()
+        self.phase = ObserverPhase.CALIBRATING_CLOCK
         self.handle = self.clock = self.estimate = self.raw = self.received_at = None
         self.pending = []
 
     def close(self):
-        if self.handle:
-            self.lib.vio_destroy(self.handle)
-            self.handle = None
+        handle, self.handle = self.handle, None
+        self.phase = ObserverPhase.CLOSED
+        self.pending.clear()
+        if handle:
+            self.lib.vio_destroy(handle)
 
     def __del__(self):
         if getattr(self, "handle", None):
             self.close()
 
     def update(self, samples: tuple[ImuSample, ...], frames: tuple[Frame, ...]):
+        if self.phase is ObserverPhase.CLOSED:
+            raise RuntimeError("OpenVINS observer is closed")
         arrivals = sorted((*samples, *frames), key=lambda sample: sample.received_at)
         if not arrivals:
             return self.estimate
-        if self.clock is None:
+        if self.phase is ObserverPhase.CALIBRATING_CLOCK:
             self.pending.extend(arrivals)
             if self.pending[-1].received_at - self.pending[0].received_at < 1:
                 return None
@@ -65,10 +78,12 @@ class OpenVINS:
             camera_epoch = cameras[0].time_ns
             imu_offset = float(np.median([sample.received_at - sample.time for sample in imu]))
             camera_origin = float(np.median([sample.received_at - (sample.time_ns - camera_epoch) * 1e-9 for sample in cameras]))
-            self.clock = camera_epoch, imu_offset, camera_origin
             self.handle = self.lib.vio_create(self.config)
             if not self.handle:
+                self.close()
                 raise RuntimeError("OpenVINS initialization failed")
+            self.clock = camera_epoch, imu_offset, camera_origin
+            self.phase = ObserverPhase.WAITING_FOR_ESTIMATE
             arrivals, self.pending = self.pending, []
         camera_epoch, imu_offset, camera_origin = self.clock
         for sample in arrivals:
@@ -95,4 +110,5 @@ class OpenVINS:
         yaw = math.atan2(rotation[1, 0], rotation[0, 0])
         self.estimate = Estimate(Motion(data[0], self.received_at, Ned(*position), Ned(*velocity)),
                                  Attitude(data[0], self.received_at, roll, pitch, yaw))
+        self.phase = ObserverPhase.TRACKING
         return self.estimate

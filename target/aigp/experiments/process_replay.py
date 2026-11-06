@@ -2,6 +2,7 @@
 
 import argparse
 from dataclasses import asdict
+from enum import Enum, auto
 import json
 from pathlib import Path
 
@@ -9,6 +10,11 @@ from miniflight.position import PositionConfig
 from miniflight.replay import Calls
 from target.aigp.experiments.recording import Launcher, ProcessClient, RaceReader, packet_data, read_metadata
 from target.aigp.native import sha256
+
+
+class WireFormat(Enum):
+    CALLS_ONLY = auto()
+    WITH_WIRE = auto()
 
 
 def replay(path, *, client_type=ProcessClient, wrap_controller=None):
@@ -21,17 +27,17 @@ def replay(path, *, client_type=ProcessClient, wrap_controller=None):
         raise ValueError("full replay needs a flight or reset process recording")
     outcome = {}
     def recorded_calls():
-        outgoing, wire_recorded = [], False
+        outgoing, wire_format = [], WireFormat.CALLS_ONLY
         with path.open() as source:
             for row in map(json.loads, source):
                 if row["event"] == "outgoing":
                     outgoing.append(row["wire"])
-                    wire_recorded = True
+                    wire_format = WireFormat.WITH_WIRE
                 if row["event"] == "call":
-                    if row["name"] == "send" and "error" not in row and wire_recorded:
+                    if row["name"] == "send" and "error" not in row and wire_format is WireFormat.WITH_WIRE:
                         if len(outgoing) != 1:
                             raise AssertionError("recorded send must contain one outgoing packet")
-                        client.outgoing = outgoing[0]
+                        client.expect_wire_command(outgoing[0])
                     outgoing.clear()
                     yield row
                 elif row["event"] in ("result", "error"):

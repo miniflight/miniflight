@@ -1,7 +1,7 @@
 """Measure camera-only rotation over the recorded opposite-yaw probe."""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 
@@ -36,6 +36,14 @@ def image_rotation(previous, current):
     return dict(rotation=rotation.tolist(), matches=len(points), median_residual_px=float(np.median(residual)))
 
 
+@dataclass
+class CommandSegment:
+    kind: str
+    yaw_rate: float
+    started_at: float
+    ended_at: float | None = None
+
+
 def measure(trace):
     segments = []
     with trace.open() as source:
@@ -43,13 +51,14 @@ def measure(trace):
             if row['event'] != 'sent':
                 continue
             command = row['command']
-            key = (command['kind'], command.get('yaw_rate', 0))
-            if not segments or segments[-1]['key'] != key:
+            kind, yaw_rate = command['kind'], command.get('yaw_rate', 0)
+            if not segments or (segments[-1].kind, segments[-1].yaw_rate) != (kind, yaw_rate):
                 if segments:
-                    segments[-1]['end'] = row['host_time']
-                segments.append(dict(key=key, start=row['host_time']))
-    windows = [(s['start']-.25, segments[i+1]['end']-.25) for i, s in enumerate(segments[:-1])
-               if s['key'][0] == 'BodyRates' and s['key'][1] and i+1 < len(segments) and 'end' in segments[i+1]]
+                    segments[-1].ended_at = row['host_time']
+                segments.append(CommandSegment(kind, yaw_rate, row['host_time']))
+    windows = [(turn.started_at-.25, following.ended_at-.25)
+               for turn, following in zip(segments, segments[1:])
+               if turn.kind == 'BodyRates' and turn.yaw_rate and following.ended_at is not None]
     selected = {time: None for window in windows for time in window}
     attitudes, motions = {}, {}
     client = ReplayClient()

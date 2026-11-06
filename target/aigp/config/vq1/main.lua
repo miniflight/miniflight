@@ -3,13 +3,7 @@ local MASTER_OPTIONS = "game=/Script/DCGame.GameModeRaceBase"
 local LIGHTING_LEVEL = "/Game/levels/MAP_anduril_lighting_DAY"
 local TRACK_LEVEL = "/Game/levels/MAP_anduril_track01"
 
-local stage = 1
-local running = true
-local master_requested = false
-local lighting_requested = false
-local track_requested = false
-local track_finished = false
-local start_requested = false
+local stage = "load_master"
 
 local function valid(object)
     return object and object:IsValid()
@@ -82,13 +76,13 @@ local function race_started()
 end
 
 local function advance()
-    if stage == 1 then
+    if stage == "load_master" or stage == "wait_for_master" then
         if valid(world()) and valid(controller()) then
-            stage = 2
+            stage = "load_lighting"
             return
         end
 
-        if not master_requested then
+        if stage == "load_master" then
             local current_world = find_object("World", "/Game/")
 
             if valid(current_world) and valid(gameplay_statics()) then
@@ -98,55 +92,55 @@ local function advance()
                     true,
                     MASTER_OPTIONS
                 )
-                master_requested = true
+                stage = "wait_for_master"
             end
         end
         return
     end
 
-    if stage == 2 then
+    if stage == "load_lighting" or stage == "wait_for_lighting" then
         if level_loaded("MAP_anduril_lighting_DAY") then
-            stage = 3
-        elseif not lighting_requested and valid(world()) then
+            stage = "notify_lighting_loaded"
+        elseif stage == "load_lighting" and valid(world()) then
             stream_level(LIGHTING_LEVEL)
-            lighting_requested = true
+            stage = "wait_for_lighting"
         end
         return
     end
 
-    if stage == 3 then
+    if stage == "notify_lighting_loaded" then
         local manager = find_object("MapLoadingManager")
 
         if valid(manager) then
             manager:OnLightingLevelLoaded()
-            stage = 4
+            stage = "load_track"
         end
         return
     end
 
-    if stage == 4 then
+    if stage == "load_track" or stage == "wait_for_track" then
         if level_loaded("MAP_anduril_track01") then
-            stage = 5
-        elseif not track_requested and valid(world()) then
+            stage = "notify_track_loaded"
+        elseif stage == "load_track" and valid(world()) then
             stream_level(TRACK_LEVEL)
-            track_requested = true
+            stage = "wait_for_track"
         end
         return
     end
 
-    if stage == 5 then
+    if stage == "notify_track_loaded" or stage == "wait_for_track_ready" then
         local manager = find_object("MapLoadingManager")
 
-        if not track_finished and valid(manager) then
+        if stage == "notify_track_loaded" and valid(manager) then
             manager:OnTrackLevelLoaded()
-            track_finished = true
-        elseif track_finished and track_ready() then
-            stage = 6
+            stage = "wait_for_track_ready"
+        elseif stage == "wait_for_track_ready" and track_ready() then
+            stage = "assign_grid"
         end
         return
     end
 
-    if stage == 6 then
+    if stage == "assign_grid" then
         local game_state = find_object("GameStateRaceBase")
         local player_state = find_object("PlayerStateRaceBase")
 
@@ -160,13 +154,13 @@ local function advance()
             end
 
             if player_state.StartingGridSlot >= 0 then
-                stage = 7
+                stage = "confirm_opponents"
             end
         end
         return
     end
 
-    if stage == 7 then
+    if stage == "confirm_opponents" then
         local game_mode = find_object("GameModeRaceBase")
 
         if valid(game_mode) and valid(game_mode.OpponentsPopup) then
@@ -180,17 +174,18 @@ local function advance()
             results.ResultGridAlt:SetIsEnabled(false)
             print("[DirectVQ1] results_grids_enabled=" ..
                 tostring(results.ResultGrid:GetIsEnabled() or results.ResultGridAlt:GetIsEnabled()) .. "\n")
-            stage = 8
+            stage = "start_race"
         end
         return
     end
 
+    if stage == "ready" or stage == "failed" then return end
     if race_started() then
         print("[DirectVQ1] physics_ready=true\n")
-        running = false
-    elseif not start_requested and valid(controller()) then
+        stage = "ready"
+    elseif stage == "start_race" and valid(controller()) then
         controller():ServerForceStartRaceWithoutRaceVerification()
-        start_requested = true
+        stage = "wait_for_go"
     end
 end
 
@@ -200,13 +195,12 @@ local function run()
 
         if not ok then
             print("[DirectVQ1] failed: " .. tostring(message) .. "\n")
-            running = false
+            stage = "failed"
+        end
+        if stage ~= "ready" and stage ~= "failed" then
+            ExecuteWithDelay(250, run)
         end
     end)
-
-    if running then
-        ExecuteWithDelay(250, run)
-    end
 end
 
 print("[DirectVQ1] loaded\n")

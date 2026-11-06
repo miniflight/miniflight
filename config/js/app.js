@@ -3,15 +3,18 @@ import { GLTFLoader } from "/js/vendor/GLTFLoader.js";
 
 const $ = (id) => document.getElementById(id);
 const radians = Math.PI / 180;
+const FeedPhase = Object.freeze({ CONNECTING: "connecting", OFFLINE: "offline", LIVE: "live", REPLAY: "replay" });
 const telemetry = {
+  phase: FeedPhase.CONNECTING,
+  session: null,
   latest: null,
   receivedAt: 0,
   messages: 0,
   messagesWindow: 0,
   messageHz: 0,
   messageWindowStarted: performance.now(),
-  lastAttitudeSample: -1,
-  lastImuSample: -1,
+  lastAttitudeSample: null,
+  lastImuSample: null,
   lastAttitudeAt: 0,
   attitudeIntervals: [],
   attitudeJitterMs: 0,
@@ -48,6 +51,8 @@ function buildMotors(count = 4) {
 buildSignals("gyro");
 buildSignals("accel");
 buildMotors();
+
+const ModelPhase = Object.freeze({ LOADING: "loading", READY: "ready", FAILED: "failed" });
 
 class FlightView {
   constructor(container) {
@@ -100,12 +105,15 @@ class FlightView {
     this.frameWindowStarted = this.lastFrame;
     this.renderFps = 0;
     this.rotors = [];
-    this.enabled = true;
+    this.modelPhase = ModelPhase.LOADING;
 
     this.resize = this.resize.bind(this);
     this.animate = this.animate.bind(this);
     new ResizeObserver(this.resize).observe(container);
-    this.loadModel();
+    this.loadModel().catch((error) => {
+      this.modelPhase = ModelPhase.FAILED;
+      console.error("Could not load the vehicle model", error);
+    });
     this.renderer.setAnimationLoop(this.animate);
   }
 
@@ -130,6 +138,7 @@ class FlightView {
       }
     });
     this.droneBasis.add(model);
+    this.modelPhase = ModelPhase.READY;
   }
 
   setAttitude(values, reference) {
@@ -153,8 +162,6 @@ class FlightView {
   }
 
   setEnabled(enabled) {
-    if (this.enabled === enabled) return;
-    this.enabled = enabled;
     if (enabled) {
       this.lastFrame = performance.now();
       this.frameWindowStarted = this.lastFrame;
@@ -185,8 +192,10 @@ class FlightView {
       ? motorValues.reduce((sum, value) => sum + value, 0) / motorValues.length
       : 1000;
     const rotorSpeed = telemetry.latest?.health?.armed === true ? Math.max(0, (averageMotor - 950) / 1000) * 42 : 0;
-    for (let index = 0; index < this.rotors.length; index += 1) {
-      this.rotors[index].rotation.y += rotorSpeed * delta * (index % 2 ? -1 : 1);
+    if (this.modelPhase === ModelPhase.READY) {
+      for (let index = 0; index < this.rotors.length; index += 1) {
+        this.rotors[index].rotation.y += rotorSpeed * delta * (index % 2 ? -1 : 1);
+      }
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -205,6 +214,9 @@ const flightView = new FlightView($("viewport"));
 
 const GroundMode = Object.freeze({
   IDLE: "idle",
+  WAITING_FOR_DISARM: "waiting_for_disarm",
+  WAITING_FOR_IMU: "waiting_for_imu",
+  WAITING_FOR_STILLNESS: "waiting_for_stillness",
   COLLECTING: "collecting",
   LOCKED: "locked",
   REJECTED: "rejected",
@@ -213,15 +225,24 @@ const GroundMode = Object.freeze({
 class GroundReference {
   constructor(statusElement) {
     this.statusElement = statusElement;
-    this.mode = GroundMode.IDLE;
+    this.samples = [];
+    this.targetSamples = 32;
+    this.reset();
+  }
+
+  reset(mode = GroundMode.IDLE) {
+    this.mode = mode;
     this.reference = null;
     this.gyroBias = null;
     this.quality = null;
     this.lastRejection = "";
-    this.samples = [];
-    this.targetSamples = 32;
-    this.started = false;
+    this.samples.length = 0;
     this.updateLabel("GROUND · RAW");
+  }
+
+  get collecting() {
+    return this.mode === GroundMode.COLLECTING || this.mode === GroundMode.WAITING_FOR_IMU
+      || this.mode === GroundMode.WAITING_FOR_STILLNESS;
   }
 
   updateLabel(text) {
@@ -230,7 +251,7 @@ class GroundReference {
   }
 
   progressLabel(prefix) {
-    const lastReason = this.lastRejection && this.mode === GroundMode.COLLECTING
+    const lastReason = this.lastRejection && this.collecting
       ? ` · LAST: ${this.lastRejection}`
       : "";
     this.updateLabel(`${prefix} · ${this.samples.length}/${this.targetSamples}${lastReason}`);
@@ -238,40 +259,33 @@ class GroundReference {
 
   start(data) {
     if (data?.health?.armed !== false) {
-      this.reject("DISARM FIRST");
+      const automatic = this.mode === GroundMode.IDLE || this.mode === GroundMode.WAITING_FOR_DISARM;
+      this.reject("DISARM FIRST", automatic ? GroundMode.WAITING_FOR_DISARM : GroundMode.REJECTED);
       return;
     }
-    this.mode = GroundMode.COLLECTING;
-    this.reference = null;
-    this.gyroBias = null;
-    this.quality = null;
-    this.lastRejection = "";
-    this.samples.length = 0;
-    this.started = true;
+    this.reset(GroundMode.COLLECTING);
     this.progressLabel("GROUND · COLLECTING");
   }
 
-  reject(message) {
-    this.mode = GroundMode.REJECTED;
-    this.reference = null;
-    this.gyroBias = null;
-    this.quality = null;
+  reject(message, mode = GroundMode.REJECTED) {
+    this.reset(mode);
     this.lastRejection = message;
-    this.samples.length = 0;
     this.progressLabel(`GROUND · REJECTED: ${message}`);
   }
 
   waitForStill(message) {
+    this.mode = GroundMode.WAITING_FOR_STILLNESS;
     this.lastRejection = message;
     this.samples.length = 0;
     this.progressLabel(`GROUND · REJECTED: ${message}`);
   }
 
   observe(data) {
-    if (!this.started && data?.connection?.state === "live" && data?.health?.armed === false) {
+    if ((this.mode === GroundMode.IDLE || this.mode === GroundMode.WAITING_FOR_DISARM)
+        && data?.connection?.state === "live" && data?.health?.armed === false) {
       this.start(data);
     }
-    if (this.mode !== GroundMode.COLLECTING) return;
+    if (!this.collecting) return;
     if (data?.health?.armed !== false) {
       this.reject("DISARM FIRST");
       return;
@@ -281,6 +295,7 @@ class GroundReference {
     const gyro = data?.signals?.gyro_msp;
     const accel = data?.signals?.accel_msp;
     if (![attitude, gyro, accel].every((values) => values?.length === 3 && values.every(finite))) {
+      this.mode = GroundMode.WAITING_FOR_IMU;
       this.progressLabel("GROUND · WAITING FOR IMU");
       return;
     }
@@ -291,6 +306,7 @@ class GroundReference {
       return;
     }
 
+    this.mode = GroundMode.COLLECTING;
     this.samples.push({
       roll: attitude[0],
       pitch: attitude[1],
@@ -359,6 +375,8 @@ class GroundReference {
   }
 }
 
+const ScopePhase = Object.freeze({ HIDDEN: "hidden", IDLE: "idle", FRAME_QUEUED: "frame_queued" });
+
 class ImuScope {
   constructor(canvas) {
     this.canvas = canvas;
@@ -368,7 +386,7 @@ class ImuScope {
     this.count = 0;
     this.gyro = Array.from({ length: 3 }, () => new Float32Array(this.capacity));
     this.accel = Array.from({ length: 3 }, () => new Float32Array(this.capacity));
-    this.enabled = false;
+    this.phase = ScopePhase.HIDDEN;
     this.frame = null;
     this.colors = ["#ff626f", "#5cf29a", "#5db4ff"];
     this.draw = this.draw.bind(this);
@@ -393,20 +411,27 @@ class ImuScope {
     }
     this.cursor = (this.cursor + 1) % this.capacity;
     this.count = Math.min(this.count + 1, this.capacity);
-    if (this.enabled && this.frame === null) {
-      this.frame = requestAnimationFrame(this.draw);
-    }
+    if (this.phase === ScopePhase.IDLE) this.scheduleDraw();
+  }
+
+  clear() {
+    this.cursor = this.count = 0;
+    if (this.phase === ScopePhase.IDLE) this.scheduleDraw();
+  }
+
+  scheduleDraw() {
+    this.phase = ScopePhase.FRAME_QUEUED;
+    this.frame = requestAnimationFrame(this.draw);
   }
 
   setEnabled(enabled) {
-    if (this.enabled === enabled) return;
-    this.enabled = enabled;
     if (enabled) {
-      this.frame = requestAnimationFrame(this.draw);
-    } else if (this.frame !== null) {
-      cancelAnimationFrame(this.frame);
-      this.frame = null;
+      if (this.phase === ScopePhase.HIDDEN) this.scheduleDraw();
+      return;
     }
+    if (this.phase === ScopePhase.FRAME_QUEUED) cancelAnimationFrame(this.frame);
+    this.phase = ScopePhase.HIDDEN;
+    this.frame = null;
   }
 
   plot(values, top, height, scale) {
@@ -430,8 +455,9 @@ class ImuScope {
   }
 
   draw() {
+    if (this.phase !== ScopePhase.FRAME_QUEUED) return;
     this.frame = null;
-    if (!this.enabled) return;
+    this.phase = ScopePhase.IDLE;
     const context = this.context;
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
@@ -474,7 +500,20 @@ class ImuScope {
 
 const groundReference = new GroundReference($("groundState"));
 const imuScope = new ImuScope($("imuScope"));
-let scopeMode = false;
+const ViewMode = Object.freeze({ ATTITUDE: "attitude", SCOPE: "scope" });
+let viewMode = ViewMode.ATTITUDE;
+
+function selectView(mode) {
+  if (viewMode === mode) return;
+  viewMode = mode;
+  const scope = mode === ViewMode.SCOPE;
+  document.querySelector(".stage").classList.toggle("scope-mode", scope);
+  $("scopeButton").setAttribute("aria-pressed", String(scope));
+  $("scopeButton").textContent = scope ? "3D VIEW" : "IMU SCOPE";
+  flightView.setEnabled(!scope);
+  if (scope) imuScope.resize();
+  imuScope.setEnabled(scope);
+}
 
 function setVector(id, values, digits = 0) {
   const labels = ["X", "Y", "Z"];
@@ -506,7 +545,7 @@ function readinessFor(data) {
   if (data.replay) {
     return ["waiting", "RELATIVE ROTATION", "Gyro integration from the first recorded frame."];
   }
-  if (finite(data.blackbox?.copied)) {
+  if (exportInProgress(data.blackbox)) {
     return ["waiting", "SAVING BLACKBOX", "Live readings resume after the export."];
   }
   if (connection.state !== "live") {
@@ -542,6 +581,10 @@ function readinessFor(data) {
   return ["ready", "MINIFLIGHT INPUT READY", `Ground reference quality ${groundReference.quality}.`];
 }
 
+function exportInProgress(box) {
+  return box?.phase === "streaming" || finite(box?.copied);
+}
+
 function renderTelemetry(data) {
   const connection = data.connection || {};
   const controller = data.controller || {};
@@ -563,7 +606,7 @@ function renderTelemetry(data) {
       ? `CONNECTING · ${port?.split("/").pop() || "USB"}`
       : `OFFLINE · ${connection.message || "Waiting for USB"}`;
   $("stageStatus").textContent = displayState === "live"
-    ? (scopeMode ? "Raw IMU scope" : "Vehicle attitude")
+    ? (viewMode === ViewMode.SCOPE ? "Raw IMU scope" : "Vehicle attitude")
     : displayState === "connecting" ? "Connecting to flight controller" : "Last flight-controller sample";
 
   $("controller").textContent = plain(controller.variant);
@@ -578,10 +621,10 @@ function renderTelemetry(data) {
   $("i2c").textContent = plain(health.i2c_errors);
   $("sensors").textContent = health.sensors?.length ? health.sensors.join(" · ") : "—";
   const box = data.blackbox;
-  const copying = finite(box?.copied);
+  const copying = exportInProgress(box);
   $("blackboxSize").textContent = box?.ready
     ? `${(box.used / 1048576).toFixed(1)} / ${(box.capacity / 1048576).toFixed(1)} MiB` : "—";
-  $("blackboxButton").disabled = !box?.ready || !box.used || copying || savingBlackbox || state !== "live";
+  $("blackboxButton").disabled = !box?.ready || !box.used || copying || downloadPhase !== DownloadPhase.IDLE || state !== "live";
   $("blackboxButton").textContent = copying
     ? `SAVING ${Math.round(100 * box.copied / box.used)}%` : "SAVE BLACKBOX";
 
@@ -620,32 +663,50 @@ function renderTelemetry(data) {
   $("sensorTitle").textContent = replay ? "Recorded sensors" : "Body sensors · MSP values";
   $("gyroLabel").textContent = replay ? "Gyroscope · °/s · FRD" : "Gyroscope";
   if (replay) {
-    if (scopeMode) {
-      scopeMode = false;
-      document.querySelector(".stage").classList.remove("scope-mode");
-      flightView.setEnabled(true);
-      imuScope.setEnabled(false);
-      $("scopeButton").setAttribute("aria-pressed", "false");
-      $("scopeButton").textContent = "IMU SCOPE";
-    }
+    selectView(ViewMode.ATTITUDE);
     $("linkState").dataset.state = "replay";
     $("linkText").textContent = `REPLAY · ${replay.name}`;
     $("stageStatus").textContent = `Recorded gyro · ${replay.time_s.toFixed(2)} / ${replay.duration_s.toFixed(2)} s`;
-    $("replayButton").textContent = replay.playing ? "RESTART" : "PLAY RECORDING";
+    const playing = replay.phase === undefined ? replay.playing : replay.phase === "playing";
+    $("replayButton").textContent = playing ? "RESTART" : "PLAY RECORDING";
     $("controller").textContent = "GyroAttitude";
     $("controllerMeta").textContent = "Device timestamps · recorded gyro";
     setVector("gyro", signals.gyro_deg_s, 1);
   }
 }
 
+function setFeedPhase(phase, session = null) {
+  if (telemetry.phase === phase && telemetry.session === session) return;
+  telemetry.phase = phase;
+  telemetry.session = session;
+  telemetry.lastAttitudeSample = telemetry.lastImuSample = null;
+  telemetry.lastAttitudeAt = telemetry.attitudeJitterMs = 0;
+  telemetry.attitudeIntervals.length = 0;
+  groundReference.reset();
+  imuScope.clear();
+}
+
+function acceptSample(key, count) {
+  if (!finite(count) || telemetry[key] === count) return false;
+  telemetry[key] = count;
+  return true;
+}
+
 function acceptState(data) {
+  if (data.replay) {
+    setFeedPhase(FeedPhase.REPLAY, data.replay.name);
+  } else if (data.connection?.state === "live") {
+    setFeedPhase(FeedPhase.LIVE, data.connection.session ?? data.connection.port);
+  } else {
+    setFeedPhase(FeedPhase.OFFLINE);
+  }
   telemetry.latest = data;
   telemetry.receivedAt = performance.now();
   telemetry.messages += 1;
   telemetry.messagesWindow += 1;
   const traffic = data.traffic || {};
 
-  if (traffic.attitude_samples_total !== telemetry.lastAttitudeSample) {
+  if (acceptSample("lastAttitudeSample", traffic.attitude_samples_total)) {
     const attitudeNow = performance.now();
     const interval = attitudeNow - telemetry.lastAttitudeAt;
     if (telemetry.lastAttitudeAt > 0 && interval < 100) {
@@ -664,7 +725,6 @@ function acceptState(data) {
       telemetry.attitudeJitterMs = 0;
     }
     telemetry.lastAttitudeAt = attitudeNow;
-    telemetry.lastAttitudeSample = traffic.attitude_samples_total;
     if (data.signals?.body_to_start_wxyz) {
       flightView.setRecordedRotation(data.signals.body_to_start_wxyz);
     } else {
@@ -672,8 +732,7 @@ function acceptState(data) {
       flightView.setAttitude(data.signals?.attitude_deg, groundReference.reference);
     }
   }
-  if (traffic.imu_samples_total !== telemetry.lastImuSample) {
-    telemetry.lastImuSample = traffic.imu_samples_total;
+  if (acceptSample("lastImuSample", traffic.imu_samples_total)) {
     imuScope.push(data.signals?.gyro_msp, data.signals?.accel_msp);
   }
 }
@@ -692,24 +751,25 @@ $("replayButton").addEventListener("click", async () => {
 });
 
 $("scopeButton").addEventListener("click", () => {
-  scopeMode = !scopeMode;
-  document.querySelector(".stage").classList.toggle("scope-mode", scopeMode);
-  $("scopeButton").setAttribute("aria-pressed", String(scopeMode));
-  $("scopeButton").textContent = scopeMode ? "3D VIEW" : "IMU SCOPE";
-  flightView.setEnabled(!scopeMode);
-  if (scopeMode) imuScope.resize();
-  imuScope.setEnabled(scopeMode);
+  selectView(viewMode === ViewMode.SCOPE ? ViewMode.ATTITUDE : ViewMode.SCOPE);
   if (telemetry.latest) renderTelemetry(telemetry.latest);
 });
 
-let savingBlackbox = false;
+const DownloadPhase = Object.freeze({
+  IDLE: "idle", REQUESTING: "requesting", RECEIVING: "receiving", DOWNLOADING: "downloading",
+});
+let downloadPhase = DownloadPhase.IDLE;
 $("blackboxButton").addEventListener("click", async () => {
-  savingBlackbox = $("blackboxButton").disabled = true;
+  if (downloadPhase !== DownloadPhase.IDLE) return;
+  downloadPhase = DownloadPhase.REQUESTING;
+  $("blackboxButton").disabled = true;
   $("blackboxStatus").textContent = "Reading flash…";
   try {
     const response = await fetch("/blackbox", {method: "POST"});
     if (!response.ok) throw new Error("Export failed");
+    downloadPhase = DownloadPhase.RECEIVING;
     const url = URL.createObjectURL(await response.blob());
+    downloadPhase = DownloadPhase.DOWNLOADING;
     const link = document.createElement("a");
     Object.assign(link, {href: url, download: "miniflight-blackbox.bbl"});
     link.click();
@@ -718,7 +778,7 @@ $("blackboxButton").addEventListener("click", async () => {
   } catch {
     $("blackboxStatus").textContent = "Could not save Blackbox";
   } finally {
-    savingBlackbox = false;
+    downloadPhase = DownloadPhase.IDLE;
   }
 });
 
@@ -727,8 +787,9 @@ events.addEventListener("state", (event) => {
   acceptState(JSON.parse(event.data));
 });
 events.onerror = () => {
+  setFeedPhase(FeedPhase.CONNECTING);
   telemetry.latest = null;
-  $("linkState").dataset.state = "connecting";
+  renderTelemetry({connection: {state: "opening"}});
   $("linkText").textContent = "CONNECTING · LOCALHOST";
 };
 

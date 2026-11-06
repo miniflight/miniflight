@@ -63,14 +63,23 @@ async function refresh(data) {
     }
   } catch (error) { document.querySelector('#source').textContent = `Waiting for a snapshot: ${error.message}`; }
 }
-let latest, drawing = false;
+const DrawPhase = Object.freeze({ IDLE: 'idle', DRAWING: 'drawing' });
+let pendingSnapshot = null;
+let drawPhase = DrawPhase.IDLE;
 const signals = new EventSource('./signals');
 signals.onmessage = async event => {
-  latest = JSON.parse(event.data);
-  if (drawing) return;
-  drawing = true;
-  while (latest) { const data = latest; latest = null; await refresh(data); }
-  drawing = false;
+  pendingSnapshot = JSON.parse(event.data);
+  if (drawPhase === DrawPhase.DRAWING) return;
+  drawPhase = DrawPhase.DRAWING;
+  try {
+    while (pendingSnapshot) {
+      const data = pendingSnapshot;
+      pendingSnapshot = null;
+      await refresh(data);
+    }
+  } finally {
+    drawPhase = DrawPhase.IDLE;
+  }
 };
 </script>
 </html>

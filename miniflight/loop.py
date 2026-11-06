@@ -2,6 +2,18 @@
 
 import math
 import time
+from dataclasses import dataclass
+
+
+@dataclass
+class Cadence:
+    period: float
+    deadline: float
+
+    def next_tick(self, now):
+        scheduled = self.deadline + self.period
+        self.deadline = now + self.period if scheduled < now else scheduled
+        return self.deadline
 
 
 def run(receive, update, send, *, hz=50, clock=time):
@@ -15,11 +27,9 @@ def run(receive, update, send, *, hz=50, clock=time):
         raise ValueError("control frequency must be finite and positive")
     period = 1 / hz
     now = clock.monotonic()
-    deadline = now - period
+    cadence = Cadence(period, now - period)
     while True:
-        deadline += period
-        if deadline < now:
-            deadline = now + period
+        deadline = cadence.next_tick(now)
         clock.sleep(max(0, deadline - clock.monotonic()))
         signals = receive(clock.monotonic())
         if signals is not None:

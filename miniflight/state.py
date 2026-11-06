@@ -3,10 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum, auto
 from typing import NamedTuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+class SampleOrder(Enum):
+    FIRST = auto()
+    ADVANCING = auto()
+    REPEATED = auto()
+    REGRESSED = auto()
+
+
+def sample_order(previous, current):
+    if previous is None:
+        return SampleOrder.FIRST
+    if current > previous:
+        return SampleOrder.ADVANCING
+    if current == previous:
+        return SampleOrder.REPEATED
+    return SampleOrder.REGRESSED
 
 
 class Ned(NamedTuple):
@@ -37,6 +55,17 @@ class ImuIncrement(NamedTuple):
     dt: float  # integration seconds, independent of publication cadence
     acceleration: tuple[float, float, float]  # FRD specific force, m/s²
     gyro: tuple[float, float, float]  # FRD rad/s
+
+
+class ImuClock(NamedTuple):
+    time: float
+    published_at: float
+
+
+class ImuClockPhase(Enum):
+    UNOBSERVED = auto()
+    FRESH = auto()
+    STALE = auto()
 
 
 @dataclass(frozen=True)
@@ -96,6 +125,12 @@ class State:
     imu_samples: tuple[ImuSample, ...] = ()  # New accepted measurements, in arrival order.
     imu_increments: tuple[ImuIncrement, ...] = ()  # New measured integration intervals.
     imu_increment_clock: tuple[float, float] | None = None  # Latest increment's device and host seconds.
+
+    def imu_clock_phase(self, now, max_age):
+        if self.imu_increment_clock is None:
+            return ImuClockPhase.UNOBSERVED
+        age = now - self.imu_increment_clock[1]
+        return ImuClockPhase.STALE if age > max_age else ImuClockPhase.FRESH
 
     @property
     def rate_feedback(self) -> RateSample | None:

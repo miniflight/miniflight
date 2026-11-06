@@ -139,6 +139,26 @@ void pattern_breathing(void) {
     }
 }
 
+static void pattern_blink(void) {
+    led_on();
+    delay_ms(250);
+    led_off();
+    delay_ms(250);
+}
+
+typedef struct {
+    void (*cycle)(void);
+    unsigned repetitions;
+    uint32_t pause_ms;
+} BlinkPhase;
+
+static const BlinkPhase phases[] = {
+    {pattern_heartbeat, 3, 1000},
+    {pattern_sos, 2, 1000},
+    {pattern_breathing, 2, 1000},
+    {pattern_blink, 10, 2000},
+};
+
 /* ===== MAIN ===== */
 
 void main(void) {
@@ -156,34 +176,13 @@ void main(void) {
     }
     delay_ms(1000);
     
-    /* Demo different patterns forever */
-    while(1) {
-        /* Heartbeat pattern (3 cycles) */
-        for(int i = 0; i < 3; i++) {
-            pattern_heartbeat();
+    for (;;) {
+        for (unsigned i = 0; i < sizeof(phases) / sizeof(phases[0]); i++) {
+            const BlinkPhase *phase = &phases[i];
+            for (unsigned cycle = 0; cycle < phase->repetitions; cycle++) {
+                phase->cycle();
+            }
+            delay_ms(phase->pause_ms);
         }
-        delay_ms(1000);
-        
-        /* SOS pattern (2 cycles) */
-        for(int i = 0; i < 2; i++) {
-            pattern_sos();
-        }
-        delay_ms(1000);
-        
-        /* Breathing pattern (2 cycles) */
-        for(int i = 0; i < 2; i++) {
-            pattern_breathing();
-        }
-        delay_ms(1000);
-        
-        /* Simple blink (5 seconds) */
-        for(int i = 0; i < 10; i++) {
-            led_on();
-            delay_ms(250);
-            led_off();
-            delay_ms(250);
-        }
-        delay_ms(2000);
     }
 }
-

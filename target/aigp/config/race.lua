@@ -2,8 +2,9 @@
 local race_path = os.getenv("MINIFLIGHT_RACE_STATUS_FILE")
 if race_path then
     local output = assert(io.open(race_path, "w"))
-    local centers_loaded = false
-    local max_callback, max_write, reported = 0, 0, false
+    local geometry_phase = "waiting_for_track"
+    local race_phase = "unobserved"
+    local max_callback, max_write = 0, 0
     local game, player
     local function observe_race()
         ExecuteInGameThread(function()
@@ -12,7 +13,7 @@ if race_path then
             if not valid(player) then player = controller() end
             local state = valid(player) and player.PlayerState or nil
             if valid(game) and valid(state) then
-                if not centers_loaded and track_ready() then
+                if geometry_phase == "waiting_for_track" and track_ready() then
                     local track = game:GetCurrentTrack()
                     local origin = track:GetStartingGrid().PlayerStart0:K2_GetComponentLocation()
                     local system = StaticFindObject("/Script/Engine.Default__KismetSystemLibrary")
@@ -24,12 +25,14 @@ if race_path then
                             (center.X - origin.X) / 100, (center.Y - origin.Y) / 100, -(center.Z - origin.Z) / 100)
                     end
                     output:write('{"gate_centers":[' .. table.concat(centers, ",") .. ']}\n')
-                    centers_loaded = true
+                    geometry_phase = "published"
                 end
+                local completed = state.bRaceCompleted
+                local next_phase = completed and "finished" or "observing"
                 local line = string.format(
                     '{"started":%s,"valid":%s,"completed":%s,"time_seconds":%.9f,"active_gate_index":%d,"finish_time_seconds":%.9f}\n',
                     tostring(game:HasRaceStarted()), tostring(state:IsRaceValid()),
-                    tostring(state.bRaceCompleted), game:GetRaceTime(),
+                    tostring(completed), game:GetRaceTime(),
                     state.ActiveGateSequentialId, state:GetCompletedRaceTotalTime())
                 local writing = os.clock()
                 output:write(line)
@@ -37,11 +40,11 @@ if race_path then
                 local finished = os.clock()
                 max_callback = math.max(max_callback, finished - began)
                 max_write = math.max(max_write, finished - writing)
-                if finished - began >= .05 or state.bRaceCompleted and not reported then
+                if finished - began >= .05 or next_phase == "finished" and race_phase ~= "finished" then
                     print(string.format("[miniflight observer] callback_max_ms=%.3f write_max_ms=%.3f\n",
                         max_callback * 1000, max_write * 1000))
                 end
-                reported = state.bRaceCompleted
+                race_phase = next_phase
             end
             ExecuteWithDelay(50, observe_race)
         end)

@@ -13,6 +13,21 @@
 
 #define MAHONY_INIT_SAMPLE_COUNT 20
 
+typedef enum {
+    MAHONY_COLLECTING_GRAVITY,
+    MAHONY_TRACKING
+} MahonyPhase;
+
+typedef enum {
+    ALTITUDE_WAITING_FOR_BASELINE,
+    ALTITUDE_TRACKING
+} AltitudePhase;
+
+typedef enum {
+    ESTIMATE_NO_HISTORY,
+    ESTIMATE_CACHED
+} EstimateHistory;
+
 typedef struct {
     /* Gains */
     float kp;  /* Proportional gain for accelerometer correction */
@@ -21,7 +36,7 @@ typedef struct {
     /* State */
     Vector3D bias;           /* Gyro bias estimate (rad/s) */
     Quaternion q;            /* Orientation quaternion (body -> world) */
-    bool initialized;
+    MahonyPhase phase;
     
     /* Initialization */
     float init_samples[MAHONY_INIT_SAMPLE_COUNT][3];  /* Gravity samples */
@@ -29,11 +44,11 @@ typedef struct {
     
     /* History for velocity estimation */
     float last_alt;
-    bool has_last_alt;
+    AltitudePhase altitude_phase;
     
     /* Last state (for fallback) */
     StateEstimate last_state;
-    bool has_last_state;
+    EstimateHistory history;
 } MahonyEstimator;
 
 /* Initialize estimator */
@@ -47,12 +62,12 @@ StateEstimate mahony_update(MahonyEstimator *est, SensorReadings *readings, floa
 
 /* Check if initialized */
 static inline bool mahony_is_initialized(MahonyEstimator *est) {
-    return est->initialized;
+    return est->phase == MAHONY_TRACKING;
 }
 
 /* Get initialization progress [0.0, 1.0] */
 static inline float mahony_init_progress(MahonyEstimator *est) {
-    if (est->initialized) return 1.0f;
+    if (mahony_is_initialized(est)) return 1.0f;
     if (est->init_sample_idx == 0) return 0.0f;
     return (float)est->init_sample_idx / MAHONY_INIT_SAMPLE_COUNT;
 }
