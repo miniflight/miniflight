@@ -3,6 +3,10 @@
 These tools are optional. The simulator loads recording tools when `--record` is
 requested; gate controllers do not import them.
 
+The [camera/IMU experiment](camera_imu/README.md) builds its pinned VQ1 sensor
+probes, flies two gates continuously, and records exact process replay and
+native scoring.
+
 The R1 goal is six valid gates, no collision, and a native finish below 10 seconds
 with a computed reference and PID. MPC comes after that.
 

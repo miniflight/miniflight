@@ -1,0 +1,189 @@
+{
+  "date": "2026-11-07",
+  "target": "vq1.r1",
+  "executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "environment": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "opencv": "5.0.0",
+    "compiler": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+  },
+  "source_sha256": {
+    "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+    "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+    "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+    "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+    "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+    "runner.py": "c034ee3190fc30d437949fe0c2a8847158af6235895154612f1cea91271383be",
+    "score.py": "2aab8eafff51bb956405ef2bd0f0e127b7761d740cc0f5becf94a06a878eeb0b",
+    "sensors.py": "4f8cb063373d3d60d7dba2727df25d243bf08e5c654828d898002888b760029d",
+    "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+    "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+    "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+    "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+    "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+    "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+    "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+  },
+  "prototype_recordings": [
+    {
+      "recording": "attempt-04",
+      "trace_sha256": "fbb93bb6559db09764a338cb1113082ee2ab7ae37c4eeed4d174031455444879",
+      "passed": true,
+      "native_gates_passed": 2,
+      "valid_race": true,
+      "controller_error": null,
+      "reset_calls": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "commands": 793,
+      "exact_replay": true,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.07801485466220816,
+            -0.028834850636123868
+          ],
+          "blind_time_to_crossing_s": 0.762317107546945
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.11168156628953278,
+            -0.1514957170857386
+          ],
+          "blind_time_to_crossing_s": 0.9621527535019148
+        }
+      ]
+    },
+    {
+      "recording": "attempt-05-repeat",
+      "trace_sha256": "d8f87d3b8399eb2a7bcd08461ec9a82845ea24c048541db5cf962e6c16e4f0d1",
+      "passed": true,
+      "native_gates_passed": 2,
+      "valid_race": true,
+      "controller_error": null,
+      "reset_calls": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "commands": 784,
+      "exact_replay": true,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.08659820927237755,
+            -0.018130888778179453
+          ],
+          "blind_time_to_crossing_s": 0.7529286443733394
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.1464067791789428,
+            -0.14151089685865997
+          ],
+          "blind_time_to_crossing_s": 0.9547065138916153
+        }
+      ]
+    }
+  ],
+  "packaged_live_checks": [
+    {
+      "recording": "run-01",
+      "trace_sha256": "18faba0cbeaa32adb6542a1936ca69284570f2acacbf496768c0273305409727",
+      "passed": false,
+      "native_gates_passed": 1,
+      "valid_race": true,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "no confirmed opening in the largest visible gate rim"
+      },
+      "reset_calls": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "commands": 732,
+      "exact_replay": true,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.08528961564137401,
+            -0.01901987366537683
+          ],
+          "blind_time_to_crossing_s": 0.7655398270664211
+        },
+        {
+          "gate": 2,
+          "native_pass": false
+        }
+      ]
+    },
+    {
+      "recording": "run-02",
+      "trace_sha256": "201f4f25c2b8f7c958c3610f1e812b2badf064e87588d4c2c060cd7168b58a32",
+      "passed": true,
+      "native_gates_passed": 2,
+      "valid_race": true,
+      "controller_error": null,
+      "reset_calls": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "commands": 768,
+      "exact_replay": true,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.18935892226312107,
+            -0.018488122661535406
+          ],
+          "blind_time_to_crossing_s": 0.7147802765799831
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_offset_width_down_m": [
+            -0.3170225678039189,
+            -0.1465563289914607
+          ],
+          "blind_time_to_crossing_s": 0.9029070664529826
+        }
+      ]
+    }
+  ],
+  "input_independence": {
+    "packaged_commands": 768,
+    "corrupted_native_pose_packets": 2886,
+    "gate_counter_zeroed": true,
+    "exact_commands": true
+  },
+  "score_exit_codes": {
+    "failed_recording": 1,
+    "passed_recording": 0
+  },
+  "imu_stub_sha256": "df26d671388b911e78b1f140cdc603882108d1cb81ad47943467c8fa4e179305",
+  "limitation": "One of two fresh packaged runs missed the gate-two look-ahead confirmation window."
+}
