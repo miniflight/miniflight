@@ -14,6 +14,19 @@ from target.aigp.experiments.camera_imu.accuracy import score_estimates
 
 
 class MotionTest(unittest.TestCase):
+    def test_edges_between_pixel_centers(self):
+        axis = np.arange(128)
+        for phase in np.linspace(.05, .95, 10):
+            x, y, side = 25.+phase, 25.+phase*.7, 70.5
+            coverage = lambda a, b: np.maximum(0, np.minimum(axis+.5, b)-np.maximum(axis-.5, a))
+            inner = np.outer(coverage(y, y+side), coverage(x, x+side))
+            outer = np.outer(coverage(y-5, y+side+5), coverage(x-5, x+side+5))
+            image = np.zeros((128, 128, 3), dtype=np.uint8)
+            image[:, :, 2] = np.round(255*(outer-inner)).astype(np.uint8)
+            corners = np.array([[x, y], [x+side, y], [x+side, y+side], [x, y+side]])
+            found = vision.refine(image, corners+[.13, .17])
+            self.assertLess(float(np.sqrt(np.mean((found-corners)**2))), .1)
+
     def test_scoring_frame_times_and_json(self):
         rotation = Rotation.from_euler("z", .7).as_matrix()
         center, anchor = np.array([4., 5., 6.]), np.array([2., 3., 4.])

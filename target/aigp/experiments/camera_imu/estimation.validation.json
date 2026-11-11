@@ -632,6 +632,142 @@
         "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
         "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
+    },
+    {
+      "name": "run-07",
+      "method": "Same 0.5 s guarded estimator; subpixel gradient-peak interpolation",
+      "passed": true,
+      "controller_error": null,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.95474533499519,
+          "first_lock_time_s": 6.034872,
+          "first_lock_image_id": 388,
+          "crossing_position_ned_m": [
+            -23.297967779254975,
+            -0.4516808834178689,
+            -1.1205862140994032
+          ],
+          "crossing_offset_width_down_m": [
+            -0.051778672951813945,
+            -0.02039707655762048
+          ],
+          "last_image_id": 687,
+          "last_image_time_s": 15.971475199,
+          "blind_time_to_crossing_s": 1.9832701359951912,
+          "final_phase_to_crossing_s": 1.1565373349951926,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.014417482890321442,
+            0.005442941287575421,
+            -0.16202749584376988
+          ]
+        }
+      ],
+      "estimation": {
+        "camera_position_m": {
+          "count": 300,
+          "median": 0.0969404525511629,
+          "p95": 0.3085159821412707,
+          "maximum": 0.7023122933943833,
+          "rms": 0.15516759611032852
+        },
+        "camera_velocity_m_s": {
+          "count": 53,
+          "median": 0.043033793615078544,
+          "p95": 0.09105028057420989,
+          "maximum": 0.23873742405828965,
+          "rms": 0.0611789649733581
+        },
+        "fused_position_m": {
+          "count": 627,
+          "median": 0.09884542530505323,
+          "p95": 0.18061468605635622,
+          "maximum": 0.38792896800154814,
+          "rms": 0.11819223739047456
+        },
+        "fused_velocity_m_s": {
+          "count": 627,
+          "median": 0.056792881478816,
+          "p95": 0.10671813627194296,
+          "maximum": 0.11693795842228223,
+          "rms": 0.06607596384732549
+        },
+        "unfused_position_m": {
+          "count": 627,
+          "median": 0.12545091327793306,
+          "p95": 0.5739011152179934,
+          "maximum": 0.6659276532105629,
+          "rms": 0.25514527520428176
+        },
+        "unfused_velocity_m_s": {
+          "count": 627,
+          "median": 0.09508720685020328,
+          "p95": 0.1493970020671151,
+          "maximum": 0.1583734939578987,
+          "rms": 0.10133124657072157
+        },
+        "capture_to_output_ms": {
+          "count": 300,
+          "median": 30.546001987672433,
+          "p95": 40.28252793699876,
+          "maximum": 43.60222598702812,
+          "rms": 31.32863970462077
+        },
+        "velocity_fit_age_ms": {
+          "count": 53,
+          "median": 234.42968793370687,
+          "p95": 253.83099650254692,
+          "maximum": 260.7440277482098,
+          "rms": 227.40391093103474
+        },
+        "accepted_camera_position_m": {
+          "count": 58,
+          "median": 0.0999775576671782,
+          "p95": 0.1213147306925136,
+          "maximum": 0.12862538028218817,
+          "rms": 0.09695946161392408
+        },
+        "camera_position_updates": 58,
+        "camera_velocity_updates": 53
+      },
+      "input_independence": {
+        "calls": 13392,
+        "wire_commands": 763,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3133,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 96520820,
+        "raw_recordings_retained": false
+      },
+      "sources": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      }
     }
-  ]
+  ],
+  "subpixel_synthetic_test": {
+    "old_rms_px": 0.15132708834616304,
+    "new_rms_px": 0.05708007912619258,
+    "new_maximum_rms_px": 0.07001218656053884
+  }
 }

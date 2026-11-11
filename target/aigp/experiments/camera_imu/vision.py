@@ -33,7 +33,14 @@ def refine(image, corners):
         samples = centers[:, None]+offsets[None, :, None]*normal
         x, y = (samples[:, :, i].astype(np.float32) for i in (0, 1))
         response = -cv2.remap(gx, x, y, cv2.INTER_LINEAR)*normal[0]-cv2.remap(gy, x, y, cv2.INTER_LINEAR)*normal[1]
-        points = samples[np.arange(len(centers)), response.argmax(axis=1)]
+        best = response.argmax(axis=1)
+        rows = np.arange(len(centers))
+        before = response[rows, np.maximum(best-1, 0)]
+        after = response[rows, np.minimum(best+1, len(offsets)-1)]
+        curvature = before-2*response[rows, best]+after
+        valid = (best > 0) & (best < len(offsets)-1) & (curvature < -1e-6)
+        subpixel = np.divide(.5*(before-after), curvature, out=np.zeros_like(curvature), where=valid)
+        points = centers+(offsets[best]+np.clip(subpixel, -.5, .5))[:, None]*normal
         outside = (points-2*normal).astype(np.float32)
         rim = cv2.remap(signal, outside[:, 0, None], outside[:, 1, None], cv2.INTER_LINEAR)
         supported += np.median(rim) > .08
