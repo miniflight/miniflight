@@ -181,7 +181,7 @@ def live(root, shift):
         destination = root/"source"/source.relative_to(HERE)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source.read_bytes())
-    metadata = dict(process="two_gate", revision=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+    metadata = dict(process="camera_imu", revision=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         settings=SETTINGS, shift_right_m=shift, setup="IMU controlled shift then local-origin reset", position_used_for="offline scoring",
         sources={str(source): hashlib.sha256(source.read_bytes()).hexdigest() for source in sources},
         probes=json.loads((binaries/"build.json").read_text()))
@@ -242,7 +242,7 @@ def one(root, shift):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     root.mkdir(parents=True)
     original = dict(SETTINGS)
-    SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.25, speed_m_s=2.,
+    SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
                     beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
     try:
@@ -281,7 +281,10 @@ def main():
         parser.error("live, replay, score and video require a path")
     elif args.mode in ("live", "one"):
         run = one if args.mode == "one" else live
-        if not run(args.path.resolve(), args.shift)["passed_without_reset"]:
+        result = run(args.path.resolve(), args.shift)
+        used = args.mode != "one" or all(result.get("estimation", {}).get(name, 0) > 0
+            for name in ("camera_position_updates", "camera_velocity_updates"))
+        if not result["passed_without_reset"] or not used:
             raise SystemExit(1)
     elif args.mode == "replay":
         print(json.dumps(replay(args.path.resolve(), args.poison)), flush=True)

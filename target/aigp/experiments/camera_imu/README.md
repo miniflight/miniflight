@@ -7,7 +7,7 @@ python -m target.aigp.experiments.camera_imu one target/aigp/.runtime/gate-estim
 ```
 
 This runs at 2 m/s. Gate size and pixels supply translation; IMU rotation puts
-measurements in one local frame. A 0.25 s camera history supplies velocity.
+measurements in one local frame. A 0.5 s camera history supplies velocity.
 Position and velocity corrections apply at their measurement times and carry
 forward through the IMU history. Corrections require all aperture sides to be
 at least 60 pixels long and reprojection RMS at most 1 pixel. The gate anchor

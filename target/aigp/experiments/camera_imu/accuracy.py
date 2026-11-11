@@ -62,4 +62,7 @@ def score_estimates(root, motion, ticks, center, rotation, observations):
                 "velocity_error_n_m_s", "velocity_error_e_m_s", "velocity_error_d_m_s"))
             writer.writeheader()
             writer.writerows(rows)
-    return {key: statistics(values) for key, values in errors.items()}
+    result = {key: statistics(values) for key, values in errors.items()}
+    result["camera_position_updates"] = int(sum(np.linalg.norm(row["position_correction"]) > 0 for row in observations))
+    result["camera_velocity_updates"] = int(sum(np.linalg.norm(row["velocity_correction"]) > 0 for row in observations))
+    return result
