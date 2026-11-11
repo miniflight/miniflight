@@ -1,6 +1,6 @@
 """One aperture, with an IMU frame rooted at the stationary shifted start."""
 
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from dataclasses import replace
 from enum import Enum, auto
 import json
@@ -127,7 +127,8 @@ class Inertial:
         self.rotation = None
         self.position = np.zeros(3)
         self.velocity = np.zeros(3)
-        self.times, self.positions, self.rotations = [], [], []
+        self.raw_position, self.raw_velocity = np.zeros(3), np.zeros(3)
+        self.times, self.positions, self.rotations, self.velocities = [], [], [], []
 
     def update(self, samples):
         for sample in samples:
@@ -146,12 +147,39 @@ class Inertial:
                 velocity = self.velocity + acceleration*sample.dt
                 self.position = self.position + .5*(self.velocity+velocity)*sample.dt
                 self.velocity = velocity
+                raw_velocity = self.raw_velocity + acceleration*sample.dt
+                self.raw_position += .5*(self.raw_velocity+raw_velocity)*sample.dt
+                self.raw_velocity = raw_velocity
             else:
                 continue
             self.time, self.gyro = sample.time, sample.gyro
             self.times.append(sample.time)
             self.positions.append(self.position.copy())
+            self.velocities.append(self.velocity.copy())
             self.rotations.append(self.rotation.as_rotation_matrix() @ CAMERA_FROM_BODY.T)
+
+    def velocity_at(self, stamp):
+        if not self.times[0] <= stamp <= self.times[-1]:
+            raise ValueError("velocity measurement is outside the IMU history")
+        return np.array([np.interp(stamp, self.times, column) for column in np.asarray(self.velocities).T])
+
+    def correct_velocity(self, stamp, measured, gain):
+        delta = gain*(np.asarray(measured)-self.velocity_at(stamp))
+        for i in range(bisect_left(self.times, stamp), len(self.times)):
+            self.velocities[i] += delta
+            self.positions[i] += delta*(self.times[i]-stamp)
+        self.position, self.velocity = self.positions[-1].copy(), self.velocities[-1].copy()
+        return delta
+
+    def correct_position(self, stamp, measured, gain):
+        pose = self.camera_pose(stamp)
+        if pose is None:
+            raise ValueError("position measurement is outside the IMU history")
+        delta = gain*(np.asarray(measured)-pose[0])
+        for i in range(bisect_left(self.times, stamp), len(self.times)):
+            self.positions[i] += delta
+        self.position = self.positions[-1].copy()
+        return delta
 
     def camera_pose(self, stamp):
         index = bisect_right(self.times, stamp)-1
@@ -262,6 +290,8 @@ class GateController(BaseController):
                 self.inertial.position = np.zeros(3)
                 self.inertial.times = [now]
                 self.inertial.positions = [self.inertial.position.copy()]
+                self.inertial.velocities = [self.inertial.velocity.copy()]
+                self.inertial.raw_position = np.zeros(3)
                 self.inertial.rotations = [self.inertial.rotation.as_rotation_matrix() @ CAMERA_FROM_BODY.T]
                 self.phase = Phase.ACQUIRING
                 self.acquire_started = now
