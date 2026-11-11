@@ -243,7 +243,7 @@ def one(root, shift):
     root.mkdir(parents=True)
     original = dict(SETTINGS)
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.25, speed_m_s=2.,
-                    beyond_m=1.5, maximum_blind_s=3., flight_timeout_s=20.,
+                    beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
