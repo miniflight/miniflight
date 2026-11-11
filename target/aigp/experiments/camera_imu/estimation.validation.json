@@ -103,23 +103,23 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "f52067ee0c74816d5c9616ae9490f69d89b9bc50217590af70cb729e0787ba0f",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "7ee321726123e53e8cbda14b49cb6c1928931102320292cb64c59aed867a2d3c",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "f52067ee0c74816d5c9616ae9490f69d89b9bc50217590af70cb729e0787ba0f",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "7ee321726123e53e8cbda14b49cb6c1928931102320292cb64c59aed867a2d3c",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     },
     {
@@ -209,23 +209,23 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "dff0650f88de862e90dc9f43197b1e12a098091232045a7272aae5c122b13528",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "68d4e67888a6e6827376f1bc1a892169830523592a8e3d81b64a1aeafd856e1e",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "dff0650f88de862e90dc9f43197b1e12a098091232045a7272aae5c122b13528",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "68d4e67888a6e6827376f1bc1a892169830523592a8e3d81b64a1aeafd856e1e",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     },
     {
@@ -341,23 +341,23 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "3b04c43153cf0a40591adedd6920ecd689315db0eae11c3fadba5e35abaf33c4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "3b04c43153cf0a40591adedd6920ecd689315db0eae11c3fadba5e35abaf33c4",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "f65473f74c84c23704182c565aa3db12ab10e40d41f3a6abacb170eb81a8d924",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     },
     {
@@ -470,23 +470,23 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "3b04c43153cf0a40591adedd6920ecd689315db0eae11c3fadba5e35abaf33c4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "0c07081bd9ea30f1ce042f2520d7bf7cfd62e31eac7ff006efd228166a6f13ce",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "3b04c43153cf0a40591adedd6920ecd689315db0eae11c3fadba5e35abaf33c4",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "0c07081bd9ea30f1ce042f2520d7bf7cfd62e31eac7ff006efd228166a6f13ce",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     },
     {
@@ -614,23 +614,23 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "ba4b1fa891b427b5181c4564a27ced849670a5778a31fb8ddbfe55ef1c9b3833",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     },
     {
@@ -745,23 +745,154 @@
         "raw_recordings_retained": false
       },
       "sources": {
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
-        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      }
+    },
+    {
+      "name": "run-08",
+      "method": "Frozen subpixel estimator; opposite sideways start",
+      "passed": true,
+      "controller_error": null,
+      "gates": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 18.352854441845032,
+          "first_lock_time_s": 6.021294,
+          "first_lock_image_id": 389,
+          "crossing_position_ned_m": [
+            -23.297967780955517,
+            -0.371425954022091,
+            -1.0842597885270873
+          ],
+          "crossing_offset_width_down_m": [
+            0.028476260891514244,
+            0.01592933918884863
+          ],
+          "last_image_id": 697,
+          "last_image_time_s": 16.268073153,
+          "blind_time_to_crossing_s": 2.0847812888450328,
+          "final_phase_to_crossing_s": 1.1913114418450341,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.015899498929142032,
+            0.04502008405207891,
+            -0.0852434429535111
+          ]
+        }
+      ],
+      "estimation": {
+        "camera_position_m": {
+          "count": 309,
+          "median": 0.0892194014218628,
+          "p95": 0.36181961008787683,
+          "maximum": 0.6468085415430315,
+          "rms": 0.16596521499236705
+        },
+        "camera_velocity_m_s": {
+          "count": 38,
+          "median": 0.06342163458845854,
+          "p95": 0.25013074147422387,
+          "maximum": 0.3010985366031673,
+          "rms": 0.11928705421568697
+        },
+        "fused_position_m": {
+          "count": 645,
+          "median": 0.09504773993310126,
+          "p95": 0.26979511976386295,
+          "maximum": 0.46633711004312295,
+          "rms": 0.1308607781315636
+        },
+        "fused_velocity_m_s": {
+          "count": 645,
+          "median": 0.04013041655708048,
+          "p95": 0.1195892136757392,
+          "maximum": 0.12767129273857802,
+          "rms": 0.06499547171663622
+        },
+        "unfused_position_m": {
+          "count": 645,
+          "median": 0.10693903023698852,
+          "p95": 0.5521184563059971,
+          "maximum": 0.6724709202557438,
+          "rms": 0.24303639064542865
+        },
+        "unfused_velocity_m_s": {
+          "count": 645,
+          "median": 0.09770212284417464,
+          "p95": 0.18479509949946055,
+          "maximum": 0.20183867957575086,
+          "rms": 0.11297429252232295
+        },
+        "capture_to_output_ms": {
+          "count": 309,
+          "median": 31.155957003917933,
+          "p95": 40.19833759657914,
+          "maximum": 68.14361598640417,
+          "rms": 31.729998725616475
+        },
+        "velocity_fit_age_ms": {
+          "count": 38,
+          "median": 232.94445408848043,
+          "p95": 250.28705127467887,
+          "maximum": 250.52941342742406,
+          "rms": 210.20437074779883
+        },
+        "accepted_camera_position_m": {
+          "count": 45,
+          "median": 0.08699493476872773,
+          "p95": 0.12057158668710799,
+          "maximum": 0.1276907610521219,
+          "rms": 0.09125754557928975
+        },
+        "camera_position_updates": 45,
+        "camera_velocity_updates": 38
+      },
+      "input_independence": {
+        "calls": 13295,
+        "wire_commands": 779,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3156,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 97284942,
+        "raw_recordings_retained": false
+      },
+      "sources": {
+        "__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "runner.py": "128c76575791f18547b8c0e2fa9a18bf1cebf7dcc1dfd80c0946d917f138c06a",
+        "score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
       }
     }
   ],
@@ -769,5 +900,72 @@
     "old_rms_px": 0.15132708834616304,
     "new_rms_px": 0.05708007912619258,
     "new_maximum_rms_px": 0.07001218656053884
-  }
+  },
+  "final_frozen_runs": [
+    "run-07",
+    "run-08"
+  ],
+  "final_protocol": {
+    "speed_m_s": 2.0,
+    "final_distance_m": 2.5,
+    "beyond_m": 1.5,
+    "stop_beyond_m": 1.0,
+    "lock_frames": 3,
+    "maximum_blind_s": 4.5,
+    "flight_timeout_s": 20.0,
+    "shift_right_m": 0.5,
+    "acquisition_close_gaps": true,
+    "acquisition_largest_rim": true,
+    "gates_to_pass": 1,
+    "handoff_distance_m": 5.0,
+    "lookahead_enabled": false,
+    "lookahead_start_m": 12.0,
+    "lookahead_interval_s": 0.1,
+    "lookahead_max_age_s": 2.0,
+    "lookahead_during_final": false,
+    "height_alignment": false,
+    "height_alignment_distance_m": 6.0,
+    "height_alignment_deadband_m": 0.4,
+    "camera_correction": true,
+    "camera_window_s": 0.5
+  },
+  "aggregate": {
+    "accepted_camera_position_m": {
+      "count": 103,
+      "rms": 0.09451065797641137
+    },
+    "camera_velocity_m_s": {
+      "count": 91,
+      "rms": 0.09012135496934914
+    },
+    "fused_position_m": {
+      "count": 1272,
+      "rms": 0.1247769939044952
+    },
+    "fused_velocity_m_s": {
+      "count": 1272,
+      "rms": 0.06553029933550585
+    },
+    "unfused_position_m": {
+      "count": 1272,
+      "rms": 0.24907873669031047
+    },
+    "unfused_velocity_m_s": {
+      "count": 1272,
+      "rms": 0.1073930195617148
+    },
+    "capture_to_output_ms": {
+      "count": 609,
+      "median": 30.92801200339501,
+      "p95": 40.271199789258816,
+      "maximum": 68.14361598640417
+    },
+    "velocity_fit_age_ms": {
+      "count": 91,
+      "median": 233.59543048757024,
+      "p95": 251.68987837537492,
+      "maximum": 260.7440277482098
+    }
+  },
+  "limitation": "Two one-gate simulator flights, same gate, opposite commanded starts. IMU orientation rotates camera translation into a common frame; this is not a general-scene VIO estimator."
 }

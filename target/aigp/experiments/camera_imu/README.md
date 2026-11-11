@@ -19,6 +19,16 @@ post-flight scorer. Full traces and images are temporary, capped at 128 MiB per
 trace, and deleted after normal replay and poisoned-state replay. Only small
 summaries and a camera-error CSV remain.
 
+The final frozen controller passed 2/2 one-gate runs from opposite sideways
+starts. Across those flights, corrected gate-relative position/velocity RMS
+was 0.125 m / 0.066 m/s; uncorrected IMU on the same flights was
+0.249 m / 0.107 m/s. Trusted camera observations were 0.095 m / 0.090 m/s RMS.
+Median capture-to-output age was 31 ms. The velocity fit's effective time was
+234 ms before its latest image, accounted for by the delayed IMU correction.
+Earlier failures and exact replay checks are in
+[estimation.validation.json](estimation.validation.json). These are simulator
+results for one gate; IMU orientation still supplies the common frame.
+
 From the repository root, with Python 3.11+, Wine and MinGW-w64 installed:
 
 ```sh
