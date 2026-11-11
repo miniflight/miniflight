@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-12",
+  "baseline_revision": "71626f1129f05f68b38b81fe6b72b98e46121864",
+  "tracker_source_sha256": "0f721fb2dafdaa0ab73e5649db0eb004d1d64203c039c3dcebedfd05fc796e21",
+  "command": "PYTHONPATH=. target/aigp/.runtime/client-venv/bin/python3.11 -m unittest test.patch_track",
+  "unit_tests_passed": 5,
+  "device": "macOS, native VQ1 R1 through Wine/D3DMetal",
+  "numpy": "2.4.6",
+  "opencv": "5.0.0",
+  "source": {
+    "video_sha256": "3b0f28afd8cb3d60d3f224d858fc3c081ddf62f237e3f94141a68b647979e204",
+    "rgb_sha256": "56b29ddffbecb6c0ea403f7d36d4d1b29133bef1ab0067ea0809602cc686d392",
+    "native_trace_sha256": "bf3423c18b06e54a6283e186bfea59a36f716b99d4d06cb68c1aacce697377f5",
+    "native_frame_ids": [
+      619,
+      648
+    ],
+    "lossless_decoded_camera_frames_retained": 45,
+    "raw_flight_retained": false
+  },
+  "tracker": {
+    "algorithm": "OpenCV Lucas-Kanade, consecutive frames, no pyramid",
+    "window_px": [
+      15,
+      15
+    ],
+    "inputs": "30 decoded grayscale camera images and a manually selected image coordinate; no IMU or simulator state",
+    "initial_point": [
+      305.5,
+      266.5
+    ],
+    "final_point": [
+      298.8401794433594,
+      262.03521728515625
+    ]
+  },
+  "scoring": {
+    "reference": "Fixed gate inner aperture corners, exact rendered view and fixture geometry",
+    "view_join": "view creation -> render execution -> surface read -> UDP frame identity",
+    "simulator_state_used_only_for_scoring": true
+  },
+  "checkpoint": {
+    "accepted_frames": 30,
+    "consecutive_native_frames": true,
+    "capture_span_s": 0.9672579523175955,
+    "error_rms_px": 0.5364909695545051,
+    "error_max_px": 0.8348989890090308,
+    "reverse_endpoint_error_px": 0.09263343285643,
+    "maximum_pair_cycle_px": 0.04218659922480583,
+    "displacement_px": [
+      -6.659820556640625,
+      -4.46478271484375
+    ],
+    "negative_cases": {
+      "flat": "lost_low_contrast",
+      "edge": "lost_one_dimensional"
+    },
+    "limit": "One selected gate corner in one short native approach; no camera pose or background VIO is estimated.",
+    "reference_only_for_scoring": true,
+    "passed_checkpoint": true
+  },
+  "native_flight": {
+    "one_gate_passed": true,
+    "exact_replay": true,
+    "pose_poisoned_replay": true,
+    "corrupted_pose_packets": 3086
+  },
+  "earlier_attempts": [
+    {
+      "method": "Fixed first-frame 8x8 brightness template, faint raster seam",
+      "result": "Unverified physical correspondence despite 0.11px cycle",
+      "maximum_coarse_visual_mark_disagreement_px": 2.879236
+    },
+    {
+      "method": "Fixed first-frame 8x8 brightness template, native gate corner",
+      "result": "Rejected appearance change at frame 2"
+    }
+  ],
+  "remaining": "One selected corner, one short approach. Does not estimate camera motion or close the flight-control loop."
+}
