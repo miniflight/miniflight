@@ -4,9 +4,24 @@ import numpy as np
 
 from target.aigp.experiments.camera_imu.motion import GateMotion
 from target.aigp.experiments.camera_imu.sensors import Inertial
+from target.aigp.experiments.camera_imu import vision
+from scipy.spatial.transform import Rotation
 
 
 class MotionTest(unittest.TestCase):
+    def test_camera_translation_with_independent_rotation(self):
+        motion = GateMotion()
+        center, speed = np.array([.3, -.2, 6.]), np.array([.5, -.1, .2])
+        for t in np.arange(0., .31, 1/30):
+            rotation = Rotation.from_euler("xyz", [t*.1, t*.3, -t*.2]).as_matrix()
+            camera = (vision.SQUARE+center-speed*t) @ rotation
+            pixels = camera @ vision.K.T
+            pose = vision.best_pose(pixels[:, :2]/pixels[:, 2:])
+            measured = -rotation @ pose[2]
+            np.testing.assert_allclose(measured, speed*t-center, atol=1e-6)
+            observed = motion.observe(t, measured)
+        np.testing.assert_allclose(observed["velocity"], speed, atol=1e-5)
+
     def test_acceleration_and_dropped_frames(self):
         motion = GateMotion()
         acceleration = np.array([2., -.5, .2])

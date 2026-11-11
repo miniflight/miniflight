@@ -21,6 +21,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 
 
 from . import vision
+from .motion import GateMotion
 from target.aigp.native import BASE
 
 
@@ -217,6 +218,8 @@ class GateController(BaseController):
         self.setup_started = self.setup_steady = self.acquire_started = None
         self.shift_displacement = None
         self.signal = {}
+        self.camera_motion = GateMotion(SETTINGS.get("camera_window_s", .25))
+        self.camera_observation = None
 
     def drive(self, target):
         p, v = self.inertial.position, self.inertial.velocity
@@ -229,6 +232,8 @@ class GateController(BaseController):
         return acceleration_control(self.config, acceleration, self.inertial.rotation.to_euler(), 0.)
 
     def observe(self, frame, stamp, position, rotation):
+        if SETTINGS.get("camera_correction") and self.camera_motion.observations and stamp <= self.camera_motion.observations[-1][0]:
+            return
         corners = None
         if self.previous is not None:
             guess = vision.warped(self.previous, position, rotation, "rotation_and_motion")
@@ -253,7 +258,8 @@ class GateController(BaseController):
         self.count += 1
         self.centers.append(center)
         self.centers = self.centers[-5:]
-        self.anchor = np.median(self.centers, axis=0)
+        if not SETTINGS.get("camera_correction") or self.locked is None:
+            self.anchor = np.median(self.centers, axis=0)
         self.last_image_time, self.last_image_id = stamp, frame.id
         self.last_corners = corners.copy()
         self.last_gate_corners = pose[1] @ rotation.T + position
@@ -264,6 +270,17 @@ class GateController(BaseController):
             self.direction /= np.linalg.norm(self.direction)
             self.began = self.inertial.time
             self.phase = Phase.TRACKING
+        if SETTINGS.get("camera_correction"):
+            measured = -rotation @ pose[2]
+            velocity = self.camera_motion.observe(stamp, measured)
+            delta_v = np.zeros(3)
+            if velocity is not None and np.linalg.norm(velocity["velocity"]) <= 8.:
+                delta_v = self.inertial.correct_velocity(velocity["time"], velocity["velocity"], .15)
+            delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if self.locked is not None else np.zeros(3)
+            self.camera_observation = dict(image_id=frame.id, capture_time=stamp, used_at=self.inertial.time,
+                position_relative_gate=measured.tolist(), velocity=velocity,
+                position_correction=delta_p.tolist(), velocity_correction=delta_v.tolist())
+            self.previous = (self.inertial.camera_pose(stamp)[0], rotation, corners, pose)
 
     def update(self, telemetry, frames, race_state):
         state = vehicle.state
@@ -335,4 +352,7 @@ class GateController(BaseController):
             camera_orientation=self.inertial.rotations[-1].tolist(),
             shift_displacement=self.shift_displacement.tolist(),
             motion_available=state.motion is not None, attitude_available=state.attitude is not None)
+        if SETTINGS.get("camera_correction"):
+            self.signal.update(camera_observation=self.camera_observation,
+                unfused_position=self.inertial.raw_position.tolist(), unfused_velocity=self.inertial.raw_velocity.tolist())
         return self.drive(target)

@@ -1,4 +1,4 @@
-"""Run or replay two consecutive gates with camera and IMU steering."""
+"""Camera/IMU gate flights, replay and post-flight scoring."""
 
 import argparse
 import base64
@@ -10,6 +10,8 @@ import math
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import tempfile
 import time
 
 from pymavlink.dialects.v20 import common as mavlink
@@ -217,7 +219,14 @@ def live(root, shift):
                         batch["published_ns"] = batch["rows"][-1][-1]*10**9//tap.frequency+bounds[0]
                     return batch
                 with recording(root/"flight.jsonl", metadata) as record:
-                    outcome, _ = execute(Calls(record), record, root/"native.jsonl", reader, producer, camera.read)
+                    count = 0
+                    def bounded_record(**row):
+                        nonlocal count
+                        record(**row)
+                        count += 1
+                        if count % 64 == 0 and (root/"flight.jsonl").stat().st_size > 128*1024**2:
+                            raise RuntimeError("temporary flight trace exceeded 128 MiB")
+                    outcome, _ = execute(Calls(bounded_record), bounded_record, root/"native.jsonl", reader, producer, camera.read)
                     print(json.dumps(outcome), flush=True)
     finally:
         native.prepare = prepare
@@ -229,9 +238,39 @@ def live(root, shift):
     return score(root)
 
 
+def one(root, shift):
+    """One corrected gate; remove pixels and raw traces after scoring and replay."""
+    root.mkdir(parents=True)
+    original = dict(SETTINGS)
+    SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.25, speed_m_s=2.,
+                    beyond_m=1.5, maximum_blind_s=3., flight_timeout_s=20.,
+                    lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
+    try:
+        with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
+            raw = Path(temporary)/"flight"
+            try:
+                result = live(raw, shift)
+                checked = replay(raw/"flight.jsonl", poison=True)
+                checked.pop("outcome")
+                (root/"input-independence.json").write_text(json.dumps(checked, indent=2)+"\n")
+                return result
+            except Exception as error:
+                (root/"failure.json").write_text(json.dumps(dict(type=type(error).__name__, message=str(error)), indent=2)+"\n")
+                raise
+            finally:
+                for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv"):
+                    if (raw/name).exists():
+                        shutil.copyfile(raw/name, root/name)
+                size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
+                (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")
+    finally:
+        SETTINGS.clear()
+        SETTINGS.update(original)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("build", "live", "replay", "score", "video"))
+    parser.add_argument("mode", choices=("build", "one", "live", "replay", "score", "video"))
     parser.add_argument("path", type=Path, nargs="?")
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument("--poison", action="store_true")
@@ -240,14 +279,15 @@ def main():
         print(build())
     elif args.path is None:
         parser.error("live, replay, score and video require a path")
-    elif args.mode == "live":
-        if not live(args.path.resolve(), args.shift)["passed_two_without_reset"]:
+    elif args.mode in ("live", "one"):
+        run = one if args.mode == "one" else live
+        if not run(args.path.resolve(), args.shift)["passed_without_reset"]:
             raise SystemExit(1)
     elif args.mode == "replay":
         print(json.dumps(replay(args.path.resolve(), args.poison)), flush=True)
     elif args.mode == "score":
         from .score import score
-        if not score(args.path.resolve())["passed_two_without_reset"]:
+        if not score(args.path.resolve())["passed_without_reset"]:
             raise SystemExit(1)
     else:
         from .video import render

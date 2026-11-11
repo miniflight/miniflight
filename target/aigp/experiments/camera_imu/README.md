@@ -1,5 +1,22 @@
 # camera + imu
 
+One gate with camera position/velocity correcting the IMU estimate:
+
+```sh
+python -m target.aigp.experiments.camera_imu one target/aigp/.runtime/gate-estimator/run-01 --shift -.5
+```
+
+This runs at 2 m/s. Gate size and pixels supply translation; IMU rotation puts
+measurements in one local frame. A 0.25 s camera history supplies velocity.
+Position and velocity corrections apply at their measurement times and carry
+forward through the IMU history. The first confirmed gate anchor stays fixed.
+`score.json` reports gate-relative position/velocity errors for camera, corrected
+IMU and an uncorrected IMU on the same flight, plus capture-to-controller-output
+age and the velocity fit's effective age. Simulator motion is read only by the
+post-flight scorer. Full traces and images are temporary, capped at 128 MiB per
+trace, and deleted after normal replay and poisoned-state replay. Only small
+summaries and a camera-error CSV remain.
+
 From the repository root, with Python 3.11+, Wine and MinGW-w64 installed:
 
 ```sh

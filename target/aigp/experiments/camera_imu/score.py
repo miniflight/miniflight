@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation
 
 from .controller import ALLOWED
 from .geometry import gate_openings
+from .accuracy import score_estimates
 
 
 def score(root):
@@ -20,6 +21,8 @@ def score(root):
     positions, attitudes, ticks, race, collisions, arms, outcomes = [], [], [], [], [], [], []
     accepted = set()
     resets = 0
+    settings = json.loads(path.open().readline())["metadata"]["settings"]
+    observations, previous_image, host_offset = [], None, None
     for row in map(json.loads, path.open()):
         if row["event"] == "call":
             if row["name"] == "reset":
@@ -28,6 +31,9 @@ def score(root):
                 arms.append(row["arguments"]["armed"])
             elif row["name"] == "race":
                 race.extend(row.get("result", []))
+            elif row["name"] == "producer_imu" and row.get("result", {}).get("rows"):
+                batch = row["result"]
+                host_offset = batch["published_ns"]*1e-9-batch["rows"][-1][0]*1e-6
             elif row["name"] == "poll":
                 for packet in row.get("result", []):
                     if packet["camera"]:
@@ -35,7 +41,8 @@ def score(root):
                     for message in decoder.parse_buffer(base64.b64decode(packet["wire"])) or ():
                         kind = message.get_type()
                         if kind == "LOCAL_POSITION_NED":
-                            positions.append([message.time_boot_ms*.001, message.x, message.y, message.z])
+                            positions.append([message.time_boot_ms*.001, message.x, message.y, message.z,
+                                              message.vx, message.vy, message.vz])
                         elif kind == "ATTITUDE":
                             attitudes.append([message.time_boot_ms*.001, message.roll, -message.pitch, -message.yaw])
                         elif kind == "COLLISION":
@@ -48,14 +55,19 @@ def score(root):
                 signal = row["signals"]
                 assert not signal["motion_available"] and not signal["attitude_available"]
                 ticks.append(signal)
+                observed = signal.get("camera_observation")
+                if observed is not None and observed["image_id"] != previous_image:
+                    previous_image = observed["image_id"]
+                    observations.append(dict(observed, capture_to_output_s=row["host_time"]-host_offset-observed["capture_time"]))
         elif row["event"] == "result":
             outcomes.append(row)
     assert accepted <= ALLOWED
     p = np.asarray(positions)
     clock_regressions = int(np.sum(np.diff(p[:, 0]) < 0))
     p = p[np.r_[True, np.diff(p[:, 0]) > 0]]
-    position_at = lambda t: np.array([np.interp(t, p[:, 0], col) for col in p[:, 1:].T])
-    openings = gate_openings()[:2]
+    position_at = lambda t: np.array([np.interp(t, p[:, 0], col) for col in p[:, 1:4].T])
+    requested = settings.get("gates_to_pass", 2)
+    openings = gate_openings()[:requested]
     local_to_native = Rotation.from_euler("z", attitudes[0][3]).as_matrix()
     approach = [tick for tick in ticks if tick["phase"] in ("TRACKING", "FINAL_IMU", "HANDOFF")]
     histories = {tick["imu_history_start"] for tick in approach}
@@ -77,8 +89,8 @@ def score(root):
         vertical /= np.linalg.norm(vertical)
         normal = np.cross(width, vertical)
         basis = np.array([width, vertical, normal])
-        signed = (p[:, 1:]-center) @ normal
-        indices = [i for i in np.flatnonzero(signed[:-1]*signed[1:] < 0) if np.linalg.norm(p[i, 1:]-center) < 2.]
+        signed = (p[:, 1:4]-center) @ normal
+        indices = [i for i in np.flatnonzero(signed[:-1]*signed[1:] < 0) if np.linalg.norm(p[i, 1:4]-center) < 2.]
         native = [state for state in race if state["active_gate_index"] >= number]
         gate = dict(gate=number, native_pass=bool(native and native[0]["valid"]), crossing_imu_time_s=None)
         gate_ticks = [tick for tick in ticks if tick.get("gate_number") == number and tick["phase"] in ("TRACKING", "FINAL_IMU")]
@@ -107,11 +119,15 @@ def score(root):
                     estimated_gate_error_width_down_normal_m=(basis @ (estimate-truth)).tolist())
         result["gates"].append(gate)
     passed = all(gate["native_pass"] and gate["crossing_imu_time_s"] is not None for gate in result["gates"])
-    result["passed_two_without_reset"] = (passed and result["controller_error"] is None
+    result["passed_without_reset"] = (passed and result["controller_error"] is None
         and result["controller_phase"] == "COMPLETE" and result["valid_race"] and not collisions
         and resets == 0 and arms == [True, False] and clock_regressions == 0 and len(histories) == 1)
-    if result["passed_two_without_reset"]:
+    if requested == 2:
+        result["passed_two_without_reset"] = result["passed_without_reset"]
+    if requested == 2 and result["passed_without_reset"]:
         result["time_between_crossings_s"] = result["gates"][1]["crossing_imu_time_s"]-result["gates"][0]["crossing_imu_time_s"]
+    if settings.get("camera_correction"):
+        result["estimation"] = score_estimates(root, p, approach, openings[0].mean(axis=0), local_to_native, observations)
     (root/"score.json").write_text(json.dumps(result, indent=2)+"\n")
     print(json.dumps(result, indent=2))
     return result
