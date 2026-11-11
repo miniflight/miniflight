@@ -279,7 +279,8 @@ class GateController(BaseController):
             delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if self.locked is not None else np.zeros(3)
             self.camera_observation = dict(image_id=frame.id, capture_time=stamp, used_at=self.inertial.time,
                 position_relative_gate=measured.tolist(), velocity=velocity,
-                position_correction=delta_p.tolist(), velocity_correction=delta_v.tolist())
+                position_correction=delta_p.tolist(), velocity_correction=delta_v.tolist(),
+                corners=corners.tolist(), reprojection_rmse_px=float(pose[0]))
             self.previous = (self.inertial.camera_pose(stamp)[0], rotation, corners, pose)
 
     def update(self, telemetry, frames, race_state):
