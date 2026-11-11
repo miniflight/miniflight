@@ -16,7 +16,8 @@ def statistics(values):
 def score_estimates(root, motion, ticks, center, rotation, observations):
     truth = lambda stamp, start: np.array([np.interp(stamp, motion[:, 0], col) for col in motion[:, start:start+3].T])
     errors = {key: [] for key in ("camera_position_m", "camera_velocity_m_s", "fused_position_m", "fused_velocity_m_s",
-                                  "unfused_position_m", "unfused_velocity_m_s", "capture_to_output_ms", "velocity_fit_age_ms")}
+                                  "unfused_position_m", "unfused_velocity_m_s", "capture_to_output_ms", "velocity_fit_age_ms",
+                                  "accepted_camera_position_m")}
     rows = []
     for tick in ticks:
         if "unfused_position" not in tick:
@@ -33,6 +34,8 @@ def score_estimates(root, motion, ticks, center, rotation, observations):
         stamp = observed["capture_time"]
         position_error = rotation @ observed["position_relative_gate"]-(truth(stamp, 1)-center)
         errors["camera_position_m"].append(np.linalg.norm(position_error))
+        if observed.get("correction_enabled"):
+            errors["accepted_camera_position_m"].append(np.linalg.norm(position_error))
         row = dict(image_id=observed["image_id"], capture_time=stamp,
                    position_error_m=float(np.linalg.norm(position_error)),
                    capture_to_output_ms=observed["capture_to_output_s"]*1000,

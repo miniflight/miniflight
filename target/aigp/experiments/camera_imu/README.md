@@ -9,7 +9,9 @@ python -m target.aigp.experiments.camera_imu one target/aigp/.runtime/gate-estim
 This runs at 2 m/s. Gate size and pixels supply translation; IMU rotation puts
 measurements in one local frame. A 0.25 s camera history supplies velocity.
 Position and velocity corrections apply at their measurement times and carry
-forward through the IMU history. The first confirmed gate anchor stays fixed.
+forward through the IMU history. Corrections require all aperture sides to be
+at least 60 pixels long and reprojection RMS at most 1 pixel. The gate anchor
+stays fixed after the first frame meeting those conditions.
 `score.json` reports gate-relative position/velocity errors for camera, corrected
 IMU and an uncorrected IMU on the same flight, plus capture-to-controller-output
 age and the velocity fit's effective age. Simulator motion is read only by the

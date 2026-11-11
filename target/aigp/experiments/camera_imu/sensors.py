@@ -220,6 +220,7 @@ class GateController(BaseController):
         self.signal = {}
         self.camera_motion = GateMotion(SETTINGS.get("camera_window_s", .25))
         self.camera_observation = None
+        self.camera_fusion_started = False
 
     def drive(self, target):
         p, v = self.inertial.position, self.inertial.velocity
@@ -258,7 +259,7 @@ class GateController(BaseController):
         self.count += 1
         self.centers.append(center)
         self.centers = self.centers[-5:]
-        if not SETTINGS.get("camera_correction") or self.locked is None:
+        if not SETTINGS.get("camera_correction") or not self.camera_fusion_started:
             self.anchor = np.median(self.centers, axis=0)
         self.last_image_time, self.last_image_id = stamp, frame.id
         self.last_corners = corners.copy()
@@ -272,15 +273,21 @@ class GateController(BaseController):
             self.phase = Phase.TRACKING
         if SETTINGS.get("camera_correction"):
             measured = -rotation @ pose[2]
-            velocity = self.camera_motion.observe(stamp, measured)
+            side_px = float(np.min(np.linalg.norm(np.roll(corners, -1, axis=0)-corners, axis=1)))
+            trusted = self.locked is not None and side_px >= 60. and pose[0] <= 1.
+            if trusted and not self.camera_fusion_started:
+                self.camera_motion.observations.clear()
+                self.camera_fusion_started = True
+            velocity = self.camera_motion.observe(stamp, measured) if trusted else None
             delta_v = np.zeros(3)
             if velocity is not None and np.linalg.norm(velocity["velocity"]) <= 8.:
                 delta_v = self.inertial.correct_velocity(velocity["time"], velocity["velocity"], .15)
-            delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if self.locked is not None else np.zeros(3)
+            delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if trusted else np.zeros(3)
             self.camera_observation = dict(image_id=frame.id, capture_time=stamp, used_at=self.inertial.time,
                 position_relative_gate=measured.tolist(), velocity=velocity,
                 position_correction=delta_p.tolist(), velocity_correction=delta_v.tolist(),
-                corners=corners.tolist(), reprojection_rmse_px=float(pose[0]))
+                corners=corners.tolist(), reprojection_rmse_px=float(pose[0]),
+                minimum_side_px=side_px, correction_enabled=trusted)
             self.previous = (self.inertial.camera_pose(stamp)[0], rotation, corners, pose)
 
     def update(self, telemetry, frames, race_state):
