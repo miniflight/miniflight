@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from target.aigp.experiments.patch_track import track
+from target.aigp.experiments.patch_track import seeds, track
 
 
 class PatchTest(unittest.TestCase):
@@ -16,6 +16,15 @@ class PatchTest(unittest.TestCase):
         result = track([self.image(), self.image(.35, -.2)], [32., 32.])[-1]
         self.assertEqual(result["status"], "tracked")
         np.testing.assert_allclose(result["point"], [32.35, 31.8], atol=.15)
+
+    def test_seed_coverage_and_blank(self):
+        image = np.zeros((120, 160), dtype=np.uint8)
+        self.assertEqual(len(seeds(image)), 0)
+        for y in range(3):
+            for x in range(4):
+                image[y*40+18:y*40+25, x*40+18:x*40+25] = 200
+        occupied = {(int(x//40), int(y//40)) for x, y in seeds(image)}
+        self.assertEqual(len(occupied), 12)
 
     def test_reject_missing_information(self):
         flat = np.full((64, 64), 80.)

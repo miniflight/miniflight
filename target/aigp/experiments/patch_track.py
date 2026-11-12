@@ -4,6 +4,21 @@ import cv2
 import numpy as np
 
 
+def seeds(image, columns=4, rows=3, per_cell=8):
+    """Choose image corners in separate cells, rather than one textured object."""
+    height, width = image.shape
+    points = []
+    for y in range(rows):
+        for x in range(columns):
+            mask = np.zeros_like(image, dtype=np.uint8)
+            mask[y*height//rows+10:(y+1)*height//rows-10,
+                 x*width//columns+10:(x+1)*width//columns-10] = 255
+            found = cv2.goodFeaturesToTrack(image, per_cell, .01, 18, mask=mask, blockSize=7)
+            if found is not None:
+                points.extend(found.reshape(-1, 2))
+    return np.asarray(points, dtype=float).reshape(-1, 2)
+
+
 def sample(image, centers, side=8):
     """Bilinear samples; centers use pixel-center coordinates."""
     centers = np.asarray(centers, dtype=float).reshape(-1, 2)
