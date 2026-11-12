@@ -72,12 +72,15 @@ def landmark_covariance(point, rotations, positions, intrinsics, pixel_sigma=.3)
     return (vt.T/singular**2) @ vt
 
 
-def map_pose(world, pixels, intrinsics, rotation, position, pixel_sigma=.3, rotation_sigma=np.pi/180):
+def map_pose(world, pixels, intrinsics, rotation, position, pixel_sigma=.3, rotation_sigma=np.pi/180,
+             landmark_covariances=None):
     """Position and rotation from mapped points with a soft gyro rotation prior.
 
     Rotation maps world into camera axes. Return position, corrected rotation,
     pixel RMS and the fitted rotation correction; return None on failure.
     The prior sigmas are in pixels and radians, respectively.
+    Optional landmark covariances are projected at the supplied initial pose;
+    these observation weights remain fixed during this fit.
     """
     import cv2
     from scipy.optimize import least_squares
@@ -85,19 +88,27 @@ def map_pose(world, pixels, intrinsics, rotation, position, pixel_sigma=.3, rota
     if len(world) < 6:
         return None
     world, pixels = np.asarray(world), np.asarray(pixels)
+    whitening = None
+    if landmark_covariances is not None:
+        camera = (world-position) @ rotation.T
+        jacobian = projection_jacobians(camera, intrinsics) @ rotation
+        variance = pixel_sigma**2*np.eye(2)+jacobian @ landmark_covariances @ jacobian.transpose(0, 2, 1)
+        whitening = np.linalg.inv(np.linalg.cholesky(variance))
     def residual(value):
         correction, _ = cv2.Rodrigues(value[3:])
         camera = (world-value[:3]) @ (correction @ rotation).T
         projected = camera @ intrinsics.T
-        error = (projected[:, :2]/projected[:, 2:]-pixels).ravel()/pixel_sigma
-        return np.r_[error, value[3:]/rotation_sigma]
+        error = projected[:, :2]/projected[:, 2:]-pixels
+        weighted = error/pixel_sigma if whitening is None else np.einsum('nij,nj->ni', whitening, error)
+        return np.r_[weighted.ravel(), value[3:]/rotation_sigma]
     fit = least_squares(residual, np.r_[position, np.zeros(3)], loss='huber',
                         f_scale=.8/pixel_sigma, x_scale=[1., 1., 1., .01, .01, .01])
     corrected = cv2.Rodrigues(fit.x[3:])[0] @ rotation
     camera = (world-fit.x[:3]) @ corrected.T
     if not fit.success or not np.isfinite(fit.x).all() or np.any(camera[:, 2] <= 0):
         return None
-    rms = float(np.sqrt(np.mean((residual(fit.x)[:-3]*pixel_sigma)**2)))
+    projected = camera @ intrinsics.T
+    rms = float(np.sqrt(np.mean((projected[:, :2]/projected[:, 2:]-pixels)**2)))
     return fit.x[:3], corrected, rms, fit.x[3:]
 
 

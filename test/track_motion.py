@@ -7,6 +7,26 @@ from miniflight.vision import landmark_covariance, map_pose, translation_directi
 
 
 class TranslationTest(unittest.TestCase):
+    def test_uncertain_landmarks_do_not_pull_the_pose(self):
+        rng = np.random.default_rng(31)
+        k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1]])
+        true = rng.uniform([-3., -2., 5.], [3., 2., 30.], (40, 3))
+        position = np.array([1., -.3, .8])
+        camera = true-position
+        h = camera @ k.T
+        pixels = h[:, :2]/h[:, 2:]
+        mapped = true.copy()
+        mapped[20:] += [8., -5., 12.]
+        covariance = np.zeros((40, 3, 3))
+        covariance[20:] = np.eye(3)*1e6
+        weighted = map_pose(mapped, pixels, k, np.eye(3), position+[.1, .1, .1], landmark_covariances=covariance)
+        np.testing.assert_allclose(weighted[0], position, atol=.001)
+        uniform = map_pose(mapped, pixels, k, np.eye(3), position+[.1, .1, .1])
+        self.assertGreater(np.linalg.norm(uniform[0]-position), .1)
+        clean = map_pose(true, pixels, k, np.eye(3), position+[.1, .1, .1])
+        zero = map_pose(true, pixels, k, np.eye(3), position+[.1, .1, .1], landmark_covariances=covariance*0)
+        np.testing.assert_allclose(clean[0], zero[0], atol=1e-6)
+
     def test_depth_covariance_matches_pixel_noise(self):
         rng = np.random.default_rng(19)
         k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1]])
