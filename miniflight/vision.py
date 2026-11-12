@@ -52,6 +52,26 @@ def triangulate_views(pixels, rotations, positions, intrinsics):
     return point if np.all(camera[:, 2] > 0) else None
 
 
+def projection_jacobians(camera, intrinsics):
+    """Derivative of image coordinates with respect to camera XYZ, per point."""
+    h = np.asarray(camera) @ intrinsics.T
+    return (intrinsics[None, :2, :]*h[:, 2, None, None]
+            -h[:, :2, None]*intrinsics[None, 2:3, :])/h[:, 2, None, None]**2
+
+
+def landmark_covariance(point, rotations, positions, intrinsics, pixel_sigma=.3):
+    """Conditional XYZ covariance for fixed camera poses and independent pixel noise."""
+    rotations, positions = np.asarray(rotations), np.asarray(positions)
+    camera = np.einsum('nij,nj->ni', rotations, np.asarray(point)-positions)
+    if len(camera) < 2 or np.any(camera[:, 2] <= 0):
+        return None
+    jacobian = (projection_jacobians(camera, intrinsics) @ rotations).reshape(-1, 3)/pixel_sigma
+    _, singular, vt = np.linalg.svd(jacobian, full_matrices=False)
+    if singular[-1] < 1e-10:
+        return None
+    return (vt.T/singular**2) @ vt
+
+
 def map_pose(world, pixels, intrinsics, rotation, position, pixel_sigma=.3, rotation_sigma=np.pi/180):
     """Position and rotation from mapped points with a soft gyro rotation prior.
 

@@ -3,10 +3,28 @@ import unittest
 import cv2
 import numpy as np
 
-from miniflight.vision import map_pose, translation_direction, triangulate_views
+from miniflight.vision import landmark_covariance, map_pose, translation_direction, triangulate_views
 
 
 class TranslationTest(unittest.TestCase):
+    def test_depth_covariance_matches_pixel_noise(self):
+        rng = np.random.default_rng(19)
+        k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1]])
+        point = np.array([2., .7, 30.])
+        times = np.linspace(0, 1, 12)
+        positions = np.column_stack((times*2, times*.2, times*.4))
+        rotations = np.repeat(np.eye(3)[None], 12, axis=0)
+        camera = point-positions
+        h = camera @ k.T
+        pixels = h[:, :2]/h[:, 2:]
+        predicted = landmark_covariance(point, rotations, positions, k, .2)
+        samples = [triangulate_views(pixels+rng.normal(0, .2, pixels.shape), rotations, positions, k) for _ in range(300)]
+        empirical = np.cov(np.array(samples).T)
+        np.testing.assert_allclose(np.diag(empirical)/np.diag(predicted), np.ones(3), atol=.25)
+        weak = landmark_covariance(point, rotations, positions*.1, k, .2)
+        self.assertGreater(weak[2, 2], predicted[2, 2]*70)
+        self.assertIsNone(landmark_covariance(point, rotations, np.zeros_like(positions), k, .2))
+
     def test_image_points_correct_gyro_bias(self):
         rng = np.random.default_rng(8)
         world = rng.uniform([-3., -2., 5.], [3., 2., 30.], (50, 3))
