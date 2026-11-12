@@ -16,6 +16,8 @@ python -m target.aigp.experiments.camera_imu.background_score FLIGHT SENSORS
 
 `background SENSORS --map-uncertainty` compares covariance-weighted `multi`
 against the original twelve-view fit as `uniform`, using the same map points.
+The mixed fresh-turn result is in [uncertainty.validation.json](uncertainty.validation.json);
+weighting remains optional.
 
 Two fresh turn comparisons are in [multiview.validation.json](multiview.validation.json).
 The background estimator runs in replay; it does not drive the flight controller.

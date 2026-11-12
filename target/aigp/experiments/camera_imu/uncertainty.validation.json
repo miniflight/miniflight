@@ -1,0 +1,193 @@
+{
+  "date": "2026-11-12",
+  "protocol": {
+    "frozen_before_fresh_flights": true,
+    "candidate": "Twelve-view landmark covariance projected into each current pixel observation",
+    "conditional_on": "Fixed calibration camera poses and independent pixel noise; excludes shared trajectory and tracking correlations",
+    "calibration_frames": [
+      0,
+      59
+    ],
+    "holdout_frames": [
+      60,
+      119
+    ],
+    "depth_views": 12,
+    "base_pixel_sigma": 0.3,
+    "map_covariance_pixel_sigma": "max(0.3, calibration landmark reprojection RMS)",
+    "weights": "Anisotropic 2x2 projected covariance + 0.3px observation variance; weights fixed during each pose solve",
+    "gyro_prior_sigma_deg": 1.0,
+    "same_background_points_and_initial_state_for_every_method": true,
+    "pose_methods": [
+      "two",
+      "uniform",
+      "multi"
+    ],
+    "primary_baseline": "uniform: the previous twelve-view estimator",
+    "acceptance": "All 60 frames estimated and weighted RMS lower than uniform RMS in both fresh turn directions",
+    "turn": {
+      "start_after_lock_s": 7.75,
+      "duration_s": 1.5,
+      "velocity_angle_deg": 25.0,
+      "signs": [
+        1,
+        -1
+      ]
+    },
+    "gate_pose_updates_after_calibration": false,
+    "simulator_pose_only_for_scoring": true,
+    "sha256": {
+      "miniflight/vision.py": "1212f54a02626b64e3005cee6dfaf8ed35bb0af5b251b82774c1acaea9a27644",
+      "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+      "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+      "target/aigp/experiments/patch_track.py": "3a87c919be6a6648a8848eee938fcc90e9809f8def699dce63e2a8d0d04b6eb3"
+    }
+  },
+  "unit_tests_passed": 19,
+  "covariance_monte_carlo": {
+    "samples": 300,
+    "pixel_noise_sigma": 0.2,
+    "maximum_standardized_covariance_discrepancy": 0.06196853536411493,
+    "predicted": [
+      [
+        0.00010142583304538936,
+        4.380179246074199e-05,
+        0.002178252744493999
+      ],
+      [
+        4.380179246074199e-05,
+        5.536218797592386e-05,
+        0.0013156592904055434
+      ],
+      [
+        0.002178252744493999,
+        0.0013156592904055434,
+        0.06542742429350244
+      ]
+    ],
+    "empirical": [
+      [
+        9.933747377279164e-05,
+        4.733500317338431e-05,
+        0.0020530284820723626
+      ],
+      [
+        4.733500317338431e-05,
+        5.622743743133252e-05,
+        0.0014335983787068926
+      ],
+      [
+        0.0020530284820723626,
+        0.0014335983787068926,
+        0.06213666412685577
+      ]
+    ]
+  },
+  "default_estimator": "Original twelve-view fit without landmark covariance weighting",
+  "original_estimator_remains_default": true,
+  "native_pose_used_only_for_scoring": true,
+  "live_control_integration": false,
+  "fresh": [
+    {
+      "direction": "right",
+      "revision": "539bb089635ee8ea31465eecde6722bcdd17e15a",
+      "input_sha256": {
+        "camera-input.json": "6d577505cecb35c3d4a7be7cc9dbacae94d04f3862b3fbf0cdef9db49a76fd95",
+        "gyro-input.json": "8930a614366c1b80bbaa8ef8378e4c418245e83af0048567d1f1072d4bfe5c1d",
+        "source-lossless.mp4": "75bdb2feeb6c767cb0d9557a378cfa0e016ec737623bd7d2feddf40533d30e8f"
+      },
+      "estimate_sha256": "658778652e03d31b2f123ff4ad1a301d4cac45f9a7075bb7b815f1f993a69801",
+      "background_points": 24,
+      "conditional_relative_depth_sigma_min_median_p95": [
+        0.05627433986321493,
+        0.14865660716254314,
+        0.19134967692641955
+      ],
+      "frames": 60,
+      "constant_velocity_rms_m": 0.6168838568525526,
+      "two_view_rms_m": 0.2639247984944203,
+      "original_twelve_view_rms_m": 0.26355679527097886,
+      "uncertainty_weighted_rms_m": 0.21766540166598478,
+      "original_final_error_m": 0.3497796146388383,
+      "weighted_final_error_m": 0.3273764566850001,
+      "improved_original": true,
+      "actual_turn": {
+        "maximum_heading_change_deg": 27.5211900477654,
+        "maximum_lateral_departure_m": 1.1996221643376235,
+        "positive_turn_angle_max_deg": 27.5211900477654,
+        "negative_turn_angle_min_deg": 0.06656835330782057
+      },
+      "native_gate_pass": true,
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 2981,
+      "controller_packets": [
+        "COMMAND_ACK",
+        "HEARTBEAT",
+        "HIGHRES_IMU"
+      ],
+      "temporary_bytes_removed": 98138787
+    },
+    {
+      "direction": "left",
+      "revision": "858f0637ec66edd1cf5358e834e14c2f2bcf7cc4",
+      "input_sha256": {
+        "camera-input.json": "18aed22555267d0c74523232be91797d708863ab0965e0df5c941d21d4121e24",
+        "gyro-input.json": "6dbbd77b605b40d71a5ee1c6a921de7880adb484288e60fffd218574b1889eba",
+        "source-lossless.mp4": "7819c3e769d17e9b7fa5414e6a5f91c1d13bfab0ee7651e1fdbfd22419fb0ebf"
+      },
+      "estimate_sha256": "6bac8652d36190185aa5e872ca130c92a45846fd7a34b35c0b251c12a0d44a53",
+      "background_points": 27,
+      "conditional_relative_depth_sigma_min_median_p95": [
+        0.050136386004563986,
+        0.12131360969485354,
+        0.17899287290287577
+      ],
+      "frames": 60,
+      "constant_velocity_rms_m": 0.5952974699741528,
+      "two_view_rms_m": 0.21698505455659464,
+      "original_twelve_view_rms_m": 0.25527638003952824,
+      "uncertainty_weighted_rms_m": 0.2596887261097889,
+      "original_final_error_m": 0.36143372531114587,
+      "weighted_final_error_m": 0.400066334910556,
+      "improved_original": false,
+      "actual_turn": {
+        "maximum_heading_change_deg": 25.847140648463025,
+        "maximum_lateral_departure_m": 1.1680445364983698,
+        "positive_turn_angle_max_deg": -0.033895484671770906,
+        "negative_turn_angle_min_deg": -25.847140648463025
+      },
+      "native_gate_pass": true,
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 3206,
+      "controller_packets": [
+        "COMMAND_ACK",
+        "HEARTBEAT",
+        "HIGHRES_IMU"
+      ],
+      "temporary_bytes_removed": 98083839
+    }
+  ],
+  "development": [
+    {
+      "direction": "right",
+      "original_rms_m": 0.30040099218748967,
+      "weighted_rms_m": 0.3299407538959614
+    },
+    {
+      "direction": "left",
+      "original_rms_m": 0.22821045260110678,
+      "weighted_rms_m": 0.23096411733315828
+    }
+  ],
+  "accepted": false,
+  "assessment": "Mixed fresh result: right improves about 26cm to 22cm RMS; left changes about 25cm to 26cm. The predeclared two-direction acceptance rule is not met; weighting remains optional.",
+  "limitations": "Conditional independent-pixel covariance excludes shared camera-trajectory uncertainty and correlated tracking errors. The experiment does not establish these as the cause of residual drift.",
+  "retention": {
+    "raw_recordings_retained": false,
+    "raw_bytes_removed": 196222626,
+    "retained_bytes": 39367594
+  }
+}
