@@ -32,6 +32,26 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
     return None if pose is None else (pose[0], pose[2])
 
 
+def triangulate_views(pixels, rotations, positions, intrinsics):
+    """One world point from multiple views, or None for unobservable depth.
+
+    Rotations map world vectors into camera axes; positions are camera centers
+    in the same world frame. Camera translations set the reconstruction's scale.
+    """
+    if len(pixels) < 2:
+        return None
+    projection = np.array([intrinsics @ np.column_stack((r, -r @ p))
+                           for r, p in zip(rotations, positions, strict=True)])
+    pixels = np.asarray(pixels)
+    design = (pixels[:, :, None]*projection[:, None, 2, :]-projection[:, :2, :]).reshape(-1, 4)
+    _, singular, vt = np.linalg.svd(design, full_matrices=False)
+    if singular[-2] < 1e-10 or abs(vt[-1, 3]) < 1e-10:
+        return None
+    point = vt[-1, :3]/vt[-1, 3]
+    camera = np.array([r @ (point-p) for r, p in zip(rotations, positions, strict=True)])
+    return point if np.all(camera[:, 2] > 0) else None
+
+
 def translation_direction(previous, current, intrinsics, rotation):
     """Unit camera displacement in previous-camera axes, with supplied rotation.
 
