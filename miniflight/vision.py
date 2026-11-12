@@ -32,6 +32,31 @@ def relative_rotation(previous, current, intrinsics, threshold_px=1.0):
     return None if pose is None else (pose[0], pose[2])
 
 
+def translation_direction(previous, current, intrinsics, rotation):
+    """Unit camera displacement in previous-camera axes, with supplied rotation.
+
+    Return (direction, positive-depth mask, singular values), or None for
+    insufficient constraints. Rotation maps previous-camera to current-camera
+    axes. Correspondences must describe a static scene; reject outliers before
+    this least-squares fit. Magnitude is unknown, and weak parallax is unreliable.
+    """
+    if len(previous) < 3:
+        return None
+    inverse = np.linalg.inv(intrinsics)
+    a, b = (np.column_stack((points, np.ones(len(points)))) @ inverse.T
+            for points in (previous, current))
+    rotated = a @ rotation.T
+    _, singular, vt = np.linalg.svd(np.cross(rotated, b), full_matrices=False)
+    if singular[1] < 1e-10:
+        return None
+    direction = vt[-1]
+    depths = np.array([np.linalg.lstsq(np.column_stack((u, -v)), direction, rcond=None)[0]
+                       for u, v in zip(rotated, b, strict=True)])
+    if np.sum(np.all(depths < 0, axis=1)) > np.sum(np.all(depths > 0, axis=1)):
+        direction, depths = -direction, -depths
+    return rotation.T @ direction, np.all(depths > 0, axis=1), singular
+
+
 def parallax_angles(previous, current, rotation):
     """Return per-point parallax in radians for matching nonzero N-by-3 rays.
 
