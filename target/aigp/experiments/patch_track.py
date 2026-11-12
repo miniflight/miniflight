@@ -40,13 +40,16 @@ def texture(patch):
                               [np.mean(gx*gy), np.mean(gy*gy)]])
 
 
-def track(images, seed, side=15):
-    """Track consecutive grayscale frames; stop at the first rejected estimate.
+def track(images, seed, side=15, anchor_first=False):
+    """Track grayscale frames; stop at the first rejected estimate.
 
+    Keep the first image as reference when anchor_first is set; otherwise use
+    adjacent frames. The previous estimate initializes the anchored search.
     A cycle is a consistency check, not independent evidence of correspondence.
     No camera pose, gate geometry, timestamps or simulator state enters here.
     """
     point = np.asarray(seed, dtype=np.float32).reshape(1, 1, 2)
+    anchor = point.copy()
     parameters = dict(winSize=(side, side), maxLevel=0,
                       criteria=(cv2.TERM_CRITERIA_COUNT | cv2.TERM_CRITERIA_EPS, 30, .001))
     rows = []
@@ -56,16 +59,20 @@ def track(images, seed, side=15):
         row = dict(frame=index, status="tracked")
         try:
             if previous is not None:
-                next_point, good, error = cv2.calcOpticalFlowPyrLK(previous, image, point, None, **parameters)
+                source = anchor if anchor_first else point
+                flags = cv2.OPTFLOW_USE_INITIAL_FLOW if anchor_first else 0
+                guess = point.copy() if anchor_first else None
+                next_point, good, error = cv2.calcOpticalFlowPyrLK(previous, image, source, guess, flags=flags, **parameters)
                 if not good[0, 0] or not np.isfinite(next_point).all():
                     rows.append(dict(row, status="lost_flow"))
                     break
-                back, reverse_good, _ = cv2.calcOpticalFlowPyrLK(image, previous, next_point, None, **parameters)
+                guess = source.copy() if anchor_first else None
+                back, reverse_good, _ = cv2.calcOpticalFlowPyrLK(image, previous, next_point, guess, flags=flags, **parameters)
                 if not reverse_good[0, 0] or not np.isfinite(back).all():
                     rows.append(dict(row, status="lost_cycle"))
                     break
                 row.update(point=next_point.ravel().tolist(), photometric_mae=float(error[0, 0]),
-                           cycle_px=float(np.linalg.norm(back-point)))
+                           cycle_px=float(np.linalg.norm(back-source)))
                 if row["cycle_px"] > 1.:
                     row["status"] = "lost_cycle"
                 elif row["photometric_mae"] > 20.:
@@ -85,5 +92,6 @@ def track(images, seed, side=15):
         rows.append(row)
         if row["status"] != "tracked":
             break
-        previous = image
+        if previous is None or not anchor_first:
+            previous = image
     return rows

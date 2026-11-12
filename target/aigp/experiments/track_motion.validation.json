@@ -1,0 +1,140 @@
+{
+  "date": "2026-11-12",
+  "unit_tests": 8,
+  "tracker_window_px": 15,
+  "device": "macOS, native VQ1 R1 through Wine/D3DMetal; offline image and gyro analysis",
+  "versions": {
+    "opencv": "5.0.0",
+    "numpy": "2.4.6"
+  },
+  "sources": {
+    "miniflight/vision.py": "4f35a4646ab15920ddd3b3bcd1a99661320cef79083fedc6d21ffc750a24ebf2",
+    "target/aigp/experiments/patch_track.py": "3a87c919be6a6648a8848eee938fcc90e9809f8def699dce63e2a8d0d04b6eb3"
+  },
+  "motion_fit": {
+    "robust_samples": 256,
+    "seed": 0,
+    "sampson_threshold_px": 0.8,
+    "minimum_inliers": 24,
+    "minimum_cells": 6,
+    "minimum_median_derotated_flow_px": 1.5,
+    "maximum_leave_one_cell_out_deg": 10,
+    "minimum_positive_depth_fraction": 0.8
+  },
+  "map_fit": {
+    "scale": "1.5m gate aperture from camera pixels at first accepted frame and frame 59",
+    "fixed_tracker_mask": {
+      "x": [
+        224,
+        416
+      ],
+      "y": [
+        216,
+        360
+      ]
+    },
+    "withheld_gate_after_frame": 59,
+    "minimum_map_parallax_px": 1.5,
+    "maximum_triangulation_reprojection_px": 0.8,
+    "minimum_visible_points": 6,
+    "position_fit": "Three translation variables with gyro rotation fixed, Huber loss at .8px"
+  },
+  "flights": [
+    {
+      "name": "native-check",
+      "shift_m": -0.5,
+      "capture_revision": "0796f007d3f2b2eefb38ac61a7235106087184e6",
+      "input_sha256": {
+        "source-lossless.mp4": "2c424db9a6a42300d46e985cd25a245c023b5ab525ab90cd5c26998aadaec782",
+        "camera-input.json": "3b6aa123aeda2d9e20a7b3189a50e268bf737d36c366ca647ea1aa1937c70d27",
+        "gyro-input.json": "4a803c54c092525582ee785c6a9a05c000499f08dd9702973eae83381a7eea68"
+      },
+      "selected_points": 92,
+      "surviving_frames_30_60_90": {
+        "30": 81,
+        "60": 79,
+        "90": 76
+      },
+      "accepted_motion": {
+        "window_s": 2.9656189996749163,
+        "direction_error_deg": 4.883441472193723,
+        "without_gyro_error_deg": 105.02527875934045,
+        "gate_excluded_direction_error_deg": 5.476805006961495,
+        "gate_excluded_without_gyro_error_deg": 101.86702724354532,
+        "gyro_rotation_error_deg": 0.008262176409626414
+      },
+      "metric_background_map": {
+        "initialization_frames": [
+          0,
+          59
+        ],
+        "mapped_points": 28,
+        "holdout_frames": 30,
+        "adjacent_reference_rms_m": 0.3293851493801472,
+        "fixed_reference_rms_m": 0.10757353359550692,
+        "gyro_rectified_fixed_reference_rms_m": 0.11776502449426222,
+        "constant_velocity_rms_m": 0.07518242368064,
+        "fixed_reference_final_error_m": 0.08872844992870815,
+        "accepted_for_control": false
+      },
+      "native_gate_pass": true,
+      "exact_native_replay": true,
+      "pose_poisoned_replay": true,
+      "temporary_recording_bytes_removed": 95811297,
+      "raw_recording_retained": false
+    },
+    {
+      "name": "heldout-right",
+      "shift_m": 0.5,
+      "capture_revision": "7fc8129751f46a187e2486a84f3e3d6cefa98ff7",
+      "input_sha256": {
+        "source-lossless.mp4": "e64ae67a9f4754c158cd9043f99d0e869ed84c69b4aa47dd814cd3d53f397a48",
+        "camera-input.json": "81952d2ad8f5149880f3da3f8d3d83c23500325782022008422652ea8a7cc00d",
+        "gyro-input.json": "dcccf5b01f932931bb6212cbc11e5aff1d037a997d16ddc37901b2fa5ae6d9c2"
+      },
+      "selected_points": 94,
+      "surviving_frames_30_60_90": {
+        "30": 86,
+        "60": 85,
+        "90": 75
+      },
+      "accepted_motion": {
+        "window_s": 2.9655477479100227,
+        "direction_error_deg": 0.554126488654326,
+        "without_gyro_error_deg": 101.11221142842211,
+        "gate_excluded_direction_error_deg": 5.644805131912788,
+        "gate_excluded_without_gyro_error_deg": 99.82598952401685,
+        "gyro_rotation_error_deg": 0.01660652047277979
+      },
+      "metric_background_map": {
+        "initialization_frames": [
+          6,
+          59
+        ],
+        "mapped_points": 27,
+        "holdout_frames": 30,
+        "adjacent_reference_rms_m": 0.25158460747499095,
+        "fixed_reference_rms_m": 0.24322977137112756,
+        "gyro_rectified_fixed_reference_rms_m": 0.25275296671358666,
+        "constant_velocity_rms_m": 0.06164577186654102,
+        "fixed_reference_final_error_m": 0.06247765759787819,
+        "accepted_for_control": false
+      },
+      "native_gate_pass": true,
+      "exact_native_replay": true,
+      "pose_poisoned_replay": true,
+      "temporary_recording_bytes_removed": 96896684,
+      "raw_recording_retained": false
+    }
+  ],
+  "assessment": "Background direction is recovered in two short native flights. Keeping reference pixels fixed improves position on the first clip but barely changes the second. Rectifying patches with gyro rotation does not improve either RMS. Metric background position remains worse than constant velocity on both flights. No control integration.",
+  "limitations": "Two approaches to the same gate; short motion windows rejected by a conservative parallax threshold. Map initialized from two gate poses; only one second with gate measurements withheld. No full VIO or race claim.",
+  "experiment_scripts_sha256": {
+    "track.py": "c5b87ec8487bbe009c8f491a97cd44955fc4da3cb0c81047a591b04c314c7308",
+    "score_map.py": "5531ab9999ca07c83343bfcb0eb76024ad497b67c4acd8888d89503133c791bc",
+    "map.py": "ce52466d504d27c6565e2364cdb2528add509d6becd0dba130c74d3ef3f126f6",
+    "capture.py": "c3ef88ea99db0f26d07331d06dacff72a77edb34fd0431ec0cbb18e155c6ce1f",
+    "estimate.py": "fa5463c3cd8b151ec75463dbaa04f542290c96f42ac5a7160df3f45d8c97f242",
+    "score.py": "f0b718b7e40f0c87de66b25e1426f674a09bc62718f0826d2800e7a2c0a80d68"
+  }
+}

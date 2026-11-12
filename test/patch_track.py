@@ -42,12 +42,15 @@ class PatchTest(unittest.TestCase):
         self.assertEqual(track([self.image()], [2., 2.])[0]["status"], "lost_outside_image")
 
     def test_sequence_and_independent_reverse(self):
-        images = [self.image(i*.16, -i*.23) for i in range(10)]
-        forward = track(images, [32., 32.])
-        self.assertTrue(all(row["status"] == "tracked" for row in forward))
-        backward = track(images[::-1], forward[-1]["point"])
-        self.assertTrue(all(row["status"] == "tracked" for row in backward))
-        np.testing.assert_allclose(backward[-1]["point"], [32., 32.], atol=.2)
+        images = [self.image(i*.16, -i*.23) for i in range(40)]
+        for anchor in (False, True):
+            with self.subTest(anchor_first=anchor):
+                forward = track(images, [32., 32.], anchor_first=anchor)
+                self.assertTrue(all(row["status"] == "tracked" for row in forward))
+                np.testing.assert_allclose(forward[-1]["point"], [38.24, 23.03], atol=.2)
+                backward = track(images[::-1], forward[-1]["point"], anchor_first=anchor)
+                self.assertTrue(all(row["status"] == "tracked" for row in backward))
+                np.testing.assert_allclose(backward[-1]["point"], [32., 32.], atol=.2)
 
 
 if __name__ == "__main__":
