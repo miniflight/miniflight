@@ -77,7 +77,10 @@ def signals(controller):
 def execute(calls, record, path, reader=None, producer=None, camera=None, client=None):
     if client is None:
         client = SensorClient(calls, producer_read=producer, camera_clock=camera, record_camera=True)
-    controller = RecordedController(Controller, record, signals=signals)
+    controller_type = Controller
+    if SETTINGS.get('turn_test'):
+        from .turn import Controller as controller_type
+    controller = RecordedController(controller_type, record, signals=signals)
     simulator = AIGPSimulator(controller, client=client, race_reader=RaceReader(calls, reader),
         clock=calls, timeout=.3, startup_timeout=30., race_status_path=path,
         monitor_path=Path(path).with_suffix(".unused.png"), launcher=Launcher(calls))
