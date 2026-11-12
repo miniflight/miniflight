@@ -52,6 +52,35 @@ def triangulate_views(pixels, rotations, positions, intrinsics):
     return point if np.all(camera[:, 2] > 0) else None
 
 
+def map_pose(world, pixels, intrinsics, rotation, position, pixel_sigma=.3, rotation_sigma=np.pi/180):
+    """Position and rotation from mapped points with a soft gyro rotation prior.
+
+    Rotation maps world into camera axes. Return position, corrected rotation,
+    pixel RMS and the fitted rotation correction; return None on failure.
+    The prior sigmas are in pixels and radians, respectively.
+    """
+    import cv2
+    from scipy.optimize import least_squares
+
+    if len(world) < 6:
+        return None
+    world, pixels = np.asarray(world), np.asarray(pixels)
+    def residual(value):
+        correction, _ = cv2.Rodrigues(value[3:])
+        camera = (world-value[:3]) @ (correction @ rotation).T
+        projected = camera @ intrinsics.T
+        error = (projected[:, :2]/projected[:, 2:]-pixels).ravel()/pixel_sigma
+        return np.r_[error, value[3:]/rotation_sigma]
+    fit = least_squares(residual, np.r_[position, np.zeros(3)], loss='huber',
+                        f_scale=.8/pixel_sigma, x_scale=[1., 1., 1., .01, .01, .01])
+    corrected = cv2.Rodrigues(fit.x[3:])[0] @ rotation
+    camera = (world-fit.x[:3]) @ corrected.T
+    if not fit.success or not np.isfinite(fit.x).all() or np.any(camera[:, 2] <= 0):
+        return None
+    rms = float(np.sqrt(np.mean((residual(fit.x)[:-3]*pixel_sigma)**2)))
+    return fit.x[:3], corrected, rms, fit.x[3:]
+
+
 def translation_direction(previous, current, intrinsics, rotation):
     """Unit camera displacement in previous-camera axes, with supplied rotation.
 

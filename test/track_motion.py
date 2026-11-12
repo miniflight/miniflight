@@ -3,10 +3,27 @@ import unittest
 import cv2
 import numpy as np
 
-from miniflight.vision import translation_direction, triangulate_views
+from miniflight.vision import map_pose, translation_direction, triangulate_views
 
 
 class TranslationTest(unittest.TestCase):
+    def test_image_points_correct_gyro_bias(self):
+        rng = np.random.default_rng(8)
+        world = rng.uniform([-3., -2., 5.], [3., 2., 30.], (50, 3))
+        k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1]])
+        true_position = np.array([.7, -.4, .5])
+        true_rotation = cv2.Rodrigues(np.array([.04, -.02, .01]))[0]
+        camera = (world-true_position) @ true_rotation.T
+        projected = camera @ k.T
+        pixels = projected[:, :2]/projected[:, 2:]+rng.normal(0, .1, (50, 2))
+        pixels[:2] += [12., -8.]
+        biased = cv2.Rodrigues(np.radians([.6, -.3, .2]))[0] @ true_rotation
+        result = map_pose(world, pixels, k, biased, np.array([.5, -.2, .4]))
+        self.assertIsNotNone(result)
+        np.testing.assert_allclose(result[0], true_position, atol=.02)
+        error = cv2.Rodrigues(result[1] @ true_rotation.T)[0]
+        self.assertLess(np.linalg.norm(error), np.radians(.1))
+
     def test_multiview_depth_with_pixel_noise(self):
         rng = np.random.default_rng(3)
         k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1]])
