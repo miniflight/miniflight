@@ -59,5 +59,8 @@ score['native_turn'] = dict(maximum_heading_change_deg=float(max(map(abs, veloci
     positive_turn_angle_max_deg=max(velocities), negative_turn_angle_min_deg=min(velocities))
 score['turn_valid'] = score['native_turn']['maximum_heading_change_deg'] >= 10. and score['native_turn']['maximum_lateral_departure_m'] >= .25
 score['passed_turn_comparison'] = score['turn_valid'] and score['methods']['multi']['better_than_constant_velocity']
+if 'uniform' in score['methods']:
+    score['passed_uncertainty_comparison'] = (score['turn_valid'] and score['methods']['multi']['complete']
+        and score['methods']['uniform']['complete'] and score['methods']['multi']['position_rms_m'] < score['methods']['uniform']['position_rms_m'])
 (ESTIMATES/'multiview-score.json').write_text(json.dumps(score, indent=2)+'\n')
 print(json.dumps({**score,'methods':{key:{k:v for k,v in value.items() if k!='rows'} for key,value in score['methods'].items()}},indent=2))

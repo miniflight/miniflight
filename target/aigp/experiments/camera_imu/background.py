@@ -12,13 +12,14 @@ from scipy.spatial.transform import Rotation, Slerp
 
 from common.math import Quaternion
 from miniflight.attitude import gyro_step
-from miniflight.vision import map_pose, triangulate_views
+from miniflight.vision import landmark_covariance, map_pose, triangulate_views
 from target.aigp.experiments.camera_imu import vision
 from target.aigp.experiments.patch_track import seeds, track
 
 ROOT = Path(sys.argv[1]).resolve()
 CUT = 59
 RECTIFY = '--raw' not in sys.argv
+UNCERTAINTY = '--map-uncertainty' in sys.argv
 K, K_INV = vision.K, vision.K_INV
 
 
@@ -122,11 +123,17 @@ def main():
         projected = project(np.einsum('nij,nj->ni', rotations[keyframes], many-positions[keyframes]))
         rms = np.sqrt(np.mean((projected-pixels)**2))
         if rms <= 1. and min(two[2], many[2]) > .5:
-            mapped.append(dict(track=item, two=two, multi=many, map_rms_px=float(rms), parallax_px=float(parallax)))
+            covariance = None
+            if UNCERTAINTY:
+                covariance = landmark_covariance(many, rotations[keyframes], positions[keyframes], K, max(.3, float(rms)))
+                assert covariance is not None, 'unobservable landmark covariance'
+            mapped.append(dict(track=item, two=two, multi=many, covariance=covariance,
+                               map_rms_px=float(rms), parallax_px=float(parallax)))
     print('MAP', first, CUT, 'gate observations', len(gate), 'tracks', len(tracks), 'shared points', len(mapped), flush=True)
     assert len(mapped) >= 6
     result = dict(protocol=dict(calibration_end_frame=CUT, map_views=keyframes.tolist(), tracker='fixed first reference, 15x15',
         gyro_rectified=RECTIFY,
+        landmark_uncertainty=UNCERTAINTY,
         visual_rotation_prior_sigma_deg=1., pixel_sigma=.3,
         gate_size_m=1.5, gate_exclusion='Red excess>20, expanded 9px; permanently reject intersecting tracks',
         map_parallax_min_px=1.5, map_rms_max_px=1.,
@@ -136,9 +143,10 @@ def main():
         gate_fit_rms_m=float(np.sqrt(np.mean((design @ coefficients-measured)**2))),
         gate_overlap_rejections=overlap_rejections,
         map_points=[dict(seed=m['track']['seed'], two=m['two'].tolist(), multi=m['multi'].tolist(),
+                        covariance=None if m['covariance'] is None else m['covariance'].tolist(),
                         reprojection_rms_px=m['map_rms_px'], parallax_px=m['parallax_px']) for m in mapped],
         methods={}, simulator_state_used=False)
-    for method in ('two', 'multi'):
+    for method in (('two', 'uniform', 'multi') if UNCERTAINTY else ('two', 'multi')):
         current = positions[CUT].copy()
         output = []
         for index in range(CUT+1, len(frames)):
@@ -146,9 +154,10 @@ def main():
             if len(visible) < 6:
                 output.append(dict(frame=index, status='lost_points', points=len(visible)))
                 break
-            world = np.array([m[method] for m in visible])
+            world = np.array([m['multi' if method == 'uniform' else method] for m in visible])
             pixels = np.array([m['track']['rows'][index]['point'] for m in visible])
-            pose = map_pose(world, pixels, K, rotations[index], current)
+            covariance = np.array([m['covariance'] for m in visible]) if UNCERTAINTY and method == 'multi' else None
+            pose = map_pose(world, pixels, K, rotations[index], current, landmark_covariances=covariance)
             if pose is None:
                 output.append(dict(frame=index, status='lost_fit', points=len(visible)))
                 break
