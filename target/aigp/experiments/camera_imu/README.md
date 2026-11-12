@@ -6,6 +6,17 @@ One gate with camera position/velocity correcting the IMU estimate:
 python -m target.aigp.experiments.camera_imu one target/aigp/.runtime/gate-estimator/run-01 --shift -.5
 ```
 
+Background-map replay uses `source-lossless.mp4`, `camera-input.json` and
+`gyro-input.json` in `SENSORS`. Native reference poses remain in `FLIGHT` for scoring:
+
+```sh
+python -m target.aigp.experiments.camera_imu.background SENSORS
+python -m target.aigp.experiments.camera_imu.background_score FLIGHT SENSORS
+```
+
+Two fresh turn comparisons are in [multiview.validation.json](multiview.validation.json).
+The background estimator runs in replay; it does not drive the flight controller.
+
 This runs at 2 m/s. Gate size and pixels supply translation; IMU rotation puts
 measurements in one local frame. A 0.5 s camera history supplies velocity.
 Position and velocity corrections apply at their measurement times and carry

@@ -1,0 +1,258 @@
+{
+  "date": "2026-11-12",
+  "protocol": {
+    "frozen_before_turn_scoring": true,
+    "calibration_frames": [
+      0,
+      59
+    ],
+    "holdout_frames": [
+      60,
+      119
+    ],
+    "depth_views": 12,
+    "turn": {
+      "start_after_gate_lock_s": 7.75,
+      "duration_s": 1.5,
+      "commanded_velocity_angle_deg": 25,
+      "signs": [
+        1,
+        -1
+      ]
+    },
+    "shared_initial_state": "Robust linear fit to all accepted gate camera positions before frame 60, rotated by gyro",
+    "tracker": "15x15 fixed first-reference LK; no pyramids",
+    "feature_admission": "same tracks for both depth methods; parallax>=1.5px, positive depths, 12-view reprojection RMS<=1px",
+    "turn_validity": {
+      "minimum_actual_heading_change_deg": 10,
+      "minimum_lateral_departure_m": 0.25
+    },
+    "acceptance": "Full holdout coverage; twelve-view RMS position error lower than camera-derived constant velocity in both turn directions",
+    "map_updates_after_calibration": false,
+    "gate_updates_after_calibration": false,
+    "simulator_position_only_for_scoring": true,
+    "sha256": {
+      "work/multiview-turn-20261112/estimate.py": "9eb30ec495026d248df67105e7fa35de1c67fd8702c4bbacd5caed8ddf41a707",
+      "work/multiview-turn-20261112/score.py": "e69bd388e36cea64e4bfb308ce189ec86402fdeebda7a7c18f99e8784fb56d0d",
+      "miniflight/vision.py": "be485dad5e26641511886f95ab9306e36a303f824ce63c23b5743519ae339ae1",
+      "target/aigp/experiments/patch_track.py": "3a87c919be6a6648a8848eee938fcc90e9809f8def699dce63e2a8d0d04b6eb3",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4"
+    },
+    "protocol_revision": 3,
+    "replaced_attempt": "Fixed rectangle rejected the right-bend clip before estimation: gate moved outside it. No turn position-error scores were examined.",
+    "feature_exclusion": "Reject a track permanently when its 15x15 support touches red-gate pixels or a warp border; no painted image masks.",
+    "gyro_rectification": "Warp images into the initial camera orientation using gyro before LK; 19x19 dilation covers pixel support and interpolation.",
+    "baseline_fairness": "Both maps and constant velocity share all gate observations before frame60, robust linear camera trajectory, and the same initial position/velocity.",
+    "camera_pose_fit": "Translation plus a small visual rotation correction; 0.3px observation sigma and 1 degree gyro-prior sigma; no fitted time offset.",
+    "fresh_validation_flights": [
+      "right-validation",
+      "left-validation"
+    ],
+    "development_flights": [
+      "right-bend",
+      "left-bend"
+    ]
+  },
+  "unit_tests_passed": 17,
+  "software_and_input_verification": {
+    "python": "3.11.14",
+    "machine": "arm64",
+    "system": "Darwin",
+    "opencv": "5.0.0",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "clips": {
+      "right-validation": {
+        "decoded_frames": 120,
+        "rgb_matches_native_decoded_frames": true,
+        "consecutive_native_camera_ids": true
+      },
+      "left-validation": {
+        "decoded_frames": 120,
+        "rgb_matches_native_decoded_frames": true,
+        "consecutive_native_camera_ids": true
+      }
+    }
+  },
+  "published_pipeline": {
+    "estimator": "target/aigp/experiments/camera_imu/background.py",
+    "scorer": "target/aigp/experiments/camera_imu/background_score.py",
+    "byte_identical_to_frozen_scripts": true,
+    "replay_verification": {
+      "estimates_match_exactly_excluding_wall_time": true,
+      "scores_match_exactly": true,
+      "frames": 60,
+      "methods": 2
+    }
+  },
+  "timing": {
+    "warmup_after_camera_lock_s": 5.5,
+    "initialization_camera_frames": 60,
+    "scored_camera_frames_per_turn": 60,
+    "native_capture": "view creation -> render execution -> surface read -> UDP image identity",
+    "orientation": "Full-rate producer gyro integrated with native physics dt; capture-time interpolation",
+    "live_estimator_latency_measured": false
+  },
+  "scope": "Offline estimator replay on native flights; background pose does not drive the flight controller.",
+  "estimator_inputs": [
+    "camera pixels",
+    "camera capture times",
+    "IMU gyro",
+    "intrinsics",
+    "fixed camera mount",
+    "known 1.5m gate size"
+  ],
+  "metric_initialization": "Gate camera poses before frame 60; robust linear fit gives the same starting position and velocity to every method.",
+  "post_initialization": "Frozen background map, current background pixel observations and gyro; no gate pose updates.",
+  "native_motion_only_for_scoring": true,
+  "fresh_flights": [
+    {
+      "name": "right-validation",
+      "capture_revision": "4a4eefc4a6f7fdb3b3915c16e27d227b07d51130",
+      "source_sha256": {
+        "source-lossless.mp4": "65938d885837cb0f989278dae1578e7286054682d9af84d4b0c11c4901260e2e",
+        "camera-input.json": "3f0ba5dd604f7d01bb8636892f124057f19a7d3ac15f6d8129cb31f0a77f47d2",
+        "gyro-input.json": "d81d29b2ad26e8aee796f78c8d5ba0ab2f073e46439386ce283a3c2a886396b2"
+      },
+      "estimate_sha256": "4ae2b4beb630fbfd41dccca2f9bf75431d6e7dda3194a2cb8ed7f25a8cb2e023",
+      "native_trace_sha256": "d1ce5a7e96dcb43c01bc25a09865fcd27895df0dcf8accd62d49ab2b26c617ba",
+      "source_frames": 120,
+      "capture_span_s": 3.9687855504453182,
+      "native_camera_ids": [
+        557,
+        676
+      ],
+      "actual_turn": {
+        "maximum_heading_change_deg": 26.339827424496047,
+        "maximum_lateral_departure_m": 1.166980255512636,
+        "positive_turn_angle_max_deg": 26.339827424496047,
+        "negative_turn_angle_min_deg": -0.02503149715667666
+      },
+      "turn_valid": true,
+      "background_points": 28,
+      "depth_views": 12,
+      "valid_frames": 60,
+      "expected_frames": 60,
+      "constant_velocity_rms_m": 0.5802596821486127,
+      "two_view_rms_m": 0.2246082428488202,
+      "twelve_view_rms_m": 0.19561104316938402,
+      "final_error_m": 0.4397331129414824,
+      "constant_velocity_final_error_m": 1.1557379836808277,
+      "passed": true,
+      "rotation_score": {
+        "gyro_rms_deg": 0.24508061177612356,
+        "corrected_rms_deg": 0.030283092650768253,
+        "gyro_max_deg": 0.73671215345448,
+        "corrected_max_deg": 0.07108160149476504
+      },
+      "native_gate_pass": true,
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 3152,
+      "accepted_controller_packets": [
+        "COMMAND_ACK",
+        "HEARTBEAT",
+        "HIGHRES_IMU"
+      ],
+      "turn_command_ticks": 75,
+      "turn_command_span_s": 1.4795269999999991,
+      "maximum_capture_clock_difference_ms": 1.862645149230957e-06,
+      "temporary_bytes_removed": 97509626,
+      "raw_recordings_retained": false
+    },
+    {
+      "name": "left-validation",
+      "capture_revision": "4a4eefc4a6f7fdb3b3915c16e27d227b07d51130",
+      "source_sha256": {
+        "source-lossless.mp4": "5ae1fe607e1cff1410ce600cb69f44b60f0bb78376c899d6be97122a2823dfae",
+        "camera-input.json": "484165a693859559c89bee2df1b06da41359373243230e067990e171a9262f6e",
+        "gyro-input.json": "701ade11cc2648ba0528d82f3b5ce5db5ee21e4d35e093c89c3018da17fa0f2c"
+      },
+      "estimate_sha256": "1158072e4bd8cb62c3aacf528bb37d0959524bd3b92befa0c2a4954f20bd014b",
+      "native_trace_sha256": "055bd7982f161119035793292b02d11b85ea6859fd69eaf7e1bfa7cbcad2ac53",
+      "source_frames": 120,
+      "capture_span_s": 3.9685011990368366,
+      "native_camera_ids": [
+        585,
+        704
+      ],
+      "actual_turn": {
+        "maximum_heading_change_deg": 26.144922840772026,
+        "maximum_lateral_departure_m": 1.172256627517438,
+        "positive_turn_angle_max_deg": -0.061243501380397615,
+        "negative_turn_angle_min_deg": -26.144922840772026
+      },
+      "turn_valid": true,
+      "background_points": 29,
+      "depth_views": 12,
+      "valid_frames": 60,
+      "expected_frames": 60,
+      "constant_velocity_rms_m": 0.6142531046829719,
+      "two_view_rms_m": 0.4225550624705158,
+      "twelve_view_rms_m": 0.30084166920591854,
+      "final_error_m": 0.7236829817871232,
+      "constant_velocity_final_error_m": 1.1927811314628256,
+      "passed": true,
+      "rotation_score": {
+        "gyro_rms_deg": 0.2556532117970755,
+        "corrected_rms_deg": 0.030882382407278072,
+        "gyro_max_deg": 0.7663064127716239,
+        "corrected_max_deg": 0.09173800973399857
+      },
+      "native_gate_pass": true,
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 3103,
+      "accepted_controller_packets": [
+        "COMMAND_ACK",
+        "HEARTBEAT",
+        "HIGHRES_IMU"
+      ],
+      "turn_command_ticks": 75,
+      "turn_command_span_s": 1.4778979999999997,
+      "maximum_capture_clock_difference_ms": 1.862645149230957e-06,
+      "temporary_bytes_removed": 97069026,
+      "raw_recordings_retained": false
+    }
+  ],
+  "development": [
+    {
+      "name": "right-bend",
+      "fixed_rotation_rms_m": 1.0343980786164653,
+      "constant_velocity_rms_m": 0.586236403481476,
+      "fixed_rotation_passed": false,
+      "visually_corrected_rotation_rms_m": 0.30040096766208946
+    },
+    {
+      "name": "left-bend",
+      "fixed_rotation_rms_m": 0.7388736706231535,
+      "constant_velocity_rms_m": 0.6103261839244948,
+      "fixed_rotation_passed": false,
+      "visually_corrected_rotation_rms_m": 0.2282103377193139
+    }
+  ],
+  "rejected_setup": "A fixed gate rectangle failed coverage during the bend before any position estimates were scored; replaced by permanent rejection of gate-overlapping tracks.",
+  "synthetic_triangulation": {
+    "points": 100,
+    "views": 12,
+    "noise_sigma_px": 0.2,
+    "two_view_rms_3d_m": 0.8566055467004157,
+    "twelve_view_rms_3d_m": 0.585307942977574,
+    "pure_rotation_rejected": true
+  },
+  "aggregate": {
+    "constant_velocity_rms_m": 0.5974981905160379,
+    "two_view_rms_m": 0.3383797006138933,
+    "twelve_view_rms_m": 0.2537413940810781
+  },
+  "limitations": "Two fresh simulator turns after two development flights; two seconds of estimator evaluation per turn. Endpoint errors remain 0.44m and 0.72m. No closed-loop background-map flight or VQ1 completion claim.",
+  "replay_scripts_sha256": {
+    "rotation_score.py": "c9b9bbfe38ba276634b433c62e42c84ba24bb7052a321a6f4bffb3cac47c15d3",
+    "estimate-fixed-rotation.py": "7ccea45450def9b25cf7504d2256e91dc564393347609d9f5af190aba3b52d93",
+    "capture.py": "accef196166df1535774fbf528cab7f4701de354b4cfaf5c57b03270a9ba2e82",
+    "estimate.py": "9eb30ec495026d248df67105e7fa35de1c67fd8702c4bbacd5caed8ddf41a707",
+    "geometry.py": "3f55a5705d38f70c5af3ba853e324481f9ee22b6d23998c267ee29233c61ef87",
+    "video.py": "898b37b5b95a69f46b39ee984bb2b050f815757bd3b6756385e91f5824b37c63",
+    "score.py": "e69bd388e36cea64e4bfb308ce189ec86402fdeebda7a7c18f99e8784fb56d0d"
+  }
+}
