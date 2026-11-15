@@ -229,7 +229,8 @@ class GateController(BaseController):
     targets = ("vq1.r1",)
 
     def __init__(self):
-        config = json.loads((BASE.parents[1]/"test/fixtures/vq1_r1_sub10.config.json").read_text())
+        supplied=SETTINGS.get('position_config')
+        config=dict(supplied) if supplied is not None else json.loads((BASE.parents[1]/"test/fixtures/vq1_r1_sub10.config.json").read_text())
         config.update(max_speed=SETTINGS["speed_m_s"], max_acceleration=3., max_horizontal_acceleration=3., max_tilt=.45)
         self.config = PositionConfig(**config)
         self.inertial = Inertial()

@@ -138,6 +138,7 @@ def replay(path, poison=False):
     SETTINGS['joint_initialization_shadow'] = metadata['settings'].get('joint_initialization_shadow',False)
     SETTINGS['gate_return'] = metadata['settings'].get('gate_return',False)
     SETTINGS['continuous_course'] = metadata['settings'].get('continuous_course',False)
+    SETTINGS['position_config']=metadata['settings'].get('position_config')
     updates = [row for row in map(json.loads, path.open()) if row["event"] == "update"]
     outcomes = [row for row in map(json.loads, path.open()) if row["event"] == "result"]
     decoder = mavlink.MAVLink(None)
@@ -339,8 +340,10 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2.):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
+    calibration=None if dynamics_model is None else dynamics_model.read_bytes()
+    position_config=None if calibration is None else json.loads(calibration)['position_config']
     root.mkdir(parents=True)
     original = dict(SETTINGS)
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
@@ -359,6 +362,7 @@ def one(root, shift, course_gates=None, speed=2.):
             visual_gravity=True,
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
+        SETTINGS.update(position_config=position_config,dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
@@ -396,6 +400,7 @@ def main():
     parser.add_argument('--gate-return',action='store_true')
     parser.add_argument('--gates',type=int,choices=range(1,7),default=6)
     parser.add_argument('--speed',type=float,default=2.)
+    parser.add_argument('--dynamics-model',type=Path)
     args = parser.parse_args()
     if args.mode == "build":
         print(build())
@@ -403,7 +408,7 @@ def main():
         parser.error("live, replay, score and video require a path")
     elif args.mode=='course':
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed)
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if not result['passed_without_reset']:

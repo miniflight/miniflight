@@ -6,6 +6,15 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_supplied_model_never_reads_the_native_calibration_fixture(self):
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import sensors
+        config=dict(hover_thrust=.27,thrust_acceleration=60.,thrust_curve=[10.,100.],body_resistance_per_m=[.05,.05,.1])
+        with patch.dict(sensors.SETTINGS,position_config=config),patch.object(Path,'read_text',side_effect=AssertionError('native fixture read')):
+            controller=sensors.GateController()
+        self.assertEqual(controller.config.thrust_curve,[10.,100.])
+        self.assertEqual(controller.config.body_resistance_per_m,[.05,.05,.1])
+
     def test_fused_or_native_motion_cannot_change_the_exported_inputs(self):
         rows=[dict(imu_time=1.,camera_orientation=np.eye(3).tolist(),motor_commands=[.25]*4,gate_number=1,
             camera_observation=dict(image_id=7,capture_time=1.,corners=[[0,0],[1,0],[1,1],[0,1]]),
