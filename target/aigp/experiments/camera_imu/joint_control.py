@@ -127,8 +127,7 @@ class GateController(base.GateController):
         elapsed = self.joint.integral.at(now)[0]-self.started
         angle = np.radians(20.)*base.SETTINGS.get('joint_turn_sign', 1)
         target, wanted, feedforward = slow_reference(self.start, self.forward, self.speed, angle, elapsed)
-        correction = Rotation.from_rotvec(state[6:9]).as_matrix().T
-        body = self.joint.reference @ correction @ self.joint.reference.T @ self.inertial.rotation.as_rotation_matrix()
+        body = self.inertial.rotation.as_rotation_matrix()
         feedback = 1.2*(target-position)+2.*(wanted-velocity)
         acceleration = feedforward+feedback
         acceleration += body @ quadratic_resistance(body.T @ velocity, self.config.body_resistance_per_m)
@@ -137,6 +136,7 @@ class GateController(base.GateController):
             position=position.tolist(), velocity=velocity.tolist(), target=target.tolist(),
             target_velocity=wanted.tolist(), target_acceleration=feedforward.tolist(),
             feedback_acceleration=feedback.tolist(), control_estimate_source='joint_camera_imu',
+            attitude_estimate_source='imu_gyro',
             motion_available=False, attitude_available=False,
             joint=dict(reference_id=self.joint.reference_id, reference_time=self.joint.reference_time,
                 reference_rotation=self.joint.reference.tolist(), reference_position=self.reference_position.tolist(),

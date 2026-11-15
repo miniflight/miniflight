@@ -37,6 +37,15 @@ class IntegralTest(unittest.TestCase):
 
 
 class JointTest(unittest.TestCase):
+    def test_metric_initialization_stays_anchored(self):
+        request, world = self.problem()
+        request['fixed_anchor'] = True
+        request['depth_sigma'] = np.full(16, .5).tolist()
+        result = solve_window(request)
+        np.testing.assert_allclose(np.array(result['states'])[0, :6], request['anchor'], atol=1e-9)
+        np.testing.assert_allclose(np.array(result['states'])[-1, 3:6], [.24, 0., 2.], atol=.02)
+        self.assertLess(np.mean(abs(np.exp(result['depths'])/world[:,2]-1)), .01)
+
     def test_slow_profile_decelerates_before_turn(self):
         start, forward = np.zeros(3), np.array([1., 0., 0.])
         angle = np.radians(20.)
@@ -83,9 +92,25 @@ class JointTest(unittest.TestCase):
             if i:
                 force = np.array([acceleration, 0., 0.])-gravity
                 edges.append(dict(first=i-1, last=i, dt=.1, dv=(force*.1).tolist(), dp=(force*.005).tolist()))
-        return dict(intrinsics=k.tolist(), rays=(world/world[:, 2:]).tolist(), depth_prior=prior.tolist(),
+        return dict(model_version=2, anchor_velocity_sigma=.05,
+            intrinsics=k.tolist(), rays=(world/world[:, 2:]).tolist(), depth_prior=prior.tolist(),
             depth_sigma=np.full(16, .2).tolist(), states=states, frames=frames, edges=edges,
             gravity=gravity.tolist(), anchor=states[0][:6], depths=prior.tolist()), world
+
+    def test_camera_rotation_does_not_rotate_world_force(self):
+        import cv2
+        request, world = self.problem(0., 1.)
+        k = np.array(request['intrinsics'])
+        for i, frame in enumerate(request['frames']):
+            if not i:
+                continue
+            camera_rotation = cv2.Rodrigues(np.array([0., 0., .03*i/4]))[0]
+            camera = (world-[0., 0., 1.5+2*i*.1]) @ camera_rotation.T
+            h = camera @ k.T
+            frame['pixels'] = (h[:, :2]/h[:, 2:]).tolist()
+        result = solve_window(request, check_jacobian=True)
+        np.testing.assert_allclose(np.array(result['states'])[-1, 3:6], [0., 0., 2.], atol=.01)
+        self.assertLess(result['jacobian_check_error'], 1e-4)
 
     def test_acceleration_updates_velocity_and_depth(self):
         request, world = self.problem()

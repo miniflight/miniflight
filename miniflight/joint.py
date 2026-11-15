@@ -14,6 +14,8 @@ def solve_window(request, check_jacobian=False):
     landmark ids and rectified pixels; rays are fixed first-view bearings.
     IMU edges contain measured duration and specific-force dv/dp integrals.
     The anchor and depth priors come from camera/IMU initialization.
+    Version 2 keeps supplied world-force integrals in world axes and robustifies
+    image residuals only. Version 1 remains for replaying earlier experiments.
     """
     started = time.perf_counter()
     k = np.array(request['intrinsics'])
@@ -26,6 +28,8 @@ def solve_window(request, check_jacobian=False):
     gravity = np.array(request['gravity'])
     anchor = np.array(request['anchor'])
     count, landmarks = len(states), len(rays)
+    world_force = request.get('model_version', 1) >= 2
+    anchor_velocity_sigma = request.get('anchor_velocity_sigma', .1)
     columns = count*9+landmarks
     pixel_rows = sum(len(f['ids'])*2 for f in frames)
     total_rows = pixel_rows+count*3+6+landmarks+len(edges)*6
@@ -35,9 +39,11 @@ def solve_window(request, check_jacobian=False):
     edge_data = []
     for edge in edges:
         i, j, dt = edge['first'], edge['last'], edge['dt']
-        density = .3**2
-        covariance = np.block([[np.eye(3)*(density*dt**3/3+.005**2), np.eye(3)*density*dt**2/2],
-                               [np.eye(3)*density*dt**2/2, np.eye(3)*(density*dt+.03**2)]])
+        density = (.01 if world_force else .3)**2
+        velocity_floor = .003 if world_force else .03
+        position_floor = .003 if world_force else .005
+        covariance = np.block([[np.eye(3)*(density*dt**3/3+position_floor**2), np.eye(3)*density*dt**2/2],
+                               [np.eye(3)*density*dt**2/2, np.eye(3)*(density*dt+velocity_floor**2)]])
         edge_data.append((i, j, dt, np.array(edge['dv']), np.array(edge['dp']),
                           np.linalg.inv(np.linalg.cholesky(covariance))))
 
@@ -55,10 +61,10 @@ def solve_window(request, check_jacobian=False):
             errors.extend(((h[:, :2]/h[:, 2:]-pixels)/.3).ravel())
         errors.extend((state[:, 6:9]/np.radians(1.)).ravel())
         errors.extend((state[0, :3]-anchor[:3])/.05)
-        errors.extend((state[0, 3:6]-anchor[3:6])/.1)
+        errors.extend((state[0, 3:6]-anchor[3:6])/anchor_velocity_sigma)
         errors.extend((value[count*9:]-depth_prior)/depth_sigma)
         for i, j, dt, dv, dp, whitening in edge_data:
-            correction = cv2.Rodrigues((state[i, 6:9]+state[j, 6:9])*.5)[0].T
+            correction = np.eye(3) if world_force else cv2.Rodrigues((state[i, 6:9]+state[j, 6:9])*.5)[0].T
             position = state[j, :3]-state[i, :3]-state[i, 3:6]*dt-correction @ dp-.5*gravity*dt**2
             velocity = state[j, 3:6]-state[i, 3:6]-correction @ dv-gravity*dt
             errors.extend(whitening @ np.r_[position, velocity])
@@ -91,7 +97,7 @@ def solve_window(request, check_jacobian=False):
             result[row:row+3, i*9+6:i*9+9] = np.eye(3)/np.radians(1.)
             row += 3
         result[row:row+3, :3] = np.eye(3)/.05
-        result[row+3:row+6, 3:6] = np.eye(3)/.1
+        result[row+3:row+6, 3:6] = np.eye(3)/anchor_velocity_sigma
         row += 6
         result[row:row+landmarks, count*9:] = np.diag(1/depth_sigma)
         row += landmarks
@@ -102,24 +108,37 @@ def solve_window(request, check_jacobian=False):
             left[3:, 3:6] = -np.eye(3)
             right[:3, :3] = np.eye(3)
             right[3:, 3:6] = np.eye(3)
-            derivative = cv2.Rodrigues((state[i, 6:9]+state[j, 6:9])*.5)[1].reshape(3, 3, 3)
-            rotation = np.column_stack([np.r_[-.5*d.T @ dp, -.5*d.T @ dv] for d in derivative])
-            left[:, 6:9] = right[:, 6:9] = rotation
+            if not world_force:
+                derivative = cv2.Rodrigues((state[i, 6:9]+state[j, 6:9])*.5)[1].reshape(3, 3, 3)
+                rotation = np.column_stack([np.r_[-.5*d.T @ dp, -.5*d.T @ dv] for d in derivative])
+                left[:, 6:9] = right[:, 6:9] = rotation
             result[row:row+6, i*9:i*9+9] = whitening @ left
             result[row:row+6, j*9:j*9+9] = whitening @ right
             row += 6
         return result
 
     initial = np.r_[states.ravel(), request['depths']]
+    def visual_huber(squared):
+        rho = np.array([squared, np.ones_like(squared), np.zeros_like(squared)])
+        ids = np.flatnonzero(squared[:pixel_rows] > 1.)
+        root = np.sqrt(squared[ids])
+        rho[0, ids] = 2*root-1
+        rho[1, ids] = 1/root
+        rho[2, ids] = -.5/root**3
+        return rho
     lower = np.r_[np.full(count*9, -np.inf), np.full(landmarks, np.log(.5))]
     upper = np.r_[np.full(count*9, np.inf), np.full(landmarks, np.log(10000.))]
+    if request.get('fixed_anchor'):
+        initial[:6] = anchor
+        lower[:6], upper[:6] = anchor-1e-10, anchor+1e-10
     error = None
     if check_jacobian:
         step = 1e-6
         numeric = np.column_stack([(residual(initial+np.eye(columns)[i]*step)-residual(initial-np.eye(columns)[i]*step))/(2*step) for i in range(columns)])
         error = float(np.max(abs(numeric-jacobian(initial))))
     fit = least_squares(residual, initial, jac=jacobian, bounds=(lower, upper),
-                        loss='huber', f_scale=.8/.3, max_nfev=32, ftol=1e-4, xtol=1e-5, gtol=1e-4,
+                        loss=visual_huber if world_force else 'huber', f_scale=.8/.3, max_nfev=32,
+                        ftol=1e-4, xtol=1e-5, gtol=1e-4,
                         x_scale=np.r_[np.tile([1., 1., 1., 1., 1., 1., .01, .01, .01], count), np.full(landmarks, .1)])
     state = fit.x[:count*9].reshape(count, 9)
     depths = fit.x[count*9:]
@@ -129,7 +148,10 @@ def solve_window(request, check_jacobian=False):
     rms = float(np.sqrt(np.mean((h[:, :2]/h[:, 2:]-last_pixels)**2)))
     c = .8/.3
     initial_squared = residual(initial)**2
-    initial_cost = .5*np.sum(np.where(initial_squared <= c*c, initial_squared, 2*c*np.sqrt(initial_squared)-c*c))
+    if world_force:
+        initial_cost = .5*c*c*np.sum(visual_huber(initial_squared/(c*c))[0])
+    else:
+        initial_cost = .5*np.sum(np.where(initial_squared <= c*c, initial_squared, 2*c*np.sqrt(initial_squared)-c*c))
     return dict(states=state.tolist(), depths=depths.tolist(), reprojection_rms_px=rms,
         finite=bool(np.isfinite(fit.x).all() and np.all(camera[:, 2] > 0)), converged=bool(fit.success),
         evaluations=fit.nfev, cost=float(fit.cost), initial_cost=float(initial_cost),

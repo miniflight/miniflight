@@ -103,7 +103,7 @@ class JointEstimator:
             covariance = landmark_covariance(point, rotations, positions, vision.K, max(.3, rms))
             if covariance is None:
                 continue
-            sigma = np.clip(np.sqrt(covariance[2, 2])/point[2], .15, .5)
+            sigma = np.clip(np.sqrt(covariance[2, 2])/point[2], .5, 1.)
             cell = tuple((self.tracker.seeds[index, 0]/[160, 120]).astype(int))
             candidates.append((index, point, float(sigma), float(parallax), cell))
         groups = {}
@@ -143,9 +143,8 @@ class JointEstimator:
             return None
         state = self.states[self.window[-1]['id']]
         dt, dv, dp = self.between(self.solution_time, stamp)
-        correction = cv2.Rodrigues(state[6:9])[0].T
-        return np.r_[state[:3]+state[3:6]*dt+correction @ dp+.5*self.gravity*dt**2,
-                     state[3:6]+correction @ dv+self.gravity*dt, state[6:9]]
+        return np.r_[state[:3]+state[3:6]*dt+dp+.5*self.gravity*dt**2,
+                     state[3:6]+dv+self.gravity*dt, state[6:9]]
 
     def _step(self, image_id, stamp):
         ids = np.flatnonzero(self.tracker.alive).tolist()
@@ -164,7 +163,8 @@ class JointEstimator:
         observed = {point for frame in self.window for point in frame['ids']}
         inactive = [point for point in range(len(depth_prior)) if point not in observed]
         depth_prior[inactive] = self.depths[inactive]
-        request = dict(intrinsics=vision.K.tolist(), rays=self.rays.tolist(), depth_prior=depth_prior.tolist(),
+        request = dict(model_version=2, fixed_anchor=True, anchor_velocity_sigma=.05,
+            intrinsics=vision.K.tolist(), rays=self.rays.tolist(), depth_prior=depth_prior.tolist(),
             depth_sigma=self.depth_sigma.tolist(), gravity=self.gravity.tolist(), anchor=self.anchor.tolist(),
             states=[self.states[f['id']].tolist() for f in self.window], depths=self.depths.tolist(),
             frames=[dict(ids=f['ids'], pixels=f['pixels']) for f in self.window], edges=edges)

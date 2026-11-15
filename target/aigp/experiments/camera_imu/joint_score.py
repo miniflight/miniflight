@@ -240,4 +240,3 @@ if __name__ == '__main__':
     maximum=max(errors,default=0.)
     assert maximum<1e-5
     print(json.dumps(dict(solves=len(rows),maximum_numeric_difference=maximum)))
-
