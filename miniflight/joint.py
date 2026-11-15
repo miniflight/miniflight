@@ -16,6 +16,8 @@ def solve_window(request, check_jacobian=False):
     The anchor and depth priors come from camera/IMU initialization.
     Version 2 keeps supplied world-force integrals in world axes and robustifies
     image residuals only. Version 1 remains for replaying earlier experiments.
+    Optional gate_pixels observe a static gate_world learned during camera
+    initialization. fixed_anchor_position leaves the initial velocity adjustable.
     """
     started = time.perf_counter()
     k = np.array(request['intrinsics'])
@@ -31,9 +33,18 @@ def solve_window(request, check_jacobian=False):
     world_force = request.get('model_version', 1) >= 2
     anchor_velocity_sigma = request.get('anchor_velocity_sigma', .1)
     columns = count*9+landmarks
-    pixel_rows = sum(len(f['ids'])*2 for f in frames)
+    gate_world = np.array(request.get('gate_world', [])).reshape(-1, 3)
+    frame_data = []
+    for frame in frames:
+        ids = np.array(frame['ids'], dtype=int)
+        pixels = np.array(frame['pixels']).reshape(-1, 2)
+        gate_pixels = np.array(frame.get('gate_pixels', [])).reshape(-1, 2)
+        if len(gate_pixels) and (len(gate_pixels) != 4 or len(gate_world) != 4):
+            raise ValueError('gate observations require four mapped corners')
+        sigma = np.r_[np.full(len(ids), .3), np.full(len(gate_pixels), request.get('gate_pixel_sigma', .8))]
+        frame_data.append((ids, np.vstack((pixels, gate_pixels)), sigma))
+    pixel_rows = sum(len(pixels)*2 for _, pixels, _ in frame_data)
     total_rows = pixel_rows+count*3+6+landmarks+len(edges)*6
-    frame_data = [(np.array(frame['ids'], dtype=int), np.array(frame['pixels']).reshape(-1, 2)) for frame in frames]
     if count < 2 or len(frames) != count or len(frame_data[-1][0]) < 6:
         raise ValueError('joint window needs at least two states and six current landmarks')
     edge_data = []
@@ -53,12 +64,13 @@ def solve_window(request, check_jacobian=False):
         world = rays*depths[:, None]
         rotations = [cv2.Rodrigues(s[6:9])[0] for s in state]
         errors = []
-        for i, (ids, pixels) in enumerate(frame_data):
-            if not len(ids):
+        for i, (ids, pixels, sigma) in enumerate(frame_data):
+            if not len(pixels):
                 continue
-            camera = (world[ids]-state[i, :3]) @ rotations[i].T
+            observed = np.vstack((world[ids], gate_world)) if len(pixels) > len(ids) else world[ids]
+            camera = (observed-state[i, :3]) @ rotations[i].T
             h = camera @ k.T
-            errors.extend(((h[:, :2]/h[:, 2:]-pixels)/.3).ravel())
+            errors.extend(((h[:, :2]/h[:, 2:]-pixels)/sigma[:, None]).ravel())
         errors.extend((state[:, 6:9]/np.radians(1.)).ravel())
         errors.extend((state[0, :3]-anchor[:3])/.05)
         errors.extend((state[0, 3:6]-anchor[3:6])/anchor_velocity_sigma)
@@ -75,19 +87,20 @@ def solve_window(request, check_jacobian=False):
         world = rays*np.exp(value[count*9:])[:, None]
         result = np.zeros((total_rows, columns))
         row = 0
-        for i, (ids, pixels) in enumerate(frame_data):
-            if not len(ids):
+        for i, (ids, pixels, sigma) in enumerate(frame_data):
+            if not len(pixels):
                 continue
             rotation, derivative = cv2.Rodrigues(state[i, 6:9])
-            relative = world[ids]-state[i, :3]
+            observed = np.vstack((world[ids], gate_world)) if len(pixels) > len(ids) else world[ids]
+            relative = observed-state[i, :3]
             camera = relative @ rotation.T
-            projection = projection_jacobians(camera, k)/.3
+            projection = projection_jacobians(camera, k)/sigma[:, None, None]
             position_jacobian = -projection @ rotation
             dr = derivative.reshape(3, 3, 3)
             camera_rotation = np.array([relative @ d.T for d in dr])
             rotation_jacobian = np.einsum('nij,knj->nik', projection, camera_rotation)
-            depth_jacobian = np.einsum('nij,nj->ni', projection @ rotation, world[ids])
-            n = len(ids)*2
+            depth_jacobian = np.einsum('nij,nj->ni', projection[:len(ids)] @ rotation, world[ids])
+            n = len(pixels)*2
             result[row:row+n, i*9:i*9+3] = position_jacobian.reshape(-1, 3)
             result[row:row+n, i*9+6:i*9+9] = rotation_jacobian.reshape(-1, 3)
             for point_index, point in enumerate(ids):
@@ -128,9 +141,10 @@ def solve_window(request, check_jacobian=False):
         return rho
     lower = np.r_[np.full(count*9, -np.inf), np.full(landmarks, np.log(.5))]
     upper = np.r_[np.full(count*9, np.inf), np.full(landmarks, np.log(10000.))]
-    if request.get('fixed_anchor'):
-        initial[:6] = anchor
-        lower[:6], upper[:6] = anchor-1e-10, anchor+1e-10
+    fixed = 6 if request.get('fixed_anchor') else (3 if request.get('fixed_anchor_position') else 0)
+    if fixed:
+        initial[:fixed] = anchor[:fixed]
+        lower[:fixed], upper[:fixed] = anchor[:fixed]-1e-10, anchor[:fixed]+1e-10
     error = None
     if check_jacobian:
         step = 1e-6
@@ -142,7 +156,8 @@ def solve_window(request, check_jacobian=False):
                         x_scale=np.r_[np.tile([1., 1., 1., 1., 1., 1., .01, .01, .01], count), np.full(landmarks, .1)])
     state = fit.x[:count*9].reshape(count, 9)
     depths = fit.x[count*9:]
-    last_ids, last_pixels = frame_data[-1]
+    last_ids, last_pixels, _ = frame_data[-1]
+    last_pixels = last_pixels[:len(last_ids)]
     camera = (rays[last_ids]*np.exp(depths[last_ids, None])-state[-1, :3]) @ cv2.Rodrigues(state[-1, 6:9])[0].T
     h = camera @ k.T
     rms = float(np.sqrt(np.mean((h[:, :2]/h[:, 2:]-last_pixels)**2)))
