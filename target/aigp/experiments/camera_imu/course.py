@@ -114,13 +114,14 @@ class GateController(base.GateController):
             self.alignment_active=False;self.alignment_settled=None;self.alignment_gate=self.gate_number
             self.search_hint=None
         if self.gate_number>1 and self.phase is base.single.Phase.TRACKING and self.last_relative_gate is not None:
-            age=self.inertial.time-self.last_image_time
+            age=self.inertial.time-self.measurement_time()
             relative=self.gate_relative()
             if self.alignment_active or (abs(relative[2])>base.SETTINGS.get('visibility_height_change_m',1.5) and self.gate_remaining()>8.):
                 if not self.alignment_active:
                     self.alignment_direction=float(np.sign(relative[2]))
                 self.alignment_active=True
-                visual=None if self.camera_observation is None else self.camera_observation.get('velocity')
+                observed=self.latest_camera_observation()
+                visual=None if observed is None else observed.get('velocity')
                 settled=(abs(relative[2])<base.SETTINGS.get('visibility_height_change_m',1.5) and abs(self.inertial.velocity[2])<.5 and age<.25
                          and visual is not None and abs(visual['velocity'][2])<.5)
                 self.alignment_settled=(self.alignment_settled or self.inertial.time) if settled else None
@@ -128,7 +129,7 @@ class GateController(base.GateController):
                     self.alignment_active=False
                 else:
                     self.signal.update(visibility_alignment=True,alignment_relative_gate=relative.tolist(),
-                        alignment_image_age_s=age,alignment_hint=self.search_hint)
+                        alignment_image_age_s=self.inertial.time-self.last_image_time,alignment_metric_age_s=age,alignment_hint=self.search_hint)
                     if age>base.SETTINGS['maximum_blind_s']:
                         raise TimeoutError('height alignment could not regain the mapped gate')
                     correction=alignment_step(relative[2],age,self.hint_bearing(),self.alignment_direction)
@@ -206,6 +207,7 @@ class Controller(base.single.BaseController):
             self.gate.motor_outputs=command.outputs
             self.gate.signal.update(gyro=self.motor.gyro,rate_request=self.motor.rate_request,rate_integral=self.motor.integral)
             self.gate.signal['visual_gravity']=self.gate.gravity_observation
+            self.gate.signal['partial_gate']=self.gate.partial_observation
         return command
 
 

@@ -25,6 +25,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 from . import vision
 from .motion import GateMotion
 from .gravity import GateGravity
+from .partial import RimTemplate,outer_top,relative_from_top
 from target.aigp.native import BASE
 
 
@@ -253,12 +254,46 @@ class GateController(BaseController):
         self.camera_observation = None
         self.gravity=GateGravity()
         self.gravity_observation=None
+        self.rim_template=RimTemplate();self.partial_motion=GateMotion(.5);self.partial_observation=None
         self.camera_fusion_started = False
         self.last_relative_gate=None
         self.last_relative_position=None
 
     def gate_relative(self):
         return self.last_relative_gate-(self.inertial.position-self.last_relative_position)
+
+    def latest_camera_observation(self):
+        full=self.camera_observation;partial=self.partial_observation
+        if partial is not None and partial['gate_number']==getattr(self,'gate_number',1):
+            if full is None or partial['capture_time']>full['capture_time']:return partial
+        return full
+
+    def measurement_time(self):
+        observed=self.latest_camera_observation()
+        stamp=-float('inf') if self.last_image_time is None else self.last_image_time
+        return stamp if observed is None else max(stamp,observed['capture_time'])
+
+    def observe_partial(self,frame,stamp,rotation):
+        if not SETTINGS.get('partial_gate') or self.locked is None:return
+        template=self.rim_template.model()
+        if template is None:return
+        top=outer_top(frame.bgr)
+        if top is None:return
+        relative=relative_from_top(top[0],rotation,template['width_m'],template['center_to_top_m'])
+        if relative is None or relative @ self.direction<1.:return
+        prior=self.gate_relative() @ self.direction
+        if abs(relative @ self.direction-prior)>max(5.,.5*abs(prior)):return
+        gate=getattr(self,'gate_number',1);old=self.partial_observation
+        if old is None or old['gate_number']!=gate or stamp-old['capture_time']>.15:self.partial_motion.observations.clear()
+        velocity=self.partial_motion.observe(stamp,-relative)
+        delta_v=np.zeros(3)
+        if velocity is not None and velocity['residual_m']<=.15 and np.linalg.norm(velocity['velocity'])<=8.:
+            delta_v=self.inertial.correct_velocity(velocity['time'],velocity['velocity'],.15)
+        delta_p=self.inertial.correct_position(stamp,self.anchor-relative,.2)
+        self.last_relative_gate=relative;self.last_relative_position=self.inertial.camera_pose(stamp)[0].copy()
+        self.partial_observation=dict(gate_number=gate,image_id=frame.id,capture_time=stamp,position_relative_gate=(-relative).tolist(),
+            top_corners=top[0].tolist(),edge_residual_px=top[1],template=template,velocity=velocity,
+            position_correction=delta_p.tolist(),velocity_correction=delta_v.tolist())
 
     def gate_remaining(self):
         if SETTINGS.get('continuous_course') and self.last_relative_gate is not None:
@@ -300,6 +335,7 @@ class GateController(BaseController):
                 self.count, self.centers = 0, []
         pose = vision.best_pose(corners)
         if pose is None:
+            self.observe_partial(frame,stamp,rotation)
             self.previous = None if self.locked is None else self.previous
             return
         if SETTINGS.get('continuous_course') and pose[0]>1.:
@@ -315,9 +351,11 @@ class GateController(BaseController):
             if measured is not None:
                 correction,data=measured
                 self.inertial.correct_orientation(data['start'],correction)
-                self.camera_motion.observations=[(t,correction.apply(p) if t>=data['start'] else p) for t,p in self.camera_motion.observations]
+                for observer in (self.camera_motion,self.partial_motion):
+                    observer.observations=[(t,correction.apply(p) if t>=data['start'] else p) for t,p in observer.observations]
                 rotation=correction.as_matrix() @ rotation
                 self.gravity_observation=dict(data,image_id=frame.id,capture_time=stamp)
+        if SETTINGS.get('partial_gate'):self.rim_template.observe(frame.bgr,corners,pose,frame.id)
         center = position + rotation @ pose[2]
         if self.locked is not None and not SETTINGS.get('continuous_course'):
             limit = max(.5, .05*np.linalg.norm(self.anchor-position))
@@ -393,9 +431,11 @@ class GateController(BaseController):
         if self.phase is Phase.SHIFTING:
             visual_setup=SETTINGS.get('visual_initialization',False)
             if visual_setup:
-                for frame in frames:
+                self.pending.extend(frames)
+                for frame in self.pending:
                     stamp=frame.time_ns*1e-9;pose=self.inertial.camera_pose(stamp)
                     if pose is not None:self.observe(frame,stamp,*pose)
+                self.pending=[frame for frame in self.pending if frame.time_ns*1e-9>now]
                 if self.locked is None:
                     if now-self.setup_started>5.:raise TimeoutError('initial gate unavailable before arming')
                     return None

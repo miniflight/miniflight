@@ -6,6 +6,32 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_partial_measurement_cannot_keep_a_different_gate_fresh(self):
+        from target.aigp.experiments.camera_imu import sensors
+        c=object.__new__(sensors.GateController);c.gate_number=3;c.last_image_time=1.
+        c.camera_observation=dict(capture_time=1.)
+        c.partial_observation=dict(gate_number=3,capture_time=2.)
+        self.assertEqual(c.measurement_time(),2.)
+        c.gate_number=4
+        self.assertEqual(c.measurement_time(),1.)
+
+    def test_visual_startup_waits_for_imu_before_processing_a_camera_frame(self):
+        from unittest.mock import patch,Mock
+        from types import SimpleNamespace
+        from common.math import Quaternion
+        from miniflight.state import Frame
+        from target.aigp.experiments.camera_imu import sensors,vision
+        state=SimpleNamespace(motion=None,attitude=None,imu_increments=(),time=1.)
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),visual_initialization=True),patch.object(sensors,'vehicle',SimpleNamespace(state=state)):
+            c=sensors.GateController();c.phase=sensors.Phase.SHIFTING;c.setup_started=1.
+            c.inertial.rotation=Quaternion();c.inertial.time=1.;c.observe=Mock()
+            c.inertial.camera_pose=lambda t:None if t>c.inertial.time else (np.zeros(3),vision.CAMERA_FROM_BODY.T)
+            frame=Frame(1,1_100_000_000,1001.1,np.zeros((360,640,3),np.uint8))
+            self.assertIsNone(c.update((),(frame,),None));c.observe.assert_not_called()
+            state.time=c.inertial.time=1.2
+            self.assertIsNone(c.update((),(),None));c.observe.assert_called_once()
+            self.assertEqual(c.pending,[])
+
     def test_clipped_frame_retains_two_measured_top_corners(self):
         import cv2
         from target.aigp.experiments.camera_imu.partial import outer_top

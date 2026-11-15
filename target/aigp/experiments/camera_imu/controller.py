@@ -225,9 +225,9 @@ class GateController(single.GateController):
                 self.signal["lookahead"] = dict(count=self.lookahead_count, image_id=self.lookahead["frame"],
                     image_time=self.lookahead["time"], center=self.lookahead["center"].tolist(),
                     image_corners=self.lookahead["corners"].tolist())
-        if self.gate_number >= 2 and self.phase is single.Phase.TRACKING and self.locked is not None and self.inertial.time-self.last_image_time > SETTINGS["lookahead_max_age_s"]:
+        if self.gate_number >= 2 and self.phase is single.Phase.TRACKING and self.locked is not None and self.inertial.time-self.measurement_time() > SETTINGS["lookahead_max_age_s"]:
             if not (SETTINGS.get('continuous_course') and getattr(self,'alignment_active',False)
-                    and self.inertial.time-self.last_image_time<=SETTINGS['maximum_blind_s']):
+                    and self.inertial.time-self.measurement_time()<=SETTINGS['maximum_blind_s']):
                 raise TimeoutError("gate image exceeded the lookahead freshness interval")
         return request
 

@@ -48,7 +48,7 @@ def render(root):
     updates = [r for r in map(json.loads, path.open()) if r["event"] == "update" and r.get("signals", {}).get("phase") in ("TRACKING", "FINAL_IMU", "HANDOFF")]
     if not updates:
         raise ValueError("Recording has no approach frames")
-    accepted, ahead = {}, {}
+    accepted, ahead, partial = {}, {}, {}
     clock = {}
     for row in updates:
         state = row["signals"]
@@ -57,6 +57,8 @@ def render(root):
         candidate = state.get("lookahead")
         if candidate is not None:
             ahead.setdefault(candidate["image_id"], candidate)
+        clipped=state.get('partial_gate')
+        if clipped is not None:partial.setdefault((clipped['gate_number'],clipped['image_id']),clipped)
     for row in map(json.loads, path.open()):
         if row["event"] == "call" and row["name"] == "camera_clock":
             clock.update({(frame, stamp):(low+high)/2 for frame, stamp, low, high in row.get("result", [])})
@@ -122,6 +124,10 @@ def render(root):
                         image[22:178, 474:630] = crop
                         cv2.rectangle(image, (473, 21), (630, 178), GREEN, 1)
                         cv2.putText(image, "aperture crop", (477, 14), 0, .38, GREEN, 1, cv2.LINE_AA)
+                elif (gate,frame.id) in partial:
+                    draw_measured(image,np.array(partial[(gate,frame.id)]['top_corners']),(245,115,245))
+                    mode,color='partial rim + gyro',(245,115,245)
+                    detail='two measured top corners; frame size learned from complete views'
                 elif "gate_corners" in state:
                     p = np.array([np.interp(t, times, axis) for axis in positions.T])
                     xyz = (np.array(state["gate_corners"])-p) @ rotation(t).as_matrix()
