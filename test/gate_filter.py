@@ -16,6 +16,16 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_upright_seed_recovers_depth_without_using_planar_pitch(self):
+        from miniflight.gate_filter import upright_seed
+        for yaw in [-.4,0.,.3]:
+            R=Rotation.from_euler('xyz',[.07,-.13,.2]).as_matrix();camera=CAMERA_FROM_BODY @ R.T
+            center=np.array([15.,1.,-.8]);gate=Rotation.from_euler('z',yaw).as_matrix()
+            xyz=(POINTS @ gate.T+center) @ camera.T;h=xyz @ K.T;pixels=h[:,:2]/h[:,2,None]
+            translation,right=upright_seed(pixels,camera @ [0.,0.,1.],K)
+            np.testing.assert_allclose(translation,camera @ center,atol=1e-10)
+            np.testing.assert_allclose(right,camera @ gate @ [0.,1.,0.],atol=1e-10)
+
     def test_moving_start_preserves_one_frame_and_nonzero_velocity(self):
         from types import SimpleNamespace
         from unittest.mock import patch

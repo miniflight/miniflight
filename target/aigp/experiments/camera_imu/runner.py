@@ -359,7 +359,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
     if course_gates is not None:
         SETTINGS.update(continuous_course=True,sensor_interface='public_camera_and_HIGHRES_IMU',
             gates_to_pass=course_gates,speed_m_s=speed,joint_control=False,gate_return=False,
-            beyond_m=4.,finish_beyond_m=0.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
+            beyond_m=4.,finish_beyond_m=0. if course_gates==6 else 1.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
             camera_position_min_side_px=20.,camera_velocity_min_side_px=20.,
             vertical_speed_limit_m_s=3.,
             camera_window_s=1.,

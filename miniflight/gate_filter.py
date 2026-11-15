@@ -9,6 +9,20 @@ def skew(x):
     return np.array([[0.,-c,b],[c,0.,-a],[-b,a,0.]])
 
 
+def upright_seed(pixels,camera_down,intrinsics,height=1.5):
+    """Metric translation from observed vertical edges and gravity, without planar pose ambiguity."""
+    rays=np.c_[pixels,np.ones(4)] @ np.linalg.inv(intrinsics).T;points=np.zeros((4,3));residual=[]
+    for top,bottom in [(0,3),(1,2)]:
+        design=np.column_stack((-rays[top],rays[bottom]));depth=np.linalg.lstsq(design,height*np.asarray(camera_down),rcond=None)[0]
+        if min(depth)<=0:return None
+        points[top]=depth[0]*rays[top];points[bottom]=depth[1]*rays[bottom]
+        residual.append(np.linalg.norm(design @ depth-height*np.asarray(camera_down)))
+    if max(residual)>.15:return None
+    left=(points[0]+points[3])/2;right=(points[1]+points[2])/2;edge=right-left
+    if not .5*height<np.linalg.norm(edge)<1.5*height:return None
+    return (left+right)/2,edge/np.linalg.norm(edge)
+
+
 class GateFilter:
     """Error coordinates: p,v,right attitude error,gyro bias,force bias,gate(xyz,yaw)."""
     def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics):
@@ -213,6 +227,9 @@ class GateHistory:
             for row in self.observations:
                 if row['time']==stamp:
                     seed=row.get('seed')
+                    if not row.get('rim'):
+                        constrained=upright_seed(row['pixels'],self.filter.C @ self.filter.R.T @ [0.,0.,1.],self.filter.K)
+                        if constrained is not None:seed=constrained
                     if row.get('rim'):
                         if self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
                         # Two observed top corners plus upright geometry can seed a nearer hypothesis.
