@@ -262,6 +262,8 @@ def execute(calls,record,path,reader=None,client=None):
     controller_type=Controller
     if base.SETTINGS.get('joint_estimator'):
         from .gate_filter_live import Controller as controller_type
+    if base.SETTINGS.get('thrust_excitation'):
+        from .thrust_control import Controller as controller_type
     controller=RecordedController(lambda:controller_type(calls),record,signals=lambda c:c.gate.signal)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
@@ -309,8 +311,8 @@ def execute(calls,record,path,reader=None,client=None):
         record(event='profile',scope='motor_send',stages={'motor_send':timing_data(client.timing)['motor_send']})
     try:
         run(read_signals,controller.update,send,hz=50.,clock=calls)
-    except StopIteration:
-        reason=reason or 'estimated course complete'
+    except StopIteration as exception:
+        reason=reason or str(exception) or 'estimated course complete'
     except Exception as exception:
         error=dict(type=type(exception).__name__,message=str(exception))
         record(event='flight_error',error=error)

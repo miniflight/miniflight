@@ -339,7 +339,7 @@ def public_course(root,shift):
             print(json.dumps(outcome),flush=True)
     from .score import score
     result=score(root)
-    if any(g.get('first_lock_time_s') is not None for g in result['gates']):
+    if SETTINGS.get('render_video',True) and any(g.get('first_lock_time_s') is not None for g in result['gates']):
         from .video import render
         render(root)
     checked=replay(root/'flight.jsonl')
@@ -349,12 +349,13 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
     root.mkdir(parents=True)
     original = dict(SETTINGS)
+    SETTINGS.update(thrust_excitation=excitation,render_video=excitation is None)
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
                     beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
@@ -377,6 +378,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
         SETTINGS.update(joint_estimator=joint_estimator,brake_test=brake_test)
         if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False,continuous_origin=True,moving_start=moving_start,command_epoch='public_send',ground_support=True)
         if brake_test:SETTINGS['finish_beyond_m']=1.
+        if excitation:SETTINGS.update(flight_timeout_s=90.,course_timeout_s=110.)
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
@@ -412,6 +414,7 @@ def main():
     parser.add_argument('--crossing-constraint',action='store_true')
     parser.add_argument('--joint-estimator',action='store_true');parser.add_argument('--brake-test',action='store_true')
     parser.add_argument('--moving-start',action='store_true')
+    parser.add_argument('--thrust-excitation',choices=('train','validate'))
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
     parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
@@ -430,7 +433,8 @@ def main():
         if args.dynamics_model is None:parser.error('course requires --dynamics-model; see dynamics.model.json for the public-data calibration')
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
         if args.brake_test and (not args.joint_estimator or args.gates!=1):parser.error('brake test requires --joint-estimator --gates 1')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start)
+        if args.thrust_excitation and (not args.joint_estimator or args.gates!=1):parser.error('thrust excitation requires --joint-estimator --gates 1')
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():
@@ -439,7 +443,7 @@ def main():
         if args.joint_estimator:
             from .gate_filter_score import score_live
             score_live(args.path.resolve())
-        if not result['passed_without_reset']:
+        if not result['passed_without_reset'] and not (args.thrust_excitation and result['termination']=='public thrust excitation complete' and result['controller_error'] is None):
             raise SystemExit(1)
     elif args.mode == 'joint':
         SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign,
