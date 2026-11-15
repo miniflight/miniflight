@@ -1,0 +1,4909 @@
+{
+  "date": "2026-11-15",
+  "recorded_at": "2026-11-15T12:51:11.532936+00:00",
+  "implementation_revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+  "native_binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "device": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "opencv": "5.0.0"
+  },
+  "unit_tests_passed": 55,
+  "frozen_protocol": {
+    "recorded_at": "2026-11-15T12:34:08.636767+00:00",
+    "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+    "trial": "gravity-01",
+    "new_prior": "Gates are upright; no gate heading, coordinates, or native orientation is supplied.",
+    "inputs": "Public pixel edges, camera calibration, public gyro attitude history; native state is scorer-only.",
+    "fit": {
+      "window_s": 0.5,
+      "minimum_side_px": 80,
+      "maximum_reprojection_px": 0.5,
+      "minimum_images": 5,
+      "minimum_span_s": 0.1,
+      "maximum_plane_residual": 0.01,
+      "minimum_observability": 0.1,
+      "maximum_innovation_deg": 10,
+      "gain": 0.15,
+      "maximum_correction_per_image_deg": 0.15
+    },
+    "prediction": {
+      "native_gates": 6,
+      "contacts": 0,
+      "resets": 0,
+      "finish_time_s_max": 52.48,
+      "gate5_attitude_p95_deg_max": 0.7,
+      "gate5_camera_height_p95_m_max": 0.35
+    },
+    "offline_score": {
+      "observations": 112,
+      "median_gravity_error_deg": 0.307,
+      "p95_gravity_error_deg": 0.919
+    },
+    "baseline": "visibility-01:6/6 at52.474s,20contacts,0% motor saturation;2.2deg pitch error gave0.92m camera height error at22m before impact. All older failures retained.",
+    "device": {
+      "system": "Darwin",
+      "machine": "arm64",
+      "python": "3.11.14",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "opencv": "5.0.0"
+    },
+    "binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+    "unit_tests_passed": 55,
+    "validation": [
+      {
+        "name": "validation-01",
+        "shift_right_m": -0.5
+      },
+      {
+        "name": "validation-02",
+        "shift_right_m": -0.5
+      },
+      {
+        "name": "validation-03",
+        "shift_right_m": 0.5
+      },
+      {
+        "name": "validation-04",
+        "shift_right_m": -0.5
+      },
+      {
+        "name": "validation-05",
+        "shift_right_m": 0.5
+      }
+    ],
+    "acceptance": {
+      "native_gates": 6,
+      "estimated_gates": 6,
+      "valid_finish": true,
+      "contacts": 0,
+      "resets": 0,
+      "normal_replay_exact": true,
+      "poisoned_replay_exact": true,
+      "continuous_imu": true,
+      "arms": [
+        true,
+        false
+      ]
+    },
+    "performance_goals": {
+      "native_finish_time_s_max": 55.0,
+      "gate5_attitude_p95_deg_max": 0.7,
+      "gate5_camera_height_p95_m_max": 0.35
+    },
+    "pilot": {
+      "name": "gravity-01",
+      "clean": true,
+      "native_finish_s": 46.790187836,
+      "gate5_attitude_p95_deg": 0.5565437187611362,
+      "corrections": 66,
+      "maximum_correction_deg": 0.15
+    },
+    "prior_trials": "baseline-01 clean52.4809; bearing01-03 all2/6 failed; visibility01 native6 valid52.474 with20contact packets. Keep all outcomes, no selective omission.",
+    "raw_policy": "Each raw trace capped384MiB,deleted after scoring and exact normal+poisoned replay; retain compressed controls,scored reference CSVs,plots and compact continuous video.",
+    "source_sha256": {
+      "miniflight/attitude.py": "72251a77d8e84465226fa4be9ad104ea170da013e6aee088d5a11175c834fc75",
+      "miniflight/mixer.py": "93fdfba40ddbb0350293ab327f1d4bdceb1706af4a7a0544eb190c16e33ccf1e",
+      "miniflight/position.py": "247c05241c59505dc84591b0187fe7ab0fa7ef19e00ac36470f9f25878735ea5",
+      "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+      "target/aigp/client.py": "02d1c5c03be3a80d2290ec2ca3554499c94a275e2a9d124de3ea562a5a7de785",
+      "target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+      "target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+      "target/aigp/experiments/camera_imu/accuracy.py": "81b78ea43862b260f8cededcc50f3d4f3215005f5410c6209a2532eb7a564163",
+      "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+      "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+      "target/aigp/experiments/camera_imu/controller.py": "2fb98fa7f2c8a11abb5064769c067ffe2df0ca8eef76948b495e6ea8fef4cbdb",
+      "target/aigp/experiments/camera_imu/course.py": "1f1adb80c5f607f04b2a71e49fb4682f2fc0914962dd0b3b7ea80c184a1f93f6",
+      "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+      "target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+      "target/aigp/experiments/camera_imu/gravity.py": "d713fa1e39677d9a101ec231fe55d0096562461c2d0477ddde50d12e575d33bb",
+      "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+      "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+      "target/aigp/experiments/camera_imu/motion.py": "17cf4ff7e8415fca7834992a41f11e3b95124010be593431b596e5afe891cd05",
+      "target/aigp/experiments/camera_imu/plots.py": "78bd1ec8beae65e411ebc256439ecf06f2698a402d3ada9279f84333bb2d6e56",
+      "target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+      "target/aigp/experiments/camera_imu/runner.py": "5ba591c566509a7e293b9cd1cb821931edec62aae125b392c4f3378935a49867",
+      "target/aigp/experiments/camera_imu/score.py": "7a286e0f87cc2409c69d0057b0f062782772d0e37d2a87f9b45671c7c6d9e836",
+      "target/aigp/experiments/camera_imu/sensors.py": "9500b016577b29db2a2c5ddded6a1a2667eb23b5a043521f7cec53606f7337b5",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+      "target/aigp/experiments/camera_imu/video.py": "6dcb3f55d7621a0d3e56dfacad18cda5749063be4315944e3eb0d124f9625fed",
+      "target/aigp/experiments/camera_imu/vision.py": "43899542def9a2d4aa0ba860cab7c5b7ee1c38bb71ceb662333d7b32cf593565",
+      "target/aigp/experiments/recording.py": "896bed0c699a5a322cdefbddc2e1014e3c8d3c2a7be84dd9bf3050c076743205",
+      "test/fixtures/vq1_r1_sub10.config.json": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+    }
+  },
+  "replacement_protocol": {
+    "recorded_at": "2026-11-15T12:42:37.371034+00:00",
+    "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+    "trial": "gravity-01",
+    "new_prior": "Gates are upright; no gate heading, coordinates, or native orientation is supplied.",
+    "inputs": "Public pixel edges, camera calibration, public gyro attitude history; native state is scorer-only.",
+    "fit": {
+      "window_s": 0.5,
+      "minimum_side_px": 80,
+      "maximum_reprojection_px": 0.5,
+      "minimum_images": 5,
+      "minimum_span_s": 0.1,
+      "maximum_plane_residual": 0.01,
+      "minimum_observability": 0.1,
+      "maximum_innovation_deg": 10,
+      "gain": 0.15,
+      "maximum_correction_per_image_deg": 0.15
+    },
+    "prediction": {
+      "native_gates": 6,
+      "contacts": 0,
+      "resets": 0,
+      "finish_time_s_max": 52.48,
+      "gate5_attitude_p95_deg_max": 0.7,
+      "gate5_camera_height_p95_m_max": 0.35
+    },
+    "offline_score": {
+      "observations": 112,
+      "median_gravity_error_deg": 0.307,
+      "p95_gravity_error_deg": 0.919
+    },
+    "baseline": "visibility-01:6/6 at52.474s,20contacts,0% motor saturation;2.2deg pitch error gave0.92m camera height error at22m before impact. All older failures retained.",
+    "device": {
+      "system": "Darwin",
+      "machine": "arm64",
+      "python": "3.11.14",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "opencv": "5.0.0"
+    },
+    "binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+    "unit_tests_passed": 55,
+    "validation": [
+      {
+        "name": "validation-06",
+        "shift_right_m": -0.5
+      }
+    ],
+    "acceptance": {
+      "native_gates": 6,
+      "estimated_gates": 6,
+      "valid_finish": true,
+      "contacts": 0,
+      "resets": 0,
+      "normal_replay_exact": true,
+      "poisoned_replay_exact": true,
+      "continuous_imu": true,
+      "arms": [
+        true,
+        false
+      ]
+    },
+    "performance_goals": {
+      "native_finish_time_s_max": 55.0,
+      "gate5_attitude_p95_deg_max": 0.7,
+      "gate5_camera_height_p95_m_max": 0.35
+    },
+    "pilot": {
+      "name": "gravity-01",
+      "clean": true,
+      "native_finish_s": 46.790187836,
+      "gate5_attitude_p95_deg": 0.5565437187611362,
+      "corrections": 66,
+      "maximum_correction_deg": 0.15
+    },
+    "prior_trials": "baseline-01 clean52.4809; bearing01-03 all2/6 failed; visibility01 native6 valid52.474 with20contact packets. Keep all outcomes, no selective omission.",
+    "raw_policy": "Each raw trace capped384MiB,deleted after scoring and exact normal+poisoned replay; retain compressed controls,scored reference CSVs,plots and compact continuous video.",
+    "source_sha256": {
+      "miniflight/attitude.py": "72251a77d8e84465226fa4be9ad104ea170da013e6aee088d5a11175c834fc75",
+      "miniflight/mixer.py": "93fdfba40ddbb0350293ab327f1d4bdceb1706af4a7a0544eb190c16e33ccf1e",
+      "miniflight/position.py": "247c05241c59505dc84591b0187fe7ab0fa7ef19e00ac36470f9f25878735ea5",
+      "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+      "target/aigp/client.py": "02d1c5c03be3a80d2290ec2ca3554499c94a275e2a9d124de3ea562a5a7de785",
+      "target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+      "target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+      "target/aigp/experiments/camera_imu/accuracy.py": "81b78ea43862b260f8cededcc50f3d4f3215005f5410c6209a2532eb7a564163",
+      "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+      "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+      "target/aigp/experiments/camera_imu/controller.py": "2fb98fa7f2c8a11abb5064769c067ffe2df0ca8eef76948b495e6ea8fef4cbdb",
+      "target/aigp/experiments/camera_imu/course.py": "1f1adb80c5f607f04b2a71e49fb4682f2fc0914962dd0b3b7ea80c184a1f93f6",
+      "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+      "target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+      "target/aigp/experiments/camera_imu/gravity.py": "d713fa1e39677d9a101ec231fe55d0096562461c2d0477ddde50d12e575d33bb",
+      "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+      "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+      "target/aigp/experiments/camera_imu/motion.py": "17cf4ff7e8415fca7834992a41f11e3b95124010be593431b596e5afe891cd05",
+      "target/aigp/experiments/camera_imu/plots.py": "78bd1ec8beae65e411ebc256439ecf06f2698a402d3ada9279f84333bb2d6e56",
+      "target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+      "target/aigp/experiments/camera_imu/runner.py": "5ba591c566509a7e293b9cd1cb821931edec62aae125b392c4f3378935a49867",
+      "target/aigp/experiments/camera_imu/score.py": "7a286e0f87cc2409c69d0057b0f062782772d0e37d2a87f9b45671c7c6d9e836",
+      "target/aigp/experiments/camera_imu/sensors.py": "9500b016577b29db2a2c5ddded6a1a2667eb23b5a043521f7cec53606f7337b5",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+      "target/aigp/experiments/camera_imu/video.py": "6dcb3f55d7621a0d3e56dfacad18cda5749063be4315944e3eb0d124f9625fed",
+      "target/aigp/experiments/camera_imu/vision.py": "43899542def9a2d4aa0ba860cab7c5b7ee1c38bb71ceb662333d7b32cf593565",
+      "target/aigp/experiments/recording.py": "896bed0c699a5a322cdefbddc2e1014e3c8d3c2a7be84dd9bf3050c076743205",
+      "test/fixtures/vq1_r1_sub10.config.json": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+    },
+    "extension_reason": "Original validation01 timed out before arming with no initialized IMU and no native pose data; retain that failure. Add one unchanged left-shift trial to obtain the five actually flown races originally intended. Do not omit the startup failure from attempt counts."
+  },
+  "development": [
+    {
+      "name": "baseline-01",
+      "revision": "6f07381ac1c48c2afe9dfdaa754e399d92f89399",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 52.480941772,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2366,
+          "median": 1.4785686931220519,
+          "p95": 2.245125105918947,
+          "maximum": 2.8144191668733343,
+          "rms": 1.5089245093909784
+        },
+        "velocity_error_m_s": {
+          "count": 2366,
+          "median": 0.23687824904120672,
+          "p95": 0.8333915354587277,
+          "maximum": 1.8995535470212375,
+          "rms": 0.4122699860238632
+        },
+        "attitude_error_deg": {
+          "count": 2366,
+          "median": 0.24951373247941658,
+          "p95": 0.8333642488391763,
+          "maximum": 1.1490371475008563,
+          "rms": 0.44892137805808635
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "fafd760af25c66bc330f6a5318010d9a66d4393d4be63589a295f589353d1914",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.982134389795203,
+          "first_lock_time_s": 11.530116999999999,
+          "first_lock_image_id": 328,
+          "crossing_position_ned_m": [
+            -23.29796774539962,
+            -0.4318372053753717,
+            -1.3915601939101834
+          ],
+          "crossing_offset_width_down_m": [
+            -0.03193502808545623,
+            -0.29137105879792047
+          ],
+          "last_image_id": 468,
+          "last_image_time_s": 16.179906275,
+          "blind_time_to_crossing_s": 0.8022281147952022,
+          "final_phase_to_crossing_s": 0.386880389795202,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.031382690495691055,
+            -0.29900224851655127,
+            -0.41634935993820243
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.35959725504072,
+          "first_lock_time_s": 17.316983999999998,
+          "first_lock_image_id": 497,
+          "crossing_position_ned_m": [
+            -46.89374909599117,
+            -2.443504661629797,
+            3.931615781028851
+          ],
+          "crossing_offset_width_down_m": [
+            0.05648542407248741,
+            -0.06819490245947975
+          ],
+          "last_image_id": 789,
+          "last_image_time_s": 26.880875900000003,
+          "blind_time_to_crossing_s": 0.4787213550407152,
+          "final_phase_to_crossing_s": 0.46678425504071797,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.004905038525945559,
+            -0.06384411706540336,
+            -0.17935352913174418
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 38.32822416058602,
+          "first_lock_time_s": 28.034644999999998,
+          "first_lock_image_id": 823,
+          "crossing_position_ned_m": [
+            -74.59374986140024,
+            1.2650614436983636,
+            12.554181055180255
+          ],
+          "crossing_offset_width_down_m": [
+            0.0650516036890245,
+            -0.04562905715226717
+          ],
+          "last_image_id": 1117,
+          "last_image_time_s": 37.819607688000005,
+          "blind_time_to_crossing_s": 0.508616472586013,
+          "final_phase_to_crossing_s": 0.471529160586023,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.011318332729537181,
+            -0.036250696310182635,
+            -0.17310637818471958
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 48.83704993135449,
+          "first_lock_time_s": 41.402522999999995,
+          "first_lock_image_id": 1224,
+          "crossing_position_ned_m": [
+            -111.49374375986613,
+            -5.100918435536328,
+            23.451919104004354
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0009286811341412859,
+            -0.04789061878028339
+          ],
+          "last_image_id": 1432,
+          "last_image_time_s": 48.315099191,
+          "blind_time_to_crossing_s": 0.521950740354491,
+          "final_phase_to_crossing_s": 0.45318993135449404,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.02027539582363188,
+            -0.028544587776649703,
+            -0.17384847285493668
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 53.83167027024296,
+          "first_lock_time_s": 49.118632,
+          "first_lock_image_id": 1456,
+          "crossing_position_ned_m": [
+            -135.4937437643864,
+            -0.9353430765036673,
+            24.238871701217175
+          ],
+          "crossing_offset_width_down_m": [
+            -0.135352976475385,
+            -0.04855092014856362
+          ],
+          "last_image_id": 1582,
+          "last_image_time_s": 53.310336546,
+          "blind_time_to_crossing_s": 0.5213337242429574,
+          "final_phase_to_crossing_s": 0.4667782702429619,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.011046644676836187,
+            -0.024285123001306936,
+            -0.1358764659643754
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 54.089006999999995,
+          "first_lock_image_id": 1605
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 23367,
+        "wire_commands": 2506
+      },
+      "poisoned_replay": {
+        "calls": 23367,
+        "wire_commands": 2506,
+        "exact_updates": true,
+        "corrupted_pose_packets": 17639,
+        "corrupted_navigation_packets": 17639,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "baseline-01",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 52.480941772,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2366,
+            "median": 1.4785686931220519,
+            "p95": 2.245125105918947,
+            "maximum": 2.8144191668733343,
+            "rms": 1.5089245093909784
+          },
+          "velocity_error_m_s": {
+            "count": 2366,
+            "median": 0.23687824904120672,
+            "p95": 0.8333915354587277,
+            "maximum": 1.8995535470212375,
+            "rms": 0.4122699860238632
+          },
+          "attitude_error_deg": {
+            "count": 2366,
+            "median": 0.24951373247941658,
+            "p95": 0.8333642488391763,
+            "maximum": 1.1490371475008563,
+            "rms": 0.44892137805808635
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 7.596653,
+            "maximum_full_pose_age_s": 1.2847614139999983,
+            "horizontal_speed_at_end_m_s": 0.038682099850503186,
+            "relative_height_at_end_m": -0.11056455247627506
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 7.924739000000002,
+            "maximum_full_pose_age_s": 1.8453877979999973,
+            "horizontal_speed_at_end_m_s": 0.03642600696493921,
+            "relative_height_at_end_m": -0.11298037293353658
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 2.2929969999999997,
+            "maximum_full_pose_age_s": 0.2850398359999957,
+            "horizontal_speed_at_end_m_s": 4.833770607478279,
+            "relative_height_at_end_m": 0.2371662965759067
+          }
+        ],
+        "motor_saturation": null,
+        "missing_motor_trace": true,
+        "plots": [
+          "camera.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "state.png"
+        ]
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 946,
+          "median": 9.32995049999974,
+          "p95": 21.322156249994784,
+          "maximum": 33.265655000001004,
+          "rms": 11.741523635059119
+        },
+        "velocity_fit_age_ms": {
+          "count": 906,
+          "median": 482.6166429921681,
+          "p95": 512.2009407168284,
+          "maximum": 575.0700406605685,
+          "rms": 456.2704291023228
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 210763118,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "abd4b77f4197fdbb0241f423a722f67d85dd22abe8cd996af61c8b8d593ba255",
+        "input-independence.json": "71789c5fe875d6bec7cb24c166ce29f518d9558c40b577376e4c5025ea8ec49c",
+        "retention.json": "bfefa139d3fb3528761130a6d005e60510c874b1c5891036c96d92b1e5046788",
+        "score.json": "2d93bc1aa86d32592954a3496f85dc70485b03c9fe0ee3ea9b33854a9e8c35fa",
+        "recovery-diagnostic.json": "53d72a9131d5c965684a0bd818a23a1baf7500338e8fd6b0c1861570496da700",
+        "replay.json": "2e1a87da9ca9c1047e5f3c632fa5d1147c510ab2792515ec140d5041ff99f0df",
+        "camera-errors.csv": "5d499531fca3fe49618c21d920f4dcd4612acb582640cb60740783198ce8b461",
+        "protocol.json": "b7e29a94bfe2039fc589b354976e505183825b19c5b5d48af2d09aa426a31fe3",
+        "video.json": "60df0f3c9a3cb01cfdbcea26c1e053424771c8b05fa05df86f6e0e33db017f2a",
+        "control.jsonl.gz": "d2ecce6e1a0587fa75d4e44a267869e4f252f1f1f4689f4186e1c756e4ac553c",
+        "course-camera-imu.mp4": "31e3a1d07bb804133a614e4b757f6dd3be6fd50d7e66ae3c5d8b4228722906f7"
+      }
+    },
+    {
+      "name": "bearing-01",
+      "revision": "a6c195f5d8368baa41de2c3c6f48992a87165d64",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1037,
+          "median": 0.4718624851861335,
+          "p95": 2.766356747982395,
+          "maximum": 3.2671024268632345,
+          "rms": 1.086518420046054
+        },
+        "velocity_error_m_s": {
+          "count": 1037,
+          "median": 0.1868915925833254,
+          "p95": 0.7743637494705893,
+          "maximum": 0.9320859546771156,
+          "rms": 0.3483949522975
+        },
+        "attitude_error_deg": {
+          "count": 1037,
+          "median": 0.13332709255909203,
+          "p95": 0.31965164573062727,
+          "maximum": 1.4850406318498497,
+          "rms": 0.18779666692862473
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "6d2eacc8ebdf2908ba19ec5c152bcb64fac2baed67c4c4951528303b5376a1ff",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.084116657012995,
+          "first_lock_time_s": 11.46284,
+          "first_lock_image_id": 318,
+          "crossing_position_ned_m": [
+            -23.297967761439402,
+            -0.42175635126824196,
+            -1.257733188604332
+          ],
+          "crossing_offset_width_down_m": [
+            -0.021854157593493684,
+            -0.15754405472629762
+          ],
+          "last_image_id": 463,
+          "last_image_time_s": 16.290146813,
+          "blind_time_to_crossing_s": 0.7939698440129952,
+          "final_phase_to_crossing_s": 0.43876765701299547,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.010954079206542176,
+            -0.16494498759388462,
+            -0.17878561742493604
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.655710242240882,
+          "first_lock_time_s": 17.37146,
+          "first_lock_image_id": 492,
+          "crossing_position_ned_m": [
+            -46.893749100656784,
+            -2.5007278738204866,
+            3.953725403777852
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0007377854112557001,
+            -0.046085272704472574
+          ],
+          "last_image_id": 760,
+          "last_image_time_s": 26.189084874000002,
+          "blind_time_to_crossing_s": 0.4666253682408801,
+          "final_phase_to_crossing_s": 0.4481382422408835,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.012572500675649023,
+            -0.03854069000690349,
+            -0.19950818250069793
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 27.225837,
+          "first_lock_image_id": 791
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 12051,
+        "wire_commands": 1172
+      },
+      "poisoned_replay": {
+        "calls": 12051,
+        "wire_commands": 1172,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9158,
+        "corrupted_navigation_packets": 9158,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "bearing-01",
+        "native_gates": 2,
+        "clean": false,
+        "contacts": 0,
+        "finish_s": null,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 1037,
+            "median": 0.4718624851861335,
+            "p95": 2.766356747982395,
+            "maximum": 3.2671024268632345,
+            "rms": 1.086518420046054
+          },
+          "velocity_error_m_s": {
+            "count": 1037,
+            "median": 0.1868915925833254,
+            "p95": 0.7743637494705893,
+            "maximum": 0.9320859546771156,
+            "rms": 0.3483949522975
+          },
+          "attitude_error_deg": {
+            "count": 1037,
+            "median": 0.13332709255909203,
+            "p95": 0.31965164573062727,
+            "maximum": 1.4850406318498497,
+            "rms": 0.18779666692862473
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.785273,
+            "maximum_full_pose_age_s": 3.0842460189999983,
+            "horizontal_speed_at_end_m_s": 0.2363569489666971,
+            "relative_height_at_end_m": -0.15671379267124674
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 4.983217000000003,
+            "maximum_full_pose_age_s": 4.485834188999998,
+            "horizontal_speed_at_end_m_s": 0.0827560937373577,
+            "relative_height_at_end_m": -2.555885120069103
+          }
+        ],
+        "motor_saturation": null,
+        "missing_motor_trace": true,
+        "plots": [
+          "camera.png",
+          "gate-2.png",
+          "gate-3.png",
+          "state.png"
+        ]
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 307,
+          "median": 9.317162999995077,
+          "p95": 20.12282989999825,
+          "maximum": 30.022149999997083,
+          "rms": 11.772643447738018
+        },
+        "velocity_fit_age_ms": {
+          "count": 287,
+          "median": 481.6952904573917,
+          "p95": 514.12611559989,
+          "maximum": 577.0830684445905,
+          "rms": 442.6805700142108
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 107244122,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "20c86d1f61ff18c9f78d78aecb3b7144aeaefb100e3226f598e4539dfbaf0e76",
+        "input-independence.json": "94bb0c76e869ea82d9f0af1ad7d4ad5bee8596fbc59b3d2c535134c68c006406",
+        "retention.json": "9c7b8b5f7f4d8c1de62d61cbcd3d6d376247183d005a9869ec0fbaa7ca9f43bd",
+        "score.json": "96c98ba0e9b0f8258cab26d254b6365737fc8f66ed10568b904c20664ea3d9b9",
+        "replay.json": "a741bd7031c4f15a97f30c7fbceebd4682c8cc6a9603088ed4b34e99a1685bbf",
+        "camera-errors.csv": "2f461cc101ef2d7c3182dd42a76df3a61480db98a25597064fcb79239fddee41",
+        "protocol.json": "1f642abb853d5abcbac049ac5f8eeaeea719b956142ae254b25f372d3d717800",
+        "video.json": "2fed21e194e61f6ea386ca4c7312d1f2939584f0c00649f6bf2a28219580b3ef",
+        "control.jsonl.gz": "672fa2598e6e86e8888e857b12c52ef2c5488eabc1950b902f940f758ea18165",
+        "course-camera-imu.mp4": "8c1c91f2c7c4cb52359e9049182e6598948de64885cb70ae7c23bafd2e55efb3"
+      }
+    },
+    {
+      "name": "bearing-02",
+      "revision": "a6c195f5d8368baa41de2c3c6f48992a87165d64",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1158,
+          "median": 0.2585805722242738,
+          "p95": 2.128064202359734,
+          "maximum": 2.7098864867688257,
+          "rms": 0.8680432745472013
+        },
+        "velocity_error_m_s": {
+          "count": 1158,
+          "median": 0.22582483496638234,
+          "p95": 0.476929989605837,
+          "maximum": 0.5960415258152353,
+          "rms": 0.26414924268755224
+        },
+        "attitude_error_deg": {
+          "count": 1158,
+          "median": 0.13874867757527892,
+          "p95": 0.6269240963569184,
+          "maximum": 1.3815480244970917,
+          "rms": 0.3553118558363503
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "cb56b261eb4e44e8af862d0bc2502813cb2a6045ad8c84e0c2691a9f39acc83a",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.159277913654353,
+          "first_lock_time_s": 11.426167999999999,
+          "first_lock_image_id": 326,
+          "crossing_position_ned_m": [
+            -23.29796777178027,
+            -0.4045881171111932,
+            -1.1684719144221976
+          ],
+          "crossing_offset_width_down_m": [
+            -0.004685912507925357,
+            -0.0682827826461206
+          ],
+          "last_image_id": 482,
+          "last_image_time_s": 16.613279103,
+          "blind_time_to_crossing_s": 0.5459988106543534,
+          "final_phase_to_crossing_s": 0.4325469136543525,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0006300506543075003,
+            -0.05219253980302207,
+            -0.17736153874374097
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.904603219973964,
+          "first_lock_time_s": 17.414028,
+          "first_lock_image_id": 505,
+          "crossing_position_ned_m": [
+            -46.89374909696921,
+            -2.491578024727911,
+            3.926164246704218
+          ],
+          "crossing_offset_width_down_m": [
+            0.008412060306926573,
+            -0.07364643089834953
+          ],
+          "last_image_id": 776,
+          "last_image_time_s": 26.411274738000003,
+          "blind_time_to_crossing_s": 0.4933284819739612,
+          "final_phase_to_crossing_s": 0.4669502199739668,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.008117487710808906,
+            -0.07848288470916366,
+            -0.1718971140346138
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 27.522771,
+          "first_lock_image_id": 809
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 13188,
+        "wire_commands": 1295
+      },
+      "poisoned_replay": {
+        "calls": 13188,
+        "wire_commands": 1295,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9952,
+        "corrupted_navigation_packets": 9952,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "bearing-02",
+        "native_gates": 2,
+        "clean": false,
+        "contacts": 0,
+        "finish_s": null,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 1158,
+            "median": 0.2585805722242738,
+            "p95": 2.128064202359734,
+            "maximum": 2.7098864867688257,
+            "rms": 0.8680432745472013
+          },
+          "velocity_error_m_s": {
+            "count": 1158,
+            "median": 0.22582483496638234,
+            "p95": 0.476929989605837,
+            "maximum": 0.5960415258152353,
+            "rms": 0.26414924268755224
+          },
+          "attitude_error_deg": {
+            "count": 1158,
+            "median": 0.13874867757527892,
+            "p95": 0.6269240963569184,
+            "maximum": 1.3815480244970917,
+            "rms": 0.3553118558363503
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.963929,
+            "maximum_full_pose_age_s": 3.714985851999998,
+            "horizontal_speed_at_end_m_s": 0.21604369049636435,
+            "relative_height_at_end_m": -0.01762025613989726
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 7.224869999999994,
+            "maximum_full_pose_age_s": 4.477903680999994,
+            "horizontal_speed_at_end_m_s": 0.006392273553011367,
+            "relative_height_at_end_m": -0.49495034227273216
+          }
+        ],
+        "motor_saturation": null,
+        "missing_motor_trace": true,
+        "plots": [
+          "camera.png",
+          "gate-2.png",
+          "gate-3.png",
+          "state.png"
+        ]
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 311,
+          "median": 10.870709999998951,
+          "p95": 22.272453999997666,
+          "maximum": 34.12127699999701,
+          "rms": 12.511384415310289
+        },
+        "velocity_fit_age_ms": {
+          "count": 286,
+          "median": 476.68150938109125,
+          "p95": 511.06967345277224,
+          "maximum": 543.4189407803362,
+          "rms": 425.45778661363283
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 117628073,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "81513e0aca57ff3ff3da7bedefa57aab24ec1f88e34611206f85cf7cb1f47b89",
+        "input-independence.json": "645837f2762d08fbd8d50e8037310bacf59d9cee81b0b1154e927589fcd1f405",
+        "retention.json": "c6ecbddcf1a56e1b6207a4bcc54de6261e4f86f2c8f9c095453c70d15d74e204",
+        "score.json": "0213415abc9acc50eff0e7fcbba42600fcbc81c64cacf6a0f476a90fc356ec10",
+        "replay.json": "3f6619f8ac493f736626f5b14ab0e28e0f5cb525e34c3f856589b334e33c819f",
+        "camera-errors.csv": "237d851dabf849df1456e20ff5a37a3b5a219bd485d5a40e7d0f233df21f928b",
+        "protocol.json": "1f642abb853d5abcbac049ac5f8eeaeea719b956142ae254b25f372d3d717800",
+        "video.json": "7576a43a6c33c7cb58ea5b5d382c5d0a44a43cd9f7861bc61454ef29ca8774c7",
+        "control.jsonl.gz": "f167ecd2ad25d1ddf5de8a3d5a267a232c961d4c85dbf03779e5b787b8ee0f56",
+        "course-camera-imu.mp4": "a941c6e291c6a6136ec5b1fd757a2a25e33e3073bdbb957cf5cff643162d488b"
+      }
+    },
+    {
+      "name": "bearing-03",
+      "revision": "a6c195f5d8368baa41de2c3c6f48992a87165d64",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1117,
+          "median": 0.4257577943737344,
+          "p95": 1.141590330798262,
+          "maximum": 2.4244900582433155,
+          "rms": 0.6915977134382273
+        },
+        "velocity_error_m_s": {
+          "count": 1117,
+          "median": 0.15598186874045736,
+          "p95": 0.6963883449336499,
+          "maximum": 0.8725617698715655,
+          "rms": 0.3210631915032823
+        },
+        "attitude_error_deg": {
+          "count": 1117,
+          "median": 0.1914345100401613,
+          "p95": 0.37727152331552655,
+          "maximum": 1.0723262201943005,
+          "rms": 0.23981283429282974
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "f9fe67bfd501d01ca67e9b4e013d07088f6af46c79d3f81310922043e80b4abd",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.03157030268603,
+          "first_lock_time_s": 11.441794,
+          "first_lock_image_id": 326,
+          "crossing_position_ned_m": [
+            -23.29796777471795,
+            -0.42148989750515675,
+            -1.149202948996274
+          ],
+          "crossing_offset_width_down_m": [
+            -0.021587690542732834,
+            -0.04901381515086248
+          ],
+          "last_image_id": 479,
+          "last_image_time_s": 16.539933116,
+          "blind_time_to_crossing_s": 0.49163718668603096,
+          "final_phase_to_crossing_s": 0.4546293026860333,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.008912496086348792,
+            -0.029621861566632858,
+            -0.180613603840783
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.114223529519933,
+          "first_lock_time_s": 17.301788,
+          "first_lock_image_id": 500,
+          "crossing_position_ned_m": [
+            -46.893749098798324,
+            -2.494601302266815,
+            3.940258798745229
+          ],
+          "crossing_offset_width_down_m": [
+            0.005388784493659872,
+            -0.059551878487189604
+          ],
+          "last_image_id": 752,
+          "last_image_time_s": 25.639794586,
+          "blind_time_to_crossing_s": 0.47442894351993203,
+          "final_phase_to_crossing_s": 0.4523635295199355,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.015531007661998877,
+            -0.0602803106076954,
+            -0.19881080358388648
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 26.911234999999998,
+          "first_lock_image_id": 790
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 13489,
+        "wire_commands": 1254
+      },
+      "poisoned_replay": {
+        "calls": 13489,
+        "wire_commands": 1254,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9837,
+        "corrupted_navigation_packets": 9837,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "bearing-03",
+        "native_gates": 2,
+        "clean": false,
+        "contacts": 0,
+        "finish_s": null,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 1117,
+            "median": 0.4257577943737344,
+            "p95": 1.141590330798262,
+            "maximum": 2.4244900582433155,
+            "rms": 0.6915977134382273
+          },
+          "velocity_error_m_s": {
+            "count": 1117,
+            "median": 0.15598186874045736,
+            "p95": 0.6963883449336499,
+            "maximum": 0.8725617698715655,
+            "rms": 0.3210631915032823
+          },
+          "attitude_error_deg": {
+            "count": 1117,
+            "median": 0.1914345100401613,
+            "p95": 0.37727152331552655,
+            "maximum": 1.0723262201943005,
+            "rms": 0.23981283429282974
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.312650999999999,
+            "maximum_full_pose_age_s": 2.7471527609999953,
+            "horizontal_speed_at_end_m_s": 0.26365022631930773,
+            "relative_height_at_end_m": -0.2943269674544302
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 7.050834999999999,
+            "maximum_full_pose_age_s": 4.489843236999995,
+            "horizontal_speed_at_end_m_s": 0.00674745187646907,
+            "relative_height_at_end_m": 0.1882483326591493
+          }
+        ],
+        "motor_saturation": null,
+        "missing_motor_trace": true,
+        "plots": [
+          "camera.png",
+          "gate-2.png",
+          "gate-3.png",
+          "state.png"
+        ]
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 338,
+          "median": 8.834833999998182,
+          "p95": 20.86779009999756,
+          "maximum": 45.61071199999844,
+          "rms": 11.77680422469356
+        },
+        "velocity_fit_age_ms": {
+          "count": 312,
+          "median": 480.6264328343062,
+          "p95": 512.7958737160016,
+          "maximum": 549.1274732361954,
+          "rms": 434.1713264892097
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 115720653,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "6a997540de5264753ef031f94aeaa43b9948ae96731f3a134c04ce5fc32c8f90",
+        "input-independence.json": "069f0fd3f18c5e760938db686cc8a4e9fd83becba5cd5609aa4fece104356301",
+        "retention.json": "287105afad85e4e9002a5c1178c663814107da415035be6ef152101c2b1f6478",
+        "score.json": "a2f05ec26815c864b22801a5833ce5a51bad5a5ba3fc732ccdca7beba188b2a3",
+        "replay.json": "8e6a1c485f795a70369128f36dc71b7914ba22a316bf03ed3fc560a2a4b301e0",
+        "camera-errors.csv": "850667dfa897f1c5762f8713061dffe292570fbc2362d365993b2ecbc7a96ce1",
+        "protocol.json": "1f642abb853d5abcbac049ac5f8eeaeea719b956142ae254b25f372d3d717800",
+        "video.json": "ddb92627dfbea8d914c37cd6d38d750971989923a87153b85b7a4e06f479c022",
+        "control.jsonl.gz": "18068183c1d6af17b7a024c4b2828e26cb20949b756ca6283354f2a92b9214ea",
+        "course-camera-imu.mp4": "c32e5c8d93d835dfa4a8afc86005590e7963a3f1c35b354fa992e2f612d9e136"
+      }
+    },
+    {
+      "name": "visibility-01",
+      "revision": "df8319e8347c6a0ae5c98d1e4ded8985dd0cb566",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 52.474136353,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2361,
+          "median": 1.3297762424227986,
+          "p95": 4.920889754229545,
+          "maximum": 6.321664460855829,
+          "rms": 2.3324149992544974
+        },
+        "velocity_error_m_s": {
+          "count": 2361,
+          "median": 0.23979709343833894,
+          "p95": 1.3624455363592796,
+          "maximum": 1.674028146908617,
+          "rms": 0.522297498383603
+        },
+        "attitude_error_deg": {
+          "count": 2361,
+          "median": 0.4119161026587607,
+          "p95": 2.8274496787206367,
+          "maximum": 4.953927403659378,
+          "rms": 1.6266186229498985
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "6798c154f152eda201e275acd68a7b58d9c8dca62d150aab7c38d003b88bda34",
+      "contact_packets": 20,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.070081976998026,
+          "first_lock_time_s": 11.446036999999999,
+          "first_lock_image_id": 327,
+          "crossing_position_ned_m": [
+            -23.297967776451078,
+            -0.41969409182394835,
+            -1.1345451652931329
+          ],
+          "crossing_offset_width_down_m": [
+            -0.019791883066928972,
+            -0.03435603166758705
+          ],
+          "last_image_id": 481,
+          "last_image_time_s": 16.573281180000002,
+          "blind_time_to_crossing_s": 0.4968007969980235,
+          "final_phase_to_crossing_s": 0.46199497699802805,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.014569696661473194,
+            -0.03035892682924536,
+            -0.17641781549338212
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 24.97219213454755,
+          "first_lock_time_s": 17.547670999999998,
+          "first_lock_image_id": 510,
+          "crossing_position_ned_m": [
+            -46.893749104895036,
+            -2.51414588967068,
+            3.984591118529627
+          ],
+          "crossing_offset_width_down_m": [
+            -0.014155797482468905,
+            -0.01521955630989046
+          ],
+          "last_image_id": 719,
+          "last_image_time_s": 24.502745946,
+          "blind_time_to_crossing_s": 0.4694461885475505,
+          "final_phase_to_crossing_s": 0.4603621345475517,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.016013549288516362,
+            -0.029264620709073905,
+            -0.19490945229910803
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 32.84375727787939,
+          "first_lock_time_s": 25.587339,
+          "first_lock_image_id": 751,
+          "crossing_position_ned_m": [
+            -74.5937498614293,
+            1.2312023633188502,
+            12.54495259884213
+          ],
+          "crossing_offset_width_down_m": [
+            0.031192522179644407,
+            -0.054857509344925344
+          ],
+          "last_image_id": 955,
+          "last_image_time_s": 32.372814238000004,
+          "blind_time_to_crossing_s": 0.470943039879387,
+          "final_phase_to_crossing_s": 0.4644602778793896,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.011348289911999671,
+            -0.04854262847735641,
+            -0.14965179261442443
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 43.47039636391642,
+          "first_lock_time_s": 33.452847999999996,
+          "first_lock_image_id": 987,
+          "crossing_position_ned_m": [
+            -111.49374377124592,
+            -5.165545222327999,
+            23.526798336371606
+          ],
+          "crossing_offset_width_down_m": [
+            -0.06555545875812807,
+            0.026988621499415773
+          ],
+          "last_image_id": 1273,
+          "last_image_time_s": 42.970870538,
+          "blind_time_to_crossing_s": 0.4995258259164217,
+          "final_phase_to_crossing_s": 0.49695136391642336,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.012183230647504158,
+            -0.024410766050012384,
+            -0.07366097076853793
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 48.841326661957766,
+          "first_lock_time_s": 43.711684,
+          "first_lock_image_id": 1295,
+          "crossing_position_ned_m": [
+            -135.4937437576824,
+            -0.7014905958412905,
+            24.249493340567856
+          ],
+          "crossing_offset_width_down_m": [
+            0.0984995054874287,
+            -0.03792930942912863
+          ],
+          "last_image_id": 1434,
+          "last_image_time_s": 48.339805342000005,
+          "blind_time_to_crossing_s": 0.5015213199577602,
+          "final_phase_to_crossing_s": 0.4854226619577702,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.027059844702455534,
+            -0.019805687529547172,
+            -0.1166929165987192
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 58.85652985468222,
+          "first_lock_time_s": 49.115933,
+          "first_lock_image_id": 1457,
+          "crossing_position_ned_m": [
+            -159.19374068311808,
+            -4.068203070861649,
+            24.740822463916757
+          ],
+          "crossing_offset_width_down_m": [
+            0.33178686067355806,
+            -0.15898691813349633
+          ],
+          "last_image_id": 1730,
+          "last_image_time_s": 58.203595567,
+          "blind_time_to_crossing_s": 0.6529342876822213,
+          "final_phase_to_crossing_s": 0.6438548546822247,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.014018749659039266,
+            -0.12861157313613975,
+            0.004957278320830755
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 23315,
+        "wire_commands": 2499
+      },
+      "poisoned_replay": {
+        "calls": 23315,
+        "wire_commands": 2499,
+        "exact_updates": true,
+        "corrupted_pose_packets": 17567,
+        "corrupted_navigation_packets": 17567,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "visibility-01",
+        "native_gates": 6,
+        "clean": false,
+        "contacts": 20,
+        "finish_s": 52.474136353,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2361,
+            "median": 1.3297762424227986,
+            "p95": 4.920889754229545,
+            "maximum": 6.321664460855829,
+            "rms": 2.3324149992544974
+          },
+          "velocity_error_m_s": {
+            "count": 2361,
+            "median": 0.23979709343833894,
+            "p95": 1.3624455363592796,
+            "maximum": 1.674028146908617,
+            "rms": 0.522297498383603
+          },
+          "attitude_error_deg": {
+            "count": 2361,
+            "median": 0.4119161026587607,
+            "p95": 2.8274496787206367,
+            "maximum": 4.953927403659378,
+            "rms": 1.6266186229498985
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 4.800518,
+            "maximum_full_pose_age_s": 2.0435178449999967,
+            "horizontal_speed_at_end_m_s": 0.004160419051241513,
+            "relative_height_at_end_m": -0.03208738740776962
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 4.699476999999998,
+            "maximum_full_pose_age_s": 1.5456463589999956,
+            "horizontal_speed_at_end_m_s": 0.02845522871849793,
+            "relative_height_at_end_m": -0.4344229333028471
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 7.275044000000001,
+            "maximum_full_pose_age_s": 1.6874754369999962,
+            "horizontal_speed_at_end_m_s": 0.03278146355315255,
+            "relative_height_at_end_m": -0.17207192596519327
+          },
+          {
+            "gate": 5,
+            "alignment_duration_s": 1.9280490000000015,
+            "maximum_full_pose_age_s": 0.2225503199999963,
+            "horizontal_speed_at_end_m_s": 4.759228718893888,
+            "relative_height_at_end_m": 0.16115677191573807
+          },
+          {
+            "gate": 6,
+            "alignment_duration_s": 7.735545000000002,
+            "maximum_full_pose_age_s": 4.252728951999991,
+            "horizontal_speed_at_end_m_s": 0.2726091708202206,
+            "relative_height_at_end_m": -0.4785952253291892
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "contact-frames.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "gate-5.png",
+          "gate-6.png",
+          "reference.png",
+          "state.png",
+          "vertical-plane-gravity.png",
+          "visual-gravity.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "visibility-01",
+        "strict_flight_pass": false,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 52.474136353,
+        "inflight_contact_packets": 20,
+        "contact_episodes": 1,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 2.689756731180275,
+        "gate5_camera_vertical_error_p95_m": 0.9237467997225077,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": false,
+          "gate5_camera_height": false,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 0,
+        "maximum_gravity_correction_deg": null,
+        "control_imu_interval_ms": {
+          "median": 19.852999999997678,
+          "p95": 33.795599999996284,
+          "max": 59.13400000000024
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7202080292266213,
+            "vertical_centerline_margin_m": 0.7056439683324129
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.7258441148110816,
+            "vertical_centerline_margin_m": 0.7247804436901095
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.7088073901139059,
+            "vertical_centerline_margin_m": 0.6851424906550753
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.6744444535354223,
+            "vertical_centerline_margin_m": 0.7130113785005849
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.6415004068061216,
+            "vertical_centerline_margin_m": 0.702070690570872
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.4082130516199923,
+            "vertical_centerline_margin_m": 0.5810130818665044
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.4787984341437,
+        "scored_setup_overhead_s": 5.057173352999998,
+        "current_speed_horizontal_lower_bound_s": 32.09575968682874,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 14
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 849,
+          "median": 8.643876999997246,
+          "p95": 20.277426799997027,
+          "maximum": 32.844002999993904,
+          "rms": 11.330171324756286
+        },
+        "velocity_fit_age_ms": {
+          "count": 802,
+          "median": 481.4186798555715,
+          "p95": 511.4748088989611,
+          "maximum": 571.234088264383,
+          "rms": 443.12354836791553
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 214541838,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "b0bc6c6fbde9a1826c155b53916a9af481cce0d9d30bf914ef23ee6ffb235672",
+        "input-independence.json": "5ec810ad515e74cad57cfb24eb93ef451db07d64508facbee21ce1097c660d6f",
+        "retention.json": "0f65e6159535515822939d847d71a107af1f1311fc5d5d78c241844be5ca2c87",
+        "visual-gravity-scored.csv": "f2eaf775646d673a6b4afb5eb1c1137beceaf65dee814db12cb5b90fcb51c566",
+        "score.json": "35d8b3311ca7f7b9d55517160223a39d604b3923ff42ee58d662b84e3c497919",
+        "vertical-plane-hypotheses.json": "c703c7522c8109b2a9d6ab16b32b5a53e2eae78f5e109c92be126f45a47e765f",
+        "replay.json": "93a6ad172e08c008e10a45405ec6ca1d0710330de00035fbb4123a7c3694ddf7",
+        "camera-errors.csv": "bce4311f4f4cf98f533eeb5a8326cdd7834db7aebc578e3d43f1296efaf2a727",
+        "protocol.json": "1c8ed6f97ba360f1deaf6a4623cb101db2d2d4f3b169fa05906cdbcfd721db3f",
+        "video.json": "44b7ce1929d72c4b71b55b5c727bc996da9fbcc934aabe2bfef0e63ec8548dda",
+        "visual-gravity-hypotheses.json": "a91753b78b810466252759bd49f9d4adff0a4a73133bfd0a52bc1101035a5b5b",
+        "vertical-plane-scores.json": "eea834eac944a46a15c0cb7f00e373667167645ea26c12ea815d6acdc83a8289",
+        "control.jsonl.gz": "b692175e18a2ceae8f5929c37bdd1ab299f3efea262f970adb1d54e1e9d6b691",
+        "course-camera-imu.mp4": "8f092d54dcd528e9ee309acb3bb10f540594f15f497cd04e88a97753f9f59748"
+      }
+    },
+    {
+      "name": "gravity-01",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 46.790187836,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2079,
+          "median": 1.0794501853468932,
+          "p95": 3.9963833021372572,
+          "maximum": 6.2986007039996466,
+          "rms": 2.249387622983179
+        },
+        "velocity_error_m_s": {
+          "count": 2079,
+          "median": 0.17539080916725255,
+          "p95": 0.7703063208405021,
+          "maximum": 2.32962849184218,
+          "rms": 0.42252964680162797
+        },
+        "attitude_error_deg": {
+          "count": 2079,
+          "median": 0.3070746947155051,
+          "p95": 0.5738684864408742,
+          "maximum": 1.0261483249178038,
+          "rms": 0.34241998581783867
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "f14ea6e2d5041a25b2c2746788c60e3f652916d2c4fd9128ab72ce529de04244",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.165085879735017,
+          "first_lock_time_s": 11.510093999999999,
+          "first_lock_image_id": 326,
+          "crossing_position_ned_m": [
+            -23.297967780414336,
+            -0.422041337480364,
+            -1.1028305236097584
+          ],
+          "crossing_offset_width_down_m": [
+            -0.02213912484042797,
+            -0.0026413896968324134
+          ],
+          "last_image_id": 482,
+          "last_image_time_s": 16.685798099,
+          "blind_time_to_crossing_s": 0.4792877807350173,
+          "final_phase_to_crossing_s": 0.4561308797350172,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.017439532064472796,
+            0.023068498501621328,
+            -0.2358640155048375
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 25.259399503544383,
+          "first_lock_time_s": 17.453440999999998,
+          "first_lock_image_id": 501,
+          "crossing_position_ned_m": [
+            -46.89374909904604,
+            -2.480197686142648,
+            3.946308993620846
+          ],
+          "crossing_offset_width_down_m": [
+            0.019792401358569845,
+            -0.053501685375049554
+          ],
+          "last_image_id": 725,
+          "last_image_time_s": 24.78712481,
+          "blind_time_to_crossing_s": 0.47227469354438156,
+          "final_phase_to_crossing_s": 0.46485250354438534,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0052361779050722635,
+            -0.05207654994829825,
+            -0.14829858557474335
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 33.34121036487299,
+          "first_lock_time_s": 25.503911,
+          "first_lock_image_id": 727,
+          "crossing_position_ned_m": [
+            -74.59374986760513,
+            1.0370688737623825,
+            12.54112113547263
+          ],
+          "crossing_offset_width_down_m": [
+            -0.16294096784591924,
+            -0.05868894894609096
+          ],
+          "last_image_id": 968,
+          "last_image_time_s": 32.889854996000004,
+          "blind_time_to_crossing_s": 0.45135536887298855,
+          "final_phase_to_crossing_s": 0.4411713648729929,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.02681964626403106,
+            -0.05307214325480041,
+            -0.2038809893425233
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 43.90278916316147,
+          "first_lock_time_s": 33.622205,
+          "first_lock_image_id": 947,
+          "crossing_position_ned_m": [
+            -111.49374374695395,
+            -4.7371918261858665,
+            23.44814273400145
+          ],
+          "crossing_offset_width_down_m": [
+            0.3627979277539656,
+            -0.051667033315303874
+          ],
+          "last_image_id": 1284,
+          "last_image_time_s": 43.421563452,
+          "blind_time_to_crossing_s": 0.4812257111614713,
+          "final_phase_to_crossing_s": 0.469564163161472,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.03371465511944822,
+            -0.03474888751084464,
+            -0.15032562832560864
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 48.942086427479154,
+          "first_lock_time_s": 44.465892,
+          "first_lock_image_id": 1315,
+          "crossing_position_ned_m": [
+            -135.49374375856138,
+            -0.8662002217006275,
+            24.210624788852176
+          ],
+          "crossing_offset_width_down_m": [
+            -0.06621012513069804,
+            -0.07679784097892535
+          ],
+          "last_image_id": 1434,
+          "last_image_time_s": 48.42148086,
+          "blind_time_to_crossing_s": 0.5206055674791514,
+          "final_phase_to_crossing_s": 0.44782142747915543,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.016810155185547102,
+            -0.05374288875173452,
+            -0.17584014708358733
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 53.30791222863607,
+          "first_lock_time_s": 49.205746,
+          "first_lock_image_id": 1455,
+          "crossing_position_ned_m": [
+            -159.193740701981,
+            -4.389248533411445,
+            24.805135080604625
+          ],
+          "crossing_offset_width_down_m": [
+            0.010741405997746208,
+            -0.09467426213908921
+          ],
+          "last_image_id": 1563,
+          "last_image_time_s": 52.72057482100001,
+          "blind_time_to_crossing_s": 0.5873374076360633,
+          "final_phase_to_crossing_s": 0.3956322286360745,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.1251624057562749,
+            -0.09120787392263287,
+            -0.3264819782030015
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 20787,
+        "wire_commands": 2219
+      },
+      "poisoned_replay": {
+        "calls": 20787,
+        "wire_commands": 2219,
+        "exact_updates": true,
+        "corrupted_pose_packets": 15812,
+        "corrupted_navigation_packets": 15812,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "gravity-01",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 46.790187836,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2079,
+            "median": 1.0794501853468932,
+            "p95": 3.9963833021372572,
+            "maximum": 6.2986007039996466,
+            "rms": 2.249387622983179
+          },
+          "velocity_error_m_s": {
+            "count": 2079,
+            "median": 0.17539080916725255,
+            "p95": 0.7703063208405021,
+            "maximum": 2.32962849184218,
+            "rms": 0.42252964680162797
+          },
+          "attitude_error_deg": {
+            "count": 2079,
+            "median": 0.3070746947155051,
+            "p95": 0.5738684864408742,
+            "maximum": 1.0261483249178038,
+            "rms": 0.34241998581783867
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 5.211329999999997,
+            "maximum_full_pose_age_s": 2.113683097999999,
+            "horizontal_speed_at_end_m_s": 0.25462793112189336,
+            "relative_height_at_end_m": 0.07899946238520639
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 5.245435999999998,
+            "maximum_full_pose_age_s": 1.6867040529999997,
+            "horizontal_speed_at_end_m_s": 0.10631492479300689,
+            "relative_height_at_end_m": -0.24851079673951348
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 7.9234440000000035,
+            "maximum_full_pose_age_s": 1.7214785409999962,
+            "horizontal_speed_at_end_m_s": 0.0552453936904254,
+            "relative_height_at_end_m": -0.07060376844007843
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "gravity-01",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 46.790187836,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.5565437187611362,
+        "gate5_camera_vertical_error_p95_m": 0.12847565480249523,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 66,
+        "maximum_gravity_correction_deg": 0.15,
+        "control_imu_interval_ms": {
+          "median": 19.601999999999897,
+          "p95": 33.42109999999997,
+          "max": 66.5169999999975
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7178607874531223,
+            "vertical_centerline_margin_m": 0.7373586103031676
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.7202075109349806,
+            "vertical_centerline_margin_m": 0.6864983146249505
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.5770589444476311,
+            "vertical_centerline_margin_m": 0.6813110510539097
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.37720198453958476,
+            "vertical_centerline_margin_m": 0.6883329666846968
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.6737897871628523,
+            "vertical_centerline_margin_m": 0.6632021590210753
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.7292585062958041,
+            "vertical_centerline_margin_m": 0.6453257378609114
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.80706220654127,
+        "scored_setup_overhead_s": 4.989281836,
+        "current_speed_horizontal_lower_bound_s": 32.16141244130826,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 728,
+          "median": 9.518505999997373,
+          "p95": 21.006555249992687,
+          "maximum": 32.2563509999938,
+          "rms": 11.73555585649112
+        },
+        "velocity_fit_age_ms": {
+          "count": 682,
+          "median": 476.08784121667026,
+          "p95": 518.4020113594237,
+          "maximum": 596.6791750368614,
+          "rms": 438.59168446292136
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 194314878,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "34c86b3dcbd46b981490779093b53b3efd1ecfe0dcf78bff94d2df483ffc1f7b",
+        "input-independence.json": "cf32bae670b6a68426a8a5bdfc0e34115872f5737b84dbc7bb40a56884c5067c",
+        "retention.json": "e4e5b6bffe0be3698ecfb9527140361064d4b88b8307bd6c1e43a0b99697f55b",
+        "score.json": "e774e1d90a0982749d051d4758c326a562ee5179fdf05366945c1f2c97c851c9",
+        "replay.json": "f636c9e69527ee8070cd7961c63b8b2f1cffcbf46fe7845e51f5a09eb6c9a665",
+        "camera-errors.csv": "3c81cb3f192f0cf02a7136ea9a8f45a1d0c81f9f3d169b766e453e622f93fc21",
+        "protocol.json": "a64b5c5279a512cb30109433bc772534feff79cbb83dbab62818538c0de5042a",
+        "video.json": "63ec271d1fb1606592e9c77a1d66d50ecb5a1d2048b3d12c194c3a9a0e719710",
+        "control.jsonl.gz": "b311aa962c612094dea706ce99f5b7d7afde52dea416e11bd4b84db5bcf326a3",
+        "course-camera-imu.mp4": "d598cc0a988586da956b315b175f24f76d7ce9dc60544f4514bd8200a648b11c"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "name": "gravity-validation/validation-01",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "failure": {
+        "type": "IndexError",
+        "message": "too many indices for array: array is 1-dimensional, but 2 were indexed"
+      },
+      "controller_outcome": {
+        "error": {
+          "type": "TimeoutError",
+          "message": "sensor-only course deadline exceeded"
+        },
+        "connection_closed": true,
+        "filtered_packets": 707,
+        "phase": "CALIBRATING",
+        "final_signal": {},
+        "race": null,
+        "termination": null,
+        "estimated_gates_passed": 0,
+        "estimated_gate_number": 1,
+        "armed_boot_time": null,
+        "prediction_bias": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "failure_class": "Unarmed startup timeout; no initialized sensor state. Secondary scorer failure on absent native pose. No replay result survived.",
+      "retention": {
+        "temporary_bytes_removed": 8682001,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "controller-outcome-from-log.json": "d51864666a0b6e6acf538428f05933cbfd1d5cddb99a9a659819e5df1bebb790",
+        "retention.json": "397ec8ae900eefbcb677288d3d1806167a802905ffddd5d922d1917f7f998056",
+        "protocol.json": "a64b5c5279a512cb30109433bc772534feff79cbb83dbab62818538c0de5042a",
+        "failure.json": "cf4be22ed29292a16bea6b9e59e82d5d85c4d15c25a63176def11f81bfc685f5",
+        "control.jsonl.gz": "e457fe09b29d6d3b05216be6a2af5ce98231e25d327239c4db1a8fe960375705"
+      }
+    },
+    {
+      "name": "gravity-validation/validation-02",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 49.899307251,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2065,
+          "median": 1.0463324913219019,
+          "p95": 3.066672297394165,
+          "maximum": 5.134045317239805,
+          "rms": 1.6920447260682605
+        },
+        "velocity_error_m_s": {
+          "count": 2065,
+          "median": 0.22264027707847975,
+          "p95": 1.2919189924737766,
+          "maximum": 2.087571645439342,
+          "rms": 0.5572410197949448
+        },
+        "attitude_error_deg": {
+          "count": 2065,
+          "median": 0.2694187186758992,
+          "p95": 0.6745732052109843,
+          "maximum": 1.2735766942831452,
+          "rms": 0.3608452452909371
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "53cfaf678b422f1e13290f8da2e555839c1d13bbc3c161d919f127d406dfe248",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.002900691235226,
+          "first_lock_time_s": 11.361806999999999,
+          "first_lock_image_id": 321,
+          "crossing_position_ned_m": [
+            -23.297967772294506,
+            -0.39178317534140883,
+            -1.1606918929973866
+          ],
+          "crossing_offset_width_down_m": [
+            0.008119030214389766,
+            -0.06050276278905631
+          ],
+          "last_image_id": 475,
+          "last_image_time_s": 16.486419477000002,
+          "blind_time_to_crossing_s": 0.516481214235224,
+          "final_phase_to_crossing_s": 0.4364536912352257,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.0052919455985886085,
+            -0.03482245153668822,
+            -0.17566444388076882
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.017555864562496,
+          "first_lock_time_s": 17.489461,
+          "first_lock_image_id": 505,
+          "crossing_position_ned_m": [
+            -46.893749096095654,
+            -2.4227036337185504,
+            3.93828450643193
+          ],
+          "crossing_offset_width_down_m": [
+            0.0772864528002056,
+            -0.061526179603131434
+          ],
+          "last_image_id": 747,
+          "last_image_time_s": 25.560375696,
+          "blind_time_to_crossing_s": 0.45718016856249477,
+          "final_phase_to_crossing_s": 0.441985864562497,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.033784254056177666,
+            -0.09778895180300477,
+            -0.27608846674150106
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 34.98931580567864,
+          "first_lock_time_s": 26.656776999999998,
+          "first_lock_image_id": 780,
+          "crossing_position_ned_m": [
+            -74.59374987198812,
+            1.233325169158776,
+            12.631787745083647
+          ],
+          "crossing_offset_width_down_m": [
+            0.03331533865105199,
+            0.03197763663669064
+          ],
+          "last_image_id": 1015,
+          "last_image_time_s": 34.487100926000004,
+          "blind_time_to_crossing_s": 0.5022148796786396,
+          "final_phase_to_crossing_s": 0.47707880567864436,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.01259408658221329,
+            0.010380802731614758,
+            -0.15401294763981416
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 46.603595713865204,
+          "first_lock_time_s": 35.500698,
+          "first_lock_image_id": 1045,
+          "crossing_position_ned_m": [
+            -111.49374375836035,
+            -5.048435610944891,
+            23.45429284191309
+          ],
+          "crossing_offset_width_down_m": [
+            0.05155414374791932,
+            -0.0455168872971726
+          ],
+          "last_image_id": 1364,
+          "last_image_time_s": 46.128387715,
+          "blind_time_to_crossing_s": 0.4752079988652014,
+          "final_phase_to_crossing_s": 0.46708771386520453,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.000969589432494835,
+            -0.06155294937962598,
+            -0.09580335031832383
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 51.33803912743358,
+          "first_lock_time_s": 46.99546,
+          "first_lock_image_id": 1390,
+          "crossing_position_ned_m": [
+            -135.49374374089612,
+            -0.7737002489425339,
+            24.092199630385903
+          ],
+          "crossing_offset_width_down_m": [
+            0.026289833128255165,
+            -0.195223010770242
+          ],
+          "last_image_id": 1498,
+          "last_image_time_s": 50.593795003000004,
+          "blind_time_to_crossing_s": 0.7442441244335782,
+          "final_phase_to_crossing_s": 0.4248981274335861,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.06667799238898739,
+            -0.042603578575872776,
+            -0.22464708856182605
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 56.44114723041997,
+          "first_lock_time_s": 51.61371,
+          "first_lock_image_id": 1515,
+          "crossing_position_ned_m": [
+            -159.19374070053877,
+            -4.292201700857356,
+            24.820486986244713
+          ],
+          "crossing_offset_width_down_m": [
+            0.10778824043141381,
+            -0.07932236838072984
+          ],
+          "last_image_id": 1658,
+          "last_image_time_s": 55.921829926,
+          "blind_time_to_crossing_s": 0.519317304419971,
+          "final_phase_to_crossing_s": 0.472828230419978,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.014183908790519362,
+            -0.0756525688337718,
+            -0.14090335845512797
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 20675,
+        "wire_commands": 2195
+      },
+      "poisoned_replay": {
+        "calls": 20675,
+        "wire_commands": 2195,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16720,
+        "corrupted_navigation_packets": 16720,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "validation-02",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 49.899307251,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2065,
+            "median": 1.0463324913219019,
+            "p95": 3.066672297394165,
+            "maximum": 5.134045317239805,
+            "rms": 1.6920447260682605
+          },
+          "velocity_error_m_s": {
+            "count": 2065,
+            "median": 0.22264027707847975,
+            "p95": 1.2919189924737766,
+            "maximum": 2.087571645439342,
+            "rms": 0.5572410197949448
+          },
+          "attitude_error_deg": {
+            "count": 2065,
+            "median": 0.2694187186758992,
+            "p95": 0.6745732052109843,
+            "maximum": 1.2735766942831452,
+            "rms": 0.3608452452909371
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.385608000000001,
+            "maximum_full_pose_age_s": 1.8869557959999987,
+            "horizontal_speed_at_end_m_s": 1.4775540404581902,
+            "relative_height_at_end_m": -0.07485488885264735
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 5.986044,
+            "maximum_full_pose_age_s": 3.8894110959999963,
+            "horizontal_speed_at_end_m_s": 0.10080130068559,
+            "relative_height_at_end_m": 0.1459787102540715
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 8.542488999999996,
+            "maximum_full_pose_age_s": 1.8196635899999976,
+            "horizontal_speed_at_end_m_s": 0.013132439226109304,
+            "relative_height_at_end_m": 0.127936091429794
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "validation-02",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 49.899307251,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.4760920487408976,
+        "gate5_camera_vertical_error_p95_m": 0.21239768503996248,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 73,
+        "maximum_gravity_correction_deg": 0.15000000000000002,
+        "control_imu_interval_ms": {
+          "median": 21.204999999998364,
+          "p95": 41.33899999999925,
+          "max": 68.9739999999972
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7318808820791606,
+            "vertical_centerline_margin_m": 0.6794972372109437
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.6627134594933448,
+            "vertical_centerline_margin_m": 0.6784738203968685
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.7066845736424984,
+            "vertical_centerline_margin_m": 0.70802236336331
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.688445768545631,
+            "vertical_centerline_margin_m": 0.694483112702828
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.7137100791652952,
+            "vertical_centerline_margin_m": 0.5447769892297587
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.6322116718621366,
+            "vertical_centerline_margin_m": 0.6606776316192708
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.63335964757945,
+        "scored_setup_overhead_s": 4.819114251000002,
+        "current_speed_horizontal_lower_bound_s": 32.126671929515894,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 708,
+          "median": 11.655216999994167,
+          "p95": 21.63909189999806,
+          "maximum": 47.691703999998225,
+          "rms": 13.315539314861915
+        },
+        "velocity_fit_age_ms": {
+          "count": 657,
+          "median": 476.4101036321762,
+          "p95": 509.54715464153526,
+          "maximum": 637.9999448677936,
+          "rms": 428.13097992245605
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 204104789,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "9a7e7f8e7094307d2bb8995c87fdab562fae96acfcb562a304ba56f2def420c9",
+        "input-independence.json": "dc6e02e870051486e76cf8652b08f26789239639d186d0913eb5f11d46056870",
+        "retention.json": "b98a010da4be3f4db1b9a5d9c7afa96837088a2d5b459a06413940b59f28c4f4",
+        "score.json": "7faa06ef17f0b1c56e500257d3e31412604257bf66651678d5420718ad9d1e92",
+        "replay.json": "52f3d5065bb13721c8f46d6c7f28c28985d0a7ba348a63c9cb001cb56c9136cb",
+        "camera-errors.csv": "c0e60b94e2357ae821a712261e8f6272c0f30cd842c6aec3f89f67ab7d97cc27",
+        "protocol.json": "a64b5c5279a512cb30109433bc772534feff79cbb83dbab62818538c0de5042a",
+        "video.json": "5f0abeb57db4717b7f8f72ba049d75f58969d1c17696ae19c16ff102d9d31a34",
+        "control.jsonl.gz": "bee555c9e33903a98cb9e18756b7d97057f849df0b830ba760ac172b27f031e3",
+        "course-camera-imu.mp4": "d00f6443fe6162499391088208b28c03b75ffb160d3beaf122cddf5b1f93096b"
+      }
+    },
+    {
+      "name": "gravity-validation/validation-03",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": 0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": 0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 49.372974396,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2087,
+          "median": 1.2062530957984914,
+          "p95": 4.213825140713766,
+          "maximum": 5.524375066967377,
+          "rms": 1.937968690438008
+        },
+        "velocity_error_m_s": {
+          "count": 2087,
+          "median": 0.19819031933862313,
+          "p95": 1.1463928942199912,
+          "maximum": 2.01361598899668,
+          "rms": 0.5510129501551791
+        },
+        "attitude_error_deg": {
+          "count": 2087,
+          "median": 0.42227030717607433,
+          "p95": 0.822706706549764,
+          "maximum": 1.6046755493574523,
+          "rms": 0.49313393964632246
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "03e6aedee7b7e8f25aa3323b3388d2ae7cfdef4f5d7a8061ba8a3372f483d031",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.34702076300253,
+          "first_lock_time_s": 11.574698,
+          "first_lock_image_id": 329,
+          "crossing_position_ned_m": [
+            -23.297967769392407,
+            -0.390958095211125,
+            -1.1841648513966847
+          ],
+          "crossing_offset_width_down_m": [
+            0.008944107470810413,
+            -0.08397572128937138
+          ],
+          "last_image_id": 487,
+          "last_image_time_s": 16.824224595,
+          "blind_time_to_crossing_s": 0.5227961680025288,
+          "final_phase_to_crossing_s": 0.4387477630025316,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.002502874040346819,
+            -0.0653644648252197,
+            -0.22534635175852333
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.606682746152064,
+          "first_lock_time_s": 17.603215,
+          "first_lock_image_id": 508,
+          "crossing_position_ned_m": [
+            -46.893749102858436,
+            -2.445902889138982,
+            3.987035303452524
+          ],
+          "crossing_offset_width_down_m": [
+            0.05408720334847743,
+            -0.0127753797421844
+          ],
+          "last_image_id": 767,
+          "last_image_time_s": 26.155622787000002,
+          "blind_time_to_crossing_s": 0.45105995915206165,
+          "final_phase_to_crossing_s": 0.4436187461520653,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.013905097094652836,
+            -0.02686689913121753,
+            -0.1878405628559516
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 35.886455234176545,
+          "first_lock_time_s": 27.199534999999997,
+          "first_lock_image_id": 798,
+          "crossing_position_ned_m": [
+            -74.59374986778762,
+            1.1872071399510329,
+            12.58458579815707
+          ],
+          "crossing_offset_width_down_m": [
+            -0.012802696335763766,
+            -0.015224304643520967
+          ],
+          "last_image_id": 1044,
+          "last_image_time_s": 35.389116054,
+          "blind_time_to_crossing_s": 0.4973391801765459,
+          "final_phase_to_crossing_s": 0.4741872341765472,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.004200413542776958,
+            -0.004447350409998476,
+            -0.16647411523739863
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 46.45798690953054,
+          "first_lock_time_s": 36.340603,
+          "first_lock_image_id": 1072,
+          "crossing_position_ned_m": [
+            -111.493743764176,
+            -5.312211820945764,
+            23.42804970399079
+          ],
+          "crossing_offset_width_down_m": [
+            -0.21222206946597685,
+            -0.07175999292457658
+          ],
+          "last_image_id": 1362,
+          "last_image_time_s": 45.990547428000006,
+          "blind_time_to_crossing_s": 0.4674394815305334,
+          "final_phase_to_crossing_s": 0.46282790953053876,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.00032057149426240706,
+            -0.053904700706017855,
+            -0.20003131407515184
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 51.425257832357744,
+          "first_lock_time_s": 46.711835,
+          "first_lock_image_id": 1382,
+          "crossing_position_ned_m": [
+            -135.4937437595064,
+            -0.9178210218868061,
+            24.203911705313025
+          ],
+          "crossing_offset_width_down_m": [
+            -0.11783092613877887,
+            -0.08351091819798936
+          ],
+          "last_image_id": 1509,
+          "last_image_time_s": 50.891197277,
+          "blind_time_to_crossing_s": 0.5340605553577404,
+          "final_phase_to_crossing_s": 0.468091832357743,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.024857544390497057,
+            -0.06291239229244398,
+            -0.15273930058312796
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 55.81829127731333,
+          "first_lock_time_s": 51.676763,
+          "first_lock_image_id": 1528,
+          "crossing_position_ned_m": [
+            -159.1937406957331,
+            -4.18828136249874,
+            24.810288414674602
+          ],
+          "crossing_offset_width_down_m": [
+            0.2117085775413874,
+            -0.08952095267411332
+          ],
+          "last_image_id": 1646,
+          "last_image_time_s": 55.455824695000004,
+          "blind_time_to_crossing_s": 0.3624665823133242,
+          "final_phase_to_crossing_s": 0.3517082773133282,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.4203729015771895,
+            -0.041351247966110644,
+            -1.0451177786952532
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 20837,
+        "wire_commands": 2230
+      },
+      "poisoned_replay": {
+        "calls": 20837,
+        "wire_commands": 2230,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16568,
+        "corrupted_navigation_packets": 16568,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "validation-03",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 49.372974396,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2087,
+            "median": 1.2062530957984914,
+            "p95": 4.213825140713766,
+            "maximum": 5.524375066967377,
+            "rms": 1.937968690438008
+          },
+          "velocity_error_m_s": {
+            "count": 2087,
+            "median": 0.19819031933862313,
+            "p95": 1.1463928942199912,
+            "maximum": 2.01361598899668,
+            "rms": 0.5510129501551791
+          },
+          "attitude_error_deg": {
+            "count": 2087,
+            "median": 0.42227030717607433,
+            "p95": 0.822706706549764,
+            "maximum": 1.6046755493574523,
+            "rms": 0.49313393964632246
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.171551999999998,
+            "maximum_full_pose_age_s": 2.1865436480000007,
+            "horizontal_speed_at_end_m_s": 0.2897027387747582,
+            "relative_height_at_end_m": 0.12389527583333826
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 6.164960999999998,
+            "maximum_full_pose_age_s": 2.1841482570000004,
+            "horizontal_speed_at_end_m_s": 0.05460481241623738,
+            "relative_height_at_end_m": 0.01815540437589913
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 7.56617,
+            "maximum_full_pose_age_s": 1.851979741000001,
+            "horizontal_speed_at_end_m_s": 0.08004573539716074,
+            "relative_height_at_end_m": -0.11591915911810213
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "validation-03",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 49.372974396,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.2558681300143025,
+        "gate5_camera_vertical_error_p95_m": 0.18081025619268762,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 84,
+        "maximum_gravity_correction_deg": 0.1207592291056211,
+        "control_imu_interval_ms": {
+          "median": 20.939999999999515,
+          "p95": 39.423999999996795,
+          "max": 99.77900000000517
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7310558048227399,
+            "vertical_centerline_margin_m": 0.6560242787106286
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.6859127089450731,
+            "vertical_centerline_margin_m": 0.7272246202578156
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.7271972159577865,
+            "vertical_centerline_margin_m": 0.7247756953564797
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.5277778428275735,
+            "vertical_centerline_margin_m": 0.6682400070754241
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.6221689861547715,
+            "vertical_centerline_margin_m": 0.6564890818020113
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.5282913347521629,
+            "vertical_centerline_margin_m": 0.6504790473258873
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.69323850008485,
+        "scored_setup_overhead_s": 5.123672395999998,
+        "current_speed_horizontal_lower_bound_s": 32.13864770001697,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 796,
+          "median": 10.570528999997109,
+          "p95": 20.896343999997402,
+          "maximum": 36.68956699999626,
+          "rms": 12.664362018532211
+        },
+        "velocity_fit_age_ms": {
+          "count": 694,
+          "median": 475.51085362898516,
+          "p95": 512.1997370467224,
+          "maximum": 587.4750148657562,
+          "rms": 428.6471027172177
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 202495265,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "899fdda939547963850cf038d476fe5bd6bdc36ed3e4fa0516923ae7ec40a57a",
+        "input-independence.json": "1e8f2316e7ea84e2694ed6c645eca6181fd24c297e1ba71d75f3f9eb2b0eb66c",
+        "retention.json": "179855adf0f8d7547b6ff6e3a6d9bb9ce7c2e5b986c6807d4d2c96f370b292ef",
+        "score.json": "a107f8e3e36da9803955de62146fdba6f4fdb4b6a4aa1db4cc6369d1e7714a7c",
+        "replay.json": "0d7a80553c3e7c7c314d3c39b2f02e3bf33a1cb3f022e79ad51eabb12493ecb8",
+        "camera-errors.csv": "3e140c677da7f729291c347e5bda5b0cebc0a46bc3f9962e14f21672e1203d96",
+        "protocol.json": "ed090b879d6780a036d5b155b48cdcf729f787b7dd9c75acc92ff73f0286576e",
+        "video.json": "bdf03d264a918340ae4d4c02236ee45c50ecedadf0ea4ea6fdadf9f14cd69cfa",
+        "control.jsonl.gz": "4bcbb4deb8ac756dd7125310eacac999fa4525729a4491be7ddf09ffcd3b8466",
+        "course-camera-imu.mp4": "40685ab177ef3a9b7dff79b70ac8ca548c9e6ddfe9432a272df07dbb3682151b"
+      }
+    },
+    {
+      "name": "gravity-validation/validation-04",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 46.056232452,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1922,
+          "median": 1.5222055597734059,
+          "p95": 3.545182826072269,
+          "maximum": 6.670500933904654,
+          "rms": 2.1840026012955986
+        },
+        "velocity_error_m_s": {
+          "count": 1922,
+          "median": 0.17524830366679084,
+          "p95": 0.5982468838847678,
+          "maximum": 0.9891938903430963,
+          "rms": 0.2934068149046309
+        },
+        "attitude_error_deg": {
+          "count": 1922,
+          "median": 0.37654928248595765,
+          "p95": 1.0944666926661086,
+          "maximum": 1.8899377592624842,
+          "rms": 0.5659931147958629
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "6366425dad26b5b94e38fb83757f2d7e41f9f8e512c551b2fa3582ebd5b03095",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.1072500331084,
+          "first_lock_time_s": 11.472415999999999,
+          "first_lock_image_id": 324,
+          "crossing_position_ned_m": [
+            -23.29796777363738,
+            -0.43959229561318297,
+            -1.1630896031676736
+          ],
+          "crossing_offset_width_down_m": [
+            -0.03969009035094274,
+            -0.06290046710593225
+          ],
+          "last_image_id": 474,
+          "last_image_time_s": 16.469298937,
+          "blind_time_to_crossing_s": 0.6379510961083987,
+          "final_phase_to_crossing_s": 0.46093903310839934,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.017563651077564746,
+            -0.03934150524885206,
+            -0.13029059686250838
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 24.83744241042369,
+          "first_lock_time_s": 17.356378,
+          "first_lock_image_id": 498,
+          "crossing_position_ned_m": [
+            -46.893749104106476,
+            -2.521559538887945,
+            3.9760777523307866
+          ],
+          "crossing_offset_width_down_m": [
+            -0.021569447742050208,
+            -0.023732921601055956
+          ],
+          "last_image_id": 712,
+          "last_image_time_s": 24.403080169000003,
+          "blind_time_to_crossing_s": 0.4343622414236883,
+          "final_phase_to_crossing_s": 0.42550941042369317,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0059125763369910775,
+            -0.020946790164801096,
+            -0.14919898122197184
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 34.73381227962328,
+          "first_lock_time_s": 25.382244999999998,
+          "first_lock_image_id": 741,
+          "crossing_position_ned_m": [
+            -74.59374987332795,
+            0.7696687513634374,
+            12.513106712674
+          ],
+          "crossing_offset_width_down_m": [
+            -0.43034109367475054,
+            -0.08670333900613886
+          ],
+          "last_image_id": 1008,
+          "last_image_time_s": 34.269627646,
+          "blind_time_to_crossing_s": 0.464184633623276,
+          "final_phase_to_crossing_s": 0.45886627962327964,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.08044353780655454,
+            -0.09814283927901488,
+            -0.19269140152675515
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 42.85699996600211,
+          "first_lock_time_s": 35.013067,
+          "first_lock_image_id": 998,
+          "crossing_position_ned_m": [
+            -111.49374374932756,
+            -4.793642485212313,
+            23.451747900923
+          ],
+          "crossing_offset_width_down_m": [
+            0.3063472691689105,
+            -0.048061859482334976
+          ],
+          "last_image_id": 1252,
+          "last_image_time_s": 42.401539955000004,
+          "blind_time_to_crossing_s": 0.45546001100210276,
+          "final_phase_to_crossing_s": 0.4444219660021105,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.026098054295470824,
+            -0.09356050282762648,
+            -0.20825985601490463
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 47.77787760047003,
+          "first_lock_time_s": 43.257152999999995,
+          "first_lock_image_id": 1277,
+          "crossing_position_ned_m": [
+            -135.49374376044454,
+            -0.9154660078161527,
+            24.212232760248146
+          ],
+          "crossing_offset_width_down_m": [
+            -0.1154759110493543,
+            -0.07518986355120062
+          ],
+          "last_image_id": 1396,
+          "last_image_time_s": 47.205483666000006,
+          "blind_time_to_crossing_s": 0.5723939344700213,
+          "final_phase_to_crossing_s": 0.46894160047003197,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.02364143696389832,
+            -0.06347953179251639,
+            -0.17182724970571722
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 52.566073108041024,
+          "first_lock_time_s": 48.055043999999995,
+          "first_lock_image_id": 1421,
+          "crossing_position_ned_m": [
+            -159.19374070108515,
+            -4.238907363666523,
+            24.83984909041482
+          ],
+          "crossing_offset_width_down_m": [
+            0.16108257999280548,
+            -0.05996027073560569
+          ],
+          "last_image_id": 1542,
+          "last_image_time_s": 52.07114579500001,
+          "blind_time_to_crossing_s": 0.49492731304101767,
+          "final_phase_to_crossing_s": 0.44972610804102686,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.02768989416717514,
+            -0.04611565078262836,
+            -0.22332345854123584
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 19607,
+        "wire_commands": 2060
+      },
+      "poisoned_replay": {
+        "calls": 19607,
+        "wire_commands": 2060,
+        "exact_updates": true,
+        "corrupted_pose_packets": 15581,
+        "corrupted_navigation_packets": 15581,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "validation-04",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 46.056232452,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 1922,
+            "median": 1.5222055597734059,
+            "p95": 3.545182826072269,
+            "maximum": 6.670500933904654,
+            "rms": 2.1840026012955986
+          },
+          "velocity_error_m_s": {
+            "count": 1922,
+            "median": 0.17524830366679084,
+            "p95": 0.5982468838847678,
+            "maximum": 0.9891938903430963,
+            "rms": 0.2934068149046309
+          },
+          "attitude_error_deg": {
+            "count": 1922,
+            "median": 0.37654928248595765,
+            "p95": 1.0944666926661086,
+            "maximum": 1.8899377592624842,
+            "rms": 0.5659931147958629
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 4.944799,
+            "maximum_full_pose_age_s": 1.9839169059999975,
+            "horizontal_speed_at_end_m_s": 0.1941194903983616,
+            "relative_height_at_end_m": -0.1649865330982232
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 6.961925000000001,
+            "maximum_full_pose_age_s": 1.4527827819999963,
+            "horizontal_speed_at_end_m_s": 0.2570808148166313,
+            "relative_height_at_end_m": -0.03618988680853574
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 5.825705000000006,
+            "maximum_full_pose_age_s": 1.309916385000001,
+            "horizontal_speed_at_end_m_s": 2.3100687183224373,
+            "relative_height_at_end_m": 0.442379920143984
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "validation-04",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 46.056232452,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.4717076423569557,
+        "gate5_camera_vertical_error_p95_m": 0.15112723596923905,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 56,
+        "maximum_gravity_correction_deg": 0.15,
+        "control_imu_interval_ms": {
+          "median": 20.87599999999945,
+          "p95": 39.36700000000126,
+          "max": 78.55699999999999
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7003098219426076,
+            "vertical_centerline_margin_m": 0.6770995328940678
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.7184304645515003,
+            "vertical_centerline_margin_m": 0.716267078398944
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.3096588186187998,
+            "vertical_centerline_margin_m": 0.6532966609938617
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.43365264312463986,
+            "vertical_centerline_margin_m": 0.6919381405176657
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.624524001244196,
+            "vertical_centerline_margin_m": 0.6648101364488
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.5789173323007448,
+            "vertical_centerline_margin_m": 0.6800397292643949
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.6380296231018,
+        "scored_setup_overhead_s": 4.944648451999999,
+        "current_speed_horizontal_lower_bound_s": 32.12760592462036,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 786,
+          "median": 9.930871999996427,
+          "p95": 21.014401749997358,
+          "maximum": 63.14668799999623,
+          "rms": 12.523286094479504
+        },
+        "velocity_fit_age_ms": {
+          "count": 740,
+          "median": 478.27532154313076,
+          "p95": 508.76414157719444,
+          "maximum": 630.0158716555018,
+          "rms": 436.764434933087
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 190170016,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "d548e278a92f3a2b3c3baaa7cc24de43ba0518da01b6b000e3326d8d0834b6be",
+        "input-independence.json": "cb465d5d8a3cbfad3528ba30e456e694a326786d5af9039917be667e9726d133",
+        "retention.json": "2d9d04f8f8adf2d893c53d0895439a335007573dab03e129002eee4bc966b957",
+        "score.json": "c2cab3e2217a1aa0e82617d20950a79b9786e96e6ec09281ca24950345e52a58",
+        "replay.json": "e247089287434e4d51c9ba2394571e169c095e78bfdee66fc6e9a28c85d4de9f",
+        "camera-errors.csv": "db83239a7fdc69a69ca7050f224970f2478676d18919dbb24b65d71f50273083",
+        "protocol.json": "a64b5c5279a512cb30109433bc772534feff79cbb83dbab62818538c0de5042a",
+        "video.json": "af9e03b3d179270fd885f73cd1592c36d3c8713e258951e9139674ce1eb3b050",
+        "control.jsonl.gz": "8cbb60a75272421d6ef411f3c43ce32dba4ad470bd2df2c84ed853cc04e4fc71",
+        "course-camera-imu.mp4": "75216cc205a4f0fd81cfafa38433a4fe5fbf2946e2544107c1977a414a0fa676"
+      }
+    },
+    {
+      "name": "gravity-validation/validation-05",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": 0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": 0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 48.758087158,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2090,
+          "median": 1.4111911948681848,
+          "p95": 4.93239700369422,
+          "maximum": 5.378445178737577,
+          "rms": 2.944850417531691
+        },
+        "velocity_error_m_s": {
+          "count": 2090,
+          "median": 0.19557556270032217,
+          "p95": 0.9017888792885995,
+          "maximum": 1.2772113856017022,
+          "rms": 0.4148465383962435
+        },
+        "attitude_error_deg": {
+          "count": 2090,
+          "median": 0.2816179727286515,
+          "p95": 0.6291755080766571,
+          "maximum": 1.2075035287678655,
+          "rms": 0.3819014140638012
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "ef60f5b59dd99042a8dd031fb293bc5e113481f144eff810eb9914540947dd69",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.07912073876416,
+          "first_lock_time_s": 11.322299,
+          "first_lock_image_id": 320,
+          "crossing_position_ned_m": [
+            -23.29796777812996,
+            -0.38708667478593506,
+            -1.1117164595996467
+          ],
+          "crossing_offset_width_down_m": [
+            0.012815536766069502,
+            -0.01152732996632276
+          ],
+          "last_image_id": 477,
+          "last_image_time_s": 16.554890377,
+          "blind_time_to_crossing_s": 0.524230361764161,
+          "final_phase_to_crossing_s": 0.4508137387641611,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.00704901862137823,
+            0.02792958064705097,
+            -0.1920586364204146
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.306832682148766,
+          "first_lock_time_s": 17.351399,
+          "first_lock_image_id": 497,
+          "crossing_position_ned_m": [
+            -46.89374910557619,
+            -2.5202930540767174,
+            3.988436044755342
+          ],
+          "crossing_offset_width_down_m": [
+            -0.020302961417760838,
+            -0.011374629331559865
+          ],
+          "last_image_id": 753,
+          "last_image_time_s": 25.755539881,
+          "blind_time_to_crossing_s": 0.5512928011487652,
+          "final_phase_to_crossing_s": 0.46717068214876534,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.020885975538507927,
+            -0.0144699439172707,
+            -0.31951701268968713
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 35.19498228004033,
+          "first_lock_time_s": 26.999702,
+          "first_lock_image_id": 790,
+          "crossing_position_ned_m": [
+            -74.59374985837823,
+            1.3015275703276155,
+            12.53969290049499
+          ],
+          "crossing_offset_width_down_m": [
+            0.10151772854444883,
+            -0.06011721630218774
+          ],
+          "last_image_id": 1022,
+          "last_image_time_s": 34.719429423,
+          "blind_time_to_crossing_s": 0.4755528570403271,
+          "final_phase_to_crossing_s": 0.46665728004033014,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.014684696194803825,
+            -0.07533779715991432,
+            -0.19738453005492884
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 45.38667737810758,
+          "first_lock_time_s": 35.46069,
+          "first_lock_image_id": 989,
+          "crossing_position_ned_m": [
+            -111.49374376474286,
+            -5.056599158414094,
+            23.50414124579099
+          ],
+          "crossing_offset_width_down_m": [
+            0.043390602381802784,
+            0.004331517580213521
+          ],
+          "last_image_id": 1327,
+          "last_image_time_s": 44.889872771,
+          "blind_time_to_crossing_s": 0.49680460710757757,
+          "final_phase_to_crossing_s": 0.4789533781075832,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.008579910472839812,
+            0.03865727069157076,
+            -0.14744494614506315
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 50.34885378772463,
+          "first_lock_time_s": 45.641455,
+          "first_lock_image_id": 1347,
+          "crossing_position_ned_m": [
+            -135.49374375956276,
+            -0.8821878660244495,
+            24.214334030143704
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0821977690003867,
+            -0.07308859772998326
+          ],
+          "last_image_id": 1475,
+          "last_image_time_s": 49.821616642,
+          "blind_time_to_crossing_s": 0.5272371457246265,
+          "final_phase_to_crossing_s": 0.4495177877246306,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.015803125392708034,
+            -0.05882794481713256,
+            -0.1857115007953037
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 55.27194907170477,
+          "first_lock_time_s": 50.625841,
+          "first_lock_image_id": 1488,
+          "crossing_position_ned_m": [
+            -159.19374070205563,
+            -4.304855294295247,
+            24.829338584039082
+          ],
+          "crossing_offset_width_down_m": [
+            0.09513464807724992,
+            -0.07047076903714462
+          ],
+          "last_image_id": 1622,
+          "last_image_time_s": 54.721688237,
+          "blind_time_to_crossing_s": 0.5502608347047655,
+          "final_phase_to_crossing_s": 0.4655810717047686,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.022218211698827543,
+            -0.049373660758769346,
+            -0.19035271572839654
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 20800,
+        "wire_commands": 2222
+      },
+      "poisoned_replay": {
+        "calls": 20800,
+        "wire_commands": 2222,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16307,
+        "corrupted_navigation_packets": 16307,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "validation-05",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 48.758087158,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2090,
+            "median": 1.4111911948681848,
+            "p95": 4.93239700369422,
+            "maximum": 5.378445178737577,
+            "rms": 2.944850417531691
+          },
+          "velocity_error_m_s": {
+            "count": 2090,
+            "median": 0.19557556270032217,
+            "p95": 0.9017888792885995,
+            "maximum": 1.2772113856017022,
+            "rms": 0.4148465383962435
+          },
+          "attitude_error_deg": {
+            "count": 2090,
+            "median": 0.2816179727286515,
+            "p95": 0.6291755080766571,
+            "maximum": 1.2075035287678655,
+            "rms": 0.3819014140638012
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.475360000000002,
+            "maximum_full_pose_age_s": 2.046798246999998,
+            "horizontal_speed_at_end_m_s": 0.01977208751689895,
+            "relative_height_at_end_m": 0.09515089865127768
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 5.735824999999998,
+            "maximum_full_pose_age_s": 2.789142439999999,
+            "horizontal_speed_at_end_m_s": 0.08580172612730838,
+            "relative_height_at_end_m": -0.6355784636869604
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 7.696022999999997,
+            "maximum_full_pose_age_s": 2.044780011999997,
+            "horizontal_speed_at_end_m_s": 0.021781036762964365,
+            "relative_height_at_end_m": 0.012653031864737319
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "validation-05",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 48.758087158,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.3033494674897674,
+        "gate5_camera_vertical_error_p95_m": 0.2430467448647763,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 83,
+        "maximum_gravity_correction_deg": 0.15000000000000002,
+        "control_imu_interval_ms": {
+          "median": 20.403000000001725,
+          "p95": 37.10610000000008,
+          "max": 83.29099999999912
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7271843755274808,
+            "vertical_centerline_margin_m": 0.7284726700336772
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.7196969508757896,
+            "vertical_centerline_margin_m": 0.7286253706684401
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.6384821837491015,
+            "vertical_centerline_margin_m": 0.679882783697813
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.6966093099117475,
+            "vertical_centerline_margin_m": 0.7356684824197871
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.6578021432931637,
+            "vertical_centerline_margin_m": 0.6669114022700174
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.6448652642163004,
+            "vertical_centerline_margin_m": 0.669529230962856
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.78033612174033,
+        "scored_setup_overhead_s": 4.808386158000003,
+        "current_speed_horizontal_lower_bound_s": 32.156067224348064,
+        "horizontal_speed_limit_m_s": 5.0,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 793,
+          "median": 10.418305999998267,
+          "p95": 20.258187399998203,
+          "maximum": 66.63642499999511,
+          "rms": 12.793246197761496
+        },
+        "velocity_fit_age_ms": {
+          "count": 743,
+          "median": 478.0864820938078,
+          "p95": 512.729906309071,
+          "maximum": 671.7240834977076,
+          "rms": 439.7790431589386
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 200011103,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "04e7319a1876e23066e0c794f3e849b870d9a51ab7c8148c908e0653376fc6ae",
+        "input-independence.json": "4aa98117f54bc95a12b3bab7f09fca62e1e8945933f5b2a1c4b9435de248e8f8",
+        "retention.json": "9f7e577d74001c2452a91aa8443ee89220f55a99860d7b8b7654c5e5e57872f4",
+        "score.json": "539517de0e60a0892476ea83e23e6142691c3f3abaf7bb636c53640eb2338505",
+        "replay.json": "ab2ef4f6f55508be6297538b6906dcafd2739acdbd729d8270186e4e117047ff",
+        "camera-errors.csv": "d795696062771464f003616caf9f6748fb2c94365706283a0eba039e81231b72",
+        "protocol.json": "ed090b879d6780a036d5b155b48cdcf729f787b7dd9c75acc92ff73f0286576e",
+        "video.json": "f06351bc426395888a76c9331bb8cb92d82fbe353cc34e9325b9d2e2a1b8c07e",
+        "control.jsonl.gz": "860d306a0b2ce87358396948449914be5acefbf1798b7e3411c4797379def76e",
+        "course-camera-imu.mp4": "dd4592120e2414835e624a27083a8c81fb76d56ad7b6d2787ea5f4127aacca04"
+      }
+    },
+    {
+      "name": "gravity-validation/validation-06",
+      "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+      "shift_right_m": -0.5,
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "visual_gravity": true,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 47.922527313,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2114,
+          "median": 1.1706570771167355,
+          "p95": 2.7456544373942346,
+          "maximum": 3.5124273866651388,
+          "rms": 1.6600587303569851
+        },
+        "velocity_error_m_s": {
+          "count": 2114,
+          "median": 0.1754361486057699,
+          "p95": 0.6470596522464916,
+          "maximum": 1.0126521359292846,
+          "rms": 0.30835311644523056
+        },
+        "attitude_error_deg": {
+          "count": 2114,
+          "median": 0.3104789419392643,
+          "p95": 0.6556741555719148,
+          "maximum": 1.0590376433143198,
+          "rms": 0.3665735874699685
+        }
+      },
+      "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+      "trace_sha256": "689cecfc17cd9226edfbca7ba94f30395942a4f56dd35bae8ba1a84b4919997b",
+      "contact_packets": 0,
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.978071022575172,
+          "first_lock_time_s": 11.443479,
+          "first_lock_image_id": 327,
+          "crossing_position_ned_m": [
+            -23.297967777975895,
+            -0.4029440712540201,
+            -1.1174079826501044
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0030418603988452927,
+            -0.017218851075312847
+          ],
+          "last_image_id": 477,
+          "last_image_time_s": 16.437811849000003,
+          "blind_time_to_crossing_s": 0.5402591735751692,
+          "final_phase_to_crossing_s": 0.4550380225751738,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.012236770145813114,
+            -0.012002803832781864,
+            -0.19393631270747622
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 25.97666825626974,
+          "first_lock_time_s": 17.485305999999998,
+          "first_lock_image_id": 508,
+          "crossing_position_ned_m": [
+            -46.89374910596556,
+            -2.5150838234121333,
+            3.9930728539574996
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0150937301854786,
+            -0.006737820767183914
+          ],
+          "last_image_id": 748,
+          "last_image_time_s": 25.473186039,
+          "blind_time_to_crossing_s": 0.5034822172697382,
+          "final_phase_to_crossing_s": 0.5022912562697393,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.012216643461371806,
+            0.0007991864315035017,
+            -0.12224488244650138
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 33.97020703434456,
+          "first_lock_time_s": 26.549798,
+          "first_lock_image_id": 780,
+          "crossing_position_ned_m": [
+            -74.5937498608086,
+            1.2158017720508223,
+            12.535577298585608
+          ],
+          "crossing_offset_width_down_m": [
+            0.015791929763771043,
+            -0.06423280771590793
+          ],
+          "last_image_id": 988,
+          "last_image_time_s": 33.474244403,
+          "blind_time_to_crossing_s": 0.4959626313445611,
+          "final_phase_to_crossing_s": 0.47156803434456407,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.01790438458476016,
+            -0.05554974793266679,
+            -0.16789255797811667
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 44.45191965043932,
+          "first_lock_time_s": 34.622307,
+          "first_lock_image_id": 1022,
+          "crossing_position_ned_m": [
+            -111.49374376581501,
+            -5.050323339409858,
+            23.514652889313393
+          ],
+          "crossing_offset_width_down_m": [
+            0.049666422673009684,
+            0.014843160334249202
+          ],
+          "last_image_id": 1303,
+          "last_image_time_s": 43.971732184000004,
+          "blind_time_to_crossing_s": 0.4801874664393182,
+          "final_phase_to_crossing_s": 0.43992665043932533,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.007658759973368832,
+            -0.019045481301230748,
+            -0.12790260547043344
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.52037250008421,
+          "first_lock_time_s": 44.697522,
+          "first_lock_image_id": 1323,
+          "crossing_position_ned_m": [
+            -135.49374375959675,
+            -0.9043586289078579,
+            24.20841338251669
+          ],
+          "crossing_offset_width_down_m": [
+            -0.10436853260867716,
+            -0.07900924264256645
+          ],
+          "last_image_id": 1455,
+          "last_image_time_s": 49.03800022,
+          "blind_time_to_crossing_s": 0.4823722800842063,
+          "final_phase_to_crossing_s": 0.45652950008420845,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.016678612625977637,
+            -0.08862683310721732,
+            -0.17365145179183775
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 54.294368624070096,
+          "first_lock_time_s": 49.782118,
+          "first_lock_image_id": 1477,
+          "crossing_position_ned_m": [
+            -159.19374070649786,
+            -4.238872479921529,
+            24.88406841198576
+          ],
+          "crossing_offset_width_down_m": [
+            0.16111746915170075,
+            -0.01574094916893784
+          ],
+          "last_image_id": 1595,
+          "last_image_time_s": 53.708491338,
+          "blind_time_to_crossing_s": 0.5858772860700938,
+          "final_phase_to_crossing_s": 0.47790162407009973,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0016334520879094172,
+            0.014042401892457921,
+            -0.07599673180112478
+          ]
+        }
+      ],
+      "normal_replay": {
+        "exact_updates": true,
+        "calls": 20941,
+        "wire_commands": 2252
+      },
+      "poisoned_replay": {
+        "calls": 20941,
+        "wire_commands": 2252,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16114,
+        "corrupted_navigation_packets": 16114,
+        "native_gate_counter_zeroed": true
+      },
+      "plot_metrics": {
+        "name": "validation-06",
+        "native_gates": 6,
+        "clean": true,
+        "contacts": 0,
+        "finish_s": 47.922527313,
+        "local_state_errors": {
+          "position_error_m": {
+            "count": 2114,
+            "median": 1.1706570771167355,
+            "p95": 2.7456544373942346,
+            "maximum": 3.5124273866651388,
+            "rms": 1.6600587303569851
+          },
+          "velocity_error_m_s": {
+            "count": 2114,
+            "median": 0.1754361486057699,
+            "p95": 0.6470596522464916,
+            "maximum": 1.0126521359292846,
+            "rms": 0.30835311644523056
+          },
+          "attitude_error_deg": {
+            "count": 2114,
+            "median": 0.3104789419392643,
+            "p95": 0.6556741555719148,
+            "maximum": 1.0590376433143198,
+            "rms": 0.3665735874699685
+          }
+        },
+        "recovery": [
+          {
+            "gate": 2,
+            "alignment_duration_s": 6.001132999999999,
+            "maximum_full_pose_age_s": 2.021075593999999,
+            "horizontal_speed_at_end_m_s": 0.07384475769129314,
+            "relative_height_at_end_m": 0.04420207535531473
+          },
+          {
+            "gate": 3,
+            "alignment_duration_s": 4.908743999999999,
+            "maximum_full_pose_age_s": 1.6886462719999962,
+            "horizontal_speed_at_end_m_s": 0.08053016233808545,
+            "relative_height_at_end_m": -0.44676126577109665
+          },
+          {
+            "gate": 4,
+            "alignment_duration_s": 7.275357,
+            "maximum_full_pose_age_s": 1.658385447999997,
+            "horizontal_speed_at_end_m_s": 0.12494448161804625,
+            "relative_height_at_end_m": -0.35016089777188686
+          }
+        ],
+        "motor_saturation": {
+          "threshold": 0.001,
+          "motor_sample_fraction": 0.0,
+          "any_motor_tick_fraction": 0.0
+        },
+        "missing_motor_trace": false,
+        "plots": [
+          "attitude-rates.png",
+          "camera.png",
+          "control.png",
+          "gate-2.png",
+          "gate-3.png",
+          "gate-4.png",
+          "reference.png",
+          "state.png"
+        ]
+      },
+      "pipeline_metrics": {
+        "name": "validation-06",
+        "strict_flight_pass": true,
+        "native_gates": 6,
+        "estimated_gates": 6,
+        "native_finish_s": 47.922527313,
+        "inflight_contact_packets": 0,
+        "contact_episodes": 0,
+        "contact_episode_gap_s": 0.25,
+        "gate5_attitude_p95_deg": 0.49151627507925677,
+        "gate5_camera_vertical_error_p95_m": 0.23029927013531223,
+        "diagnostic_goal_checks": {
+          "gate5_attitude": true,
+          "gate5_camera_height": true,
+          "finish_under_55s": true
+        },
+        "visual_gravity_corrections": 85,
+        "maximum_gravity_correction_deg": 0.11193887175587408,
+        "control_imu_interval_ms": {
+          "median": 20.26449999999791,
+          "p95": 34.58824999999788,
+          "max": 64.67699999999965
+        },
+        "centerline_margins": [
+          {
+            "gate": 1,
+            "horizontal_centerline_margin_m": 0.7369580518947051,
+            "vertical_centerline_margin_m": 0.7227811489246871
+          },
+          {
+            "gate": 2,
+            "horizontal_centerline_margin_m": 0.7249061821080719,
+            "vertical_centerline_margin_m": 0.7332621792328161
+          },
+          {
+            "gate": 3,
+            "horizontal_centerline_margin_m": 0.7242079825297792,
+            "vertical_centerline_margin_m": 0.6757671922840928
+          },
+          {
+            "gate": 4,
+            "horizontal_centerline_margin_m": 0.6903334896205406,
+            "vertical_centerline_margin_m": 0.7251568396657515
+          },
+          {
+            "gate": 5,
+            "horizontal_centerline_margin_m": 0.6356313796848732,
+            "vertical_centerline_margin_m": 0.6609907573574342
+          },
+          {
+            "gate": 6,
+            "horizontal_centerline_margin_m": 0.5788824431418496,
+            "vertical_centerline_margin_m": 0.7242590508310628
+          }
+        ],
+        "horizontal_gate_path_length_m": 160.21209810979173,
+        "scored_setup_overhead_s": 5.067006313000004,
+        "current_speed_horizontal_lower_bound_s": 32.042419621958345,
+        "horizontal_speed_limit_m_s": 5.0,
+        "unmeasured": {
+          "true_camera_exposure_age": null,
+          "vehicle_body_clearance": null,
+          "online_attitude_uncertainty_calibration": null
+        },
+        "plots": 10
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 794,
+          "median": 9.849884499996797,
+          "p95": 20.84016779999338,
+          "maximum": 27.647047999991514,
+          "rms": 12.137248792359753
+        },
+        "velocity_fit_age_ms": {
+          "count": 748,
+          "median": 477.9930170273268,
+          "p95": 508.1866122033372,
+          "maximum": 563.9705512221891,
+          "rms": 434.38527679325574
+        }
+      },
+      "retention": {
+        "temporary_bytes_removed": 197583258,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "state-errors.csv": "3113adae7d6d6ce94a910c95c9906880d719567ef58aa94091e868766eb95637",
+        "input-independence.json": "51ba57f49e7979a4cd9e1b9c712d7891ea4cca16bdd4ac9d12ee01154a90fd50",
+        "retention.json": "36a34ef7b64f37aa095f54c4e3a6a26bf10cefeca35fa8426a1b95bb6505c89b",
+        "score.json": "74eb39401de459eba45a550be9fb7be13dee452ad10f1953c3e4bab9e77691e6",
+        "replay.json": "632edee6afc84a9a2bdf3f73db9d092baeed1b436f379317bddd4d8701cc8f86",
+        "camera-errors.csv": "bfb2a887ff5fef5d0a9f3b5bfc4dc0647f32ecd054840499e967546d8bda710a",
+        "protocol.json": "a64b5c5279a512cb30109433bc772534feff79cbb83dbab62818538c0de5042a",
+        "video.json": "acce7a3355f4159f534eccf8a66e6bfd3e601f8c58a35d90fdeb187085dae54c",
+        "control.jsonl.gz": "bef81c6c87a3037f893ff95c1e34b49de4940530c018ff12deeb8c0753cf4829",
+        "course-camera-imu.mp4": "57068222e250bd15481b2c7ef7f7ab0b51ed305aef5b29b073ccebc8dcbb962f"
+      }
+    }
+  ],
+  "speed6_exploration": {
+    "name": "speed6-01",
+    "revision": "35a0a8dbdfe78ff8e955a1019a41df25eb98b50f",
+    "shift_right_m": -0.5,
+    "settings": {
+      "speed_m_s": 6.0,
+      "final_distance_m": 2.5,
+      "beyond_m": 4.0,
+      "stop_beyond_m": 1.0,
+      "lock_frames": 3,
+      "maximum_blind_s": 4.5,
+      "flight_timeout_s": 30.0,
+      "shift_right_m": -0.5,
+      "acquisition_close_gaps": true,
+      "acquisition_largest_rim": true,
+      "gates_to_pass": 6,
+      "handoff_distance_m": 5.0,
+      "lookahead_enabled": true,
+      "lookahead_start_m": 12.0,
+      "lookahead_interval_s": 0.1,
+      "lookahead_max_age_s": 2.0,
+      "lookahead_during_final": true,
+      "height_alignment": true,
+      "height_alignment_distance_m": 6.0,
+      "height_alignment_deadband_m": 0.4,
+      "camera_correction": true,
+      "camera_window_s": 1.0,
+      "continuous_course": true,
+      "sensor_interface": "public_camera_and_HIGHRES_IMU",
+      "joint_control": false,
+      "gate_return": false,
+      "finish_beyond_m": 0.0,
+      "course_timeout_s": 180.0,
+      "trace_limit_mib": 384,
+      "camera_position_min_side_px": 20.0,
+      "camera_velocity_min_side_px": 20.0,
+      "vertical_speed_limit_m_s": 3.0,
+      "startup_allowance_s": 8.0,
+      "visibility_height_change_m": 1.5,
+      "motion_prediction": "command_model",
+      "visual_gravity": true,
+      "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+    },
+    "native_taps_loaded": false,
+    "native_gates_passed": 6,
+    "estimated_gates_passed": 6,
+    "native_completed": true,
+    "native_finish_time_s": 43.406482697,
+    "valid_race": true,
+    "passed_without_reset": true,
+    "controller_error": null,
+    "reset_calls_during_flight": 0,
+    "arm_calls": [
+      true,
+      false
+    ],
+    "continuous_imu_history": true,
+    "local_state_errors": {
+      "position_error_m": {
+        "count": 1900,
+        "median": 0.4762663450196758,
+        "p95": 1.199173277170255,
+        "maximum": 2.6469335725131624,
+        "rms": 0.7164379328103512
+      },
+      "velocity_error_m_s": {
+        "count": 1900,
+        "median": 0.20041977912701064,
+        "p95": 0.8003417764058678,
+        "maximum": 1.8343655597155282,
+        "rms": 0.4082591938658433
+      },
+      "attitude_error_deg": {
+        "count": 1900,
+        "median": 0.13401999549239516,
+        "p95": 0.3983801349150986,
+        "maximum": 0.6633551264528169,
+        "rms": 0.20550527352215756
+      }
+    },
+    "state_alignment": "One fixed yaw/origin alignment at stationary start; no scale fit.",
+    "trace_sha256": "34f4332f955caefed731c0c05663ac48df263ce6ef516dc58d9ae7035fbd2fd9",
+    "contact_packets": 0,
+    "gate_crossings": [
+      {
+        "gate": 1,
+        "native_pass": true,
+        "crossing_imu_time_s": 16.92885785285073,
+        "first_lock_time_s": 11.604656,
+        "first_lock_image_id": 331,
+        "crossing_position_ned_m": [
+          -23.297967780325763,
+          -0.4119262235809761,
+          -1.100726083122787
+        ],
+        "crossing_offset_width_down_m": [
+          -0.012024010683387312,
+          -0.0005369504482840788
+        ],
+        "last_image_id": 478,
+        "last_image_time_s": 16.496780628,
+        "blind_time_to_crossing_s": 0.43207722485072964,
+        "final_phase_to_crossing_s": 0.3606098528507289,
+        "camera_updates_during_final": 0,
+        "estimated_gate_error_width_down_normal_m": [
+          -0.01729710921205938,
+          -0.004552058775631196,
+          -0.24280139648510776
+        ]
+      },
+      {
+        "gate": 2,
+        "native_pass": true,
+        "crossing_imu_time_s": 23.570707700818065,
+        "first_lock_time_s": 17.165239,
+        "first_lock_image_id": 488,
+        "crossing_position_ned_m": [
+          -46.89374911333037,
+          -2.5173742135605948,
+          4.052586273258167
+        ],
+        "crossing_offset_width_down_m": [
+          -0.017384113047537494,
+          0.05277559881390273
+        ],
+        "last_image_id": 677,
+        "last_image_time_s": 23.126057593000002,
+        "blind_time_to_crossing_s": 0.44465010781806313,
+        "final_phase_to_crossing_s": 0.42443170081806514,
+        "camera_updates_during_final": 0,
+        "estimated_gate_error_width_down_normal_m": [
+          -0.005986247195274539,
+          0.03232871607198204,
+          -0.11838290297120221
+        ]
+      },
+      {
+        "gate": 3,
+        "native_pass": true,
+        "crossing_imu_time_s": 31.181900494771256,
+        "first_lock_time_s": 23.781226999999998,
+        "first_lock_image_id": 639,
+        "crossing_position_ned_m": [
+          -74.59374988029055,
+          1.0227084399557893,
+          12.640717612768457
+        ],
+        "crossing_offset_width_down_m": [
+          -0.17730138945862345,
+          0.04090753010792513
+        ],
+        "last_image_id": 905,
+        "last_image_time_s": 30.728618009,
+        "blind_time_to_crossing_s": 0.4532824857712541,
+        "final_phase_to_crossing_s": 0.4393874947712568,
+        "camera_updates_during_final": 0,
+        "estimated_gate_error_width_down_normal_m": [
+          0.0466154155845702,
+          0.019066066848150064,
+          -0.2058189495615116
+        ]
+      },
+      {
+        "gate": 4,
+        "native_pass": true,
+        "crossing_imu_time_s": 41.53090464386143,
+        "first_lock_time_s": 34.746338,
+        "first_lock_image_id": 1025,
+        "crossing_position_ned_m": [
+          -111.49374375766352,
+          -4.9522331174081495,
+          23.475496591715146
+        ],
+        "crossing_offset_width_down_m": [
+          0.14775663988069715,
+          -0.024313149273471515
+        ],
+        "last_image_id": 1217,
+        "last_image_time_s": 41.127336396000004,
+        "blind_time_to_crossing_s": 0.4035682478614291,
+        "final_phase_to_crossing_s": 0.38118464386143813,
+        "camera_updates_during_final": 0,
+        "estimated_gate_error_width_down_normal_m": [
+          -0.01238238226168082,
+          0.013239435431135978,
+          -0.13298283000987804
+        ]
+      },
+      {
+        "gate": 5,
+        "native_pass": true,
+        "crossing_imu_time_s": 45.62458959936352,
+        "first_lock_time_s": 41.763836,
+        "first_lock_image_id": 1236,
+        "crossing_position_ned_m": [
+          -135.49374374337572,
+          -0.7517228040967786,
+          24.11859674392887
+        ],
+        "crossing_offset_width_down_m": [
+          0.048267281205886366,
+          -0.16882589991803879
+        ],
+        "last_image_id": 1336,
+        "last_image_time_s": 45.094750969,
+        "blind_time_to_crossing_s": 0.5298386303635141,
+        "final_phase_to_crossing_s": 0.3507865993635164,
+        "camera_updates_during_final": 0,
+        "estimated_gate_error_width_down_normal_m": [
+          0.04971115283117404,
+          -0.08777084621484472,
+          -0.18576559610475157
+        ]
+      },
+      {
+        "gate": 6,
+        "native_pass": true,
+        "crossing_imu_time_s": null,
+        "first_lock_time_s": 45.875026,
+        "first_lock_image_id": 1355
+      }
+    ],
+    "normal_replay": {
+      "exact_updates": true,
+      "calls": 19609,
+      "wire_commands": 2045
+    },
+    "poisoned_replay": {
+      "calls": 19609,
+      "wire_commands": 2045,
+      "exact_updates": true,
+      "corrupted_pose_packets": 14724,
+      "corrupted_navigation_packets": 14724,
+      "native_gate_counter_zeroed": true
+    },
+    "plot_metrics": {
+      "name": "speed6-01",
+      "native_gates": 6,
+      "clean": true,
+      "contacts": 0,
+      "finish_s": 43.406482697,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1900,
+          "median": 0.4762663450196758,
+          "p95": 1.199173277170255,
+          "maximum": 2.6469335725131624,
+          "rms": 0.7164379328103512
+        },
+        "velocity_error_m_s": {
+          "count": 1900,
+          "median": 0.20041977912701064,
+          "p95": 0.8003417764058678,
+          "maximum": 1.8343655597155282,
+          "rms": 0.4082591938658433
+        },
+        "attitude_error_deg": {
+          "count": 1900,
+          "median": 0.13401999549239516,
+          "p95": 0.3983801349150986,
+          "maximum": 0.6633551264528169,
+          "rms": 0.20550527352215756
+        }
+      },
+      "recovery": [
+        {
+          "gate": 2,
+          "alignment_duration_s": 3.718141000000003,
+          "maximum_full_pose_age_s": 1.7849441569999982,
+          "horizontal_speed_at_end_m_s": 0.22576554755565162,
+          "relative_height_at_end_m": -1.1164247151848594
+        },
+        {
+          "gate": 3,
+          "alignment_duration_s": 4.773638999999999,
+          "maximum_full_pose_age_s": 2.154738652999999,
+          "horizontal_speed_at_end_m_s": 0.227037472461295,
+          "relative_height_at_end_m": -0.6584215912161009
+        },
+        {
+          "gate": 4,
+          "alignment_duration_s": 1.581778,
+          "maximum_full_pose_age_s": 0.039412959999992836,
+          "horizontal_speed_at_end_m_s": 2.4218004330203464,
+          "relative_height_at_end_m": 0.009039054007347502
+        }
+      ],
+      "motor_saturation": {
+        "threshold": 0.001,
+        "motor_sample_fraction": 0.0,
+        "any_motor_tick_fraction": 0.0
+      },
+      "missing_motor_trace": false,
+      "plots": [
+        "attitude-rates.png",
+        "camera.png",
+        "control.png",
+        "gate-2.png",
+        "gate-3.png",
+        "gate-4.png",
+        "reference.png",
+        "state.png"
+      ]
+    },
+    "pipeline_metrics": {
+      "name": "speed6-01",
+      "strict_flight_pass": true,
+      "native_gates": 6,
+      "estimated_gates": 6,
+      "native_finish_s": 43.406482697,
+      "inflight_contact_packets": 0,
+      "contact_episodes": 0,
+      "contact_episode_gap_s": 0.25,
+      "gate5_attitude_p95_deg": 0.3888996029038231,
+      "gate5_camera_vertical_error_p95_m": 0.15563719722577693,
+      "diagnostic_goal_checks": {
+        "gate5_attitude": true,
+        "gate5_camera_height": true,
+        "finish_under_55s": true
+      },
+      "visual_gravity_corrections": 49,
+      "maximum_gravity_correction_deg": 0.11466437546196846,
+      "control_imu_interval_ms": {
+        "median": 19.497000000001208,
+        "p95": 33.51500000000271,
+        "max": 87.81299999999703
+      },
+      "centerline_margins": [
+        {
+          "gate": 1,
+          "horizontal_centerline_margin_m": 0.727975901610163,
+          "vertical_centerline_margin_m": 0.7394630495517159
+        },
+        {
+          "gate": 2,
+          "horizontal_centerline_margin_m": 0.7226157992460129,
+          "vertical_centerline_margin_m": 0.6872244011860973
+        },
+        {
+          "gate": 3,
+          "horizontal_centerline_margin_m": 0.5626985228349268,
+          "vertical_centerline_margin_m": 0.6990924698920755
+        },
+        {
+          "gate": 4,
+          "horizontal_centerline_margin_m": 0.5922432724128532,
+          "vertical_centerline_margin_m": 0.7156868507265292
+        },
+        {
+          "gate": 5,
+          "horizontal_centerline_margin_m": 0.6917326310876639,
+          "vertical_centerline_margin_m": 0.5711741000819619
+        }
+      ],
+      "horizontal_gate_path_length_m": 161.0890676135441,
+      "scored_setup_overhead_s": 5.185138697000001,
+      "current_speed_horizontal_lower_bound_s": 26.848177935590684,
+      "horizontal_speed_limit_m_s": 6.0,
+      "unmeasured": {
+        "true_camera_exposure_age": null,
+        "vehicle_body_clearance": null,
+        "online_attitude_uncertainty_calibration": null
+      },
+      "plots": 10
+    },
+    "timing": {
+      "capture_to_output_ms": {
+        "count": 717,
+        "median": 8.409391999999016,
+        "p95": 19.9689747999983,
+        "maximum": 25.971669999997005,
+        "rms": 11.380017042829245
+      },
+      "velocity_fit_age_ms": {
+        "count": 678,
+        "median": 480.93076087076093,
+        "p95": 510.45361052888,
+        "maximum": 604.1443235198258,
+        "rms": 442.1273256774921
+      }
+    },
+    "retention": {
+      "temporary_bytes_removed": 180271044,
+      "raw_recordings_retained": false
+    },
+    "artifact_sha256": {
+      "state-errors.csv": "bf37806e6790eef722c88e6973bdc18bc4557c0d788f88cabf0d316a60d44466",
+      "input-independence.json": "ec2c63b4ddbf82d6503ce9fc726b21696350e1aa6cae2d44f77b9d6469805fb6",
+      "retention.json": "73e838223672d78354573eab8bf1b94238c08dbacece639908c0fab4d3af83f0",
+      "score.json": "a74d495d5ff52fc5878ae3df71d1eb5994ec50a37f26456abe6ff91783ba2272",
+      "replay.json": "cb5ef0329b3d4993c7c5446358a459d510c189f1f1313955f295c4cf7186da4f",
+      "camera-errors.csv": "03022e52e6311b05eba6cb93cd6f20f13fd9752c4314dbc78c4e7c956fb8009b",
+      "protocol.json": "f0b062e15c57a7a66de1b16af5ba27f661866d8564e3b0c78b534255721b498f",
+      "video.json": "7cb9812b49f2c3d93d460c38ba5c31e2583111668948374a4610791195f4570a",
+      "control.jsonl.gz": "c522937b495197662f5eec03d4affd8bd15f59c3d3746619f1727edb164221ba",
+      "course-camera-imu.mp4": "ec093aa82c25f464ca5c6d119de92c89ba4f9e18ce4be9494c45f019776c9da5"
+    }
+  },
+  "summary": {
+    "attempts": 6,
+    "unarmed_startup_failures": 1,
+    "flown_races": 5,
+    "clean_full_course_passes": 5,
+    "native_times_s": [
+      49.899307251,
+      49.372974396,
+      46.056232452,
+      48.758087158,
+      47.922527313
+    ],
+    "median_native_time_s": 48.758087158,
+    "speed6_clean_pass": true,
+    "speed6_finish_s": 43.406482697,
+    "all_flown_replays_exact": true,
+    "scope": "Fixed VQ1 direct arena, three -0.5m and two +0.5m starts; not an official qualification or a reliability guarantee."
+  },
+  "calibration_audit": {
+    "runtime_privileged_navigation_excluded": true,
+    "poisoned_replay_tests_runtime_inputs_only": true,
+    "strict_scorer_only_end_to_end_satisfied": false,
+    "unresolved_dependency": "Command-model thrust and drag constants were estimated previously from privileged native reports.",
+    "calibration_source": "test/fixtures/vq1_r1_sub10.validation.json: force_fit.data_source",
+    "source_statement": "Native reported actuator outputs, pose and attitude aligned by their own boot timestamps.",
+    "config": "test/fixtures/vq1_r1_sub10.config.json",
+    "priors": [
+      "Nominal 1.50m gate aperture",
+      "Camera intrinsics and extrinsics",
+      "Upright-gate vertical edges for roll/pitch correction",
+      "Fixed vehicle thrust and drag calibration"
+    ],
+    "required_fix": "Identify thrust/drag from public camera measurements, public gyro/IMU and own sent commands; hold out whole flights. Do not fit against fused velocity produced by the old privileged-derived model. Replay the fit after removing native data, then repeat native control."
+  },
+  "architecture_review": {
+    "keep": [
+      "Native closed-loop flights",
+      "Explicit privileged runtime exclusion",
+      "Exact normal and poisoned replay",
+      "Known-size gate geometry",
+      "Compact numerical traces and automatic plots"
+    ],
+    "estimator_gap": "Delayed attitude corrections rotate orientation history but do not repropagate historical position/velocity through the corrected dynamics. State corrections and the frozen gate anchor are not one jointly consistent estimate.",
+    "timing_gap": "Arrival-envelope sensor clock alignment is not measured exposure time. Median camera velocity measurement age is about0.48s and is delayed-corrected; its motion-model error still matters during acceleration.",
+    "planning_gap": "Current recovery brakes toward zero forward speed and hands off with fixed thresholds. It does not predict future visibility or crossing uncertainty.",
+    "speed_limits": {
+      "cli_max_m_s": 8,
+      "camera_velocity_acceptance_m_s": 8,
+      "horizontal_acceleration_m_s2": 3,
+      "vertical_speed_m_s": 3,
+      "tilt_rad": 0.45
+    },
+    "metric_correction": "Having a number for each block is necessary instrumentation, not proof of optimality. End-to-end flight constraints must include uncertainty and predicted gate-crossing margin; block errors may correlate."
+  },
+  "numerical_feasibility": {
+    "projected_course_displacement_m": 159.12837879933207,
+    "metric_source": "Native poses used only for retrospective scoring and feasibility accounting.",
+    "lower_bound_at_5m_s": 31.825675759866414,
+    "lower_bound_at_6m_s": 26.521396466555345,
+    "mean_forward_speed_for_10s_without_setup_m_s": 15.912837879933207,
+    "measured_speed6_setup_s": 5.185138697000001,
+    "mean_forward_speed_for_10s_with_current_setup_m_s": 33.04942111212712,
+    "caveat": "Kinematic lower bounds omit acceleration, turns and sensing stops. Earlier plots used gate-center path length, which is a nominal route and not a rigorous shortest-path bound."
+  },
+  "next_checkpoints": [
+    {
+      "name": "Public-data dynamics calibration",
+      "success": "No native fields in model identification; whole-flight held-out camera velocity-change RMS <=0.5m/s over0.5s windows (proposed target); 5/5 full flights from both shifted starts and exact poisoned replay.",
+      "reason": "Close the strict scorer-only provenance gap before claiming all privileged dependencies replaced."
+    },
+    {
+      "name": "Consistent timed estimator",
+      "success": "Shared p,v,attitude,gate and model-bias history; replay delayed corrections causally; report innovation and crossing-error coverage. Test known injected sensor offsets and loss intervals without native control inputs.",
+      "reason": "High-speed control must act on an uncertainty estimate that includes timing and model error."
+    },
+    {
+      "name": "Continuous height transition",
+      "success": "At6m/s, halve measured horizontal-below1m/s time from4.442s to<=2.221s; 5/5 six-gate flights with zero contacts/resets. Publish crossing margins and sensor loss; then expand speeds.",
+      "reason": "Remove measurable stopping cost with a short trajectory prediction including camera visibility, before further threshold tuning."
+    }
+  ],
+  "references": {
+    "perception_aware_planning": "https://arxiv.org/abs/1804.04811",
+    "temporal_calibration": "https://arxiv.org/abs/1808.00692"
+  },
+  "retention": {
+    "raw_retained": false,
+    "raw_trace_cap_mib": 384,
+    "root": "/Users/hawking/Desktop/stuff/miniflight/work/height-recovery-20261115",
+    "plots": 101,
+    "control_trace_total_bytes": 9469081
+  }
+}

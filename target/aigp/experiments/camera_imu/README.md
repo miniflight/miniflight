@@ -58,6 +58,13 @@ sensor clock alignment. These are direct-arena results, above the ten-second
 target. Protocol, source hashes and failures: [course.validation.json](course.validation.json).
 The earlier `joint` experiments below use instrumented sensor timing.
 
+Upright gate edges now correct gyro tilt. Five flown repetitions passed six gates
+without contact at 46.06–49.90 s; a sixth attempt failed before arming. One 6 m/s
+trial passed in 43.41 s. [gravity.validation.json](gravity.validation.json) retains
+the failures and plots. Runtime navigation excludes native state, but the current
+thrust/drag constants came from earlier native-data fits. Public-sensor dynamics
+identification is the next checkpoint.
+
 Joint position, velocity and depth feedback for one slow 20-degree turn:
 
 ```sh
