@@ -3,6 +3,7 @@ from bisect import bisect_left
 import numpy as np
 from scipy.spatial.transform import Rotation
 from common.math import Quaternion
+from miniflight.control import BodyRates
 from miniflight.gate_filter import GateFilter,GateHistory
 from miniflight.profiling import timed
 from . import course,sensors,vision
@@ -65,7 +66,7 @@ class Inertial(sensors.Inertial):
 class GateController(course.GateController):
     def __init__(self,calls):
         super().__init__(calls);self.inertial=Inertial(self.config);self.inertial.timing=self.timing
-        self.brake_state='waiting';self.brake_steady=None;self.used_joint=set()
+        self.brake_state='waiting';self.brake_steady=None;self.used_joint=set();self.launch_cleared=False
 
     @property
     def anchor(self):
@@ -130,6 +131,13 @@ class GateController(course.GateController):
             self.full_image_time=f.last_full_visual.get(self.gate_number)
 
     def drive(self,target):
+        # Lift clear of the starting pad before asking for a large pitch/roll change.
+        if self.phase is sensors.Phase.SHIFTING and not self.launch_cleared:
+            self.launch_cleared=self.inertial.position[2]<-.2
+            self.signal['launch_cleared']=self.launch_cleared
+            if not self.launch_cleared:
+                request=sensors.acceleration_control(self.config,[0.,0.,-3.],self.inertial.rotation.to_euler(),0.)
+                return BodyRates(0.,0.,0.,request.thrust)
         if sensors.SETTINGS.get('brake_test') and self.locked is not None and self.phase is sensors.Phase.TRACKING:
             if self.brake_state=='waiting' and self.gate_remaining()<=10.:self.brake_state='braking'
             if self.brake_state=='braking':

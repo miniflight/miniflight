@@ -95,7 +95,7 @@ def score(root):
                 'gate_number','estimated_gates_passed','visibility_alignment','alignment_relative_gate','alignment_hint','search_hint','camera_observation',
                 'motor_commands','alignment_height_step','gyro','rate_request','rate_integral','visual_gravity','partial_gate',
                 'full_image_time','partial_retargets','aperture_corners_measured','measurement_time','association_counts','crossing','crossing_alignment',
-                'joint_posterior','brake_test_active','brake_test_state')
+                'joint_posterior','brake_test_active','brake_test_state','launch_cleared')
         with gzip.open(root/'control.jsonl.gz','wt') as stream:
             for tick in ticks:
                 stream.write(json.dumps({key:tick[key] for key in fields if key in tick},separators=(',',':'))+'\n')
