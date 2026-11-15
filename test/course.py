@@ -5,7 +5,7 @@ from pymavlink.dialects.v20 import common
 
 from miniflight.state import Frame
 from miniflight.replay import Calls
-from target.aigp.experiments.camera_imu.course import WireClient, alignment_step, command_specific_force, vertical_bearing
+from target.aigp.experiments.camera_imu.course import WireClient, GateController, alignment_step, command_specific_force, vertical_bearing
 from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
 from target.aigp.experiments.camera_imu.motion import GateMotion
@@ -72,9 +72,21 @@ class WireBoundaryTest(unittest.TestCase):
         self.assertFalse(scored_gate_passes(gates,completed_finish=True))
 
     def test_partial_bearing_overrides_an_incorrect_height_prediction(self):
-        self.assertGreater(alignment_step(-5.,1.,350.,1.),0.)
-        self.assertLess(alignment_step(5.,1.,100.,-1.),0.)
-        self.assertEqual(alignment_step(5.,.1,100.,-1.),5.)
+        self.assertGreater(alignment_step(-5.,1.,.3,1.),0.)
+        self.assertLess(alignment_step(5.,1.,-.3,-1.),0.)
+        self.assertEqual(alignment_step(5.,.1,-.3,-1.),5.)
+
+    def test_recovery_uses_attitude_at_the_image_time(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        gate=object.__new__(GateController)
+        gate.inertial=SimpleNamespace(time=1.,camera_pose=Mock(return_value=(np.zeros(3),vision.CAMERA_FROM_BODY.T)))
+        ray=vision.CAMERA_FROM_BODY @ [10.,0.,0.]
+        gate.search_hint=dict(time=.9,pixel=((vision.K @ ray)[:2]/ray[2]).tolist())
+        self.assertAlmostEqual(alignment_step(-1.,1.,gate.hint_bearing(),1.),0.)
+        gate.inertial.camera_pose.assert_called_once_with(.9)
+        gate.inertial.time=2.
+        self.assertIsNone(gate.hint_bearing())
 
     def test_real_gate_measurement_can_repair_a_drifted_imu_position(self):
         from unittest.mock import patch

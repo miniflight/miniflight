@@ -21,11 +21,11 @@ def vertical_bearing(pixel,orientation):
     return float(ray[2]/max(np.linalg.norm(ray[:2]),1e-6))
 
 
-def alignment_step(predicted_height,age,pixel_y,direction):
+def alignment_step(predicted_height,age,bearing,direction):
     """A partial image supplies a steering cue, not a fabricated metric pose."""
     if age<=.3:return predicted_height
-    if pixel_y is None:return 2.*direction
-    return float(np.clip((pixel_y-220.)/80.*2.,-3.,3.))
+    if bearing is None:return 2.*direction
+    return float(np.clip(8.*bearing,-3.,3.))
 
 
 def command_specific_force(config,outputs,body,velocity):
@@ -130,8 +130,7 @@ class GateController(base.GateController):
                         alignment_image_age_s=age,alignment_hint=self.search_hint)
                     if age>base.SETTINGS['maximum_blind_s']:
                         raise TimeoutError('height alignment could not regain the mapped gate')
-                    pixel=None if self.search_hint is None or self.inertial.time-self.search_hint['time']>.6 else self.search_hint['pixel'][1]
-                    correction=alignment_step(relative[2],age,pixel,self.alignment_direction)
+                    correction=alignment_step(relative[2],age,self.hint_bearing(),self.alignment_direction)
                     horizontal_speed=np.linalg.norm(self.inertial.velocity[:2])
                     braking=8.+horizontal_speed**2/(2*self.config.max_horizontal_acceleration)
                     advance=base.SETTINGS['height_alignment_distance_m'] if self.gate_remaining()>braking else 0.
@@ -143,12 +142,19 @@ class GateController(base.GateController):
         self.signal['visibility_alignment']=False
         return super().drive(target)
 
+    def hint_bearing(self):
+        hint=self.search_hint
+        if hint is None or self.inertial.time-hint['time']>.6:return None
+        pose=self.inertial.camera_pose(min(self.inertial.time,hint['time']))
+        return None if pose is None else vertical_bearing(hint['pixel'],pose[1])
+
     def search_waypoint(self,frames):
         speed=np.linalg.norm(self.inertial.velocity[:2])
         if speed>.5:
             self.search_direction=np.r_[self.inertial.velocity[:2]/speed,0.]
         if frames:
-            image=max(frames,key=lambda f:f.id).bgr.astype(np.float32)/255
+            frame=max(frames,key=lambda f:f.id)
+            image=frame.bgr.astype(np.float32)/255
             blue,green,red=cv2.split(image)
             mask=np.uint8(red-(green+blue)/2>.08)
             count,labels,stats,centers=cv2.connectedComponentsWithStats(mask)
@@ -156,10 +162,10 @@ class GateController(base.GateController):
             if candidates:
                 index=max(candidates,key=lambda i:stats[i,cv2.CC_STAT_AREA])
                 self.search_hint=dict(pixel=centers[index].tolist(),area=int(stats[index,cv2.CC_STAT_AREA]),
-                    time=self.inertial.time,frame_id=max(frames,key=lambda f:f.id).id)
+                    time=frame.time_ns*1e-9,frame_id=frame.id)
         target=self.inertial.position+self.search_direction
-        pixel=340. if self.search_hint is None else self.search_hint['pixel'][1]
-        target[2]+=float(np.clip((pixel-220.)/80.*2.,-3.,3.))
+        bearing=self.hint_bearing()
+        target[2]+=alignment_step(0.,1.,.5 if bearing is None else bearing,1.)
         return target
 
     def update(self,telemetry,frames,race_state):
