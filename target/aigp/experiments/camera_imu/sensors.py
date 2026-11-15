@@ -413,6 +413,7 @@ class GateController(BaseController):
                 self.shift_displacement = self.inertial.position.copy()
                 if visual_setup:
                     self.anchor-=self.shift_displacement
+                    self.direction=self.anchor*[1.,1.,0.];self.direction/=np.linalg.norm(self.direction)
                     self.last_relative_position-=self.shift_displacement
                     p,q,c,pose=self.previous
                     self.previous=(p-self.shift_displacement,q,c,pose)

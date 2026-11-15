@@ -126,6 +126,7 @@ class GateController(single.GateController):
             return
         was_locked = self.locked is not None
         super().observe(frame, stamp, position, rotation)
+        if self.phase is single.Phase.SHIFTING:return
         if SETTINGS.get('visual_gravity'):
             corrected=self.inertial.camera_pose(stamp)
             if corrected is not None:position,rotation=corrected

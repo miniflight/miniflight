@@ -29,6 +29,7 @@ class PublicCalibrationTest(unittest.TestCase):
             c=sensors.GateController();c.phase=sensors.Phase.SHIFTING;c.locked=1;c.setup_started=0.;c.setup_steady=.5
             c.inertial.rotation=Quaternion();c.inertial.time=1.;c.inertial.position=np.array([.2,-.5,-1.])
             c.anchor=np.array([20.,1.,2.]);c.direction=np.array([1.,0.,0.]);c.last_image_time=1.;c.last_image_id=1
+            c.last_corners=np.array([[200.,150.],[280.,150.],[280.,230.],[200.,230.]])
             relative=c.anchor-c.inertial.position;c.last_relative_gate=relative.copy();c.last_relative_position=c.inertial.position.copy()
             c.previous=(c.inertial.position.copy(),vision.CAMERA_FROM_BODY.T,np.zeros((4,2)),None)
             c.last_gate_corners=np.zeros((4,3));c.inertial.rotations=[vision.CAMERA_FROM_BODY.T.copy()]
