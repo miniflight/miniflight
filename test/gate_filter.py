@@ -16,6 +16,22 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_settling_completion_wins_on_the_deadline_tick(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from common.math import Quaternion
+        from target.aigp.experiments.camera_imu import sensors
+        state=SimpleNamespace(motion=None,attitude=None,imu_increments=(),time=10.03)
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),visual_initialization=True),patch.object(sensors,'vehicle',SimpleNamespace(state=state)):
+            c=sensors.GateController();c.phase=sensors.Phase.SHIFTING;c.locked=1;c.setup_started=0.;c.setup_steady=9.62
+            c.inertial.rotation=Quaternion();c.inertial.time=10.03;c.inertial.position=np.array([0.,-.5,-1.]);c.inertial.velocity=np.array([.1,.08,.04])
+            c.anchor=np.array([20.,1.,2.]);c.direction=np.array([1.,0.,0.]);c.last_image_time=10.03;c.last_image_id=1
+            c.last_relative_position=c.inertial.position.copy();c.last_relative_gate=c.anchor-c.inertial.position
+            c.last_corners=np.array([[200.,150.],[280.,150.],[280.,230.],[200.,230.]])
+            c.previous=(c.inertial.position.copy(),CAMERA_FROM_BODY.T,np.zeros((4,2)),None);c.last_gate_corners=np.zeros((4,3))
+            with patch.object(c,'drive',return_value=None):c.update((),(),None)
+            self.assertIs(c.phase,sensors.Phase.TRACKING);np.testing.assert_array_equal(c.inertial.velocity,[.1,.08,.04])
+
     def test_known_size_cannot_absorb_motion_or_projection_error(self):
         f=filter();expected,_=f.measurement(1,POINTS);variance=f.P[15,15]
         for _ in range(6):f.observe(1,POINTS,expected*1.01)

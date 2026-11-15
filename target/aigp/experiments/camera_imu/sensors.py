@@ -508,9 +508,10 @@ class GateController(BaseController):
                 distance=np.linalg.norm((target-self.inertial.position)[1:])
                 steady=distance<.1 and np.linalg.norm(self.inertial.velocity[1:])<.15 and abs(self.inertial.velocity[0])<.5
             self.setup_steady = (self.setup_steady or now) if steady else None
-            if now-self.setup_started > 10.:
+            setup_complete=self.setup_steady is not None and now-self.setup_steady>=.4
+            if now-self.setup_started > 10. and not setup_complete:
                 raise TimeoutError("IMU shift and settle exceeded ten seconds")
-            if self.setup_steady is not None and now-self.setup_steady >= .4:
+            if setup_complete:
                 self.shift_displacement = self.inertial.position.copy()
                 if visual_setup:
                     self.anchor-=self.shift_displacement
