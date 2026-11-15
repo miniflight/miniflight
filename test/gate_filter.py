@@ -16,6 +16,16 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_pad_support_is_not_fitted_as_a_force_bias(self):
+        f=GateFilter(np.eye(3),np.zeros(3),[11.81,0.],[0.]*3,CAMERA_FROM_BODY,K,supported=True)
+        h=GateHistory(f,0.,[0.,0.,0.]);h.command(.001,[1.]*4)
+        for t in [.02,.04,.06]:h.imu(t,[0.,0.,0.],[0.,0.,-9.81])
+        self.assertFalse(h.filter.airborne);self.assertEqual(h.filter.force_accepted,0)
+        np.testing.assert_array_equal(h.filter.p,np.zeros(3));np.testing.assert_array_equal(h.filter.ba,np.zeros(3))
+        h.imu(.08,[0.,0.,0.],[0.,0.,-11.81]);self.assertTrue(h.filter.airborne)
+        h.imu(.1,[0.,0.,0.],[0.,0.,-11.81])
+        self.assertLess(h.filter.v[2],0.);np.testing.assert_allclose(h.filter.ba,np.zeros(3),atol=1e-12)
+
     def test_sent_command_does_not_act_before_its_public_epoch(self):
         f=GateFilter(np.eye(3),np.zeros(3),[11.81,0.],[0.]*3,CAMERA_FROM_BODY,K)
         h=GateHistory(f,0.,[0.,0.,0.]);h.command(.025,[1.]*4)

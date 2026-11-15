@@ -20,7 +20,8 @@ class Inertial(sensors.Inertial):
                 super().update([sample])
                 if self.rotation is None:continue
                 rates=np.array([s.gyro for s in self.seed]);f=GateFilter(self.rotation.as_rotation_matrix(),np.zeros(3),
-                    self.config.thrust_curve,self.config.body_resistance_per_m,vision.CAMERA_FROM_BODY,vision.K)
+                    self.config.thrust_curve,self.config.body_resistance_per_m,vision.CAMERA_FROM_BODY,vision.K,
+                    supported=sensors.SETTINGS.get('ground_support',False))
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
             elif sample.time>self.time:
@@ -163,7 +164,7 @@ class Controller(course.Controller):
         if command is not None and h is not None:
             f=h.filter
             posterior=dict(position_covariance=f.P[:3,:3].tolist(),velocity_covariance=f.P[3:6,3:6].tolist(),attitude_covariance=f.P[6:9,6:9].tolist(),
-                gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets)
+                gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets,airborne=f.airborne)
             if self.gate.gate_number in f.gates:
                 relative,cov,camera,camcov=f.relative(self.gate.gate_number)
                 posterior.update(relative_gate=relative.tolist(),relative_covariance=cov.tolist(),camera_gate=camera.tolist(),camera_covariance=camcov.tolist())

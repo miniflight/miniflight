@@ -25,7 +25,7 @@ def upright_seed(pixels,camera_down,intrinsics,height=1.5):
 
 class GateFilter:
     """Error coordinates: p,v,right attitude error,gyro bias,force bias,gate(xyz,yaw)."""
-    def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics):
+    def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics,*,supported=False):
         self.p=np.zeros(3);self.v=np.zeros(3);self.R=np.array(rotation)
         self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
         self.proposals={};self.retargets=0;self.last_visual={};self.last_full_visual={}
@@ -36,6 +36,7 @@ class GateFilter:
         self.C=np.array(camera_from_body);self.K=np.array(intrinsics)
         self.acceleration_noise=.5;self.gyro_noise=.001
         self.gyro_bias_walk=.0001;self.force_bias_walk=.05
+        self.airborne=not supported
 
     def copy(self):return deepcopy(self)
 
@@ -52,6 +53,7 @@ class GateFilter:
         if not 0.<dt<=.15:raise ValueError('Process interval must be positive elapsed public time, <=150ms')
         n=len(self.P);F=np.eye(n);Q=np.zeros((n,n));omega=np.asarray(gyro)-self.bg
         rotation_step=Rotation.from_rotvec(omega*dt).as_matrix()
+        if not self.airborne:motors=None
         if motors is None:
             # Before our first command, the disarmed stationary prior supplies support.
             acceleration=np.zeros(3);Av=np.zeros((3,3));At=np.zeros((3,3))
@@ -216,8 +218,12 @@ class GateHistory:
         for stamp in nodes:
             self._advance(stamp)
             for at,acceleration in self.accelerations:
-                if at==stamp and stamp-self.filter.last_force_time>=.05:
+                if at==stamp:
                     motors=self._motor(stamp-1e-9)
+                    # A command is not proof of liftoff. Support force is not an IMU bias.
+                    upward=-float((self.filter.R @ acceleration+[0.,0.,9.81])[2])
+                    if motors is not None and upward>1.5 and np.linalg.norm(acceleration)>9.81+1.5:self.filter.airborne=True
+                    if not self.filter.airborne or stamp-self.filter.last_force_time<.05:continue
                     if motors is not None:
                         recent=[u for t,u in self.commands if stamp-.08<=t<stamp]
                         spread=max((float(np.max(abs(u-motors))) for u in recent),default=0.)
