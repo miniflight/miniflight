@@ -1,4 +1,4 @@
-import unittest
+import json,unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 import numpy as np
@@ -16,7 +16,8 @@ class ThrustResponseTest(unittest.TestCase):
         with patch.object(sensors.GateController,'drive',return_value=request):
             self.assertEqual(c.drive(None),request)
             c.inertial.time=.51;self.assertEqual(c.drive(None).thrust,.26)
-            c.inertial.time=.70;self.assertEqual(c.drive(None),request);self.assertEqual(c.index,1)
+            c.inertial.time=np.float64(.70);self.assertEqual(c.drive(None),request);self.assertEqual(c.index,1)
+            json.dumps(c.signal)
             c.inertial.time=1.3;c.inertial.velocity[2]=.4;self.assertEqual(c.drive(None),request)
             c.inertial.velocity[:]=0.;c.inertial.time=1.4;c.drive(None)
             c.inertial.time=1.91;self.assertEqual(c.drive(None).thrust,.335)

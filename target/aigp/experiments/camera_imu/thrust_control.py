@@ -33,7 +33,7 @@ class GateController(joint.GateController):
         if self.pulse_at is not None and now-self.pulse_at>=duration:
             self.index+=1;self.pulse_at=None;self.recover_at=now;self.steady=None
         active=self.pulse_at is not None
-        coast=self.recover_at is not None and now-self.recover_at<.4
+        coast=bool(self.recover_at is not None and now-self.recover_at<.4)
         applied=active and error<=1.5 and speed<=3. and fresh
         self.signal['excitation']=dict(index=self.index,phase='pulse' if active else 'coast' if coast else 'recover',applied=bool(applied),body_rates_held=active or coast,
             collective=level if active else None,duration_s=duration,hold_error_m=float(error),speed_m_s=float(speed),image_fresh=bool(fresh))
