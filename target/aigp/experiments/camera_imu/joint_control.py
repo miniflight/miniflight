@@ -40,12 +40,35 @@ class GateController(base.GateController):
     def __init__(self, calls):
         super().__init__()
         self.joint = JointEstimator(call=calls,initialization=base.SETTINGS.get('joint_initialization','linear'),
-            init_shadow=base.SETTINGS.get('joint_initialization_shadow',False),world_gravity=[0.,0.,9.81])
+            init_shadow=base.SETTINGS.get('joint_initialization_shadow',False),world_gravity=[0.,0.,9.81],
+            gate_correction=base.SETTINGS.get('gate_return',False))
         self.raw_imu = []
         self.active = False
         self.settled = None
         self.last_joint_gate_time = None
         self.future_frames = []
+
+    def returning_gate(self, frame, rotation):
+        stamp = frame.time_ns*1e-9
+        if not self.joint.gate_correction or stamp <= self.joint.last_time:
+            return None
+        elapsed = self.joint.integral.at(stamp)[0]-self.started
+        if elapsed < 1.:
+            return None
+        state = self.joint.predict(stamp)
+        camera = (self.joint.gate_world-state[:3]) @ self.joint.reference.T @ rotation
+        if np.min(camera[:,2]) <= .05:
+            return None
+        h = camera @ base.vision.K.T
+        predicted = h[:,:2]/h[:,2:]
+        corners = base.vision.refine(frame.bgr,predicted)
+        if corners is None or np.any(corners < 1) or np.any(corners >= [639,359]):
+            return None
+        pose = base.vision.best_pose(corners)
+        if (pose is None or pose[0] > 1. or base.vision.iou(corners,predicted) < .5
+                or np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1)) < 40.):
+            return None
+        return corners
 
     def _imu(self):
         remaining = []
@@ -100,7 +123,7 @@ class GateController(base.GateController):
             frame = max(ready, key=lambda f:f.time_ns)
             pose = self.inertial.camera_pose(frame.time_ns*1e-9)
             if pose is not None:
-                self.joint.observe(frame, pose[1])
+                self.joint.observe(frame, pose[1],gate_corners=self.returning_gate(frame,pose[1]))
         return self._drive_joint()
 
     def drive(self, target):
@@ -151,6 +174,12 @@ class GateController(base.GateController):
                 camera_rotation=self.joint.last_camera_rotation.tolist(),
                 elapsed_s=float(elapsed), speed=self.speed, start_position=self.start.tolist(),
                 forward=self.forward.tolist(), gate_pose_frozen_at=self.last_joint_gate_time))
+        if self.joint.gate_correction:
+            self.signal['joint'].update(gate_updates=self.joint.gate_updates,
+                first_gate_return=self.joint.first_gate_return,gate_gap_s=1.,gate_world=self.joint.gate_world.tolist(),
+                prediction_dt_s=self.joint.between(self.joint.solution_time,now)[0],
+                gate_return_elapsed_s=None if self.joint.first_gate_return is None else
+                    self.joint.integral.at(self.joint.first_gate_return)[0]-self.started)
         steady = elapsed >= 4. and np.linalg.norm(velocity) < .2 and np.linalg.norm(target-position) < .45
         self.settled = (self.settled or now) if steady else None
         if self.settled is not None and now-self.settled >= .25:

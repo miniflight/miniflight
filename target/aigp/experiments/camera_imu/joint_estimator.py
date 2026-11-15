@@ -12,7 +12,9 @@ from . import vision
 
 class JointEstimator:
     def __init__(self, call=None, period=.15, recent=5, points=24,
-                 initialization='linear', init_shadow=False, world_gravity=None):
+                 initialization='linear', init_shadow=False, world_gravity=None, gate_correction=False):
+        if gate_correction and initialization != 'reprojection':
+            raise ValueError('gate correction requires the multi-frame gate initialization')
         self.call = call or (lambda name, args, function:function())
         self.period, self.recent, self.maximum_points = period, recent, points
         self.integral = ImuIntegral()
@@ -25,6 +27,8 @@ class JointEstimator:
         self.initialization, self.init_shadow = initialization, init_shadow
         self.world_gravity = None if world_gravity is None else np.array(world_gravity)
         self.gate_pixels = []
+        self.gate_correction, self.gate_updates = gate_correction, 0
+        self.first_gate_return = None
 
     def imu(self, stamp, dt, specific_force_world):
         self.integral.append(stamp, dt, specific_force_world)
@@ -76,7 +80,12 @@ class JointEstimator:
             return
         if stamp-self.window[-1]['time'] < self.period:
             return
-        self._step(frame.id, stamp)
+        pixels = []
+        if self.gate_correction and gate_corners is not None:
+            rays = np.column_stack((gate_corners, np.ones(4))) @ vision.K_INV.T
+            h = rays @ camera_to_world.T @ self.reference @ vision.K.T
+            pixels = (h[:, :2]/h[:, 2:]).tolist()
+        self._step(frame.id, stamp, pixels)
 
     def _initialize(self):
         if len(self.gates) < 12 or self.last_time-self.gates[-1][0] > .1:
@@ -129,6 +138,8 @@ class JointEstimator:
                 velocity_reference = np.array(candidate['velocity'])
                 self.initial_velocity = velocity_reference+force+self.gravity*duration
                 accelerated = True
+                if self.gate_correction:
+                    self.gate_world = vision.SQUARE @ cv2.Rodrigues(np.array(candidate['rotation']))[0].T+candidate['center']
         key = np.unique(np.round(np.linspace(0, len(self.initial_frames)-1, 12)).astype(int))
         positions = []
         for i in key:
@@ -198,12 +209,12 @@ class JointEstimator:
         return np.r_[state[:3]+state[3:6]*dt+dp+.5*self.gravity*dt**2,
                      state[3:6]+dv+self.gravity*dt, state[6:9]]
 
-    def _step(self, image_id, stamp):
+    def _step(self, image_id, stamp, gate_pixels=()):
         ids = np.flatnonzero(self.tracker.alive).tolist()
         if len(ids) < 6:
             raise RuntimeError('joint estimator lost its background tracks')
         predicted = self.predict(stamp)
-        self.window.append(dict(id=image_id, time=stamp, ids=ids, pixels=self.tracker.points[ids].tolist()))
+        self.window.append(dict(id=image_id, time=stamp, ids=ids, pixels=self.tracker.points[ids].tolist(), gate_pixels=list(gate_pixels)))
         self.states[image_id] = predicted
         self.window = self.window[:1]+self.window[1:][-self.recent:]
         self.states = {frame['id']:self.states[frame['id']] for frame in self.window}
@@ -220,6 +231,10 @@ class JointEstimator:
             depth_sigma=self.depth_sigma.tolist(), gravity=self.gravity.tolist(), anchor=self.anchor.tolist(),
             states=[self.states[f['id']].tolist() for f in self.window], depths=self.depths.tolist(),
             frames=[dict(ids=f['ids'], pixels=f['pixels']) for f in self.window], edges=edges)
+        if self.gate_correction:
+            request.update(fixed_anchor=False, fixed_anchor_position=True, gate_world=self.gate_world.tolist(),
+                frame_ids=[f['id'] for f in self.window], frame_times=[f['time'] for f in self.window],
+                frames=[dict(ids=f['ids'],pixels=f['pixels'],gate_pixels=f.get('gate_pixels',[])) for f in self.window])
         reply = self.call('joint_solve', dict(image_id=int(image_id), capture_ns=round(stamp*1e9), sequence=self.solutions+1),
                           lambda:dict(request=request, fit=solve_window(request)))
         saved, fit = reply['request'], reply['fit']
@@ -228,6 +243,9 @@ class JointEstimator:
         for a, b in zip(saved['frames'], request['frames'], strict=True):
             assert a['ids'] == b['ids']
             np.testing.assert_allclose(a['pixels'], b['pixels'], rtol=0, atol=1e-4)
+            np.testing.assert_allclose(a.get('gate_pixels',[]), b.get('gate_pixels',[]), rtol=0, atol=1e-4)
+        if self.gate_correction:
+            np.testing.assert_allclose(saved['gate_world'],request['gate_world'],atol=1e-8)
         for a, b in zip(saved['edges'], request['edges'], strict=True):
             assert (a['first'], a['last']) == (b['first'], b['last'])
             np.testing.assert_allclose([a['dt'], *a['dv'], *a['dp']], [b['dt'], *b['dv'], *b['dp']], atol=1e-6)
@@ -246,6 +264,10 @@ class JointEstimator:
             self.states[frame['id']] = state
         self.solution_time = stamp
         self.solutions += 1
+        if len(gate_pixels):
+            self.gate_updates += 1
+            if self.first_gate_return is None:
+                self.first_gate_return = stamp
         self.timings.append(fit['solve_ms'])
         self.last_fit = fit
         self.depth_change = float(np.median(abs(np.exp(self.depths[ids]-self.initial_depth_prior[ids])-1)))

@@ -112,7 +112,7 @@ def score(root):
     result = dict(controller_error=results[-1]['error'], controller_phase=results[-1]['phase'],
         joint_control_updates=len(updates), joint_solves=len(calls), controller_packets=sorted(accepted),
         arm_calls=arms, resets=resets, collisions=collisions,
-        numerical_replay_max_difference=max(numerical_errors,default=0.), passed_joint_turn=False)
+        numerical_replay_max_difference=max(numerical_errors,default=0.), passed_joint_turn=False, passed_gate_return=False)
     replay_data = [dict(arguments=row['arguments'], request=row['result']['request'], fit=row['result']['fit']) for row in calls]
     (root/'joint-replay.json').write_text(json.dumps(replay_data,indent=2)+'\n')
     if initializations:
@@ -181,7 +181,7 @@ def score(root):
     result['depth_revisions_during_turn'] = turn[-1]['depth_revisions']-turn[0]['depth_revisions']
     gate_times = {row['signal']['joint']['gate_pose_frozen_at'] for row in updates}
     result['gate_pose_frozen'] = len(gate_times)==1 and first['gate_pose_frozen_at']<updates[0]['signal']['imu_time']-.1
-    result['passed_joint_turn'] = (result['controller_error'] is None and result['controller_phase']=='COMPLETE'
+    slow_turn = (result['controller_error'] is None and result['controller_phase']=='COMPLETE'
         and len(turn)>=40 and len(calls)>=8 and end['depth_revisions']>=4
         and result['position_rms_m']<.35 and result['velocity_rms_m_s']<.25
         and result['maximum_tracking_error_m']<.6 and 12.<result['heading_change_deg']<35.
@@ -190,9 +190,16 @@ def score(root):
         and result['maximum_turn_speed_m_s']<1.5 and result['joint_solves_during_turn']>=8
         and result['depth_revisions_during_turn']>=4 and result['gate_pose_frozen']
         and result['maximum_command_update_gap_s']<.15 and result['maximum_capture_clock_error_s']<.001)
+    returning = 'gate_updates' in first
+    result['passed_joint_turn'] = slow_turn and not returning
+    if returning:
+        from .gate_return_score import score as score_return
+        result['gate_return'] = score_return(root,calls,updates,trajectory,native)
+        result['gate_measurements_frozen'] = False
+        result['passed_gate_return'] = slow_turn and result['gate_return']['passed_recovery']
     (root/'joint-trajectory.json').write_text(json.dumps(trajectory,indent=2)+'\n')
     (root/'score.json').write_text(json.dumps(result,indent=2)+'\n')
-    render(root,updates,views,trajectory)
+    render(root,updates,views,trajectory,calls)
     print(json.dumps(result,indent=2),flush=True)
     return result
 
@@ -232,10 +239,13 @@ def score_initializations(root, initializations, positions):
     return scored
 
 
-def render(root, updates, views, trajectory):
+def render(root, updates, views, trajectory, calls=()):
     start = updates[0]['signal']['imu_time']-.3
     end = min(updates[-1]['signal']['imu_time'], start+5.)
     signals = {}
+    gate_pixels = {row['arguments']['image_id']:row['result']['request']['frames'][-1].get('gate_pixels',[]) for row in calls}
+    returning = 'gate_updates' in updates[0]['signal']['joint']
+    gate_updates = 0
     for row in updates:
         signals.setdefault(row['signal']['joint']['image_id'],row['signal'])
     camera = _Camera()
@@ -254,13 +264,21 @@ def render(root, updates, views, trajectory):
                 image = frame.bgr.copy();signal=signals.get(frame.id)
                 if signal is not None:
                     info=signal['joint'];q=np.array(info['reference_rotation']);current=np.array(info['camera_rotation'])
+                    gate_updates = info.get('gate_updates',0)
                     points=np.column_stack((info['measured_points'],np.ones(len(info['measured_points']))))
                     pixels=points @ np.linalg.inv(np.array([[320.,0,320],[0,320,180],[0,0,1.]])).T @ q.T @ current
                     pixels=pixels @ np.array([[320.,0,320],[0,320,180],[0,0,1.]]).T
                     for point in pixels[:,:2]/pixels[:,2:]:cv2.circle(image,tuple(np.round(point).astype(int)),2,(100,235,140),1,cv2.LINE_AA)
+                    if gate_pixels.get(frame.id):
+                        points=np.column_stack((gate_pixels[frame.id],np.ones(4))) @ np.linalg.inv(np.array([[320.,0,320],[0,320,180],[0,0,1.]])).T @ q.T @ current
+                        points=points @ np.array([[320.,0,320],[0,320,180],[0,0,1.]]).T
+                        corners=np.round(points[:,:2]/points[:,2:]).astype(np.int32)
+                        cv2.polylines(image,[corners],True,(230,210,80),2,cv2.LINE_AA)
                 canvas=cv2.copyMakeBorder(image,42,30,0,0,cv2.BORDER_CONSTANT,value=(22,25,30))
                 cv2.putText(canvas,'joint camera + imu feedback',(12,26),0,.65,(100,235,140),1,cv2.LINE_AA)
                 label='background pose, velocity and depths update during flight'
+                if returning:
+                    label='gate observations withheld; background + imu continue' if not gate_updates else f'mapped gate observations used: {gate_updates}'
                 cv2.putText(canvas,label,(12,419),0,.42,(215,222,230),1,cv2.LINE_AA)
                 writer.stdin.write(canvas.tobytes());saved+=1
                 if saved==30:cv2.imwrite(str(root/'joint-preview.png'),canvas)
@@ -287,4 +305,10 @@ if __name__ == '__main__':
             if result is not None:
                 np.testing.assert_allclose(result['velocity'],expected['velocity'],atol=1e-5)
             initializations+=1
+    if args.path.is_dir() and (args.path/'gate-return.json').exists():
+        from .gate_return_score import replay_without_gate
+        expected=json.loads((args.path/'gate-return.json').read_text())['baseline']
+        for fit,recorded in zip(replay_without_gate(rows),expected,strict=True):
+            np.testing.assert_allclose(fit['states'][-1],recorded['state'],atol=1e-5,rtol=0)
+            np.testing.assert_allclose(fit['depths'],recorded['depths'],atol=1e-5,rtol=0)
     print(json.dumps(dict(solves=len(rows),initializations=initializations,maximum_numeric_difference=maximum)))
