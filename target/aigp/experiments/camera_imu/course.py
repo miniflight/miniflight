@@ -15,6 +15,7 @@ from target.aigp.client import HeartbeatCadence
 from target.aigp.experiments.recording import ProcessClient, RaceReader, RecordedController
 from target.aigp.simulator import AIGPSimulator, ArmPhase
 from . import controller as base
+from .crossing import CrossingGuard,predict as crossing_prediction
 
 
 def vertical_bearing(pixel,orientation):
@@ -122,12 +123,28 @@ class GateController(base.GateController):
         self.alignment_gate=1
         self.alignment_direction=1.
         self.motor_outputs=None
+        self.crossing_guard=CrossingGuard()
+
+    def final_approach_ready(self):
+        if not base.SETTINGS.get('crossing_constraint'):return True
+        return self.crossing_guard.ready(self.gate_relative(),self.inertial.velocity,self.direction)
 
     @timed('goal')
     def drive(self,target):
         if self.alignment_gate!=self.gate_number:
             self.alignment_active=False;self.alignment_settled=None;self.alignment_gate=self.gate_number
             self.search_hint=None
+        if base.SETTINGS.get('crossing_constraint') and self.phase in (base.single.Phase.TRACKING,base.single.Phase.FINAL_IMU) and self.locked is not None:
+            correction=None
+            if self.phase is base.single.Phase.TRACKING:
+                crossing,correction=self.crossing_guard.update(self.gate_number,self.inertial.time,self.gate_relative(),
+                    self.inertial.velocity,self.direction,self.inertial.time-self.measurement_time())
+            else:crossing=crossing_prediction(self.gate_relative(),self.inertial.velocity,self.direction)
+            self.signal.update(crossing=crossing,crossing_alignment=correction is not None)
+            if correction is not None:
+                target=self.inertial.position+correction
+                self.signal['target']=target.tolist()
+                return base.single.GateController.drive(self,target)
         if self.gate_number>1 and self.phase is base.single.Phase.TRACKING and self.last_relative_gate is not None:
             age=self.inertial.time-self.measurement_time()
             relative=self.gate_relative()

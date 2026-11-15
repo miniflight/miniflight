@@ -346,6 +346,9 @@ class GateController(BaseController):
             return float(self.gate_relative() @ self.direction)
         return float((self.anchor-self.inertial.position) @ self.direction)
 
+    def final_approach_ready(self):
+        return True
+
     @timed('position_feedback')
     def drive(self, target):
         p, v = self.inertial.position, self.inertial.velocity
@@ -550,7 +553,7 @@ class GateController(BaseController):
             return self.drive(np.zeros(3))
         p, v = self.inertial.position, self.inertial.velocity
         remaining = self.gate_remaining()
-        if self.phase is Phase.TRACKING and remaining <= SETTINGS["final_distance_m"]:
+        if self.phase is Phase.TRACKING and remaining <= SETTINGS["final_distance_m"] and self.final_approach_ready():
             self.phase, self.final_at = Phase.FINAL_IMU, now
         stop_beyond=SETTINGS.get('finish_beyond_m',SETTINGS['stop_beyond_m']) if getattr(self,'gate_number',1)==SETTINGS.get('gates_to_pass',1) else SETTINGS['stop_beyond_m']
         if remaining < -stop_beyond:

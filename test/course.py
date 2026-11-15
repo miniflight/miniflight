@@ -16,6 +16,40 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_final_approach_rejects_the_recorded_gate_four_miss(self):
+        from target.aigp.experiments.camera_imu.crossing import CrossingGuard,predict
+        # Public estimate from pipeline-validation/trial-01 at blind entry, in its approach basis.
+        relative=np.array([2.384502426,2.252471136,-.05]);velocity=np.array([4.171416328,.683921486,-.075])
+        direction=np.array([1.,0.,0.]);guard=CrossingGuard()
+        self.assertAlmostEqual(predict(relative,velocity,direction)['predicted_width_m'],1.8615218,places=6)
+        self.assertFalse(guard.ready(relative,velocity,direction))
+        report,correction=guard.update(4,48.417089,relative,velocity,direction,.1)
+        self.assertTrue(report['alignment_active']);self.assertAlmostEqual(correction @ direction,0.)
+        self.assertGreater(correction[1],2.)
+
+    def test_crossing_alignment_waits_for_transverse_motion_to_settle(self):
+        from target.aigp.experiments.camera_imu.crossing import CrossingGuard
+        guard=CrossingGuard();d=np.array([1.,0.,0.])
+        guard.update(1,0.,[8.,1.,0.],[5.,0.,0.],d,.1)
+        _,target=guard.update(1,1.,[7.,.1,0.],[0.,1.,0.],d,.1)
+        self.assertIsNotNone(target)
+        guard.update(1,2.,[7.,.1,0.],[0.,0.,0.],d,.1)
+        _,target=guard.update(1,2.3,[7.,.1,0.],[0.,0.,0.],d,.1)
+        self.assertIsNone(target)
+        # Near zero forward speed, a long constant-velocity forecast must not prevent departure.
+        _,target=guard.update(1,2.4,[7.,.1,0.],[.6,.05,0.],d,.1)
+        self.assertIsNone(target)
+
+    def test_crossing_prediction_is_invariant_to_local_yaw(self):
+        from scipy.spatial.transform import Rotation
+        from target.aigp.experiments.camera_imu.crossing import predict
+        r=np.array([2.5,.8,-.1]);v=np.array([5.,.5,0.]);d=np.array([1.,0.,0.])
+        expected=predict(r,v,d)
+        for yaw in [-1.,.7,2.4]:
+            rotation=Rotation.from_euler('z',yaw).as_matrix();actual=predict(rotation @ r,rotation @ v,rotation @ d)
+            self.assertAlmostEqual(actual['predicted_width_m'],expected['predicted_width_m'])
+            self.assertAlmostEqual(actual['predicted_down_m'],expected['predicted_down_m'])
+
     def test_unarmed_startup_failure_retains_the_original_reason(self):
         import json,tempfile
         from pathlib import Path

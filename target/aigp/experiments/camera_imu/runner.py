@@ -344,7 +344,7 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
@@ -367,6 +367,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
         SETTINGS.update(position_config=position_config,visual_initialization=calibration is not None,partial_gate=partial_gate,
+            crossing_constraint=crossing_constraint,
             dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
@@ -400,6 +401,7 @@ def main():
     parser.add_argument("mode", choices=("build", "one", "joint", "course", "live", "replay", "score", "video"))
     parser.add_argument("path", type=Path, nargs="?")
     parser.add_argument("--shift", type=float, default=-.5)
+    parser.add_argument('--crossing-constraint',action='store_true')
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
     parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
@@ -416,7 +418,7 @@ def main():
         parser.error("live, replay, score and video require a path")
     elif args.mode=='course':
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate)
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():
