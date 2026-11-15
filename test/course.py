@@ -16,6 +16,22 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_unarmed_startup_failure_retains_the_original_reason(self):
+        import json,tempfile
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.score import score
+        error=dict(type='TimeoutError',message='sensor-only course deadline exceeded')
+        rows=[dict(event='config',metadata=dict(settings=dict(continuous_course=True))),
+              dict(event='result',error=error,phase='CALIBRATING',estimated_gates_passed=0)]
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'flight.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            result=score(root)
+            self.assertFalse(result['passed_without_reset'])
+            self.assertIsNone(result['native_gates_passed'])
+            self.assertEqual(result['controller_error'],error)
+            self.assertEqual(result['arm_calls'],[])
+            self.assertEqual(json.loads((root/'score.json').read_text()),result)
+
     def test_delayed_tilt_correction_preserves_earlier_orientation(self):
         from common.math import Quaternion
         from scipy.spatial.transform import Rotation

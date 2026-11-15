@@ -80,6 +80,15 @@ def score(root):
         elif row["event"] == "result":
             outcomes.append(row)
     assert accepted <= ALLOWED
+    if not positions or not attitudes:
+        outcome=outcomes[-1] if outcomes else {}
+        result=dict(scoring_status='missing_native_reference',passed_without_reset=False,gates=[],
+            native_gates_passed=None,native_completed=None,native_finish_time_s=None,valid_race=None,
+            estimated_gates_passed=outcome.get('estimated_gates_passed'),controller_error=outcome.get('error'),
+            controller_phase=outcome.get('phase'),arm_calls=arms,reset_calls_during_flight=resets,
+            continuous_imu_history=False,in_flight_collision_packets=armed_contacts(collisions,armed_at,disarmed_at))
+        (root/'score.json').write_text(json.dumps(result,indent=2)+'\n')
+        return result
     if settings.get('continuous_course'):
         import gzip
         fields=('phase','imu_time','image_id','image_time','position','velocity','camera_orientation','gate_center','remaining_m','target',

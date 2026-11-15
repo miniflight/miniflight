@@ -405,7 +405,7 @@ def main():
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
         result=one(args.path.resolve(),args.shift,args.gates,args.speed)
         from .plots import plot
-        plot(args.path.resolve())
+        if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if not result['passed_without_reset']:
             raise SystemExit(1)
     elif args.mode == 'joint':
