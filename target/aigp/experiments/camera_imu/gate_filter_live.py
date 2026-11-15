@@ -133,7 +133,7 @@ class GateController(course.GateController):
     def drive(self,target):
         # Lift clear of the starting pad before asking for a large pitch/roll change.
         if self.phase is sensors.Phase.SHIFTING and not self.launch_cleared:
-            self.launch_cleared=self.inertial.position[2]<-.2
+            self.launch_cleared=bool(self.inertial.position[2]<-.2)
             self.signal['launch_cleared']=self.launch_cleared
             if not self.launch_cleared:
                 request=sensors.acceleration_control(self.config,[0.,0.,-3.],self.inertial.rotation.to_euler(),0.)

@@ -17,6 +17,7 @@ def filter():
 
 class JointGateTest(unittest.TestCase):
     def test_launch_lifts_before_commanding_a_large_rotation(self):
+        import json
         from types import SimpleNamespace
         from unittest.mock import patch
         from common.math import Quaternion
@@ -25,9 +26,11 @@ class JointGateTest(unittest.TestCase):
         c=object.__new__(gate_filter_live.GateController);c.phase=sensors.Phase.SHIFTING;c.launch_cleared=False;c.signal={}
         c.config=PositionConfig(.27,60.,thrust_curve=(8.,106.));c.inertial=SimpleNamespace(position=np.array([0.,0.,-.1]),rotation=Quaternion.from_euler(0.,-.3,0.))
         request=c.drive(np.array([0.,-.5,-1.]));self.assertEqual((request.roll_rate,request.pitch_rate,request.yaw_rate),(0.,0.,0.));self.assertGreater(request.thrust,.27)
+        json.dumps(c.signal)
         c.inertial.position[2]=-.25
         with patch.object(course.GateController,'drive',return_value=None):c.drive(np.array([0.,-.5,-1.]))
         self.assertTrue(c.launch_cleared)
+        json.dumps(c.signal)
 
     def test_upright_seed_recovers_depth_without_using_planar_pitch(self):
         from miniflight.gate_filter import upright_seed
