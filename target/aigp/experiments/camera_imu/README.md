@@ -3,20 +3,23 @@
 Public-sensor course pilot:
 
 ```sh
-python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 2
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5
 ```
 
 ```mermaid
 flowchart LR
   C[Public camera pixels] --> G[Gate corners and metric pose]
-  I[Public gyro and accelerometer] --> A[Local attitude and motion prediction]
+  I[Public gyro and accelerometer] --> A[Local attitude]
+  A --> K[Motion prediction]
+  U[Our motor commands and vehicle calibration] --> K
   G --> E[Delayed position and velocity corrections]
-  A --> E
+  K --> E
   E --> M[Gate map and estimated crossings]
   M --> P[Approach and visibility waypoints]
   E --> P
   P --> R[Body rates and motor mixer]
   R --> D[Drone]
+  R --> U
   D --> C
   D --> I
   N[Native pose, course and race state] --> S[Postflight scorer]
@@ -25,11 +28,31 @@ flowchart LR
 The pilot receives no native pose, attitude, course geometry, gate counter, GO or
 finish state. Its start uses a fixed allowance after an acknowledged reset. Its
 own crossing estimates advance the mission. Clock alignment uses public sensor
-timestamps and packet arrival times. Public IMU timestamp intervals are estimates
-of integration time; the native IMU and camera hooks run only for scoring.
+timestamps and packet arrival times. The course profile loads no native sensor
+DLLs. Public acceleration supports initial gravity calibration and takeoff.
+After the first confirmed gate, our motor commands and vehicle model predict
+translation; camera velocity innovations learn a residual acceleration bias.
 Position and heading use a local frame chosen at the stationary start.
 `replay --poison` also falsifies native race start, validity and finish for this
 profile. Raw traces are temporary and bounded; the course video and scores remain.
+
+| Native navigation signal | Estimated replacement |
+| --- | --- |
+| Attitude | Gravity initialization and public gyro integration |
+| Position and velocity | Gate-relative camera measurements, causal velocity fits and command-model prediction |
+| Gate poses and order | Known-size image geometry and current/next-gate hypotheses |
+| Gate progress | Camera-range crossing estimates propagated with estimated displacement |
+
+Native race, pose, course, actuator and contact data remain in the recorder and
+postflight scorer. The pilot receives heartbeat/ACK transport events and sensors.
+Five unchanged six-gate trials produced three native-valid finishes and two
+contact-free passes: 52.80 s and 47.87 s. One finish included contact; two trials
+stopped after gate three. All five normal and poisoned replays matched exactly.
+Across the two clean runs, local position RMS was 1.10/1.56 m, velocity RMS
+0.34/0.57 m/s and attitude RMS 0.24/0.37 degrees. Timing uses estimated public
+sensor clock alignment. These are direct-arena results, above the ten-second
+target. Protocol, source hashes and failures: [course.validation.json](course.validation.json).
+The earlier `joint` experiments below use instrumented sensor timing.
 
 Joint position, velocity and depth feedback for one slow 20-degree turn:
 

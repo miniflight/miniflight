@@ -1,0 +1,4560 @@
+{
+  "date": "2026-11-15",
+  "recorded_at": "2026-11-15T11:36:52.031419+00:00",
+  "implementation_revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+  "binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "source_sha256": {
+    "target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+    "target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+    "target/aigp/experiments/camera_imu/accuracy.py": "81b78ea43862b260f8cededcc50f3d4f3215005f5410c6209a2532eb7a564163",
+    "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+    "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+    "target/aigp/experiments/camera_imu/controller.py": "771a17a93bf12660d2d413a8e851e00f9105f9d354959951dc195369ab26b4b1",
+    "target/aigp/experiments/camera_imu/course.py": "ad523880a73572ca824cf81bf3dde42893acf96585f8f433afbd5fe7b5a8459c",
+    "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+    "target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+    "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+    "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+    "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+    "target/aigp/experiments/camera_imu/motion.py": "17cf4ff7e8415fca7834992a41f11e3b95124010be593431b596e5afe891cd05",
+    "target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+    "target/aigp/experiments/camera_imu/runner.py": "0603d8cd87c6c353512933e089e978f52362701bf2761af6dff38521a73ed3ca",
+    "target/aigp/experiments/camera_imu/score.py": "29104c3766d076538ea2ac89da91586484a7ca85bf8378b53ea28a21157dee66",
+    "target/aigp/experiments/camera_imu/sensors.py": "edac214dceb7998412adf9a2768fe1fd0093b569196f6ec08d83bf7820363201",
+    "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+    "target/aigp/experiments/camera_imu/video.py": "6dcb3f55d7621a0d3e56dfacad18cda5749063be4315944e3eb0d124f9625fed",
+    "target/aigp/experiments/camera_imu/vision.py": "43899542def9a2d4aa0ba860cab7c5b7ee1c38bb71ceb662333d7b32cf593565",
+    "target/aigp/client.py": "02d1c5c03be3a80d2290ec2ca3554499c94a275e2a9d124de3ea562a5a7de785",
+    "target/aigp/experiments/recording.py": "896bed0c699a5a322cdefbddc2e1014e3c8d3c2a7be84dd9bf3050c076743205",
+    "miniflight/attitude.py": "72251a77d8e84465226fa4be9ad104ea170da013e6aee088d5a11175c834fc75",
+    "miniflight/position.py": "247c05241c59505dc84591b0187fe7ab0fa7ef19e00ac36470f9f25878735ea5",
+    "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+    "miniflight/mixer.py": "93fdfba40ddbb0350293ab327f1d4bdceb1706af4a7a0544eb190c16e33ccf1e",
+    "test/fixtures/vq1_r1_sub10.config.json": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+  },
+  "device": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "opencv": "5.0.0"
+  },
+  "unit_tests_passed": 50,
+  "command": "python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 --shift -.5",
+  "input_contract": {
+    "allowed": [
+      "public JPEG camera frames/timestamps",
+      "public HIGHRES_IMU gyro and accelerometer samples/timestamps",
+      "public packet arrival times",
+      "fixed camera calibration and nominal 1.5m gate aperture",
+      "heartbeat and arm/reset ACKs for transport",
+      "our own motor commands",
+      "fixed vehicle thrust/drag calibration"
+    ],
+    "scorer_only": [
+      "native position, velocity and attitude",
+      "native course poses/dimensions/IDs",
+      "native gate counter",
+      "native GO/validity/finish for lifecycle or navigation",
+      "native IMU/camera taps",
+      "native motor output reports",
+      "native contact reports"
+    ],
+    "native_sensor_taps_loaded": false,
+    "calibration": "Fixed camera intrinsics/extrinsics, nominal 1.5m opening and premeasured vehicle thrust/drag coefficients. No course poses, native heading or actual gate dimensions in navigation.",
+    "clocks": "Public camera/IMU timestamps aligned using lower-envelope packet arrivals; estimated delay, not exposure-ground-truth timing.",
+    "lifecycle": "Fixed 8s allowance after public reset ACK; own six-crossing estimate stops flight. Native GO/validity/finish ignored."
+  },
+  "architecture": {
+    "attitude": "Gravity initialization with local yaw zero, public gyro propagation.",
+    "metric_gate": "Red aperture edges and IPPE camera pose; hypothesis selection uses image reprojection only.",
+    "motion": "Public accelerometer for initial gravity/takeoff; after gate lock, gyro attitude and our motor commands predict thrust/drag. Delayed camera position and velocity corrections learn bounded residual acceleration bias.",
+    "mission": "Current/next gate hypotheses, nearer-gate correction, integrated estimated displacement for crossings, bounded image-driven height alignment.",
+    "control": "Estimated position/velocity -> attitude/body rates -> gyro PI -> mixer -> four motor commands.",
+    "scoring": "Native pose, attitude, geometry, race, motor reports and contacts only reach recorder/postflight scorer."
+  },
+  "frozen_protocol": {
+    "date": "2026-11-15",
+    "recorded_at": "2026-11-15T11:23:11.873380+00:00",
+    "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+    "binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+    "source_sha256": {
+      "target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+      "target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+      "target/aigp/experiments/camera_imu/accuracy.py": "81b78ea43862b260f8cededcc50f3d4f3215005f5410c6209a2532eb7a564163",
+      "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+      "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+      "target/aigp/experiments/camera_imu/controller.py": "771a17a93bf12660d2d413a8e851e00f9105f9d354959951dc195369ab26b4b1",
+      "target/aigp/experiments/camera_imu/course.py": "ad523880a73572ca824cf81bf3dde42893acf96585f8f433afbd5fe7b5a8459c",
+      "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+      "target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+      "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+      "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+      "target/aigp/experiments/camera_imu/motion.py": "17cf4ff7e8415fca7834992a41f11e3b95124010be593431b596e5afe891cd05",
+      "target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+      "target/aigp/experiments/camera_imu/runner.py": "0603d8cd87c6c353512933e089e978f52362701bf2761af6dff38521a73ed3ca",
+      "target/aigp/experiments/camera_imu/score.py": "29104c3766d076538ea2ac89da91586484a7ca85bf8378b53ea28a21157dee66",
+      "target/aigp/experiments/camera_imu/sensors.py": "edac214dceb7998412adf9a2768fe1fd0093b569196f6ec08d83bf7820363201",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+      "target/aigp/experiments/camera_imu/video.py": "6dcb3f55d7621a0d3e56dfacad18cda5749063be4315944e3eb0d124f9625fed",
+      "target/aigp/experiments/camera_imu/vision.py": "43899542def9a2d4aa0ba860cab7c5b7ee1c38bb71ceb662333d7b32cf593565",
+      "target/aigp/client.py": "02d1c5c03be3a80d2290ec2ca3554499c94a275e2a9d124de3ea562a5a7de785",
+      "target/aigp/experiments/recording.py": "896bed0c699a5a322cdefbddc2e1014e3c8d3c2a7be84dd9bf3050c076743205",
+      "miniflight/attitude.py": "72251a77d8e84465226fa4be9ad104ea170da013e6aee088d5a11175c834fc75",
+      "miniflight/position.py": "247c05241c59505dc84591b0187fe7ab0fa7ef19e00ac36470f9f25878735ea5",
+      "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+      "miniflight/mixer.py": "93fdfba40ddbb0350293ab327f1d4bdceb1706af4a7a0544eb190c16e33ccf1e",
+      "test/fixtures/vq1_r1_sub10.config.json": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+    },
+    "device": {
+      "system": "Darwin",
+      "machine": "arm64",
+      "python": "3.11.14",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "opencv": "5.0.0"
+    },
+    "sensor_inputs": [
+      "public JPEG camera frames/timestamps",
+      "public HIGHRES_IMU gyro and accelerometer samples/timestamps",
+      "public packet arrival times",
+      "fixed camera calibration and nominal 1.5m gate aperture",
+      "heartbeat and arm/reset ACKs for transport",
+      "our own motor commands",
+      "fixed vehicle thrust/drag calibration"
+    ],
+    "prohibited_inputs": [
+      "native position, velocity and attitude",
+      "native course poses/dimensions/IDs",
+      "native gate counter",
+      "native GO/validity/finish for lifecycle or navigation",
+      "native IMU/camera taps"
+    ],
+    "native_data": "Recorded for postflight scoring only; all native race values and pose/course traffic are falsified during replay.",
+    "estimator": "Public IMU for gravity/gyro and initial takeoff; after the first confirmed gate, command-model force prediction with gyro attitude, camera position/velocity corrections and online camera-learned acceleration bias.",
+    "mission": "Visually map ordered gates, correct nearer-gate hypotheses, advance only on estimated crossings; bounded visibility alignment and final IMU carry.",
+    "config": {
+      "gates": 6,
+      "speed_m_s": 5.0,
+      "shift_m": -0.5,
+      "startup_allowance_s": 8.0,
+      "camera_window_s": 1.0,
+      "camera_position_min_side_px": 20.0,
+      "camera_velocity_min_side_px": 20.0,
+      "visibility_height_change_m": 1.5
+    },
+    "validation": [
+      "validation-01",
+      "validation-02",
+      "validation-03"
+    ],
+    "acceptance": [
+      "native completed and valid",
+      "six native gates and six estimated gates",
+      "no collision packets between recorded arm and disarm",
+      "all startup/cleanup contact packets retained separately",
+      "no in-flight resets",
+      "continuous IMU history",
+      "confirmed arming/disarming",
+      "exact normal replay",
+      "exact replay with native pose, odometry, course, motor reports, collisions and all native race values falsified"
+    ],
+    "final_gate": "Native valid completion verifies the finish volume; the simulator may stop pose publication before a mesh-centre crossing. Earlier gates still require geometric crossing records.",
+    "scope": "Native direct arena; official Training/Qualification event selection remains unverified.",
+    "raw_policy": "Temporary trace capped at 384MiB; remove raw data after scoring and replay; retain compact errors and one continuous H264 flight video.",
+    "unit_tests_passed": 50,
+    "prior_results": "attempt-15 native-valid 54.8459s with zero contacts; its two unchanged repeats failed at 3/6 and 4/6. attempt-17 command-model native-valid 53.2992s; contact-window audit added before these trials.",
+    "motion_prediction": "command_model",
+    "camera_model_bias": "3-axis bounded acceleration bias learned only from camera velocity innovations"
+  },
+  "extension_protocol": {
+    "date": "2026-11-15",
+    "recorded_at": "2026-11-15T11:33:28.436228+00:00",
+    "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+    "binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+    "source_sha256": {
+      "target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+      "target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+      "target/aigp/experiments/camera_imu/accuracy.py": "81b78ea43862b260f8cededcc50f3d4f3215005f5410c6209a2532eb7a564163",
+      "target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+      "target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+      "target/aigp/experiments/camera_imu/controller.py": "771a17a93bf12660d2d413a8e851e00f9105f9d354959951dc195369ab26b4b1",
+      "target/aigp/experiments/camera_imu/course.py": "ad523880a73572ca824cf81bf3dde42893acf96585f8f433afbd5fe7b5a8459c",
+      "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+      "target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+      "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+      "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+      "target/aigp/experiments/camera_imu/motion.py": "17cf4ff7e8415fca7834992a41f11e3b95124010be593431b596e5afe891cd05",
+      "target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+      "target/aigp/experiments/camera_imu/runner.py": "0603d8cd87c6c353512933e089e978f52362701bf2761af6dff38521a73ed3ca",
+      "target/aigp/experiments/camera_imu/score.py": "29104c3766d076538ea2ac89da91586484a7ca85bf8378b53ea28a21157dee66",
+      "target/aigp/experiments/camera_imu/sensors.py": "edac214dceb7998412adf9a2768fe1fd0093b569196f6ec08d83bf7820363201",
+      "target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+      "target/aigp/experiments/camera_imu/video.py": "6dcb3f55d7621a0d3e56dfacad18cda5749063be4315944e3eb0d124f9625fed",
+      "target/aigp/experiments/camera_imu/vision.py": "43899542def9a2d4aa0ba860cab7c5b7ee1c38bb71ceb662333d7b32cf593565",
+      "target/aigp/client.py": "02d1c5c03be3a80d2290ec2ca3554499c94a275e2a9d124de3ea562a5a7de785",
+      "target/aigp/experiments/recording.py": "896bed0c699a5a322cdefbddc2e1014e3c8d3c2a7be84dd9bf3050c076743205",
+      "miniflight/attitude.py": "72251a77d8e84465226fa4be9ad104ea170da013e6aee088d5a11175c834fc75",
+      "miniflight/position.py": "247c05241c59505dc84591b0187fe7ab0fa7ef19e00ac36470f9f25878735ea5",
+      "miniflight/rate.py": "7c4ddb14c6ec20e2f9dad7eedc06ac30972811fc6f6eb38aa495b8bc85f76d99",
+      "miniflight/mixer.py": "93fdfba40ddbb0350293ab327f1d4bdceb1706af4a7a0544eb190c16e33ccf1e",
+      "test/fixtures/vq1_r1_sub10.config.json": "4600f56719e5e57dc4bc746dc216fc72206001e94508a8106aeaced21fb08204"
+    },
+    "device": {
+      "system": "Darwin",
+      "machine": "arm64",
+      "python": "3.11.14",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "opencv": "5.0.0"
+    },
+    "sensor_inputs": [
+      "public JPEG camera frames/timestamps",
+      "public HIGHRES_IMU gyro and accelerometer samples/timestamps",
+      "public packet arrival times",
+      "fixed camera calibration and nominal 1.5m gate aperture",
+      "heartbeat and arm/reset ACKs for transport",
+      "our own motor commands",
+      "fixed vehicle thrust/drag calibration"
+    ],
+    "prohibited_inputs": [
+      "native position, velocity and attitude",
+      "native course poses/dimensions/IDs",
+      "native gate counter",
+      "native GO/validity/finish for lifecycle or navigation",
+      "native IMU/camera taps"
+    ],
+    "native_data": "Recorded for postflight scoring only; all native race values and pose/course traffic are falsified during replay.",
+    "estimator": "Public IMU for gravity/gyro and initial takeoff; after the first confirmed gate, command-model force prediction with gyro attitude, camera position/velocity corrections and online camera-learned acceleration bias.",
+    "mission": "Visually map ordered gates, correct nearer-gate hypotheses, advance only on estimated crossings; bounded visibility alignment and final IMU carry.",
+    "config": {
+      "gates": 6,
+      "speed_m_s": 5.0,
+      "shift_m": -0.5,
+      "startup_allowance_s": 8.0,
+      "camera_window_s": 1.0,
+      "camera_position_min_side_px": 20.0,
+      "camera_velocity_min_side_px": 20.0,
+      "visibility_height_change_m": 1.5
+    },
+    "validation": [
+      "validation-04",
+      "validation-05"
+    ],
+    "acceptance": [
+      "native completed and valid",
+      "six native gates and six estimated gates",
+      "no collision packets between recorded arm and disarm",
+      "all startup/cleanup contact packets retained separately",
+      "no in-flight resets",
+      "continuous IMU history",
+      "confirmed arming/disarming",
+      "exact normal replay",
+      "exact replay with native pose, odometry, course, motor reports, collisions and all native race values falsified"
+    ],
+    "final_gate": "Native valid completion verifies the finish volume; the simulator may stop pose publication before a mesh-centre crossing. Earlier gates still require geometric crossing records.",
+    "scope": "Native direct arena; official Training/Qualification event selection remains unverified.",
+    "raw_policy": "Temporary trace capped at 384MiB; remove raw data after scoring and replay; retain compact errors and one continuous H264 flight video.",
+    "unit_tests_passed": 50,
+    "prior_results": "attempt-15 native-valid 54.8459s with zero contacts; its two unchanged repeats failed at 3/6 and 4/6. attempt-17 command-model native-valid 53.2992s; contact-window audit added before these trials.",
+    "motion_prediction": "command_model",
+    "camera_model_bias": "3-axis bounded acceleration bias learned only from camera velocity innovations",
+    "extension_reason": "Initial frozen trials: two valid finishes, one contact-free; third stopped after gate 3. Predeclare two additional unchanged trials to test repetition. Retain all five outcomes."
+  },
+  "development": [
+    {
+      "name": "attempt-01",
+      "revision": "99592bf3d9c6aadca6a1f8dfa4bc6a473fdd98b5",
+      "settings": {
+        "speed_m_s": 2.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": null,
+      "failure": {
+        "type": "AssertionError",
+        "message": "({'error': {'type': 'TimeoutError', 'message': 'gate image exceeded the lookahead freshness interval'}, 'connection_closed': True, 'filtered_packets': 6356, 'phase': 'TRACKING', 'final_signal': {'phase': 'HANDOFF', 'imu_time': 22.760685, 'position': [29.42895336708661, 0.019179017046378567, -1.0861475950964357], 'velocity': [2.0236708604790676, -0.09901709227720774, -0.06452797387859202], 'target': [35.39779433103581, 0.6298651451694987, 4.132468606608086], 'camera_orientation': [[4.5294992400083714e-06, 0.33002632972457147, 0.9439717271550098], [0.9999999366212321, 0.00033456042741931345, -0.00012176556307638155], [-0.00035600142637767155, 0.9439716678787817, -0.3300263072925181]], 'shift_displacement': [0.00073543081970426, -0.49768994998219235, -1.0016328766242546], 'motion_available': False, 'attitude_available': False, 'height_alignment': True, 'gate_number': 2, 'estimated_gates_passed': 1, 'handoff_at': 22.760685, 'imu_history_start': 7.76014, 'imu_history_samples': 1318, 'completed_estimates': [{'gate': 1, 'imu_time': 22.760685, 'estimated_center': [28.391623455211292, -0.2519190662063744, -1.1589886650655523], 'position': [29.42895336708661, 0.019179017046378567, -1.0861475950964357], 'velocity': [2.0236708604790676, -0.09901709227720774, -0.06452797387859202], 'image_id': 818, 'image_time': 20.525336284}]}, 'race': None, 'termination': None}, {'error': {'type': 'TimeoutError', 'message': 'gate image exceeded the lookahead freshness interval'}, 'connection_closed': True, 'filtered_packets': 6398, 'phase': 'TRACKING', 'final_signal': {'phase': 'HANDOFF', 'imu_time': 22.760685, 'position': [29.42895336708661, 0.019179017046378567, -1.0861475950964357], 'velocity': [2.0236708604790676, -0.09901709227720774, -0.06452797387859202], 'target': [35.39779433103581, 0.6298651451694987, 4.132468606608086], 'camera_orientation': [[4.5294992400083714e-06, 0.33002632972457147, 0.9439717271550098], [0.9999999366212321, 0.00033456042741931345, -0.00012176556307638155], [-0.00035600142637767155, 0.9439716678787817, -0.3300263072925181]], 'shift_displacement': [0.00073543081970426, -0.49768994998219235, -1.0016328766242546], 'motion_available': False, 'attitude_available': False, 'height_alignment': True, 'gate_number': 2, 'estimated_gates_passed': 1, 'handoff_at': 22.760685, 'imu_history_start': 7.76014, 'imu_history_samples': 1318, 'completed_estimates': [{'gate': 1, 'imu_time': 22.760685, 'estimated_center': [28.391623455211292, -0.2519190662063744, -1.1589886650655523], 'position': [29.42895336708661, 0.019179017046378567, -1.0861475950964357], 'velocity': [2.0236708604790676, -0.09901709227720774, -0.06452797387859202], 'image_id': 818, 'image_time': 20.525336284}]}, 'race': None, 'termination': None})"
+      },
+      "normal_replay": {
+        "calls": null,
+        "wire_commands": null,
+        "exact_updates": null
+      },
+      "poisoned_replay": null,
+      "retention": {
+        "temporary_bytes_removed": 112493252,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "protocol.json": "fa1611c0774ce13f79f1a046918dfe9f142d886f17bfb827576be2481aed348c",
+        "retention.json": "1c30a9703bd60d9853049d42bd4e5a7f07cc1c42535387dc51aac6abbafe8482"
+      }
+    },
+    {
+      "name": "attempt-02",
+      "revision": "99592bf3d9c6aadca6a1f8dfa4bc6a473fdd98b5",
+      "settings": {
+        "speed_m_s": 2.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": null,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 1,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "ACQUIRING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "no confirmed opening in the largest visible gate rim"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "3a0425d0afcb9079c58bc36f8fd7df527caaf33ddead7e5c546c8807dd780117",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 317,
+          "median": 7.646508999998858,
+          "p95": 21.836516199999068,
+          "maximum": 32.968319999998386,
+          "rms": 11.97423494935482
+        },
+        "velocity_fit_age_ms": {
+          "count": 43,
+          "median": 234.19055327743266,
+          "p95": 250.42786227795304,
+          "maximum": 263.43995947931376,
+          "rms": 220.7189072004719
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 20.70332496104685,
+          "crossing_offset_width_down_m": [
+            -0.016883623843955756,
+            -0.1281878900063936
+          ],
+          "blind_time_to_crossing_s": 2.389701724046848
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 10465,
+        "wire_commands": 1070,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 10465,
+        "wire_commands": 1070,
+        "exact_updates": true,
+        "corrupted_pose_packets": 4197,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 121064929,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "caa773450f928be137da5fe005be046d2f83948f3131867de33793d6372a9567",
+        "course-camera-imu.mp4": "e36b788e206c416b7461f30c0d047297bc9dcb3100f7844882065f1b9ce2c099",
+        "input-independence.json": "bee135b8bd2829d475020012e8b985f04444b7aa12e80abc7239a43b72990702",
+        "protocol.json": "5a6ebfb29fbaf1819e9b855d29574eb3d0d1df31a3ac9073da75d9f589f0469e",
+        "replay.json": "fb9f8f2c8186f0278b50b65ed51c1cd6c8293bad9d2115a2e5c478dde6bf5ac4",
+        "retention.json": "05b81b961d3c8e311f0dc2633d62211811d4f77256bbad88e58501eaafc49015",
+        "score.json": "6a4d4f7e6d4d663b7205316e70627b538ff1ecd44f1c6253bef2ff4fbd9e8425",
+        "video.json": "782ba1336e69bf927a57203d97eeee06af508dc8f5612137819d3519cdc0518b"
+      }
+    },
+    {
+      "name": "attempt-03",
+      "revision": "db98e15bb7d92688c62e1376d2a97c62e5fd375a",
+      "settings": {
+        "speed_m_s": 2.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": null,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 1,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "ACQUIRING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "no confirmed opening in the largest visible gate rim"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "c01042920ed016241f40403fd99adbb0f6ed6edbcb536f1d4bd0061a4292ddc2",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 325,
+          "median": 9.46767499999801,
+          "p95": 23.64679319999823,
+          "maximum": 39.39053399999892,
+          "rms": 12.598749978122092
+        },
+        "velocity_fit_age_ms": {
+          "count": 40,
+          "median": 238.2680007163902,
+          "p95": 251.45848469864055,
+          "maximum": 257.05075710310865,
+          "rms": 225.99339264062445
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 21.365497391134507,
+          "crossing_offset_width_down_m": [
+            -0.22412519097429243,
+            -0.1620565564258122
+          ],
+          "blind_time_to_crossing_s": 2.7883048451345047
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 10812,
+        "wire_commands": 1100,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 10812,
+        "wire_commands": 1100,
+        "exact_updates": true,
+        "corrupted_pose_packets": 4383,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 122765913,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "542d7eaa0141fe193e7cf9eb8d4c57d3584027dc1cc9d7e32d78904cc11badd7",
+        "course-camera-imu.mp4": "b6139ec4b0473fe48dd701857a5f36c6d5082172bfbd6295385379b231ab1fc3",
+        "input-independence.json": "ba3e6943f99dbca8f5f87f1bf125ad78395a7fbbfc68c0cef339d4ec03d36201",
+        "protocol.json": "5ae6aaf82416d64dadc85459e284c596ab6ebd400de6899ed8453561fc63e403",
+        "replay.json": "5d3a3a5cf9d26ff0c4926d1c1bb7f5bc899e8c20e3cd7654f32d896821598037",
+        "retention.json": "6b223b117ccf1dfeda23796628b80ff76d6ca2a87bcdb228e45cb6814ff28958",
+        "score.json": "27cd9f5cce9470227d70b502b58d7e7d6a51a822e2452d03f5e582552a27c191",
+        "video.json": "b1560c7a8b51c9a6627512f123d5bd193b2cb82df47c8317a0ac0f517a63bf1c"
+      }
+    },
+    {
+      "name": "attempt-04",
+      "revision": "db98e15bb7d92688c62e1376d2a97c62e5fd375a",
+      "settings": {
+        "speed_m_s": 2.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": null,
+      "native_gates_passed": 0,
+      "estimated_gates_passed": 1,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "one-gate approach exceeded its IMU time budget"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "cf01275a981d0bb25a6493bfd29def41832c26f5e51820d98abc81089a4eb90b",
+      "collision_packets_count": 6,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 1159,
+          "median": 8.359063000000333,
+          "p95": 21.854951099995287,
+          "maximum": 44.48912499999835,
+          "rms": 11.744724882226082
+        },
+        "velocity_fit_age_ms": {
+          "count": 0
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": null,
+        "wire_commands": null,
+        "exact_updates": null
+      },
+      "poisoned_replay": null,
+      "retention": {
+        "temporary_bytes_removed": 209605847,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "5889ce5c7777858713c229ceefb6b119d9cec8eac32fa93ebf502d39ffe1250c",
+        "protocol.json": "8f6ff388c01630879bedba2376a47e7c39bdcb78efb5d2922c5c06518eddd928",
+        "retention.json": "b0c3a3adc61cbdb4c92d937f70d360ea2bc3fdbccc4afdc4ab84e94e26d0ea86",
+        "score.json": "2d39fdac130d1440654723c7d0019626ebeb809f7beac7d7d66b3ccedda7c457"
+      }
+    },
+    {
+      "name": "attempt-05",
+      "revision": "db98e15bb7d92688c62e1376d2a97c62e5fd375a",
+      "settings": {
+        "speed_m_s": 3.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 1,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "FINAL_IMU",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "f3a58fa895d37363d00edc45a1dc5594e65ab1472043067173af017530563b1e",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 418,
+          "median": 8.825564499998606,
+          "p95": 22.69457524999945,
+          "maximum": 33.23376999999894,
+          "rms": 12.17675944288913
+        },
+        "velocity_fit_age_ms": {
+          "count": 54,
+          "median": 236.76418785976773,
+          "p95": 251.6979327046001,
+          "maximum": 256.358534915714,
+          "rms": 228.0568642147858
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 18.05512770979856,
+          "crossing_offset_width_down_m": [
+            -0.1914993937170861,
+            0.25339233272656
+          ],
+          "blind_time_to_crossing_s": 0.7884325397985563
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 10170,
+        "wire_commands": 1050,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 10170,
+        "wire_commands": 1050,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3754,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 84729749,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "a07e5745ef8af5e9671e5b794bd4496f69ef2a89921150b96ed3ee90acbb7cad",
+        "course-camera-imu.mp4": "54e019f3f60b9db80ea30d3a6cd647e3f8d0df3ae06204920b5350347a3e7008",
+        "input-independence.json": "a3db8e6cc5acb39f246c1eb027c8f1fa8bde0714eb97958e4b3eeede06b22eb2",
+        "protocol.json": "9c4963abadb6f495064a15d4f0fe1987c695d2521b2de51df454983eb4e5d0ba",
+        "replay.json": "d32e36a2dd74216663c03004965c9e1c96282da2c81e9054822c95ef53026b5a",
+        "retention.json": "cd05f4485193e936c93daf5d31f43d16a6f42117812f501fa2ecda3570d1aca0",
+        "score.json": "4f12a8bd9c18fff4c6bc4bbb06305a11b850d0d0a585c7a27da5fb0f464f596d",
+        "video.json": "5f4bc33424996e633eb8d9ec31a12663df1cf4a4808c4d593ce7c831d4b34fc0"
+      }
+    },
+    {
+      "name": "attempt-06",
+      "revision": "db98e15bb7d92688c62e1376d2a97c62e5fd375a",
+      "settings": {
+        "speed_m_s": 3.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "0c03a3b27c14025f8a8699547830ab3b48e8ff0274c36b2e75299af1ee0b3285",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 85,
+          "median": 7.430799999998072,
+          "p95": 22.142331199998466,
+          "maximum": 30.884987999996838,
+          "rms": 11.920919672854955
+        },
+        "velocity_fit_age_ms": {
+          "count": 21,
+          "median": 233.54807264438728,
+          "p95": 249.5125890156089,
+          "maximum": 250.04476360130568,
+          "rms": 210.41492209338963
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 16.857798893055765,
+          "crossing_offset_width_down_m": [
+            -0.2728111365190689,
+            0.22449326455909902
+          ],
+          "blind_time_to_crossing_s": 2.8298490300557635
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 8648,
+        "wire_commands": 880,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 8648,
+        "wire_commands": 880,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3192,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 72775739,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "afd92d88c78c01e5bd520226f6a932ec6bc296a4d6212d20c26be7df47b3b8c4",
+        "course-camera-imu.mp4": "3c89ca70da69369fe7390b30eddb58cba05ef69d39b8a778ec6e98ff1c122e0c",
+        "input-independence.json": "5df649c85eef1bf094ef425d969b01d39876d4d8067ba95a946dea915553dd44",
+        "protocol.json": "811329cc05536a747f2fa8f5c0f0fdeaec4b074bf471b05f067eb3ca0924bbff",
+        "replay.json": "1f1ba4c2e24ebf9d34d09867a16c08e37fcb69d98789292077e8912d03c9f990",
+        "retention.json": "cac304886be9fce21ff260f725402c0c11c48dc47381dba1cff202a5d7cf7c4e",
+        "score.json": "24b2d00697a18248ddff436b652965a41f2d56052f6fa9532ef9d2a9e64a5be3",
+        "video.json": "7f3e3fa88e272b2649d113cf17c0bbcfaaea5b4cdded18f175f2333c03276307"
+      }
+    },
+    {
+      "name": "attempt-07",
+      "revision": "ae0e3ebda552b80375358f18948bbae7ecc451ea",
+      "settings": {
+        "speed_m_s": 3.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 60.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 3,
+      "estimated_gates_passed": 3,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "26205e9a0f2ac5ab66cd02eca397a9990eff4694c3e3dfee4bff07ecc8b06862",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 585,
+          "median": 11.196310999995518,
+          "p95": 21.492540199998444,
+          "maximum": 36.22755699999658,
+          "rms": 12.21532878639743
+        },
+        "velocity_fit_age_ms": {
+          "count": 491,
+          "median": 236.16697859222668,
+          "p95": 253.6606225773994,
+          "maximum": 269.65953797603606,
+          "rms": 234.87997328438627
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 16.740385703943698,
+          "crossing_offset_width_down_m": [
+            -0.10847641252302663,
+            -0.05170214006277462
+          ],
+          "blind_time_to_crossing_s": 1.234717445943696
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 25.827527346800785,
+          "crossing_offset_width_down_m": [
+            0.07788174510640751,
+            -0.1970107650288883
+          ],
+          "blind_time_to_crossing_s": 1.0929133288007833
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": 36.68899594927027,
+          "crossing_offset_width_down_m": [
+            -0.44781563390826334,
+            0.03854590517126773
+          ],
+          "blind_time_to_crossing_s": 0.8178289242702661
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 17580,
+        "wire_commands": 1949,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 17580,
+        "wire_commands": 1949,
+        "exact_updates": true,
+        "corrupted_pose_packets": 6653,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 148956414,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "0ac0747026da73e65d65bf1fc0bdb233cb7a0a3a7708d7d2e7b0c76ad8b613ea",
+        "course-camera-imu.mp4": "afaf0a89bfdc9c3740f3e9b7c628a6295f07b23215e3d5c5d2e4990334c56d21",
+        "input-independence.json": "fbd320913efee515e92ae79b1e9ef9365a3f42bb1d5aa2bc62603ffaeb6e73ac",
+        "protocol.json": "7371aa1340c1c0ba7d3100726e0f906d8519e224ca1632a9a4a1979b5a572142",
+        "replay.json": "98c234fd2067187c04d408d66719e6cc945a88d91fbc1b20ab339f1d35202619",
+        "retention.json": "51858976e88c4fb443fc649872c7c79a85c705074416fb64a2b0d4a843fa4cc3",
+        "score.json": "83e3cd7ff0848403fb0bcecaed33a7206b6f71fe78fb3d060489c07781eb84f4",
+        "video.json": "47dd3921496b2476fc2bf45b506f35dc667a6b7f26a92dfea9bc97ae5e16fc2c"
+      }
+    },
+    {
+      "name": "attempt-08",
+      "revision": "ae0e3ebda552b80375358f18948bbae7ecc451ea",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 60.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "7a11a4feadc826827171f11b1631320fd2b53130cb934d941366e0fc499a8354",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 280,
+          "median": 8.932699499998087,
+          "p95": 22.80628694999809,
+          "maximum": 27.90766399999889,
+          "rms": 12.353149741978656
+        },
+        "velocity_fit_age_ms": {
+          "count": 251,
+          "median": 235.90526532921353,
+          "p95": 253.09114086633144,
+          "maximum": 260.05084501490927,
+          "rms": 235.1341524216307
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 13.209454675930791,
+          "crossing_offset_width_down_m": [
+            -0.2431461381603634,
+            -0.00836330356643645
+          ],
+          "blind_time_to_crossing_s": 0.4865333779307903
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 17.96925126038224,
+          "crossing_offset_width_down_m": [
+            0.1464145403658045,
+            0.014320078040575373
+          ],
+          "blind_time_to_crossing_s": 0.5767623563822397
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 8285,
+        "wire_commands": 812,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 8285,
+        "wire_commands": 812,
+        "exact_updates": true,
+        "corrupted_pose_packets": 2971,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 68945360,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "7940c76d3d1d7d139067e6bcc64bddb245ee928dca5191d52f3c47f62ef082db",
+        "course-camera-imu.mp4": "9f929c2a8c9717265a9d21b89b625db960a8cb1005cc615ae1fbd462356682bd",
+        "input-independence.json": "3ebe542cc7b7fd7f590e33fbcaaadb9d98a5dd92e241c70381928c33c8752139",
+        "protocol.json": "5308c81637bed31e773a41f271d591bc18d725702c250a62c62caad2b153d324",
+        "replay.json": "e10221a8b8a7e48aa657d7e33655e83255db6c9bc3c24e41f6478769675757d7",
+        "retention.json": "aebc44d44ad9d834d86a1e350bac5d27ce4ab36e83185f5b81cbe02d988916d4",
+        "score.json": "4126dce670a006c806865aeb86b26defcfd7ed70b7f4eb49165067776606d19c",
+        "video.json": "c3902c024a987e2ec00668ae5ef16e8e6f5d9c07377feb5f0b2493fa584a0acb"
+      }
+    },
+    {
+      "name": "attempt-09",
+      "revision": "ae0e3ebda552b80375358f18948bbae7ecc451ea",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 60.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 0,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "9faebc4a8d9a1c276612cfcd295e8e89ea7164b218a511f8e76bc5f3aebd85ba",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 288,
+          "median": 12.417286999999,
+          "p95": 24.23519719999785,
+          "maximum": 25.908858999999396,
+          "rms": 13.695986686734466
+        },
+        "velocity_fit_age_ms": {
+          "count": 241,
+          "median": 235.52980968390534,
+          "p95": 256.66907226036705,
+          "maximum": 271.6192273864948,
+          "rms": 233.10104359678277
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 13.678743478308556,
+          "crossing_offset_width_down_m": [
+            -0.08253653187134832,
+            -0.013548118006568311
+          ],
+          "blind_time_to_crossing_s": 0.502460289308555
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 22.273260931246092,
+          "crossing_offset_width_down_m": [
+            0.279925211967288,
+            0.006923427580372524
+          ],
+          "blind_time_to_crossing_s": 0.46234927724609065
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 9840,
+        "wire_commands": 1039,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 9840,
+        "wire_commands": 1039,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3687,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 85031007,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "716147d6ca31288997df34e0aa1e5bc865496e7c67aba0b2d930162c550f086f",
+        "course-camera-imu.mp4": "ea42c3f86847497be7113a9d6548d707db4ee6c3726074efc088d74f2c3ef43a",
+        "input-independence.json": "2c9bf5eda3d2488256911fe475c14bad257a7b4da53821a04cc06080b9173acc",
+        "protocol.json": "a7eceefc2e00eb388c38e3bf5128d12e7d3b1b63d47f25e80bd4237979d43402",
+        "replay.json": "d9b3899323bbf39076ed9a4c63879a782237222c3874a292b199c6dfac3fbe0d",
+        "retention.json": "35eae7110676c91e505f6cde4497db1ceedd29deb4f4523ffb981438451dd6c4",
+        "score.json": "13791f4c71709f0df6565f77f582a237d103ed9dac07e31c7ebadb639b7e3552",
+        "video.json": "1d3fdd5c1b87ef5f4b4dc0445029830cd39af8a9b88637259a346f8646d25bb1"
+      }
+    },
+    {
+      "name": "attempt-10",
+      "revision": "ae0e3ebda552b80375358f18948bbae7ecc451ea",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 0.5,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 60.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 0,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "7d2cb11982f97590fe583d218e15ce2dd4a87ad3949589e1e916aa17e1ee6583",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 169,
+          "median": 8.151623999998137,
+          "p95": 22.95030119999843,
+          "maximum": 24.46356899999902,
+          "rms": 11.543549733678729
+        },
+        "velocity_fit_age_ms": {
+          "count": 123,
+          "median": 235.35798044103552,
+          "p95": 251.89611414118414,
+          "maximum": 255.83652897427277,
+          "rms": 232.7352718912913
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 13.683528552446921,
+          "crossing_offset_width_down_m": [
+            0.05795560121844219,
+            0.009713597021232857
+          ],
+          "blind_time_to_crossing_s": 0.471159281446921
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 7506,
+        "wire_commands": 683,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 7506,
+        "wire_commands": 683,
+        "exact_updates": true,
+        "corrupted_pose_packets": 2552,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 59285038,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "48867c7eaf7cb92c83bb172cd342b1839ff38973e3603ef0b511e7778eb6b9b4",
+        "course-camera-imu.mp4": "a73b4028aa4031ccfaee6f7fe580839b44ac5fcf5bdc8fe2e5d0905a425829eb",
+        "input-independence.json": "43ddc24b75d7721580f758be697e2374e07eab2a911a28681f7626e5f9e4a324",
+        "protocol.json": "59b70c4c8aabf3615d070f8eb4076ad77ea518017497dbd0e1b5e250746c3f8b",
+        "replay.json": "a9d06139f51c1227811f86c01690d10b11682b9dd1205044652506046f547090",
+        "retention.json": "a345379cccc2c6823bc04df723cf5ee61d74cfd673c5d0b4f9643a8a024b7509",
+        "score.json": "6637a2f40bd13520fc060dfbb1fddee1d1ef45c15aef29d11b5c1c75172ed822",
+        "video.json": "01d5c429b8dd569ee985c36e87e12e5359330a7efd7ae87231c35ba0c51c9557"
+      }
+    },
+    {
+      "name": "attempt-11",
+      "revision": "3028a452d4301347e6f2492d8c85bac8be3e9433",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 6,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": false,
+      "passed_without_reset": false,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "960492d5300e5135213ec0f4e31d9b59619a0d36219d671bf57c4d889e75fb94",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1701,
+          "median": 2.954543471884994,
+          "p95": 3.3398561910847664,
+          "maximum": 3.6502934276510453,
+          "rms": 2.56827900046699
+        },
+        "velocity_error_m_s": {
+          "count": 1701,
+          "median": 0.24019262148274934,
+          "p95": 1.2591686081227824,
+          "maximum": 1.7049259909515464,
+          "rms": 0.5215683817639538
+        },
+        "attitude_error_deg": {
+          "count": 1701,
+          "median": 0.21116571135321915,
+          "p95": 0.3588229264642736,
+          "maximum": 0.9277781104333234,
+          "rms": 0.2211692606647241
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 748,
+          "median": 9.240051999995558,
+          "p95": 23.12212099999673,
+          "maximum": 33.695584999998474,
+          "rms": 12.533886292449255
+        },
+        "velocity_fit_age_ms": {
+          "count": 687,
+          "median": 481.628502745167,
+          "p95": 502.7625036057751,
+          "maximum": 603.3284581505516,
+          "rms": 447.5051433314353
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 13.145841543252667,
+          "crossing_offset_width_down_m": [
+            -0.000493476413345722,
+            0.007029937014336498
+          ],
+          "blind_time_to_crossing_s": 0.4699701892526651
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 17.80839088335614,
+          "crossing_offset_width_down_m": [
+            0.14352574845522936,
+            1.7718897315801656
+          ],
+          "blind_time_to_crossing_s": 1.0986340363561382
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": 23.801078547321573,
+          "crossing_offset_width_down_m": [
+            0.040856464821753674,
+            -0.04200800043047735
+          ],
+          "blind_time_to_crossing_s": 0.4568531793215733
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": 31.535411443515596,
+          "crossing_offset_width_down_m": [
+            0.4393178569505848,
+            -0.0444420273794959
+          ],
+          "blind_time_to_crossing_s": 0.5235388375155949
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": 36.5346241332834,
+          "crossing_offset_width_down_m": [
+            -0.21237443851353838,
+            -0.021247876230595892
+          ],
+          "blind_time_to_crossing_s": 0.5232907722833957
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": 41.453525623093185,
+          "crossing_offset_width_down_m": [
+            0.4534916341249535,
+            -0.03221762674388943
+          ],
+          "blind_time_to_crossing_s": 0.5787453100931828
+        }
+      ],
+      "normal_replay": {
+        "calls": 16530,
+        "wire_commands": 1841,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 16530,
+        "wire_commands": 1841,
+        "exact_updates": true,
+        "corrupted_pose_packets": 6287,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 147152959,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "20c644289d4eb7fe0db0d226c8c16d4f86e914548791d1cb83199fd6adf71c5b",
+        "course-camera-imu.mp4": "5152ed2ccdbdc9636d605a83a8e79d9e5233ccf09da3a9a664f32c2c50b696bc",
+        "input-independence.json": "fe7c946f6e987e149c55648b71c4e609308b41d44f0da2f398a38f760350b3ba",
+        "protocol.json": "970915316e9f2243c70a47356fd531b2de4cb0063377176e1dd638aa0cb3dcdb",
+        "replay.json": "932bcce7898fe6226ec7c3f7ec23b52717baf7ee0b5c5bb91d6382d4070eb4f6",
+        "retention.json": "d1bbd22273a13f1deecda2939ba823d784c956f0d9a1bcab5c42d44280930c36",
+        "score.json": "00ec004e7795f1b6d218122721a8e039eba56fe0945971a718692f45d01ff8ad",
+        "state-errors.csv": "8dc9a6364c2df3827005a4b05db7e403b7ff17e99dfbb545ffb1cc3b844e0f3a",
+        "video.json": "ba65266b765b5459f0313e081f6b368c6985233782b28375fd1bc34066b8e9f9"
+      }
+    },
+    {
+      "name": "attempt-12",
+      "revision": "3028a452d4301347e6f2492d8c85bac8be3e9433",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 1,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "62719c304508310d2e45a16d053497228dc1558fdd1557c2941fe47aa87b0d78",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 680,
+          "median": 0.3624645199930735,
+          "p95": 4.173560816908454,
+          "maximum": 4.864578800402631,
+          "rms": 1.6491551514181344
+        },
+        "velocity_error_m_s": {
+          "count": 680,
+          "median": 0.5638126115788694,
+          "p95": 1.2624403561357576,
+          "maximum": 1.7234703402880243,
+          "rms": 0.7832522287697159
+        },
+        "attitude_error_deg": {
+          "count": 680,
+          "median": 0.2833235043413968,
+          "p95": 0.5061746622138938,
+          "maximum": 0.9518049036085973,
+          "rms": 0.33578843898945393
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 205,
+          "median": 11.626505999998926,
+          "p95": 20.86611759999675,
+          "maximum": 23.550280999998563,
+          "rms": 11.978349432675035
+        },
+        "velocity_fit_age_ms": {
+          "count": 195,
+          "median": 481.452358985182,
+          "p95": 504.73428879342134,
+          "maximum": 541.5923519819828,
+          "rms": 450.7233491368407
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.255824359160492,
+          "crossing_offset_width_down_m": [
+            0.011889089139565275,
+            -0.002984935577984381
+          ],
+          "blind_time_to_crossing_s": 0.5522614381604924
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 9737,
+        "wire_commands": 820,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 9737,
+        "wire_commands": 820,
+        "exact_updates": true,
+        "corrupted_pose_packets": 3676,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 85414970,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "5d98da910bb339f86a740368ed389f3cf8e851ffb0c9622df234c657fa2f207a",
+        "course-camera-imu.mp4": "26dfd566989049f20d5407ee168b65e2c0bb93d2d181948b1edf7b90bda3cfda",
+        "input-independence.json": "ef0a76b5be2a51a4c4dd4ca9d73c80c42129d434d6e0788d801390f7188e2347",
+        "protocol.json": "a36c2d76ce18ee89abab9d5057e4fa0a0cd28e202356bf613e8202d2bb200e55",
+        "replay.json": "3a3924ef6d943835b41fadb1fdbf9bb1e2d4d0437fff316ee97a4670aff098c3",
+        "retention.json": "03634c6f349b73dfd144d254112032b1bb128cd7bde5e5f311e513a9d8673462",
+        "score.json": "aab3412b44dcc5781e0e49540885f7013899acf27b902795122fc0c96ff8059d",
+        "state-errors.csv": "3e07c1261c5247892757367f177cf5693a2b17fec58632ca288cdfe432061ab8",
+        "video.json": "fc02acb19ff7bd3d1468d888c89206a8edd313dd2f0fc744645a38add8c54983"
+      }
+    },
+    {
+      "name": "attempt-13",
+      "revision": "3028a452d4301347e6f2492d8c85bac8be3e9433",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "fc1ce1ae4c2319353719079267c41ea67bb9a870c75284edec88d1a8f47a5855",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 987,
+          "median": 0.4452087074249477,
+          "p95": 5.172646230438217,
+          "maximum": 5.370161463182645,
+          "rms": 1.9780344772837708
+        },
+        "velocity_error_m_s": {
+          "count": 987,
+          "median": 0.5810533990562691,
+          "p95": 1.298261604549148,
+          "maximum": 1.6964462506942002,
+          "rms": 0.7748214425714696
+        },
+        "attitude_error_deg": {
+          "count": 987,
+          "median": 0.243129317476472,
+          "p95": 0.563422927539781,
+          "maximum": 1.1392464530636799,
+          "rms": 0.3055993681389215
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 328,
+          "median": 8.680789999997884,
+          "p95": 21.881296649995896,
+          "maximum": 23.822659999996887,
+          "rms": 11.773857337102797
+        },
+        "velocity_fit_age_ms": {
+          "count": 314,
+          "median": 481.5961236238326,
+          "p95": 511.90527651038724,
+          "maximum": 637.2080234383652,
+          "rms": 450.7722766043148
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 18.341096513027146,
+          "crossing_offset_width_down_m": [
+            -0.03368336195256526,
+            0.004880440075950207
+          ],
+          "blind_time_to_crossing_s": 0.627960835027146
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.99600191566507,
+          "crossing_offset_width_down_m": [
+            0.021286274839665564,
+            -0.0017531744553537245
+          ],
+          "blind_time_to_crossing_s": 0.5130053576650688
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 12203,
+        "wire_commands": 1185,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 12203,
+        "wire_commands": 1185,
+        "exact_updates": true,
+        "corrupted_pose_packets": 4817,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 108049572,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "7323bc1e22a8a0ebbb2ff2ad418967d5af044d4cd0839104de1acf8b8e83f274",
+        "course-camera-imu.mp4": "9966c892fabc30b39a69d6308fafb549e1c5ef9fcc826c9e3dacf0d860ccc27e",
+        "input-independence.json": "2843fe18bb3bbe1be5be19675581d16cbc8113b05a079334d43bcc451200d780",
+        "protocol.json": "e3566215172c5a52380f24d2dae17e6bdc410de40dbdffd7a19fe5703338a3d4",
+        "replay.json": "88ff27843b387c4fa6a872769d05aa54cab84b45e9246d82c62bf653ddf626df",
+        "retention.json": "3dd21e8b57cb5b5a813832be39285d3b4c989e669da80378e6df050f74436a1d",
+        "score.json": "cf316a0c7300ab7e2ef45fc86f6a41f604cce379817d8af29f01c6b0178b2218",
+        "state-errors.csv": "4809200f73abb9d74bac486f51d26bc6d77364407f50638a5f8bdefe6ddc5419",
+        "video.json": "a593af057122fc2361bc48bd6549dcd96450f2761d0b577dfa055c16b0a5fd54"
+      }
+    },
+    {
+      "name": "attempt-14",
+      "revision": "3028a452d4301347e6f2492d8c85bac8be3e9433",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 4,
+      "estimated_gates_passed": 4,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "d5bac8f1b3750b3fa4d2900decb55c899781b05473a6650ade686edbb1943206",
+      "collision_packets_count": 57,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2373,
+          "median": 2.0457131399143624,
+          "p95": 12.512283355606513,
+          "maximum": 16.85630772973361,
+          "rms": 5.1668348513649685
+        },
+        "velocity_error_m_s": {
+          "count": 2373,
+          "median": 0.6150241598456989,
+          "p95": 2.3741675385613195,
+          "maximum": 4.88543295616283,
+          "rms": 1.2039085990540899
+        },
+        "attitude_error_deg": {
+          "count": 2373,
+          "median": 0.18540958156300935,
+          "p95": 0.5133866761386339,
+          "maximum": 1.1041028764217757,
+          "rms": 0.2838694661817004
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 781,
+          "median": 11.016152999992812,
+          "p95": 21.771915999998726,
+          "maximum": 36.16218199999821,
+          "rms": 12.18775640922309
+        },
+        "velocity_fit_age_ms": {
+          "count": 660,
+          "median": 481.7469090328848,
+          "p95": 513.8371516343436,
+          "maximum": 589.5198932630734,
+          "rms": 441.6224197520772
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.55957693943201,
+          "crossing_offset_width_down_m": [
+            -0.011483674325687815,
+            0.00010268821414837348
+          ],
+          "blind_time_to_crossing_s": 0.5448380304320075
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.711798035999962,
+          "crossing_offset_width_down_m": [
+            0.04337345797574118,
+            0.004079150324685872
+          ],
+          "blind_time_to_crossing_s": 0.5347676519999602
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 37.221596558502355,
+          "crossing_offset_width_down_m": [
+            -0.2834876918412938,
+            -0.0018517704498019595
+          ],
+          "blind_time_to_crossing_s": 0.4755285825023563
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 51.83712580185649,
+          "crossing_offset_width_down_m": [
+            0.12799884654333343,
+            -0.15844598128608345
+          ],
+          "blind_time_to_crossing_s": 1.9241576698564842
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 23364,
+        "wire_commands": 2530,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 23364,
+        "wire_commands": 2530,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9149,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 211104279,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "eb9c7552dc8217b958dab883a84077aa073a462ff3b8bece27c7459303bff215",
+        "course-camera-imu.mp4": "651c8b9b9167ef3320642dd665a4b2b9b49556528dd70d6f971ff19c55205a0d",
+        "input-independence.json": "9471d0c603aa97b4d5377120e8233865afcad3192fd3546d800e49d678e43cbd",
+        "protocol.json": "abe40f17f2efb09322716f813dd61df4dae0e658d1ead25650ed7bfc9da274ac",
+        "replay.json": "ac7e8c16aa3ed58bd8ce989f41321872cda478d10f27afc379e9f183a54efbfd",
+        "retention.json": "5d1c5791349c1d338d9ca174ebdb13001e0bf5196011e4245c59ec5edb053c6f",
+        "score.json": "d69b311f9791ff27e9b882c45242798d2d4e51732209e740af16480819b66ca6",
+        "state-errors.csv": "ee6e8c5466f0d64ff1cf83fed4c74e098c4741ea3807374452da09b2be531475",
+        "video.json": "86110762384350c37bc676cd6f0c1cab328d8e1fed49f88157a9b0df23bc4944"
+      }
+    },
+    {
+      "name": "attempt-15",
+      "revision": "3028a452d4301347e6f2492d8c85bac8be3e9433",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 54.845863342,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "87df5f62e475bdc0a77aa785a13b058b371ec1ae84b6b260df4b09902dc4d3a0",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2489,
+          "median": 1.3447447906071517,
+          "p95": 1.660005516899591,
+          "maximum": 2.5440300363474444,
+          "rms": 1.285907192702591
+        },
+        "velocity_error_m_s": {
+          "count": 2489,
+          "median": 0.3664753558056058,
+          "p95": 1.0498216757229812,
+          "maximum": 2.0019037465218465,
+          "rms": 0.5512546219414496
+        },
+        "attitude_error_deg": {
+          "count": 2489,
+          "median": 0.15720754164282974,
+          "p95": 0.4320542625607947,
+          "maximum": 0.921051966594027,
+          "rms": 0.2514190675461513
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 1007,
+          "median": 11.047987999997844,
+          "p95": 21.904203599991945,
+          "maximum": 35.35803499999446,
+          "rms": 12.21353974259058
+        },
+        "velocity_fit_age_ms": {
+          "count": 968,
+          "median": 481.6061306611843,
+          "p95": 512.6960717691059,
+          "maximum": 603.6958535744006,
+          "rms": 451.89419331578745
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.14796628489562,
+          "crossing_offset_width_down_m": [
+            -0.034729364692008415,
+            0.0013111718343742315
+          ],
+          "blind_time_to_crossing_s": 0.6673317018956197
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.107428065428493,
+          "crossing_offset_width_down_m": [
+            0.03412383048954258,
+            0.009647638075597464
+          ],
+          "blind_time_to_crossing_s": 0.5255875994284906
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 37.69716465596109,
+          "crossing_offset_width_down_m": [
+            -0.22979731525291552,
+            -0.03956174980194092
+          ],
+          "blind_time_to_crossing_s": 0.5154955909610877
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 51.12714187465989,
+          "crossing_offset_width_down_m": [
+            0.10008237993615213,
+            0.004839718989196596
+          ],
+          "blind_time_to_crossing_s": 0.5460017716598884
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 56.20276153376757,
+          "crossing_offset_width_down_m": [
+            -0.04323290167352363,
+            -0.02755197029132412
+          ],
+          "blind_time_to_crossing_s": 0.5226905177675647
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 24171,
+        "wire_commands": 2626,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 24171,
+        "wire_commands": 2626,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9536,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 221258854,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "49e1a535681f28cf4117d86cb0cb1743ba51976b7c485a6e523f4cd7f1f902ad",
+        "course-camera-imu.mp4": "738ecda7f5ab766d570cb3f5a5e885b1a417d462e76b467b180a4dc086cdfebf",
+        "input-independence.json": "580a2507bd3734a4b1b6ceecacad2b3beac8cc1a00c70751cf6f60411ef1a583",
+        "protocol.json": "8f7582bcc23804697f6963f1cc591a14d52461ecff482a12b67a16c7feee06fc",
+        "replay.json": "a42611dd98d2a2aa70685bd9e3900b183b4a6df0de61a4fc114b416a51703bcf",
+        "retention.json": "2039023f1ca0d0e32dacc8bb0a1f4e5eaa54466fb65f3d11718d37630b7a3903",
+        "score.json": "918f15ec5dca0855215e95517e8a7f4b4af6ae3ffc6d0d2ba0500a80106f8406",
+        "state-errors.csv": "6cf2a27c1ad01546cf069e83a26b053ceeef05c416260e28914791f3638e74ae",
+        "video.json": "a70dc1f981baaee32847ff0664663281d95d668d43ff8834cf08d517df2b92ec"
+      },
+      "scoring_note": "Original score preserved: native-valid 6/6 and zero contacts. Old scorer required final mesh-centre crossing despite native finish stopping before it. Current scorer permits the final gate only on a valid native finish; no earlier miss is excused."
+    },
+    {
+      "name": "attempt-16",
+      "revision": "19ca80851ac6bb321dde71bec2bd0d3f3f3e60e1",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 0,
+      "estimated_gates_passed": 0,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "ACQUIRING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "no confirmed opening in the largest visible gate rim"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": false,
+      "trace_sha256": "6b26ae2435f0b1a84fe9d9ae14e7580117b5329bf1b4eee00dbc6786f52a22be",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": null,
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 0
+        },
+        "velocity_fit_age_ms": {
+          "count": 0
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 6076,
+        "wire_commands": 398,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 6076,
+        "wire_commands": 398,
+        "exact_updates": true,
+        "corrupted_pose_packets": 2242,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 50552805,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "input-independence.json": "b39310b3d6be380f14ec2ed5fa9e1d0b3b6edd6109a0960fa35eca19ee3e417c",
+        "protocol.json": "f4c274025f6201e0024b2775c7fc99ec77426d7e3432eaa54bff696c0cfb8ef7",
+        "replay.json": "65380df58c2b1c60fe1e923b01438a283d1a5c3012e86a4b9f8eac775b4387f9",
+        "retention.json": "51e874533b5087a5898d9971a15544c5c2640973ad51a131e43797ae781ef8dc",
+        "score.json": "2b3387df736687e50f88a45713da39acfdb03e384343f46c6e8c402c0c143246"
+      }
+    },
+    {
+      "name": "attempt-17",
+      "revision": "19ca80851ac6bb321dde71bec2bd0d3f3f3e60e1",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 53.29920578,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "339848ee458d67fcf73cb5717a2b93d668f70a918ada799985133e43b1e9f856",
+      "collision_packets_count": 22,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2414,
+          "median": 0.9819003332653968,
+          "p95": 2.8640001171584344,
+          "maximum": 4.8811672733620375,
+          "rms": 1.5552567946603206
+        },
+        "velocity_error_m_s": {
+          "count": 2414,
+          "median": 0.270389802755998,
+          "p95": 1.386402178889511,
+          "maximum": 2.581697123480585,
+          "rms": 0.6860016346089829
+        },
+        "attitude_error_deg": {
+          "count": 2414,
+          "median": 0.3372185094060643,
+          "p95": 2.4361567939001607,
+          "maximum": 2.600840539915131,
+          "rms": 1.0760410233954685
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 905,
+          "median": 9.353326000002937,
+          "p95": 22.69624499999452,
+          "maximum": 35.542604999996286,
+          "rms": 12.326369020204783
+        },
+        "velocity_fit_age_ms": {
+          "count": 857,
+          "median": 482.06023996156233,
+          "p95": 512.5416100090049,
+          "maximum": 602.1847541013869,
+          "rms": 444.8872788885774
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.081999972941865,
+          "crossing_offset_width_down_m": [
+            -0.03486339826630947,
+            -0.05879516684938223
+          ],
+          "blind_time_to_crossing_s": 0.6047161349418637
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.712079993649215,
+          "crossing_offset_width_down_m": [
+            0.021313977680303877,
+            -0.07941085492211702
+          ],
+          "blind_time_to_crossing_s": 0.5029355986492128
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 37.30383662807405,
+          "crossing_offset_width_down_m": [
+            -0.11426096156171675,
+            0.04050767863275353
+          ],
+          "blind_time_to_crossing_s": 0.5311588750740484
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.607278891506134,
+          "crossing_offset_width_down_m": [
+            0.2143502900567983,
+            0.10203605562733682
+          ],
+          "blind_time_to_crossing_s": 0.498721521506134
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 54.77390522508434,
+          "crossing_offset_width_down_m": [
+            0.31226282199944055,
+            0.005140302357458919
+          ],
+          "blind_time_to_crossing_s": 0.4969494540843371
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 59.65721170583042,
+          "crossing_offset_width_down_m": [
+            0.42962527662440264,
+            -0.02019612129243597
+          ],
+          "blind_time_to_crossing_s": 0.45102943283041697
+        }
+      ],
+      "normal_replay": {
+        "calls": 23544,
+        "wire_commands": 2551,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 23544,
+        "wire_commands": 2551,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9269,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 214285211,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "07acaef28f2a12cac79847d6d81ce67191c817d82cbf7a65135e9cbca675e351",
+        "course-camera-imu.mp4": "6d9d5f8c2da11c61d8a714479aff3d8ba459ce902de9f6e0fb858774257e3bca",
+        "input-independence.json": "2d28aca82234b55c8d381d07ec9e8899bee60cff9ae39b5e93a56457fd146a17",
+        "protocol.json": "e4ec987616005f1705dafb8e84a4248fd5ee21f8c05e779349e59f278a79874d",
+        "replay.json": "654524c6d9366ce8224a9afed7fd7869f2cd388f667bdd54950e344d10a98db6",
+        "retention.json": "82d3c5705881e6522153b009eda1844ecd78e3941bd74b17995a6610a3a92cf8",
+        "score.json": "34674b046a837a849547f21bc972a84a68dc7b499ba6858c655624043927ba29",
+        "state-errors.csv": "600b198fb20021a55bccaea1359daf4ce1c66dcb894cc68b182f739fc453ce59",
+        "video.json": "454405d803f7634c60c9c3825199b66ca2c5b533970330fd9a945ac763ed145f"
+      }
+    }
+  ],
+  "raw_acceleration_repetition": [
+    {
+      "name": "validation-01",
+      "revision": "19ca80851ac6bb321dde71bec2bd0d3f3f3e60e1",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 3,
+      "estimated_gates_passed": 3,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "a0956a078df3f054429476bd814401c6dcf717c1341d4a42855017a0300bd5c1",
+      "collision_packets_count": 797,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 1922,
+          "median": 3.1740085559435944,
+          "p95": 5.449696572261819,
+          "maximum": 7.3780742312593794,
+          "rms": 3.596473702962598
+        },
+        "velocity_error_m_s": {
+          "count": 1922,
+          "median": 0.5338134850445196,
+          "p95": 1.74377182936419,
+          "maximum": 2.8032786676862833,
+          "rms": 0.9188163161626691
+        },
+        "attitude_error_deg": {
+          "count": 1922,
+          "median": 0.4681912296375006,
+          "p95": 0.6870804414508451,
+          "maximum": 1.2116141020104352,
+          "rms": 0.4922635413103343
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 634,
+          "median": 8.305541499996849,
+          "p95": 22.26616664999863,
+          "maximum": 29.39028699999824,
+          "rms": 12.033894150255726
+        },
+        "velocity_fit_age_ms": {
+          "count": 609,
+          "median": 477.9209628660581,
+          "p95": 515.6537273897335,
+          "maximum": 596.5345807002507,
+          "rms": 440.19131419038774
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.24436909292357,
+          "crossing_offset_width_down_m": [
+            -0.040201262846348444,
+            0.0074796302932145205
+          ],
+          "blind_time_to_crossing_s": 0.5196490639235698
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.16035183239585,
+          "crossing_offset_width_down_m": [
+            -0.09572163692858193,
+            -0.06027815769767936
+          ],
+          "blind_time_to_crossing_s": 0.73977703639585
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 39.140163033147225,
+          "crossing_offset_width_down_m": [
+            -0.3570770151195053,
+            0.019025968908446912
+          ],
+          "blind_time_to_crossing_s": 0.5190903221472212
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 19270,
+        "wire_commands": 2061,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 19270,
+        "wire_commands": 2061,
+        "exact_updates": true,
+        "corrupted_pose_packets": 7648,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 169041183,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "e9544ff0291c4ff9c9a97b0aa3bb05078bac26e43df13d58d35c24daa9d8ccef",
+        "course-camera-imu.mp4": "8d5c6cb1f6e740b0a8a79122fcc2f21fe4f6b02c5cec5101513d10ca4cde7fcc",
+        "input-independence.json": "88007758cebe5df456ed36cefb7d98622bfcc22ba0d8634503679138160a8b9c",
+        "protocol.json": "618ee59db4292fc8bddbb5914fff0b526d4bb3470094ff2029d5ad33ee24eddf",
+        "replay.json": "20d93b1c14ee263eb65babaa295da89429e75cd6e740ace449f61b111f36cc09",
+        "retention.json": "a4631fb667dd45e819f8d2a06034db38deb24bb53b0d1469a18aa118f1f74ab5",
+        "score.json": "5beb1badd77de8aefad906acdb3277ad7e4fb3b8ceb376a5c7d682ab1894030d",
+        "state-errors.csv": "345244fe65a92ff2f5d89c6c7e81c4521ce23c1acaba0093b89a0ed3c105798e",
+        "video.json": "22c2946623ca7cfe4f9a5d35b3a92d495dd71b8ffb559d93c62dfbe613688499"
+      }
+    },
+    {
+      "name": "validation-02",
+      "revision": "19ca80851ac6bb321dde71bec2bd0d3f3f3e60e1",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 4,
+      "estimated_gates_passed": 5,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "ACQUIRING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "no confirmed opening in the largest visible gate rim"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "433b7222c864d29ac9e6be11d84439ec38ddaa393628fbf6fcde8f6f37226531",
+      "collision_packets_count": 1920,
+      "prearm_collision_packets_count": null,
+      "in_flight_collision_packets_count": null,
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2366,
+          "median": 2.051149727868011,
+          "p95": 76.22196321192119,
+          "maximum": 134.77528801126618,
+          "rms": 27.314376646681794
+        },
+        "velocity_error_m_s": {
+          "count": 2366,
+          "median": 0.6894718682164233,
+          "p95": 20.20240822836034,
+          "maximum": 29.77865797498266,
+          "rms": 7.393793157815156
+        },
+        "attitude_error_deg": {
+          "count": 2366,
+          "median": 0.6213128570843846,
+          "p95": 24.81335445697939,
+          "maximum": 26.500809823799205,
+          "rms": 11.179625740488708
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 719,
+          "median": 8.22238899999661,
+          "p95": 22.321746299996548,
+          "maximum": 52.3675699999977,
+          "rms": 12.113904618990674
+        },
+        "velocity_fit_age_ms": {
+          "count": 685,
+          "median": 482.8614398974409,
+          "p95": 513.8330513721498,
+          "maximum": 688.1979183032242,
+          "rms": 451.36242863917886
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.114671545986788,
+          "crossing_offset_width_down_m": [
+            -0.04314754664096466,
+            0.009400775741192779
+          ],
+          "blind_time_to_crossing_s": 0.5446882039867873
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.04237336801051,
+          "crossing_offset_width_down_m": [
+            0.017276432507807644,
+            0.014268566472785352
+          ],
+          "blind_time_to_crossing_s": 0.5043958910105069
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 35.04634038211712,
+          "crossing_offset_width_down_m": [
+            -0.10668674453077802,
+            -0.02085892897572684
+          ],
+          "blind_time_to_crossing_s": 0.5442644491171222
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 46.66518113214314,
+          "crossing_offset_width_down_m": [
+            0.2159125331588608,
+            -0.0453081834627707
+          ],
+          "blind_time_to_crossing_s": 0.6272387671431332
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 22913,
+        "wire_commands": 2502,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 22913,
+        "wire_commands": 2502,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9145,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 199835761,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "e907816c6704324c6e06245007fa87bc979ac878245978b56b20c2968a476e6f",
+        "course-camera-imu.mp4": "7beaae208baa74f5250fd00dded87de9869e026703ecfe12f705f374b577b8b7",
+        "input-independence.json": "f85c871cfc5380cade0c3c16af8a1335dc9f0553c72d63321f315b5b94a869a7",
+        "protocol.json": "618ee59db4292fc8bddbb5914fff0b526d4bb3470094ff2029d5ad33ee24eddf",
+        "replay.json": "98771bb30e1d86c072921666b8ce5d3a65291888952ea833a797014ebe1b7ad0",
+        "retention.json": "7ca202587f31f43f4254dbf617da055c625986b0048f32956b9abea2a1d56d70",
+        "score.json": "98b846da48bc4a8c1ea3d7f740b54b97134f279a68e2839ce4a04132ba0ef740",
+        "state-errors.csv": "db8413a4aec273d9b616956f1fe0bdd6d0a92983d64c326113cf63366ec102d2",
+        "video.json": "ef03d91891c8bc05bd200e548f844ea8745afaf04fda69295ce5c9c619f10458"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "name": "model-validation/validation-01",
+      "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 53.116577148,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "ddc585d8073f996ce84c02401fd265d01afdd3a0be3a22227dc35052c1e5d1d4",
+      "collision_packets_count": 26,
+      "prearm_collision_packets_count": 0,
+      "in_flight_collision_packets_count": 26,
+      "flight_contact_times_after_arm_s": [
+        34.359801,
+        34.359879,
+        34.359899,
+        34.37836,
+        34.378386,
+        34.378466,
+        34.378547,
+        34.378669,
+        34.398053,
+        34.398156,
+        34.398805,
+        34.398829,
+        34.419766,
+        34.41982,
+        34.419942,
+        34.436882,
+        34.437038,
+        34.437058,
+        34.437078,
+        34.461593,
+        34.461684,
+        34.461746,
+        34.480073,
+        34.480138,
+        34.48017,
+        34.480377
+      ],
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2410,
+          "median": 1.2404142707100483,
+          "p95": 3.74420450411077,
+          "maximum": 5.2385906984822,
+          "rms": 1.677263197056618
+        },
+        "velocity_error_m_s": {
+          "count": 2410,
+          "median": 0.19787342097292598,
+          "p95": 1.1260257910487559,
+          "maximum": 1.4610819283872385,
+          "rms": 0.45576983632542883
+        },
+        "attitude_error_deg": {
+          "count": 2410,
+          "median": 0.6246985562438769,
+          "p95": 0.7397702602564412,
+          "maximum": 1.5991609579702197,
+          "rms": 0.5784512759013625
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 927,
+          "median": 9.735681999998747,
+          "p95": 22.867316999998618,
+          "maximum": 25.903458999996687,
+          "rms": 12.520624448889835
+        },
+        "velocity_fit_age_ms": {
+          "count": 831,
+          "median": 482.18831435988466,
+          "p95": 511.1311990154519,
+          "maximum": 686.2068610491576,
+          "rms": 448.89813202660355
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.030581620654374,
+          "crossing_offset_width_down_m": [
+            0.00530753669973423,
+            -0.04560642349199308
+          ],
+          "blind_time_to_crossing_s": 0.6210355736543711
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.827452351155372,
+          "crossing_offset_width_down_m": [
+            0.03193228803885588,
+            -0.10042244400480162
+          ],
+          "blind_time_to_crossing_s": 0.488336955155372
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 36.586706513665625,
+          "crossing_offset_width_down_m": [
+            3.3311118993708895e-05,
+            0.02917575575383382
+          ],
+          "blind_time_to_crossing_s": 0.47512178866562493
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.63009703006651,
+          "crossing_offset_width_down_m": [
+            0.16675589459114828,
+            -0.007133659548837195
+          ],
+          "blind_time_to_crossing_s": 0.48763713506650674
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 54.63973593133035,
+          "crossing_offset_width_down_m": [
+            -0.08934729919001112,
+            -0.07265542693767486
+          ],
+          "blind_time_to_crossing_s": 0.5622112563303432
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 59.4891402258388,
+          "crossing_offset_width_down_m": [
+            0.18434296303144143,
+            -0.05793130165821159
+          ],
+          "blind_time_to_crossing_s": 0.5151743848388008
+        }
+      ],
+      "normal_replay": {
+        "calls": 23755,
+        "wire_commands": 2543,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 23755,
+        "wire_commands": 2543,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16833,
+        "corrupted_navigation_packets": 16833,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 215275761,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "e7ee7cfc875d53037dfba0c1ee875e88332488026c85d266d5c1830fdb96504f",
+        "course-camera-imu.mp4": "dd5c9c08892cedcf9cd6b3e7b3e219106e81e2834b697ed4bc44719a360071b5",
+        "input-independence.json": "77b3171f9014994b3e3138fefd1712f28f8bfc23143d4667829a7aa2ecb6d191",
+        "protocol.json": "f9df24149720367c55545c6c90ca6c108a83b1ddbd0fafe5bff5dd0437e34f34",
+        "replay.json": "fcfd2860d34458de9fce17f0e6228820caf3a056dddaf8537405e84928cc4325",
+        "retention.json": "7927ae5fa8655015986739208343bfd637c1b4d434d505dd94946c16ea3fef00",
+        "score.json": "8639f33b1672c703892958e7a8699466a5d526faa3ac18dd66278d446d1d07b6",
+        "state-errors.csv": "0fd1e199fa649ef32b4580637cfd07ce58928825f6b019085611176a89218f2e",
+        "video.json": "d6e15d87e229ed479d6354ba3f9eb6db2a27fccc0b57300b75fa6c531ba675cf"
+      }
+    },
+    {
+      "name": "model-validation/validation-02",
+      "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 52.800376892,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "0f797e39e8e6b06333a6a9f516ca37bc752cda9ba84288fd50ada8f667c53667",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": 0,
+      "in_flight_collision_packets_count": 0,
+      "flight_contact_times_after_arm_s": [],
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2373,
+          "median": 1.087522469293782,
+          "p95": 1.673905379253639,
+          "maximum": 3.337179961125703,
+          "rms": 1.0980384023577878
+        },
+        "velocity_error_m_s": {
+          "count": 2373,
+          "median": 0.2134546034884707,
+          "p95": 0.6706679866036487,
+          "maximum": 1.083694996164672,
+          "rms": 0.3384765570565819
+        },
+        "attitude_error_deg": {
+          "count": 2373,
+          "median": 0.20327138774334538,
+          "p95": 0.39274498510843237,
+          "maximum": 0.9935203441485092,
+          "rms": 0.23658151045100326
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 948,
+          "median": 11.30324649999892,
+          "p95": 21.938410949996445,
+          "maximum": 33.28554099999792,
+          "rms": 12.542097362382302
+        },
+        "velocity_fit_age_ms": {
+          "count": 904,
+          "median": 482.6053656457461,
+          "p95": 511.13166777963335,
+          "maximum": 634.0783622548934,
+          "rms": 451.3370289400284
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.982147624048256,
+          "crossing_offset_width_down_m": [
+            -0.018659499015812826,
+            -0.04059028889473902
+          ],
+          "blind_time_to_crossing_s": 0.4772367480482558
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.45855902061615,
+          "crossing_offset_width_down_m": [
+            -0.004482931207329766,
+            -0.08509051674609781
+          ],
+          "blind_time_to_crossing_s": 0.45274380261614766
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 38.549983190955246,
+          "crossing_offset_width_down_m": [
+            0.047539637457004846,
+            -0.058916126570418566
+          ],
+          "blind_time_to_crossing_s": 0.47492619995524166
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 48.94504592395785,
+          "crossing_offset_width_down_m": [
+            -0.007703503532276862,
+            -0.06524983664364689
+          ],
+          "blind_time_to_crossing_s": 0.539760390957845
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 53.867113805331314,
+          "crossing_offset_width_down_m": [
+            -0.06660616602881797,
+            -0.2546514799436222
+          ],
+          "blind_time_to_crossing_s": 0.9273850343313086
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 58.850938865843425,
+          "crossing_offset_width_down_m": [
+            0.12399416749201123,
+            -0.02860444097443117
+          ],
+          "blind_time_to_crossing_s": 0.5420377168434243
+        }
+      ],
+      "normal_replay": {
+        "calls": 23195,
+        "wire_commands": 2511,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 23195,
+        "wire_commands": 2511,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16005,
+        "corrupted_navigation_packets": 16005,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 210989184,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "1b1d17bb93c7ad8ab661ad74a0c178defe22cc45fbadc57707366ed88e7e9d71",
+        "course-camera-imu.mp4": "43f0e82fba3151af4245e2905519ab437be5b73dd0e6b95c9295b8daee53baa5",
+        "input-independence.json": "0b466498bacbac3b6d9a4121da5d9408dc59738cc239e7a566ab8fe18d8944c5",
+        "protocol.json": "f9df24149720367c55545c6c90ca6c108a83b1ddbd0fafe5bff5dd0437e34f34",
+        "replay.json": "cb2044a2e3edc188ca274d859e0cd2748b95ac0986c8c4784aa541b37d3446ec",
+        "retention.json": "a693f933083b2584a9dbba9871f678558be131edc32c4aa2751ffa102186ff75",
+        "score.json": "1c0f4aabcac84d4dedf17eaa0e888e090edc506549141377739da139bdac85b7",
+        "state-errors.csv": "ea460656c0ae40fb223792232d98f0da153ff88cc479313e22d0547b39b75f03",
+        "video.json": "2b5392bfb4c8f8d8f1defb6be85f142ac7dfa06026a7f02dcc1a394bfa617933"
+      }
+    },
+    {
+      "name": "model-validation/validation-03",
+      "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 3,
+      "estimated_gates_passed": 4,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "97e6ba636b0e6654128133ff964d5ce64cc7dbf0fe69fd08c773bbcb56c727e2",
+      "collision_packets_count": 7,
+      "prearm_collision_packets_count": 0,
+      "in_flight_collision_packets_count": 7,
+      "flight_contact_times_after_arm_s": [
+        34.380106,
+        34.380247,
+        34.380267,
+        34.380327,
+        50.583371,
+        50.583429,
+        50.598816
+      ],
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2386,
+          "median": 1.6435589735998986,
+          "p95": 4.631639547338457,
+          "maximum": 5.3194747135420695,
+          "rms": 2.1025599362325607
+        },
+        "velocity_error_m_s": {
+          "count": 2386,
+          "median": 0.2937143220010895,
+          "p95": 1.503359470279565,
+          "maximum": 2.724182133908474,
+          "rms": 0.687734656245133
+        },
+        "attitude_error_deg": {
+          "count": 2386,
+          "median": 0.4111966253568098,
+          "p95": 9.540191157985724,
+          "maximum": 23.708804297410857,
+          "rms": 5.69192294621627
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 754,
+          "median": 9.312289999996892,
+          "p95": 23.153277549996613,
+          "maximum": 36.38910799999451,
+          "rms": 12.450881657154609
+        },
+        "velocity_fit_age_ms": {
+          "count": 660,
+          "median": 479.0164853073762,
+          "p95": 508.46056284428687,
+          "maximum": 589.5015891802409,
+          "rms": 433.3722966486648
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.42775278887011,
+          "crossing_offset_width_down_m": [
+            -0.00686388838798377,
+            -0.04758464198433423
+          ],
+          "blind_time_to_crossing_s": 0.5257001888701076
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.74385399012031,
+          "crossing_offset_width_down_m": [
+            0.030227905120433454,
+            -0.0727434722705847
+          ],
+          "blind_time_to_crossing_s": 0.4758071941203106
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 37.30027450063882,
+          "crossing_offset_width_down_m": [
+            -0.044057058351277135,
+            0.02369929883143486
+          ],
+          "blind_time_to_crossing_s": 0.4980016006388155
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 22972,
+        "wire_commands": 2531,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 22972,
+        "wire_commands": 2531,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16077,
+        "corrupted_navigation_packets": 16077,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 210500462,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "a81608a1b6bbb708c50eb27dc26cb0395b1690d589eeb77b963f045c2ab4b337",
+        "course-camera-imu.mp4": "8f0a1a29b6c142b83cf99c4fca2c10732022bc3f0007f7b6d624187f21ed5265",
+        "input-independence.json": "2a3d59daca902ac0f2520ad15144c26570b5b7ac0efe7f8ea9c09a09c290586f",
+        "protocol.json": "f9df24149720367c55545c6c90ca6c108a83b1ddbd0fafe5bff5dd0437e34f34",
+        "replay.json": "b925c46e90c2f74eee91f63326a93169abbeb8e64a83bf3ce02252f003b5066a",
+        "retention.json": "3abd254d06bddf2884fb2d7f297ffc23b82860cf79dfc7d2c0a1e111d38d4c79",
+        "score.json": "91a396ee9a1a2710dca027b8d1918f10d6bea7b6dbb3116f860c6a1a74bd867e",
+        "state-errors.csv": "889f8eee8fbbce950a3262860a04ec873cb0fa6d4b9a5158ae7c7c9df5b54d52",
+        "video.json": "895eb9c0a5e5624d6882d11f3d4d9a398f12e66aeab6468668371b98bc149230"
+      }
+    },
+    {
+      "name": "model-validation/validation-04",
+      "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 3,
+      "estimated_gates_passed": 4,
+      "native_completed": false,
+      "native_finish_time_s": null,
+      "valid_race": true,
+      "passed_without_reset": false,
+      "controller_phase": "TRACKING",
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "height alignment could not regain the mapped gate"
+      },
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "8c9d489768b41be6ae9859ce5a372e1031e8b6436a8c0a59fb3a996ea97c162b",
+      "collision_packets_count": 261,
+      "prearm_collision_packets_count": 0,
+      "in_flight_collision_packets_count": 249,
+      "flight_contact_times_after_arm_s": [
+        35.738424,
+        35.738474,
+        35.7386,
+        35.73872,
+        35.75798,
+        35.758001,
+        35.758071,
+        35.779182,
+        35.779254,
+        35.779358,
+        35.800563,
+        35.800588,
+        35.800674,
+        35.800751,
+        39.438644,
+        39.438697,
+        39.438724,
+        39.438747,
+        39.438954,
+        47.038417,
+        47.038521,
+        47.038596,
+        47.056099,
+        47.056128,
+        47.056973,
+        47.07623,
+        47.076314,
+        47.076408,
+        47.097152,
+        47.097178,
+        47.097222,
+        47.097303,
+        47.097459,
+        47.120785,
+        47.120907,
+        47.121001,
+        47.121025,
+        47.121048,
+        47.140478,
+        47.14052,
+        47.140579,
+        47.140641,
+        47.1573,
+        47.157323,
+        47.157498,
+        47.177638,
+        47.17775,
+        47.177799,
+        47.177926,
+        47.197891,
+        47.197918,
+        47.197939,
+        47.197986,
+        47.198571,
+        47.216403,
+        47.216604,
+        47.216625,
+        47.236705,
+        47.236934,
+        47.236956,
+        47.237024,
+        47.260705,
+        47.260886,
+        47.260907,
+        47.260927,
+        47.261076,
+        47.261145,
+        47.276053,
+        47.276092,
+        47.299755,
+        47.29978,
+        47.299842,
+        47.299971,
+        47.3001,
+        47.300695,
+        47.318186,
+        47.318341,
+        47.318363,
+        47.335697,
+        47.335839,
+        47.335859,
+        47.335951,
+        47.35703,
+        47.357194,
+        47.357217,
+        47.357239,
+        47.378647,
+        47.378723,
+        47.37879,
+        47.378876,
+        47.395769,
+        47.395795,
+        47.395896,
+        47.395954,
+        47.417663,
+        47.417779,
+        47.417918,
+        47.417938,
+        47.418008,
+        47.438311,
+        47.438405,
+        47.438486,
+        47.438553,
+        47.457092,
+        47.457115,
+        47.457158,
+        47.457231,
+        47.476446,
+        47.476625,
+        47.476699,
+        47.500581,
+        47.500654,
+        47.500677,
+        47.500803,
+        47.500865,
+        47.501487,
+        47.516484,
+        47.540147,
+        47.540178,
+        47.540273,
+        47.54039,
+        47.540446,
+        47.540539,
+        47.540594,
+        47.557469,
+        47.557492,
+        47.557513,
+        47.576667,
+        47.576739,
+        47.576853,
+        47.576888,
+        47.603731,
+        47.603752,
+        47.603772,
+        47.603849,
+        47.603952,
+        47.604001,
+        47.617427,
+        47.64009,
+        47.640116,
+        47.640138,
+        47.640186,
+        47.640336,
+        47.640381,
+        47.656527,
+        47.65675,
+        47.65677,
+        47.656863,
+        47.683517,
+        47.683605,
+        47.683659,
+        47.683775,
+        47.696402,
+        47.696611,
+        47.696696,
+        47.719345,
+        47.719393,
+        47.719619,
+        47.719646,
+        47.719668,
+        47.73781,
+        47.73783,
+        47.737916,
+        47.760187,
+        47.760348,
+        47.760371,
+        47.760451,
+        47.760491,
+        47.778709,
+        47.778814,
+        47.778876,
+        47.796938,
+        47.796963,
+        47.796985,
+        47.797031,
+        47.797758,
+        47.816606,
+        47.816624,
+        47.835772,
+        47.8358,
+        47.835824,
+        47.836047,
+        47.83607,
+        47.836698,
+        47.856594,
+        47.85681,
+        47.856829,
+        47.856849,
+        47.878635,
+        47.878681,
+        47.898138,
+        47.898186,
+        47.898289,
+        47.898434,
+        47.919591,
+        47.919732,
+        47.919906,
+        47.919931,
+        47.919989,
+        47.93704,
+        47.937142,
+        47.937249,
+        47.961356,
+        47.961568,
+        47.961587,
+        47.961607,
+        47.961649,
+        47.962245,
+        47.976984,
+        47.977023,
+        47.996581,
+        47.996606,
+        47.996629,
+        47.996762,
+        47.996848,
+        48.016322,
+        48.016365,
+        48.038139,
+        48.038175,
+        48.038202,
+        48.038254,
+        48.038392,
+        48.038469,
+        48.056547,
+        48.056785,
+        48.056806,
+        48.056826,
+        48.079096,
+        48.079141,
+        48.079258,
+        48.079325,
+        48.098483,
+        48.098512,
+        48.09857,
+        48.098686,
+        48.098855,
+        48.11925,
+        48.119505,
+        48.119534,
+        48.119558,
+        48.136484,
+        48.136573,
+        48.136645,
+        48.161377,
+        48.161542,
+        48.161563,
+        48.161584,
+        48.161635,
+        48.161749
+      ],
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2274,
+          "median": 0.8936661964972463,
+          "p95": 5.288107639383929,
+          "maximum": 7.187317066609709,
+          "rms": 2.406973430080732
+        },
+        "velocity_error_m_s": {
+          "count": 2274,
+          "median": 0.4611795950091018,
+          "p95": 2.0248529415475893,
+          "maximum": 3.1406889375591294,
+          "rms": 0.9775293056511809
+        },
+        "attitude_error_deg": {
+          "count": 2274,
+          "median": 0.13922556491760973,
+          "p95": 10.387353867610091,
+          "maximum": 11.099521677760603,
+          "rms": 5.206709043054188
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 677,
+          "median": 11.052154999999786,
+          "p95": 22.15293259999704,
+          "maximum": 34.175061999997425,
+          "rms": 12.401304975882853
+        },
+        "velocity_fit_age_ms": {
+          "count": 633,
+          "median": 479.2918438997269,
+          "p95": 512.25617965842,
+          "maximum": 552.6813514932822,
+          "rms": 432.8441859139507
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.977714768663827,
+          "crossing_offset_width_down_m": [
+            -0.014693134534895843,
+            -0.08579127387561458
+          ],
+          "blind_time_to_crossing_s": 0.5197836786638241
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.53161167145138,
+          "crossing_offset_width_down_m": [
+            0.012104919952468212,
+            -0.0786210743474181
+          ],
+          "blind_time_to_crossing_s": 0.5083572774513776
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 38.66049059261141,
+          "crossing_offset_width_down_m": [
+            -0.03195989098888828,
+            -0.052754103067768135
+          ],
+          "blind_time_to_crossing_s": 0.46919100961140714
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": 50.53175097248089,
+          "crossing_offset_width_down_m": [
+            -1.874377611973773,
+            0.43431376728725274
+          ],
+          "blind_time_to_crossing_s": 1.470893724480888
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null
+        }
+      ],
+      "normal_replay": {
+        "calls": 22161,
+        "wire_commands": 2409,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 22161,
+        "wire_commands": 2409,
+        "exact_updates": true,
+        "corrupted_pose_packets": 15489,
+        "corrupted_navigation_packets": 15489,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 201977649,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "e52182c497b3d1d092437432fbb1fe8b0dbcaec3a8d1048488fada520a8d6c28",
+        "course-camera-imu.mp4": "5d8dbb85d22e7bf5d728c483b0354187b4163e87de8e7a5347fe55e2f05c11f5",
+        "input-independence.json": "03bbbcb2afd26dcccb5f58cf72228e968ec07e9413620a016684c259dd5e6e3e",
+        "protocol.json": "f9df24149720367c55545c6c90ca6c108a83b1ddbd0fafe5bff5dd0437e34f34",
+        "replay.json": "753e3a90f1f96c074a142140f47f4d60951c53b35c76bbebf5c44e8102117500",
+        "retention.json": "e3403423b56f2075b2d46ae2f0fc0f47eede97509431dfa90dffd3342bf3f8b6",
+        "score.json": "4a521c0f5947d41a64e536b61f25bb25cb58827b416f61676c56cd386c38bed1",
+        "state-errors.csv": "33dd4312a3255874b5c4fb7452bf39c8c38db984703ec5d7bca6e024d423deaa",
+        "video.json": "f5b9b2187b0dea441ff25ee87c6516fb6559b4e4245515c0d715f2df3a2879f0"
+      }
+    },
+    {
+      "name": "model-validation/validation-05",
+      "revision": "45a890f9f62b20896bde7896a5b06405456898bd",
+      "settings": {
+        "speed_m_s": 5.0,
+        "final_distance_m": 2.5,
+        "beyond_m": 4.0,
+        "stop_beyond_m": 1.0,
+        "lock_frames": 3,
+        "maximum_blind_s": 4.5,
+        "flight_timeout_s": 30.0,
+        "shift_right_m": -0.5,
+        "acquisition_close_gaps": true,
+        "acquisition_largest_rim": true,
+        "gates_to_pass": 6,
+        "handoff_distance_m": 5.0,
+        "lookahead_enabled": true,
+        "lookahead_start_m": 12.0,
+        "lookahead_interval_s": 0.1,
+        "lookahead_max_age_s": 2.0,
+        "lookahead_during_final": true,
+        "height_alignment": true,
+        "height_alignment_distance_m": 6.0,
+        "height_alignment_deadband_m": 0.4,
+        "camera_correction": true,
+        "camera_window_s": 1.0,
+        "continuous_course": true,
+        "sensor_interface": "public_camera_and_HIGHRES_IMU",
+        "joint_control": false,
+        "gate_return": false,
+        "finish_beyond_m": 0.0,
+        "course_timeout_s": 180.0,
+        "trace_limit_mib": 384,
+        "camera_position_min_side_px": 20.0,
+        "camera_velocity_min_side_px": 20.0,
+        "vertical_speed_limit_m_s": 3.0,
+        "startup_allowance_s": 8.0,
+        "visibility_height_change_m": 1.5,
+        "motion_prediction": "command_model",
+        "control_inputs": "camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state"
+      },
+      "native_taps_loaded": false,
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_completed": true,
+      "native_finish_time_s": 47.866950989,
+      "valid_race": true,
+      "passed_without_reset": true,
+      "controller_phase": "COMPLETE",
+      "controller_error": null,
+      "reset_calls_during_flight": 0,
+      "arm_calls": [
+        true,
+        false
+      ],
+      "continuous_imu_history": true,
+      "trace_sha256": "9f5bd7b2aa3a8f673925459ca52835d3661bae46f80c674b7fb561929fa813b8",
+      "collision_packets_count": 0,
+      "prearm_collision_packets_count": 0,
+      "in_flight_collision_packets_count": 0,
+      "flight_contact_times_after_arm_s": [],
+      "local_state_errors": {
+        "position_error_m": {
+          "count": 2136,
+          "median": 0.8969771096269509,
+          "p95": 3.8074565600978802,
+          "maximum": 5.148555277847165,
+          "rms": 1.5620292330030139
+        },
+        "velocity_error_m_s": {
+          "count": 2136,
+          "median": 0.2132006475036536,
+          "p95": 1.3112980346258583,
+          "maximum": 2.1825640531169235,
+          "rms": 0.5698661028162199
+        },
+        "attitude_error_deg": {
+          "count": 2136,
+          "median": 0.3660539763160488,
+          "p95": 0.5640726803383317,
+          "maximum": 0.9224915765188088,
+          "rms": 0.37318482731576025
+        }
+      },
+      "timing": {
+        "capture_to_output_ms": {
+          "count": 903,
+          "median": 9.534248999997885,
+          "p95": 22.264263099999937,
+          "maximum": 115.753619999996,
+          "rms": 12.927338750922232
+        },
+        "velocity_fit_age_ms": {
+          "count": 778,
+          "median": 483.0093479655062,
+          "p95": 508.64756485764815,
+          "maximum": 592.3967668148648,
+          "rms": 450.0326666557483
+        }
+      },
+      "gate_crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.148890711468344,
+          "crossing_offset_width_down_m": [
+            -0.010840578200734084,
+            -0.06323587104127602
+          ],
+          "blind_time_to_crossing_s": 0.542555089468344
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.467220956823454,
+          "crossing_offset_width_down_m": [
+            0.018819088689860458,
+            -0.07338561526732872
+          ],
+          "blind_time_to_crossing_s": 0.4887434388234517
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 37.06253107541975,
+          "crossing_offset_width_down_m": [
+            0.010766504290970598,
+            0.022535506715827536
+          ],
+          "blind_time_to_crossing_s": 0.4839467644197484
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 44.71217166509416,
+          "crossing_offset_width_down_m": [
+            0.10674321241962519,
+            0.008567741599687349
+          ],
+          "blind_time_to_crossing_s": 0.5381802830941567
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.771887912105846,
+          "crossing_offset_width_down_m": [
+            -0.1477419157941951,
+            -0.04508991018470566
+          ],
+          "blind_time_to_crossing_s": 0.5287822081058451
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 54.23044095741066,
+          "crossing_offset_width_down_m": [
+            0.04991687250300249,
+            -0.06968633159385001
+          ],
+          "blind_time_to_crossing_s": 0.35759360641065285
+        }
+      ],
+      "normal_replay": {
+        "calls": 21205,
+        "wire_commands": 2277,
+        "exact_updates": true
+      },
+      "poisoned_replay": {
+        "calls": 21205,
+        "wire_commands": 2277,
+        "exact_updates": true,
+        "corrupted_pose_packets": 14567,
+        "corrupted_navigation_packets": 14567,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 195004125,
+        "raw_recordings_retained": false
+      },
+      "artifact_sha256": {
+        "camera-errors.csv": "f55f2afcab702c985fdb0acaf6d48d8b5bb585425dc6b9d2e3e38f7534ab6807",
+        "course-camera-imu.mp4": "a83ea7c02801645061484e7aa2af8fbc827e5a2a0348dc97b36080b1a174a680",
+        "input-independence.json": "f390d72fd26200d635870d61976454b7b2c4183821d9258e35c7bb4e58046eec",
+        "protocol.json": "f9df24149720367c55545c6c90ca6c108a83b1ddbd0fafe5bff5dd0437e34f34",
+        "replay.json": "67f58b0317a6c44756d8c418e355f07a23289f09fb4c87dbef038108d11f5656",
+        "retention.json": "2eba115b0d67aceeddafa68ff9d3f09c70e3bfa46303f271dee434cde2bdae2c",
+        "score.json": "8273ced756f5eb48063823af0e0f7070c696aa23341d84c62888b9318d11ade6",
+        "state-errors.csv": "52ed9f33c655d35f3b09b1d40f1253de63aa7701842713ea391926c7fe084225",
+        "video.json": "26dd7acb8df08a331a6e1b2f07f27ec64d8298e4c4085977349afe25e7352ce7"
+      }
+    }
+  ],
+  "validation_summary": {
+    "trials": 5,
+    "native_valid_finishes": 3,
+    "strict_contact_free_passes": 2,
+    "native_finish_times_s": [
+      53.116577148,
+      52.800376892,
+      47.866950989
+    ],
+    "clean_runs": [
+      "model-validation/validation-02",
+      "model-validation/validation-05"
+    ],
+    "all_normal_replays_exact": true,
+    "all_poisoned_replays_exact": true,
+    "navigation_packets_falsified": 78971
+  },
+  "accepted_claim": "The public-sensor pilot has completed all six native VQ1 direct-arena gates with a valid finish and no in-flight reset. Repeatability is quantified by all five frozen trials below; contacts and unfinished runs are failures under the stricter acceptance check.",
+  "limitations": [
+    "Not under 10 seconds.",
+    "Not an official Training/Qualification event result.",
+    "Known red gates, known nominal size, camera calibration and fixed vehicle model; no general background-only VIO claim.",
+    "Local origin and yaw are a chosen gauge. Score uses one fixed yaw/origin alignment and no scale fit.",
+    "Position, velocity, attitude and gate depth/progress are estimates, not recovery of every arbitrary native field.",
+    "Raw public acceleration is replaced by command-model translation prediction after gate lock.",
+    "Capture-to-output age is estimated from public clocks; velocity fits have a delayed effective time.",
+    "Full-course contact-free reliability remains incomplete; all failures retained."
+  ],
+  "next_checkpoint": "Make height transitions contact-free on repeated unchanged flights, then reduce waiting/braking and increase speed without weakening the input boundary.",
+  "retention": {
+    "raw_trace_limit_mib": 384,
+    "raw_recordings_retained": false,
+    "local_root": "/Users/hawking/Desktop/stuff/miniflight/work/course-20261115",
+    "flight_videos": "Continuous recorded camera streams with image tracking overlays; no cuts between gates. Scorer counters are postflight overlays.",
+    "original_scores_preserved": true,
+    "temporary_bytes_removed_across_campaign": 3526096023
+  },
+  "deliverables": {
+    "clean_flight_video": "/Users/hawking/Desktop/stuff/miniflight/work/course-20261115/model-validation/validation-05/course-camera-imu.mp4",
+    "video_sha256": "a83ea7c02801645061484e7aa2af8fbc827e5a2a0348dc97b36080b1a174a680",
+    "video_probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 640,
+          "height": 408,
+          "r_frame_rate": "30/1",
+          "duration": "42.700000",
+          "nb_frames": "1281"
+        }
+      ]
+    },
+    "video_decode_exit_code": 0,
+    "video_frame_count_note": "Recorder requested 1282 frames; the H264 stream contains 1281 frames (42.7s). Finish time and success are scored independently from native race records.",
+    "tracking_contact_sheet": "/Users/hawking/Desktop/stuff/miniflight/work/course-20261115/model-validation/validation-05/six-gates.png"
+  }
+}
