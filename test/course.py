@@ -10,12 +10,25 @@ from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
 from target.aigp.experiments.camera_imu.motion import GateMotion
 from target.aigp.experiments.camera_imu import vision
-from target.aigp.experiments.camera_imu.gravity import vertical_planes,fit_down
+from target.aigp.experiments.camera_imu.gravity import vertical_planes,fit_down,GateGravity
 from target.aigp.experiments.camera_imu.score import scored_gate_passes, armed_contacts
 import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_visual_gravity_correction_is_bounded_and_needs_support(self):
+        from scipy.spatial.transform import Rotation
+        camera=Rotation.from_euler('y',-20.,degrees=True).as_matrix() @ vision.CAMERA_FROM_BODY.T
+        points=np.array([[4.,-.75,-.75],[4.,.75,-.75],[4.,.75,.75],[4.,-.75,.75]])
+        projected=points @ camera @ vision.K.T;corners=projected[:,:2]/projected[:,2,None]
+        biased=Rotation.from_euler('y',2.2,degrees=True).as_matrix() @ camera
+        observer=GateGravity()
+        for i in range(4):self.assertIsNone(observer.observe(i*.05,corners,biased,.1,1))
+        correction,data=observer.observe(.2,corners,biased,.1,1)
+        self.assertAlmostEqual(data['correction_deg'],.15)
+        self.assertAlmostEqual(Rotation.from_matrix(correction.as_matrix() @ biased @ camera.T).magnitude(),np.radians(2.05))
+        self.assertIsNone(observer.observe(.25,corners,biased,.8,1))
+
     def test_upright_edges_recover_a_gyro_tilt_error(self):
         from scipy.spatial.transform import Rotation
         points=np.array([[8.,-.75,-.75],[8.,.75,-.75],[8.,.75,.75],[8.,-.75,.75]])
