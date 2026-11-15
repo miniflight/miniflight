@@ -19,7 +19,8 @@ class GateController(joint.GateController):
         if self.phase is not sensors.Phase.TRACKING:return super().drive(target)
         now=self.inertial.time
         if self.hold is None:
-            self.hold=self.inertial.position.copy();self.hold[2]-=.75;self.started=now
+            if self.gate_remaining()>10.:return super().drive(target)
+            self.hold=self.inertial.position.copy();self.started=now
         if now-self.started>75.:raise TimeoutError('thrust excitation did not settle in75s')
         error=np.linalg.norm(self.inertial.position-self.hold);speed=np.linalg.norm(self.inertial.velocity)
         fresh=now-self.measurement_time()<.2
@@ -35,6 +36,7 @@ class GateController(joint.GateController):
         applied=active and error<=1.5 and speed<=3. and fresh
         self.signal['excitation']=dict(index=self.index,phase='pulse' if active else 'recover',applied=bool(applied),
             collective=level if active else None,duration_s=duration,hold_error_m=float(error),speed_m_s=float(speed),image_fresh=bool(fresh))
+        self.signal['target']=self.hold.tolist()
         request=sensors.GateController.drive(self,self.hold)
         return BodyRates(request.roll_rate,request.pitch_rate,request.yaw_rate,level) if applied else request
 
