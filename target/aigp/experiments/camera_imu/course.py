@@ -136,6 +136,7 @@ class GateController(base.GateController):
                     advance=base.SETTINGS['height_alignment_distance_m'] if self.gate_remaining()>braking else 0.
                     target=self.inertial.position+advance*self.direction
                     target[2]=self.inertial.position[2]+correction
+                    self.signal.update(target=target.tolist(),alignment_height_step=correction)
                     self.signal['visibility_alignment']=True
                     self.signal['alignment_relative_gate']=relative.tolist()
                     return base.single.GateController.drive(self,target)
@@ -200,7 +201,9 @@ class Controller(base.single.BaseController):
 
     def update(self,telemetry,frames,race_state):
         command=self.motor.update(telemetry,frames,None)
-        if command is not None:self.gate.motor_outputs=command.outputs
+        if command is not None:
+            self.gate.motor_outputs=command.outputs
+            self.gate.signal.update(gyro=self.motor.gyro,rate_request=self.motor.rate_request,rate_integral=self.motor.integral)
         return command
 
 

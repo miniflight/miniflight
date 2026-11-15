@@ -69,7 +69,7 @@ def score(root):
                 message, = common.MAVLink(None).parse_buffer(base64.b64decode(packet["wire"]))
                 accepted.add(message.get_type())
             if row.get("signals"):
-                signal = row["signals"]
+                signal = dict(row["signals"],motor_commands=(row.get('command') or {}).get('outputs'))
                 assert not signal["motion_available"] and not signal["attitude_available"]
                 ticks.append(signal)
                 observed = signal.get("camera_observation")
@@ -83,7 +83,8 @@ def score(root):
     if settings.get('continuous_course'):
         import gzip
         fields=('phase','imu_time','image_id','image_time','position','velocity','camera_orientation','gate_center','remaining_m','target',
-                'gate_number','estimated_gates_passed','visibility_alignment','alignment_relative_gate','alignment_hint','search_hint','camera_observation')
+                'gate_number','estimated_gates_passed','visibility_alignment','alignment_relative_gate','alignment_hint','search_hint','camera_observation',
+                'motor_commands','alignment_height_step','gyro','rate_request','rate_integral')
         with gzip.open(root/'control.jsonl.gz','wt') as stream:
             for tick in ticks:
                 stream.write(json.dumps({key:tick[key] for key in fields if key in tick},separators=(',',':'))+'\n')
@@ -189,6 +190,12 @@ def score(root):
                 position_error_m=float(np.linalg.norm(estimated-actual)),
                 velocity_error_m_s=float(np.linalg.norm(local_to_native @ tick['velocity']-velocity)),
                 attitude_error_deg=float(np.degrees(Rotation.from_matrix(body.T @ actual_body).magnitude()))))
+            for name,values in [('estimated_position',estimated),('native_position',actual),
+                                ('estimated_velocity',local_to_native @ tick['velocity']),('native_velocity',velocity)]:
+                rows[-1].update({f'{name}_{axis}':float(value) for axis,value in zip('ned',values)})
+            for name,rotation in [('estimated_attitude',body),('native_attitude',actual_body)]:
+                rows[-1].update({f'{name}_{axis}_deg':float(value) for axis,value in
+                    zip(('roll','pitch','yaw'),Rotation.from_matrix(rotation).as_euler('xyz',degrees=True))})
         with (root/'state-errors.csv').open('w') as stream:
             writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
         result['local_state_errors']={key:statistics([row[key] for row in rows]) for key in ['position_error_m','velocity_error_m_s','attitude_error_deg']}
