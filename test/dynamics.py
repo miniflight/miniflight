@@ -1,0 +1,26 @@
+import gzip,json,tempfile,unittest
+from pathlib import Path
+import numpy as np
+from target.aigp.experiments.camera_imu.dynamics_inputs import export
+from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
+
+
+class PublicCalibrationTest(unittest.TestCase):
+    def test_fused_or_native_motion_cannot_change_the_exported_inputs(self):
+        rows=[dict(imu_time=1.,camera_orientation=np.eye(3).tolist(),motor_commands=[.25]*4,gate_number=1,
+            camera_observation=dict(image_id=7,capture_time=1.,corners=[[0,0],[1,0],[1,1],[0,1]]),
+            position=[999,999,999],velocity=[999]*3,native_position=[999]*3)]
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'control.gz'
+            def write():
+                with gzip.open(source,'wt') as stream:stream.write(json.dumps(rows[0])+'\n')
+            write();export(source,root/'first.npz');first=load(root/'first.npz')
+            rows[0].update(position=[-999]*3,velocity=[-999]*3,native_position=[-999]*3)
+            write();export(source,root/'second.npz');second=load(root/'second.npz')
+            for field in FIELDS:np.testing.assert_array_equal(first[field],second[field])
+
+    def test_fitter_rejects_added_reference_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'bad.npz';data={k:np.zeros(1) for k in FIELDS};data['native_velocity']=np.zeros(3)
+            np.savez(path,**data)
+            with self.assertRaisesRegex(ValueError,'public-data schema'):load(path)
