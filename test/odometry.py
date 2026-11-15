@@ -37,6 +37,31 @@ class IntegralTest(unittest.TestCase):
 
 
 class JointTest(unittest.TestCase):
+    def test_new_landmarks_follow_their_birth_camera_pose(self):
+        import cv2
+        request,world = self.problem()
+        k = np.array(request['intrinsics'])
+        positions = [np.array([.5*.6*t*t,0.,1.5+2*t]) for t in np.arange(5)*.1]
+        rotations = [cv2.Rodrigues(np.array([0.,0.,.02*i/4]))[0] for i in range(5)]
+        camera = (world[8:]-positions[1]) @ rotations[1].T
+        request['rays'][8:] = (camera/camera[:,2:]).tolist()
+        request['depths'][8:] = np.log(camera[:,2]*1.1).tolist()
+        request['depth_prior'] = list(request['depths'])
+        request['landmark_anchors'] = [-1]*8+[1]*8
+        request['fixed_anchor'] = True
+        for i,frame in enumerate(request['frames']):
+            if not i:
+                continue
+            camera = (world-positions[i]) @ rotations[i].T
+            h = camera @ k.T
+            frame['pixels'] = (h[:,:2]/h[:,2:]).tolist()
+        result = solve_window(request,check_jacobian=True)
+        self.assertLess(result['jacobian_check_error'],1e-4)
+        self.assertTrue(result['finite'])
+        np.testing.assert_allclose(np.array(result['states'])[-1,:3],positions[-1],atol=.07)
+        np.testing.assert_allclose(np.array(result['states'])[-1,3:6],[.24,0.,2.],atol=.08)
+        self.assertLess(np.mean(abs(np.exp(result['depths'][8:])/((world[8:]-positions[1]) @ rotations[1].T)[:,2]-1)),.04)
+
     def test_metric_initialization_stays_anchored(self):
         request, world = self.problem()
         request['fixed_anchor'] = True

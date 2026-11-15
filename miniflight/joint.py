@@ -18,6 +18,8 @@ def solve_window(request, check_jacobian=False):
     image residuals only. Version 1 remains for replaying earlier experiments.
     Optional gate_pixels observe a static gate_world learned during camera
     initialization. fixed_anchor_position leaves the initial velocity adjustable.
+    landmark_anchors select a birth-camera state for each ray, or -1 for the
+    original fixed world origin. Birth pose and landmark depth can move together.
     """
     started = time.perf_counter()
     k = np.array(request['intrinsics'])
@@ -30,6 +32,9 @@ def solve_window(request, check_jacobian=False):
     gravity = np.array(request['gravity'])
     anchor = np.array(request['anchor'])
     count, landmarks = len(states), len(rays)
+    anchors = np.array(request.get('landmark_anchors',[-1]*landmarks),dtype=int)
+    if anchors.shape != (landmarks,) or np.any(anchors < -1) or np.any(anchors >= count):
+        raise ValueError('landmark birth camera is outside the state window')
     world_force = request.get('model_version', 1) >= 2
     anchor_velocity_sigma = request.get('anchor_velocity_sigma', .1)
     columns = count*9+landmarks
@@ -58,11 +63,21 @@ def solve_window(request, check_jacobian=False):
         edge_data.append((i, j, dt, np.array(edge['dv']), np.array(edge['dp']),
                           np.linalg.inv(np.linalg.cholesky(covariance))))
 
+    def world_points(state, depths, rotations):
+        local = rays*depths[:, None]
+        directions = local.copy()
+        world = local.copy()
+        for birth in np.unique(anchors[anchors >= 0]):
+            ids = np.flatnonzero(anchors == birth)
+            directions[ids] = local[ids] @ rotations[birth]
+            world[ids] = directions[ids]+state[birth,:3]
+        return world,directions,local
+
     def residual(value):
         state = value[:count*9].reshape(count, 9)
         depths = np.exp(value[count*9:])
-        world = rays*depths[:, None]
         rotations = [cv2.Rodrigues(s[6:9])[0] for s in state]
+        world,_,_ = world_points(state,depths,rotations)
         errors = []
         for i, (ids, pixels, sigma) in enumerate(frame_data):
             if not len(pixels):
@@ -84,13 +99,14 @@ def solve_window(request, check_jacobian=False):
 
     def jacobian(value):
         state = value[:count*9].reshape(count, 9)
-        world = rays*np.exp(value[count*9:])[:, None]
+        rotations,derivatives = zip(*(cv2.Rodrigues(s[6:9]) for s in state))
+        world,directions,local = world_points(state,np.exp(value[count*9:]),rotations)
         result = np.zeros((total_rows, columns))
         row = 0
         for i, (ids, pixels, sigma) in enumerate(frame_data):
             if not len(pixels):
                 continue
-            rotation, derivative = cv2.Rodrigues(state[i, 6:9])
+            rotation, derivative = rotations[i], derivatives[i]
             observed = np.vstack((world[ids], gate_world)) if len(pixels) > len(ids) else world[ids]
             relative = observed-state[i, :3]
             camera = relative @ rotation.T
@@ -99,12 +115,20 @@ def solve_window(request, check_jacobian=False):
             dr = derivative.reshape(3, 3, 3)
             camera_rotation = np.array([relative @ d.T for d in dr])
             rotation_jacobian = np.einsum('nij,knj->nik', projection, camera_rotation)
-            depth_jacobian = np.einsum('nij,nj->ni', projection[:len(ids)] @ rotation, world[ids])
+            depth_jacobian = np.einsum('nij,nj->ni', projection[:len(ids)] @ rotation, directions[ids])
             n = len(pixels)*2
             result[row:row+n, i*9:i*9+3] = position_jacobian.reshape(-1, 3)
             result[row:row+n, i*9+6:i*9+9] = rotation_jacobian.reshape(-1, 3)
             for point_index, point in enumerate(ids):
-                result[row+point_index*2:row+point_index*2+2, count*9+point] = depth_jacobian[point_index]
+                rows = slice(row+point_index*2,row+point_index*2+2)
+                result[rows, count*9+point] = depth_jacobian[point_index]
+                birth = anchors[point]
+                if birth >= 0:
+                    project_world = projection[point_index] @ rotation
+                    result[rows,birth*9:birth*9+3] += project_world
+                    dr = derivatives[birth].reshape(3,3,3)
+                    direction_jacobian = np.column_stack([d.T @ local[point] for d in dr])
+                    result[rows,birth*9+6:birth*9+9] += project_world @ direction_jacobian
             row += n
         for i in range(count):
             result[row:row+3, i*9+6:i*9+9] = np.eye(3)/np.radians(1.)
@@ -158,7 +182,9 @@ def solve_window(request, check_jacobian=False):
     depths = fit.x[count*9:]
     last_ids, last_pixels, _ = frame_data[-1]
     last_pixels = last_pixels[:len(last_ids)]
-    camera = (rays[last_ids]*np.exp(depths[last_ids, None])-state[-1, :3]) @ cv2.Rodrigues(state[-1, 6:9])[0].T
+    rotations = [cv2.Rodrigues(s[6:9])[0] for s in state]
+    world,_,_ = world_points(state,np.exp(depths),rotations)
+    camera = (world[last_ids]-state[-1, :3]) @ rotations[-1].T
     h = camera @ k.T
     rms = float(np.sqrt(np.mean((h[:, :2]/h[:, 2:]-last_pixels)**2)))
     c = .8/.3
