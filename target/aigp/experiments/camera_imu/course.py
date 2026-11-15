@@ -231,6 +231,8 @@ def execute(calls,record,path,reader=None,client=None):
             raise TimeoutError('sensor-only course deadline exceeded')
         if ready is None or now<ready:
             return None
+        if now-ready>5. and controller.controller.gate.inertial.rotation is None:
+            raise TimeoutError('public IMU initialization exceeded five seconds')
         feedback=state.rate_feedback
         if cleanup.arm_phase is ArmPhase.ARM_REQUESTED and (feedback is None or now-feedback.received_at>.3):
             reason='IMU stream stopped'
