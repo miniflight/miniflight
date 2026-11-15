@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": "thrust-response-20261116/train-05",
+  "source_revision": "f749b70e834323eabc5c22a3465f33cc7a8ea149",
+  "model_sha256": "65a824eaa20ae011dd53cc3ea54cf09554b94bb83d970738abdf6f1b0b2618d7",
+  "expected_thrust_curve": [
+    17.957933783450514,
+    65.12082062981247
+  ],
+  "inputs": "Public IMU/gyro, own commands, measured image corners and own collection/association flags. No native pose, geometry, actuator state or race counter. No images or videos.",
+  "controls": "Only motor commands, image IDs/epochs, full-image epochs and own pulse metadata are retained. Fused states are removed.",
+  "files": {
+    "public-inputs.npz": {
+      "sha256": "2da7141449bbb6aa959891514b598917ea50e9e5fd4a1daa4573ccbda29427f6",
+      "bytes": 442472
+    },
+    "public-observations.jsonl.gz": {
+      "sha256": "60adf877bfca454d414a253b78183266ff633fd37695881b67c320dade7db8cb",
+      "bytes": 341745
+    },
+    "control.jsonl.gz": {
+      "sha256": "7f8a0ae9ca2e8cfcb76a903fe028b7d501f37590daf32da28525ba5314f811c0",
+      "bytes": 185291
+    }
+  }
+}

@@ -128,7 +128,7 @@ def run(source,output,prior,frozen=None):
     fig,ax=plt.subplots(2,3,figsize=(14,8),layout='constrained')
     for a,r in zip(ax.flat,w):
         for th,label in [(baseline,'old'),(theta,'camera fit')]:
-            pre=r['pre'];state=np.linalg.lstsq(r['B'][pre],r['y'][pre]-r['X'][pre] @ th,rcond=None)[0];prediction=r['X'] @ th+r['B'] @ state-r['y']+r['position'];a.plot(r['time']-r['start'],prediction,label=label)
+            pre=r['pre'];state=np.linalg.lstsq(r['B'][pre],r['y'][pre]-r['X'][pre] @ th,rcond=None)[0];prediction=r['X'] @ th+r['B'] @ state-r['y']+r['position'];a.plot(r['time']-r['start'],prediction,label='frozen model' if frozen is not None and label=='camera fit' else label)
         a.plot(r['time']-r['start'],r['position'],'.',label='known-size pixels + gyro');a.set_title(f"pulse{r['pulse']}, command{r['level']}");a.set(xlabel='Since pulse[s]',ylabel='Gate-relative down position[m]');a.grid(alpha=.2);a.legend(fontsize=7)
     fig.suptitle('Frozen public camera response prediction | initial state from pre-pulse images only');fig.savefig(output/'camera-response.png',dpi=130);plt.close(fig)
     print(json.dumps(dict(parameters=theta.tolist(),candidate=report['candidate'],baseline=report['baseline'],accepted=report.get('accepted')),indent=2));return report

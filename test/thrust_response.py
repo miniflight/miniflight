@@ -7,6 +7,21 @@ from target.aigp.experiments.camera_imu import thrust_control,sensors
 
 
 class ThrustResponseTest(unittest.TestCase):
+    def test_recorded_public_fixture_reproduces_the_frozen_curve(self):
+        import hashlib,gzip
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.thrust_response import windows,fit_parameters
+        root=Path(__file__).parents[1];source=Path(__file__).parent/'fixtures/thrust_response'
+        manifest=json.loads((source/'manifest.json').read_text())
+        for name,item in manifest['files'].items():
+            self.assertEqual(hashlib.sha256((source/'training'/name).read_bytes()).hexdigest(),item['sha256'])
+        with gzip.open(source/'training/control.jsonl.gz','rt') as h:
+            for row in map(json.loads,h):self.assertLessEqual(set(row),{'image_id','image_time','full_image_time','motor_commands','excitation'})
+        w,_=windows(source/'training',root/'target/aigp/experiments/camera_imu/dynamics.model.json')
+        self.assertEqual(len(w),6)
+        theta=fit_parameters(np.concatenate([r['design'] for r in w]),np.concatenate([r['target'] for r in w]))
+        np.testing.assert_allclose(theta,manifest['expected_thrust_curve'],atol=1e-8)
+
     def test_collection_finish_is_not_a_gate_crossing(self):
         from target.aigp.experiments.camera_imu import controller
         c=object.__new__(controller.GateController);c.pending=[];c.completed=[];c.phase=sensors.Phase.TRACKING
