@@ -58,7 +58,8 @@ def score(root):
                 observed = signal.get("camera_observation")
                 if observed is not None and observed["image_id"] != previous_image:
                     previous_image = observed["image_id"]
-                    observations.append(dict(observed, capture_to_output_s=row["host_time"]-host_offset-observed["capture_time"]))
+                    age = row['host_time']-host_offset-observed['capture_time'] if host_offset is not None else signal['imu_time']-observed['capture_time']
+                    observations.append(dict(observed,gate_number=signal.get('gate_number',1),capture_to_output_s=age))
         elif row["event"] == "result":
             outcomes.append(row)
     assert accepted <= ALLOWED
@@ -77,11 +78,15 @@ def score(root):
     handoffs = [tick for tick in ticks if tick["phase"] == "HANDOFF"]
     result = dict(controller_error=outcomes[-1]["error"], controller_phase=outcomes[-1]["phase"],
         native_gates_passed=max((state["active_gate_index"] for state in race), default=0),
-        valid_race=outcomes[-1]["race"]["valid"], collision_packets=collisions,
+        valid_race=bool(race and all(state['valid'] for state in race if state['started'])), collision_packets=collisions,
         reset_calls_during_flight=resets, arm_calls=arms, native_pose_clock_regressions=clock_regressions,
         controller_packet_types=sorted(accepted), filtered_packets=outcomes[-1]["filtered_packets"],
         continuous_imu_history=len(histories) == 1, handoff_time_s=handoffs[0]["imu_time"] if handoffs else None,
         trace_sha256=hashlib.sha256(path.read_bytes()).hexdigest(), gates=[])
+    result.update(native_completed=any(state['completed'] for state in race),
+        native_finish_time_s=next((state['finish_time_seconds'] for state in race if state['completed']),None),
+        estimated_gates_passed=outcomes[-1].get('final_signal',{}).get('estimated_gates_passed',0),
+        termination=outcomes[-1].get('termination'))
     for number, opening in enumerate(openings, 1):
         center = opening.mean(axis=0)
         width, vertical = opening[1]-opening[0], opening[3]-opening[0]
@@ -127,7 +132,8 @@ def score(root):
     if requested == 2 and result["passed_without_reset"]:
         result["time_between_crossings_s"] = result["gates"][1]["crossing_imu_time_s"]-result["gates"][0]["crossing_imu_time_s"]
     if settings.get("camera_correction"):
-        result["estimation"] = score_estimates(root, p, approach, openings[0].mean(axis=0), local_to_native, observations)
+        result["estimation"] = score_estimates(root, p, approach, openings.mean(axis=1), local_to_native, observations)
+        result['estimation']['capture_age_uses_estimated_sensor_clock']=settings.get('continuous_course',False)
     (root/"score.json").write_text(json.dumps(result, indent=2)+"\n")
     print(json.dumps(result, indent=2))
     return result

@@ -344,7 +344,8 @@ class GateController(BaseController):
         remaining = float((self.anchor-p) @ self.direction)
         if self.phase is Phase.TRACKING and remaining <= SETTINGS["final_distance_m"]:
             self.phase, self.final_at = Phase.FINAL_IMU, now
-        if remaining < -SETTINGS["stop_beyond_m"]:
+        stop_beyond=SETTINGS.get('finish_beyond_m',SETTINGS['stop_beyond_m']) if getattr(self,'gate_number',1)==SETTINGS.get('gates_to_pass',1) else SETTINGS['stop_beyond_m']
+        if remaining < -stop_beyond:
             self.phase = Phase.COMPLETE
             raise StopIteration
         if now-self.began > SETTINGS["flight_timeout_s"]:

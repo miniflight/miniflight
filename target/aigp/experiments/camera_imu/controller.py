@@ -32,7 +32,7 @@ class GateController(single.GateController):
         self.lookahead_scan_at = -float("inf")
 
     def observe_ahead(self, frame, stamp, position, rotation):
-        if self.gate_number != 1 or not SETTINGS["lookahead_enabled"] or self.locked is None:
+        if self.gate_number >= SETTINGS["gates_to_pass"] or not SETTINGS["lookahead_enabled"] or self.locked is None:
             return
         if (self.anchor-position) @ self.direction > SETTINGS["lookahead_start_m"]:
             return
@@ -114,12 +114,17 @@ class GateController(single.GateController):
             self.last_image_time = self.last_image_id = None
             self.last_corners = self.last_gate_corners = None
             self.final_at = self.began = None
+            if SETTINGS.get('continuous_course'):
+                self.camera_motion.observations.clear()
+                self.camera_fusion_started=False
+                self.camera_observation=None
             self.signal = dict(phase="HANDOFF", imu_time=self.inertial.time,
                 position=self.inertial.position.tolist(), velocity=self.inertial.velocity.tolist(),
                 target=self.handoff_target.tolist(), camera_orientation=self.inertial.rotations[-1].tolist(),
                 shift_displacement=self.shift_displacement.tolist(), motion_available=False, attitude_available=False)
             handoff_target = self.handoff_target
-            if self.lookahead_count >= SETTINGS["lock_frames"]:
+            fresh = self.lookahead is not None and self.inertial.time-self.lookahead['time'] <= SETTINGS['lookahead_max_age_s']
+            if self.lookahead_count >= SETTINGS["lock_frames"] and (fresh or not SETTINGS.get('continuous_course')):
                 observed = self.lookahead
                 self.anchor = observed["center"].copy()
                 self.direction = (self.anchor-self.inertial.position)*[1, 1, 0]
@@ -137,8 +142,16 @@ class GateController(single.GateController):
                 self.phase = single.Phase.TRACKING
                 handoff_target = self.anchor+SETTINGS["beyond_m"]*self.direction
                 self.signal["target"] = handoff_target.tolist()
+            elif SETTINGS.get('continuous_course') and self.lookahead is not None:
+                observed=self.lookahead
+                self.previous=(observed['position'],observed['rotation'],observed['corners'],observed['pose'])
             request = self.drive(handoff_target)
-        if self.gate_number == 1 and self.phase is single.Phase.FINAL_IMU and SETTINGS["lookahead_during_final"]:
+            if SETTINGS.get('continuous_course'):
+                self.lookahead=None
+                self.lookahead_centers,self.lookahead_frames=[],[]
+                self.lookahead_count=0
+                self.lookahead_scan_at=-float('inf')
+        if self.gate_number < SETTINGS['gates_to_pass'] and self.phase is single.Phase.FINAL_IMU and SETTINGS["lookahead_during_final"]:
             for frame in ahead_frames:
                 stamp = frame.time_ns*1e-9
                 pose = self.inertial.camera_pose(stamp)
@@ -156,8 +169,8 @@ class GateController(single.GateController):
                 self.signal["lookahead"] = dict(count=self.lookahead_count, image_id=self.lookahead["frame"],
                     image_time=self.lookahead["time"], center=self.lookahead["center"].tolist(),
                     image_corners=self.lookahead["corners"].tolist())
-        if self.gate_number == 2 and self.locked is not None and self.inertial.time-self.last_image_time > SETTINGS["lookahead_max_age_s"]:
-            raise TimeoutError("second gate image exceeded the lookahead freshness interval")
+        if self.gate_number >= 2 and self.locked is not None and self.inertial.time-self.last_image_time > SETTINGS["lookahead_max_age_s"]:
+            raise TimeoutError("gate image exceeded the lookahead freshness interval")
         return request
 
 

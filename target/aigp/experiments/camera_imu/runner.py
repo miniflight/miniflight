@@ -70,11 +70,33 @@ def reset(reader, path):
             client.disconnect()
 
 
+def reset_ack(path):
+    """Reset using transport acknowledgements, without reading native race state."""
+    with recording(path,dict(process='sensor_reset_ack')) as record:
+        calls=Calls(record);client=ResetClient(calls,camera_port=None);heartbeat=HeartbeatCadence()
+        client.open();requested=-float('inf');deadline=time.monotonic()+120
+        try:
+            while time.monotonic()<deadline:
+                packets=client.poll(.02);now=time.monotonic();heartbeat.send_if_due(client,now)
+                if client.connected and now-requested>=1.:
+                    client.reset();requested=now
+                for packet in packets:
+                    message=packet.data
+                    if message.get_type()=='COMMAND_ACK' and message.command==31000:
+                        if message.result!=0:raise RuntimeError('native reset rejected')
+                        return
+            raise TimeoutError('reset was not acknowledged')
+        finally:client.disconnect()
+
+
 def signals(controller):
     return controller.gate.signal
 
 
 def execute(calls, record, path, reader=None, producer=None, camera=None, client=None):
+    if SETTINGS.get('continuous_course'):
+        from .course import execute as sensor_execute
+        return sensor_execute(calls,record,path,reader,client)
     if client is None:
         client = SensorClient(calls, producer_read=producer, camera_clock=camera, record_camera=True)
     controller_type = Controller
@@ -115,6 +137,7 @@ def replay(path, poison=False):
     SETTINGS['joint_initialization'] = metadata['settings'].get('joint_initialization','linear')
     SETTINGS['joint_initialization_shadow'] = metadata['settings'].get('joint_initialization_shadow',False)
     SETTINGS['gate_return'] = metadata['settings'].get('gate_return',False)
+    SETTINGS['continuous_course'] = metadata['settings'].get('continuous_course',False)
     updates = [row for row in map(json.loads, path.open()) if row["event"] == "update"]
     outcomes = [row for row in map(json.loads, path.open()) if row["event"] == "result"]
     decoder = mavlink.MAVLink(None)
@@ -146,6 +169,8 @@ def replay(path, poison=False):
                     for race in row.get("result", []):
                         race["gate_centers"] = [[9999., -9999., 9999.]]*len(race.get("gate_centers", []))
                         race["active_gate_index"] = 0
+                        if SETTINGS.get('continuous_course'):
+                            race.update(started=False,valid=False,completed=True,time_seconds=-123.,finish_time_seconds=-456.)
                 if row["name"] == "send" and "error" not in row:
                     if len(outgoing) != 1:
                         raise AssertionError("send does not own one outgoing packet")
@@ -154,7 +179,11 @@ def replay(path, poison=False):
                 yield row
     recorded = iter(rows())
     calls = Calls(rows=recorded)
-    client = SensorClient(calls, record_camera=True)
+    if SETTINGS.get('continuous_course'):
+        from .course import WireClient
+        client=WireClient(calls,record_camera=True)
+    else:
+        client = SensorClient(calls, record_camera=True)
     def compare_updates(**row):
         if row.get("event") == "update":
             expected = updates.pop(0)
@@ -170,7 +199,7 @@ def replay(path, poison=False):
     compared = json.loads(json.dumps(outcome))
     if expected["final_signal"] is not None:
         compared["final_signal"] = {key: compared["final_signal"][key] for key in expected["final_signal"]}
-    if poison:
+    if poison and compared['race'] is not None:
         compared["race"]["gate_centers"] = expected["race"]["gate_centers"]
         compared["race"]["active_gate_index"] = expected["race"]["active_gate_index"]
     assert compared == expected, (compared, expected)
@@ -219,7 +248,10 @@ def live(root, shift):
                 subprocess.run([native.wine_commands()[0], str(binaries/"load.exe"), "Z:"+str(dll)], env=environment, timeout=40, check=True)
             with closing(Tap(root/"imu.bin")) as tap, closing(CameraClock(root/"events.bin")) as camera:
                 tap.wait_for_producer(process)
-                reset(reader, root/"reset.jsonl")
+                if SETTINGS.get('continuous_course'):
+                    reset_ack(root/'reset.jsonl')
+                else:
+                    reset(reader, root/"reset.jsonl")
                 time.sleep(.75)
                 bounds = tap.calibrate()
                 (root/"clock.json").write_text(json.dumps(dict(bounds=bounds, frequency=tap.frequency), indent=2)+"\n")
@@ -235,8 +267,8 @@ def live(root, shift):
                         nonlocal count
                         record(**row)
                         count += 1
-                        if count % 64 == 0 and (root/"flight.jsonl").stat().st_size > 128*1024**2:
-                            raise RuntimeError("temporary flight trace exceeded 128 MiB")
+                        if count % 64 == 0 and (root/"flight.jsonl").stat().st_size > SETTINGS.get('trace_limit_mib',128)*1024**2:
+                            raise RuntimeError("temporary flight trace exceeded its size limit")
                     outcome, _ = execute(Calls(bounded_record), bounded_record, root/"native.jsonl", reader, producer, camera.read)
                     print(json.dumps(outcome), flush=True)
     finally:
@@ -246,6 +278,12 @@ def live(root, shift):
     if SETTINGS.get('joint_control'):
         from .joint_score import score as score_joint
         scored = score_joint(root)
+    elif SETTINGS.get('continuous_course'):
+        from .score import score as score_course
+        scored=score_course(root)
+        if any(gate.get('first_lock_time_s') is not None for gate in scored['gates']):
+            from .video import render
+            render(root)
     result = replay(root/"flight.jsonl")
     (root/"replay.json").write_text(json.dumps(result, indent=2)+"\n")
     print("replay", json.dumps(result), flush=True)
@@ -255,13 +293,19 @@ def live(root, shift):
     return score(root)
 
 
-def one(root, shift):
+def one(root, shift, course_gates=None, speed=2.):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     root.mkdir(parents=True)
     original = dict(SETTINGS)
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
                     beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
+    if course_gates is not None:
+        SETTINGS.update(continuous_course=True,sensor_interface='public_camera_and_HIGHRES_IMU',
+            gates_to_pass=course_gates,speed_m_s=speed,joint_control=False,gate_return=False,
+            beyond_m=4.,finish_beyond_m=0.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
+            lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
+            control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
@@ -276,7 +320,8 @@ def one(root, shift):
                 raise
             finally:
                 for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
-                             "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png", "gate-return.json"):
+                             "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png", "gate-return.json",
+                             'course-camera-imu.mp4','video.json'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
@@ -288,7 +333,7 @@ def one(root, shift):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("build", "one", "joint", "live", "replay", "score", "video"))
+    parser.add_argument("mode", choices=("build", "one", "joint", "course", "live", "replay", "score", "video"))
     parser.add_argument("path", type=Path, nargs="?")
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument("--poison", action="store_true")
@@ -296,11 +341,17 @@ def main():
     parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
     parser.add_argument('--init-shadow',action='store_true')
     parser.add_argument('--gate-return',action='store_true')
+    parser.add_argument('--gates',type=int,choices=range(1,7),default=6)
+    parser.add_argument('--speed',type=float,default=2.)
     args = parser.parse_args()
     if args.mode == "build":
         print(build())
     elif args.path is None:
         parser.error("live, replay, score and video require a path")
+    elif args.mode=='course':
+        if not 0<args.speed<=4.:parser.error('course speed must be in (0,4]m/s')
+        if not one(args.path.resolve(),args.shift,args.gates,args.speed)['passed_without_reset']:
+            raise SystemExit(1)
     elif args.mode == 'joint':
         SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign,
             joint_initialization=args.joint_init,joint_initialization_shadow=args.init_shadow,gate_return=args.gate_return)

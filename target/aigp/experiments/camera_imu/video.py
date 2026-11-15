@@ -42,6 +42,9 @@ def draw_measured(image, corners, color):
 
 def render(root):
     path = root/"flight.jsonl"
+    settings=json.loads(path.open().readline())['metadata']['settings']
+    course=settings.get('continuous_course',False)
+    total=settings.get('gates_to_pass',2)
     updates = [r for r in map(json.loads, path.open()) if r["event"] == "update" and r.get("signals", {}).get("phase") in ("TRACKING", "FINAL_IMU", "HANDOFF")]
     if not updates:
         raise ValueError("Recording has no approach frames")
@@ -57,6 +60,11 @@ def render(root):
     for row in map(json.loads, path.open()):
         if row["event"] == "call" and row["name"] == "camera_clock":
             clock.update({(frame, stamp):(low+high)/2 for frame, stamp, low, high in row.get("result", [])})
+    if course:
+        from .joint_score import rendered_views
+        clock={key:value[2] for key,value in rendered_views(root/'events.bin').items()}
+    scored_race=[state for row in map(json.loads,path.open()) if row['event']=='call' and row['name']=='race' for state in row.get('result',[])]
+    race_times=[state['received_at'] for state in scored_race]
     hosts = [row["host_time"] for row in updates]
     states = []
     for row in updates:
@@ -70,13 +78,13 @@ def render(root):
     rotation = Slerp(times, Rotation.from_matrix([s["camera_orientation"] for s in states]))
     score = json.loads((root/"score.json").read_text())
     start = times[0]
-    crossing = score["gates"][1]["crossing_imu_time_s"]
+    crossing = score["gates"][-1]["crossing_imu_time_s"]
     end = times[-1] if crossing is None else min(times[-1], crossing+.25)
     camera = _Camera()
-    output = root/"two-gates-camera-imu.mp4"
+    output = root/('course-camera-imu.mp4' if course else 'two-gates-camera-imu.mp4')
     command = ["ffmpeg", "-v", "error", "-n", "-f", "rawvideo", "-pixel_format", "bgr24", "-video_size", "640x408",
-        "-framerate", "30", "-i", "pipe:0", "-vf", "scale=1280:816", "-an", "-c:v", "libx264", "-preset", "fast",
-        "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output)]
+        "-framerate", "30", "-i", "pipe:0", "-vf", 'null' if course else "scale=1280:816", "-an", "-c:v", "libx264", "-preset", "fast",
+        "-crf", '23' if course else "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output)]
     previous = None
     last_tick = 0
     frames = []
@@ -122,7 +130,7 @@ def render(root):
                         pixels = xyz[:, :2]/xyz[:, 2:]*320+[320, 180]
                         dashed(image, pixels, AMBER)
                     detail = f'last image {max(0., t-state["image_time"]):.2f} s old'
-                if gate == 1 and frame.id in ahead:
+                if frame.id in ahead:
                     draw_measured(image, np.array(ahead[frame.id]["image_corners"]), BLUE)
                     detail += " | blue: next candidate"
                 if state.get("height_alignment"):
@@ -130,8 +138,9 @@ def render(root):
                 panel = cv2.copyMakeBorder(image, 48, 0, 0, 0, cv2.BORDER_CONSTANT, value=(20, 23, 28))
                 cv2.putText(panel, f"Gate {gate} | {mode}", (9, 20), 0, .53, color, 1, cv2.LINE_AA)
                 cv2.putText(panel, detail, (9, 40), 0, .39, (220, 225, 230), 1, cv2.LINE_AA)
-                passed = current["native_race"]["active_gate_index"]
-                cv2.putText(panel, f"SCORER {min(passed, 2)}/2", (505, 20), 0, .46, GREEN, 1, cv2.LINE_AA)
+                native=scored_race[max(0,bisect_right(race_times,frame.received_at)-1)] if scored_race else {}
+                passed = native.get('active_gate_index',0)
+                cv2.putText(panel, f"SCORER {min(passed,total)}/{total}", (505, 20), 0, .46, GREEN, 1, cv2.LINE_AA)
                 tick = round((t-start)*30)
                 if previous is not None:
                     for _ in range(tick-last_tick):
