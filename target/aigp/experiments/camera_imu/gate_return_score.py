@@ -67,6 +67,8 @@ def score(root, calls, updates, trajectory, native):
             off_velocity_error_m_s=float(np.linalg.norm(off_velocity-sample['actual_velocity']))))
     first = next((u['signal']['joint'] for u in updates if u['signal']['joint']['first_gate_return'] is not None),None)
     metrics = dict(gate_updates=updates[-1]['signal']['joint']['gate_updates'],
+        gate_detection_counts=updates[-1]['signal']['joint'].get('gate_detection_counts',{}),
+        mapped_gate_center=estimated_gate.tolist(),scored_gate_center=true_gate.tolist(),
         gate_return_time=None if first is None else first['first_gate_return'],
         gate_return_elapsed_s=None if first is None else first['gate_return_elapsed_s'],passed_recovery=False)
     if first is not None:

@@ -47,6 +47,11 @@ class GateController(base.GateController):
         self.settled = None
         self.last_joint_gate_time = None
         self.future_frames = []
+        self.gate_detection_counts = {}
+
+    def gate_detection(self, reason, corners=None):
+        self.gate_detection_counts[reason] = self.gate_detection_counts.get(reason,0)+1
+        return corners
 
     def returning_gate(self, frame, rotation):
         stamp = frame.time_ns*1e-9
@@ -58,17 +63,20 @@ class GateController(base.GateController):
         state = self.joint.predict(stamp)
         camera = (self.joint.gate_world-state[:3]) @ self.joint.reference.T @ rotation
         if np.min(camera[:,2]) <= .05:
-            return None
+            return self.gate_detection('behind')
         h = camera @ base.vision.K.T
         predicted = h[:,:2]/h[:,2:]
         corners = base.vision.refine(frame.bgr,predicted)
         if corners is None or np.any(corners < 1) or np.any(corners >= [639,359]):
-            return None
+            return self.gate_detection('no_complete_refinement')
         pose = base.vision.best_pose(corners)
-        if (pose is None or pose[0] > 1. or base.vision.iou(corners,predicted) < .5
-                or np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1)) < 40.):
-            return None
-        return corners
+        if pose is None or pose[0] > 1.:
+            return self.gate_detection('single_frame_pose')
+        if base.vision.iou(corners,predicted) < .5:
+            return self.gate_detection('association')
+        if np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1)) < 40.:
+            return self.gate_detection('size')
+        return self.gate_detection('accepted',corners)
 
     def _imu(self):
         remaining = []
@@ -178,6 +186,7 @@ class GateController(base.GateController):
             self.signal['joint'].update(gate_updates=self.joint.gate_updates,
                 first_gate_return=self.joint.first_gate_return,gate_gap_s=1.,gate_world=self.joint.gate_world.tolist(),
                 prediction_dt_s=self.joint.between(self.joint.solution_time,now)[0],
+                gate_detection_counts=self.gate_detection_counts.copy(),
                 gate_return_elapsed_s=None if self.joint.first_gate_return is None else
                     self.joint.integral.at(self.joint.first_gate_return)[0]-self.started)
         steady = elapsed >= 4. and np.linalg.norm(velocity) < .2 and np.linalg.norm(target-position) < .45
