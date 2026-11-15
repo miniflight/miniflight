@@ -11,7 +11,7 @@ class ThrustResponseTest(unittest.TestCase):
         c=object.__new__(thrust_control.GateController)
         c.phase=sensors.Phase.TRACKING;c.hold=np.zeros(3);c.started=0.;c.pulse_at=None;c.recover_at=None
         c.steady=None;c.index=0;c.steps=thrust_control.sequence('train');c.signal={}
-        c.inertial=SimpleNamespace(time=0.,position=np.zeros(3),velocity=np.zeros(3));c.measurement_time=lambda:c.inertial.time
+        c.inertial=SimpleNamespace(time=0.,position=np.zeros(3),velocity=np.zeros(3),gyro=np.zeros(3));c.measurement_time=lambda:c.inertial.time
         request=BodyRates(0.,0.,0.,.27)
         with patch.object(sensors.GateController,'drive',return_value=request):
             self.assertEqual(c.drive(None),request)
