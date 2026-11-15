@@ -18,7 +18,7 @@ class Inertial(sensors.Inertial):
             if self.history is None:
                 super().update([sample])
                 if self.rotation is None:continue
-                rates=np.array([s.gyro for s in self.seed]);f=GateFilter(self.rotation.as_rotation_matrix(),rates.mean(axis=0),
+                rates=np.array([s.gyro for s in self.seed]);f=GateFilter(self.rotation.as_rotation_matrix(),np.zeros(3),
                     self.config.thrust_curve,self.config.body_resistance_per_m,vision.CAMERA_FROM_BODY,vision.K)
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)

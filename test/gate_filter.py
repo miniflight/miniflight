@@ -16,6 +16,11 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_visual_updates_cannot_turn_real_rotation_into_gyro_bias(self):
+        f=filter();prior=f.bg.copy();P=f.P[9:12,9:12].copy();pixels=f.measurement(1,POINTS)[0]
+        for _ in range(6):f.observe(1,POINTS,pixels+[.4,-.2])
+        np.testing.assert_array_equal(f.bg,prior);np.testing.assert_allclose(f.P[9:12,9:12],P,atol=1e-15)
+
     def test_joint_anchor_always_reads_the_current_posterior(self):
         from types import SimpleNamespace
         from target.aigp.experiments.camera_imu.gate_filter_live import GateController

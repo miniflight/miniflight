@@ -136,6 +136,8 @@ class GateFilter:
         result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
         if not result['accepted']:return result
         K=np.linalg.solve(S,H @ self.P).T
+        # Weak planar views cannot separate real yaw from gyro bias. Keep the calibration prior.
+        K[9:12]=0.
         # Known nominal size is a consider parameter: carry its correlations, never fit its mean.
         K[15]=0.
         dx=K @ residual;A=np.eye(len(self.P))-K @ H

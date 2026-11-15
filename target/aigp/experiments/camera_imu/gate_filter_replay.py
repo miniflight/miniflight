@@ -62,7 +62,7 @@ def run(source,root,model,tracks=None,force=True):
                 forces=np.array([s[2] for s in seed]);rates=np.array([s[1] for s in seed])
                 if np.max(np.linalg.norm(rates,axis=1))>.05 or np.max(forces.std(axis=0))>.2:raise RuntimeError('Stationary public initialization failed')
                 rotation=stationary_rotation(forces.mean(axis=0)).as_rotation_matrix()
-                f=GateFilter(rotation,rates.mean(axis=0),config['thrust_curve'],config['body_resistance_per_m'],vision.CAMERA_FROM_BODY,vision.K)
+                f=GateFilter(rotation,np.zeros(3),config['thrust_curve'],config['body_resistance_per_m'],vision.CAMERA_FROM_BODY,vision.K)
                 dt=np.median(np.diff([s[0] for s in seed]));f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(dt)))
                 history=GateHistory(f,stamp,gyro)
             else:history.imu(stamp,gyro,acc if force else None)
