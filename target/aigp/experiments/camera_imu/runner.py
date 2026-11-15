@@ -356,6 +356,7 @@ def one(root, shift, course_gates=None, speed=2.):
             startup_allowance_s=8.,
             visibility_height_change_m=1.5,
             motion_prediction='command_model',
+            visual_gravity=True,
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
     try:

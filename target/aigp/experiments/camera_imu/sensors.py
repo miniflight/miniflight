@@ -24,6 +24,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 
 from . import vision
 from .motion import GateMotion
+from .gravity import GateGravity
 from target.aigp.native import BASE
 
 
@@ -249,6 +250,8 @@ class GateController(BaseController):
         self.signal = {}
         self.camera_motion = GateMotion(SETTINGS.get("camera_window_s", .25))
         self.camera_observation = None
+        self.gravity=GateGravity()
+        self.gravity_observation=None
         self.camera_fusion_started = False
         self.last_relative_gate=None
         self.last_relative_position=None
@@ -306,6 +309,14 @@ class GateController(BaseController):
         if SETTINGS.get('continuous_course') and getattr(self,'gate_number',1)==1 and self.locked is None:
             if np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1))<16.:
                 return
+        if SETTINGS.get('visual_gravity'):
+            measured=self.gravity.observe(stamp,corners,rotation,pose[0],getattr(self,'gate_number',1))
+            if measured is not None:
+                correction,data=measured
+                self.inertial.correct_orientation(data['start'],correction)
+                self.camera_motion.observations=[(t,correction.apply(p) if t>=data['start'] else p) for t,p in self.camera_motion.observations]
+                rotation=correction.as_matrix() @ rotation
+                self.gravity_observation=dict(data,image_id=frame.id,capture_time=stamp)
         center = position + rotation @ pose[2]
         if self.locked is not None and not SETTINGS.get('continuous_course'):
             limit = max(.5, .05*np.linalg.norm(self.anchor-position))

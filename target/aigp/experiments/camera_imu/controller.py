@@ -126,6 +126,9 @@ class GateController(single.GateController):
             return
         was_locked = self.locked is not None
         super().observe(frame, stamp, position, rotation)
+        if SETTINGS.get('visual_gravity'):
+            corrected=self.inertial.camera_pose(stamp)
+            if corrected is not None:position,rotation=corrected
         if not was_locked and self.locked is not None:
             self.direction = (self.anchor-position)*[1, 1, 0]
             self.direction /= np.linalg.norm(self.direction)

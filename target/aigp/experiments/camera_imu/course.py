@@ -205,6 +205,7 @@ class Controller(base.single.BaseController):
         if command is not None:
             self.gate.motor_outputs=command.outputs
             self.gate.signal.update(gyro=self.motor.gyro,rate_request=self.motor.rate_request,rate_integral=self.motor.integral)
+            self.gate.signal['visual_gravity']=self.gate.gravity_observation
         return command
 
 
