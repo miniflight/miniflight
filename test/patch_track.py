@@ -2,10 +2,24 @@ import unittest
 
 import numpy as np
 
-from target.aigp.experiments.patch_track import seeds, track
+from target.aigp.experiments.patch_track import seeds, track, Tracker
 
 
 class PatchTest(unittest.TestCase):
+    def test_streaming_tracker_matches_reference_search(self):
+        images = [self.image(i*.16, -i*.23).astype(np.uint8) for i in range(30)]
+        points = [[32., 32.], [22., 35.]]
+        tracker = Tracker(images[0], points)
+        for image in images[1:]:
+            ids, found = tracker.advance(image)
+        self.assertEqual(len(ids), 2)
+        for i, point in enumerate(points):
+            rows = track(images, point, anchor_first=True)
+            np.testing.assert_allclose(found[i], rows[-1]['point'], atol=.001)
+        tracker.advance(np.full_like(images[0], 80))
+        ids, _ = tracker.advance(images[0])
+        self.assertEqual(len(ids), 0)
+
     @staticmethod
     def image(dx=0., dy=0.):
         y, x = np.mgrid[:64, :64].astype(float)

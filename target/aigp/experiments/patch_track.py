@@ -40,6 +40,50 @@ def texture(patch):
                               [np.mean(gx*gy), np.mean(gy*gy)]])
 
 
+class Tracker:
+    """Stream fixed-reference LK measurements; rejected points stay rejected."""
+    def __init__(self, image, points, side=15):
+        self.reference = np.asarray(image, dtype=np.uint8).copy()
+        self.seeds = np.asarray(points, dtype=np.float32).reshape(-1, 1, 2)
+        self.points = self.seeds[:, 0].copy()
+        self.alive = np.ones(len(self.points), dtype=bool)
+        self.side = side
+        self.parameters = dict(winSize=(side, side), maxLevel=0, flags=cv2.OPTFLOW_USE_INITIAL_FLOW,
+                               criteria=(cv2.TERM_CRITERIA_COUNT | cv2.TERM_CRITERIA_EPS, 30, .001))
+        self._texture(image)
+
+    def _texture(self, image):
+        for index in np.flatnonzero(self.alive):
+            try:
+                low, high = texture(sample(image, [self.points[index]], self.side)[0])
+                self.alive[index] = high >= 2 and low >= 2 and low/high >= .04
+            except ValueError:
+                self.alive[index] = False
+
+    def advance(self, image):
+        ids = np.flatnonzero(self.alive)
+        if not len(ids):
+            return ids, self.points[ids]
+        source = self.seeds[ids]
+        found, good, error = cv2.calcOpticalFlowPyrLK(self.reference, image, source,
+            self.points[ids, None].copy(), **self.parameters)
+        valid = good.ravel().astype(bool) & np.isfinite(found).all(axis=(1, 2)) & (error.ravel() <= 20.)
+        margin = self.side/2+1
+        valid &= np.all(found[:, 0] >= margin, axis=1)
+        valid &= (found[:, 0, 0] < image.shape[1]-margin) & (found[:, 0, 1] < image.shape[0]-margin)
+        self.alive[ids[~valid]] = False
+        ids, source, found = ids[valid], source[valid], found[valid]
+        if len(ids):
+            back, good, _ = cv2.calcOpticalFlowPyrLK(image, self.reference, found, source.copy(), **self.parameters)
+            valid = good.ravel().astype(bool) & np.isfinite(back).all(axis=(1, 2))
+            valid &= np.linalg.norm(back[:, 0]-source[:, 0], axis=1) <= 1.
+            self.alive[ids[~valid]] = False
+            self.points[ids[valid]] = found[valid, 0]
+        self._texture(image)
+        ids = np.flatnonzero(self.alive)
+        return ids, self.points[ids]
+
+
 def track(images, seed, side=15, anchor_first=False):
     """Track grayscale frames; stop at the first rejected estimate.
 
