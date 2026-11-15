@@ -340,7 +340,7 @@ class GateController(BaseController):
             self.direction = self.anchor*np.array([1, 1, 0])
             self.direction /= np.linalg.norm(self.direction)
             self.began = self.inertial.time
-            self.phase = Phase.TRACKING
+            if self.phase is not Phase.SHIFTING:self.phase = Phase.TRACKING
         if SETTINGS.get("camera_correction"):
             measured = -rotation @ pose[2]
             side_px = float(np.min(np.linalg.norm(np.roll(corners, -1, axis=0)-corners, axis=1)))
@@ -353,14 +353,15 @@ class GateController(BaseController):
             velocity = self.camera_motion.observe(stamp, measured) if sampled else None
             delta_v = np.zeros(3)
             bearing=self.camera_motion.bearing_motion(self.direction) if sampled and SETTINGS.get('continuous_course') else None
-            if bearing is not None and side_px<SETTINGS.get('camera_velocity_min_side_px',60.):
+            velocity_side=60. if self.phase is Phase.SHIFTING else SETTINGS.get('camera_velocity_min_side_px',60.)
+            if bearing is not None and side_px<velocity_side:
                 forward=self.direction;right=np.cross([0.,0.,1.],forward)
                 vf=float(self.inertial.velocity_at(bearing['time']) @ forward)
                 transverse=np.array(bearing['bearing'])*vf-bearing['range_m']*np.array(bearing['bearing_rate'])
                 measured_v=vf*forward+transverse[0]*right+[0.,0.,transverse[1]]
                 if np.linalg.norm(measured_v)<=8.:
                     delta_v=self.inertial.correct_velocity(bearing['time'],measured_v,.15)
-            if velocity is not None and side_px>=SETTINGS.get('camera_velocity_min_side_px',60.) and np.linalg.norm(velocity["velocity"]) <= 8.:
+            if velocity is not None and side_px>=velocity_side and np.linalg.norm(velocity["velocity"]) <= 8.:
                 gain=.15
                 if SETTINGS.get('continuous_course'):
                     gain*=min(1.,.15/max(velocity['residual_m'],.15))
@@ -390,27 +391,49 @@ class GateController(BaseController):
             raise TimeoutError("producer IMU stopped before the wire stream")
         now = self.inertial.time
         if self.phase is Phase.SHIFTING:
+            visual_setup=SETTINGS.get('visual_initialization',False)
+            if visual_setup:
+                for frame in frames:
+                    stamp=frame.time_ns*1e-9;pose=self.inertial.camera_pose(stamp)
+                    if pose is not None:self.observe(frame,stamp,*pose)
+                if self.locked is None:
+                    if now-self.setup_started>5.:raise TimeoutError('initial gate unavailable before arming')
+                    return None
             target = np.array([0., SETTINGS["shift_right_m"], -1.])
             distance = np.linalg.norm(target-self.inertial.position)
             steady = distance < .04 and np.linalg.norm(self.inertial.velocity) < .08
+            if visual_setup:
+                target[0]=self.inertial.position[0]
+                distance=np.linalg.norm((target-self.inertial.position)[1:])
+                steady=distance<.1 and np.linalg.norm(self.inertial.velocity[1:])<.15 and abs(self.inertial.velocity[0])<.5
             self.setup_steady = (self.setup_steady or now) if steady else None
             if now-self.setup_started > 10.:
                 raise TimeoutError("IMU shift and settle exceeded ten seconds")
             if self.setup_steady is not None and now-self.setup_steady >= .4:
                 self.shift_displacement = self.inertial.position.copy()
+                if visual_setup:
+                    self.anchor-=self.shift_displacement
+                    self.last_relative_position-=self.shift_displacement
+                    p,q,c,pose=self.previous
+                    self.previous=(p-self.shift_displacement,q,c,pose)
+                    self.last_gate_corners-=self.shift_displacement
+                    self.centers=[c-self.shift_displacement for c in self.centers]
+                    self.camera_motion.observations.clear();self.camera_observation=None
                 self.inertial.position = np.zeros(3)
                 self.inertial.times = [now]
                 self.inertial.positions = [self.inertial.position.copy()]
                 self.inertial.velocities = [self.inertial.velocity.copy()]
                 self.inertial.raw_position = np.zeros(3)
                 self.inertial.rotations = [self.inertial.rotation.as_rotation_matrix() @ CAMERA_FROM_BODY.T]
-                self.phase = Phase.ACQUIRING
+                self.phase = Phase.TRACKING if visual_setup else Phase.ACQUIRING
+                if visual_setup:self.began=now
                 self.acquire_started = now
                 self.pending = []
             else:
                 self.signal = dict(phase=self.phase.name, imu_time=now, position=self.inertial.position.tolist(),
                     velocity=self.inertial.velocity.tolist(), target=target.tolist(),
                     motion_available=False, attitude_available=False)
+                if visual_setup:self.signal.update(camera_orientation=self.inertial.rotations[-1].tolist(),camera_observation=self.camera_observation)
                 return self.drive(target)
         self.pending.extend(frames)
         for frame in self.pending:

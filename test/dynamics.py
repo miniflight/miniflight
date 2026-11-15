@@ -6,6 +6,37 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_visual_setup_produces_no_command_without_a_gate(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from common.math import Quaternion
+        from target.aigp.experiments.camera_imu import sensors
+        config=dict(hover_thrust=.27,thrust_acceleration=60.)
+        state=SimpleNamespace(motion=None,attitude=None,imu_increments=(),time=1.)
+        with patch.dict(sensors.SETTINGS,position_config=config,visual_initialization=True),patch.object(sensors,'vehicle',SimpleNamespace(state=state)):
+            controller=sensors.GateController();controller.phase=sensors.Phase.SHIFTING
+            controller.inertial.rotation=Quaternion();controller.inertial.time=1.;controller.setup_started=1.
+            self.assertIsNone(controller.update((),(),None))
+            self.assertIsNone(controller.locked)
+
+    def test_visual_setup_origin_change_preserves_the_observed_gate(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from common.math import Quaternion
+        from target.aigp.experiments.camera_imu import sensors,vision
+        state=SimpleNamespace(motion=None,attitude=None,imu_increments=(),time=1.)
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),visual_initialization=True),patch.object(sensors,'vehicle',SimpleNamespace(state=state)):
+            c=sensors.GateController();c.phase=sensors.Phase.SHIFTING;c.locked=1;c.setup_started=0.;c.setup_steady=.5
+            c.inertial.rotation=Quaternion();c.inertial.time=1.;c.inertial.position=np.array([.2,-.5,-1.])
+            c.anchor=np.array([20.,1.,2.]);c.direction=np.array([1.,0.,0.]);c.last_image_time=1.;c.last_image_id=1
+            relative=c.anchor-c.inertial.position;c.last_relative_gate=relative.copy();c.last_relative_position=c.inertial.position.copy()
+            c.previous=(c.inertial.position.copy(),vision.CAMERA_FROM_BODY.T,np.zeros((4,2)),None)
+            c.last_gate_corners=np.zeros((4,3));c.inertial.rotations=[vision.CAMERA_FROM_BODY.T.copy()]
+            with patch.object(c,'drive',return_value=None):c.update((),(),None)
+            np.testing.assert_allclose(c.anchor,relative);np.testing.assert_allclose(c.gate_relative(),relative)
+            self.assertEqual(c.phase,sensors.Phase.TRACKING)
+            self.assertEqual(c.inertial.times,[1.])
+
     def test_supplied_model_never_reads_the_native_calibration_fixture(self):
         from unittest.mock import patch
         from target.aigp.experiments.camera_imu import sensors

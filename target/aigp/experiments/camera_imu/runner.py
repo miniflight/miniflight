@@ -139,6 +139,7 @@ def replay(path, poison=False):
     SETTINGS['gate_return'] = metadata['settings'].get('gate_return',False)
     SETTINGS['continuous_course'] = metadata['settings'].get('continuous_course',False)
     SETTINGS['position_config']=metadata['settings'].get('position_config')
+    SETTINGS['visual_initialization']=metadata['settings'].get('visual_initialization',False)
     updates = [row for row in map(json.loads, path.open()) if row["event"] == "update"]
     outcomes = [row for row in map(json.loads, path.open()) if row["event"] == "result"]
     decoder = mavlink.MAVLink(None)
@@ -362,7 +363,8 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None):
             visual_gravity=True,
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
-        SETTINGS.update(position_config=position_config,dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
+        SETTINGS.update(position_config=position_config,visual_initialization=calibration is not None,
+            dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
