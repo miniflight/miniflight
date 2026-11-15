@@ -32,6 +32,15 @@ SETTINGS = dict(speed_m_s=4., final_distance_m=2.5, beyond_m=1.5, stop_beyond_m=
                 acquisition_close_gaps=True, acquisition_largest_rim=True)
 
 
+def velocity_target(delta,gain,speed,vertical_speed=None):
+    desired=gain*np.asarray(delta)
+    if vertical_speed is None:
+        return desired*min(1.,speed/max(np.linalg.norm(desired),1e-9))
+    desired[:2]*=min(1.,speed/max(np.linalg.norm(desired[:2]),1e-9))
+    desired[2]=np.clip(desired[2],-vertical_speed,vertical_speed)
+    return desired
+
+
 class CameraClock:
     """Read capture and timestamp boundaries, without reading rendered poses."""
 
@@ -221,11 +230,21 @@ class GateController(BaseController):
         self.camera_motion = GateMotion(SETTINGS.get("camera_window_s", .25))
         self.camera_observation = None
         self.camera_fusion_started = False
+        self.last_relative_gate=None
+        self.last_relative_position=None
+
+    def gate_relative(self):
+        return self.last_relative_gate-(self.inertial.position-self.last_relative_position)
+
+    def gate_remaining(self):
+        if SETTINGS.get('continuous_course') and self.last_relative_gate is not None:
+            return float(self.gate_relative() @ self.direction)
+        return float((self.anchor-self.inertial.position) @ self.direction)
 
     def drive(self, target):
         p, v = self.inertial.position, self.inertial.velocity
-        desired_velocity = self.config.position_gain*(target-p)
-        desired_velocity *= min(1., self.config.max_speed/max(np.linalg.norm(desired_velocity), 1e-9))
+        desired_velocity = velocity_target(target-p,self.config.position_gain,self.config.max_speed,
+            SETTINGS.get('vertical_speed_limit_m_s') if SETTINGS.get('continuous_course') else None)
         acceleration = self.config.velocity_gain*(desired_velocity-v)
         body = self.inertial.rotation.as_rotation_matrix()
         body_drag = quadratic_resistance(body.T @ v, self.config.body_resistance_per_m)
@@ -237,10 +256,12 @@ class GateController(BaseController):
             return
         corners = None
         if self.previous is not None:
-            guess = vision.warped(self.previous, position, rotation, "rotation_and_motion")
+            guess = vision.warped(self.previous, position, rotation, 'rotation' if SETTINGS.get('continuous_course') else "rotation_and_motion")
             if guess is not None:
                 corners = vision.refine(frame.bgr, guess)
-        if corners is None and self.locked is None:
+                if SETTINGS.get('continuous_course') and corners is not None and (np.any(corners<1) or np.any(corners>=[639,359])):
+                    corners=None
+        if corners is None and (self.locked is None or SETTINGS.get('continuous_course')):
             corners = vision.nearest_aperture(frame.bgr, close_gaps=SETTINGS["acquisition_close_gaps"],
                                              largest_rim=SETTINGS["acquisition_largest_rim"])
             if corners is not None:
@@ -250,6 +271,9 @@ class GateController(BaseController):
         if pose is None:
             self.previous = None if self.locked is None else self.previous
             return
+        if SETTINGS.get('continuous_course') and getattr(self,'gate_number',1)==1 and self.locked is None:
+            if np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1))<16.:
+                return
         center = position + rotation @ pose[2]
         if self.locked is not None:
             limit = max(.5, .05*np.linalg.norm(self.anchor-position))
@@ -263,6 +287,8 @@ class GateController(BaseController):
             self.anchor = np.median(self.centers, axis=0)
         self.last_image_time, self.last_image_id = stamp, frame.id
         self.last_corners = corners.copy()
+        self.last_relative_gate=rotation @ pose[2]
+        self.last_relative_position=np.array(position).copy()
         self.last_gate_corners = pose[1] @ rotation.T + position
         self.used_frames.append(frame.id)
         if self.locked is None and self.count >= SETTINGS["lock_frames"]:
@@ -274,13 +300,13 @@ class GateController(BaseController):
         if SETTINGS.get("camera_correction"):
             measured = -rotation @ pose[2]
             side_px = float(np.min(np.linalg.norm(np.roll(corners, -1, axis=0)-corners, axis=1)))
-            trusted = self.locked is not None and side_px >= 60. and pose[0] <= 1.
+            trusted = self.locked is not None and side_px >= SETTINGS.get('camera_position_min_side_px',60.) and pose[0] <= 1.
             if trusted and not self.camera_fusion_started:
                 self.camera_motion.observations.clear()
                 self.camera_fusion_started = True
             velocity = self.camera_motion.observe(stamp, measured) if trusted else None
             delta_v = np.zeros(3)
-            if velocity is not None and np.linalg.norm(velocity["velocity"]) <= 8.:
+            if velocity is not None and side_px>=SETTINGS.get('camera_velocity_min_side_px',60.) and np.linalg.norm(velocity["velocity"]) <= 8.:
                 delta_v = self.inertial.correct_velocity(velocity["time"], velocity["velocity"], .15)
             delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if trusted else np.zeros(3)
             self.camera_observation = dict(image_id=frame.id, capture_time=stamp, used_at=self.inertial.time,
@@ -289,6 +315,7 @@ class GateController(BaseController):
                 corners=corners.tolist(), reprojection_rmse_px=float(pose[0]),
                 minimum_side_px=side_px, correction_enabled=trusted)
             self.previous = (self.inertial.camera_pose(stamp)[0], rotation, corners, pose)
+            self.last_relative_position=self.inertial.camera_pose(stamp)[0].copy()
 
     def update(self, telemetry, frames, race_state):
         state = vehicle.state
@@ -341,7 +368,7 @@ class GateController(BaseController):
                 shift_displacement=self.shift_displacement.tolist(), motion_available=False, attitude_available=False)
             return self.drive(np.zeros(3))
         p, v = self.inertial.position, self.inertial.velocity
-        remaining = float((self.anchor-p) @ self.direction)
+        remaining = self.gate_remaining()
         if self.phase is Phase.TRACKING and remaining <= SETTINGS["final_distance_m"]:
             self.phase, self.final_at = Phase.FINAL_IMU, now
         stop_beyond=SETTINGS.get('finish_beyond_m',SETTINGS['stop_beyond_m']) if getattr(self,'gate_number',1)==SETTINGS.get('gates_to_pass',1) else SETTINGS['stop_beyond_m']
@@ -361,6 +388,8 @@ class GateController(BaseController):
             camera_orientation=self.inertial.rotations[-1].tolist(),
             shift_displacement=self.shift_displacement.tolist(),
             motion_available=state.motion is not None, attitude_available=state.attitude is not None)
+        if SETTINGS.get('continuous_course'):
+            self.signal['remaining_source']='camera_range_and_velocity'
         if SETTINGS.get("camera_correction"):
             self.signal.update(camera_observation=self.camera_observation,
                 unfused_position=self.inertial.raw_position.tolist(), unfused_velocity=self.inertial.raw_velocity.tolist())

@@ -3,6 +3,7 @@ from collections import deque
 from dataclasses import replace
 
 import numpy as np
+import cv2
 
 from miniflight import vehicle
 from miniflight.loop import run
@@ -68,14 +69,72 @@ class GateController(base.GateController):
     def __init__(self,calls):
         super().__init__()
         self.calls=calls
+        self.search_direction=np.array([1.,0.,0.])
+        self.search_hint=None
+        self.alignment_active=False
+        self.alignment_settled=None
+        self.alignment_gate=1
+        self.alignment_direction=1.
+
+    def drive(self,target):
+        if self.alignment_gate!=self.gate_number:
+            self.alignment_active=False;self.alignment_settled=None;self.alignment_gate=self.gate_number
+        if self.gate_number>1 and self.phase is base.single.Phase.TRACKING and self.last_relative_gate is not None:
+            age=self.inertial.time-self.last_image_time
+            relative=self.gate_relative()
+            if self.alignment_active or (abs(relative[2])>.5 and self.gate_remaining()>8.):
+                if not self.alignment_active:
+                    self.alignment_direction=float(np.sign(relative[2]))
+                self.alignment_active=True
+                settled=abs(relative[2])<.35 and abs(self.inertial.velocity[2])<.5 and age<.25
+                self.alignment_settled=(self.alignment_settled or self.inertial.time) if settled else None
+                if self.alignment_settled is not None and self.inertial.time-self.alignment_settled>.2:
+                    self.alignment_active=False
+                else:
+                    if age>base.SETTINGS['maximum_blind_s']:
+                        raise TimeoutError('height alignment could not regain the mapped gate')
+                    correction=relative[2]
+                    if age>.6 and abs(correction)<1.:
+                        correction=self.alignment_direction
+                        if self.search_hint is not None:
+                            correction=float(np.clip((self.search_hint['pixel'][1]-220.)/80.*2.,-1.5,1.5))
+                    target=self.inertial.position.copy();target[2]+=correction
+                    self.signal['visibility_alignment']=True
+                    return base.single.GateController.drive(self,target)
+        self.signal['visibility_alignment']=False
+        return super().drive(target)
+
+    def search_waypoint(self,frames):
+        speed=np.linalg.norm(self.inertial.velocity[:2])
+        if speed>.5:
+            self.search_direction=np.r_[self.inertial.velocity[:2]/speed,0.]
+        if frames:
+            image=max(frames,key=lambda f:f.id).bgr.astype(np.float32)/255
+            blue,green,red=cv2.split(image)
+            mask=np.uint8(red-(green+blue)/2>.08)
+            count,labels,stats,centers=cv2.connectedComponentsWithStats(mask)
+            candidates=[i for i in range(1,count) if stats[i,cv2.CC_STAT_AREA]>=8 and 3<=stats[i,cv2.CC_STAT_WIDTH]<=180]
+            if candidates:
+                index=max(candidates,key=lambda i:stats[i,cv2.CC_STAT_AREA])
+                self.search_hint=dict(pixel=centers[index].tolist(),area=int(stats[index,cv2.CC_STAT_AREA]))
+        target=self.inertial.position+self.search_direction
+        pixel=340. if self.search_hint is None else self.search_hint['pixel'][1]
+        target[2]+=float(np.clip((pixel-220.)/80.*2.,-3.,3.))
+        return target
 
     def update(self,telemetry,frames,race_state):
+        if self.alignment_active:
+            self.search_waypoint(frames)
+        if self.gate_number>1 and self.phase is base.single.Phase.ACQUIRING and self.acquisition_prior is None:
+            self.handoff_target=self.search_waypoint(frames)
         request=super().update(telemetry,frames,None)
+        if self.gate_number>1 and self.phase is base.single.Phase.ACQUIRING:
+            self.signal['search_hint']=self.search_hint
         if self.gate_number==base.SETTINGS['gates_to_pass'] and self.locked is not None:
             # Extrapolate to command time, including ordinary gaps between IMU packets.
             age=max(0.,min(.3,self.calls.monotonic()-vehicle.state.received_at))
             position=self.inertial.position+self.inertial.velocity*age
-            if (self.anchor-position) @ self.direction < 0.:
+            if self.gate_remaining()-(self.inertial.velocity @ self.direction)*age < 0.:
                 self.phase=base.single.Phase.COMPLETE
                 self.completed.append(dict(gate=self.gate_number,imu_time=self.inertial.time,
                     estimated_center=self.anchor.tolist(),position=position.tolist(),velocity=self.inertial.velocity.tolist(),

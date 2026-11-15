@@ -6,9 +6,52 @@ from pymavlink.dialects.v20 import common
 from miniflight.state import Frame
 from miniflight.replay import Calls
 from target.aigp.experiments.camera_imu.course import WireClient
+from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
+from target.aigp.experiments.camera_imu import sensors
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_descent_does_not_reduce_forward_velocity_target(self):
+        target=sensors.velocity_target([6.,0.,10.],1.,5.,3.)
+        np.testing.assert_allclose(target,[5.,0.,3.])
+        np.testing.assert_allclose(sensors.velocity_target([6.,0.,-10.],1.,5.,3.),[5.,0.,-3.])
+        self.assertAlmostEqual(np.linalg.norm(sensors.velocity_target([6.,0.,10.],1.,5.)),5.)
+
+    def test_approach_distance_uses_camera_despite_inertial_position_drift(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        gate=object.__new__(sensors.GateController)
+        gate.anchor=np.array([10.,0.,0.]);gate.direction=np.array([1.,0.,0.])
+        gate.inertial=SimpleNamespace(position=np.array([9.,0.,0.]),velocity=np.array([2.,0.,0.]),time=1.)
+        gate.last_relative_position=gate.inertial.position.copy()
+        gate.last_relative_gate=np.array([5.,0.,0.]);gate.last_image_time=1.
+        with patch.dict(sensors.SETTINGS,continuous_course=True):
+            self.assertGreater(gate.gate_remaining(),2.5)
+            gate.inertial.time=2.
+            gate.inertial.position[0]+=2.
+            self.assertAlmostEqual(gate.gate_remaining(),3.)
+            gate.inertial.position+=1000.;gate.anchor+=1000.
+            gate.last_relative_position+=1000.
+            self.assertAlmostEqual(gate.gate_remaining(),3.)
+            gate.inertial.time=2.5
+            gate.inertial.position[0]+=1.
+            self.assertLess(gate.gate_remaining(),2.5)
+
+    def test_gate_prediction_uses_displacement_during_acceleration(self):
+        from types import SimpleNamespace
+        gate=object.__new__(sensors.GateController)
+        gate.last_relative_gate=np.array([0.,0.,10.]);gate.last_relative_position=np.zeros(3)
+        gate.inertial=SimpleNamespace(position=np.array([0.,0.,1.]),velocity=np.array([0.,0.,2.]))
+        np.testing.assert_allclose(gate.gate_relative(),[0.,0.,9.])
+
+    def test_camera_height_waypoint_preserves_the_local_frame(self):
+        p=np.array([10.,-3.,-1.]);gate=np.array([40.,2.,7.])
+        target=acquisition_waypoint(p,gate)
+        self.assertAlmostEqual(np.linalg.norm((target-p)[:2]),6.)
+        self.assertEqual(target[2],gate[2])
+        shift=np.array([20.,-4.,12.])
+        np.testing.assert_allclose(acquisition_waypoint(p+shift,gate+shift),target+shift)
+
     def test_native_navigation_packets_are_unavailable(self):
         client=WireClient(Calls())
         encoder=common.MAVLink(None,srcSystem=1,srcComponent=1)
