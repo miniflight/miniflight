@@ -135,7 +135,10 @@ class GateFilter:
         solved=np.linalg.solve(S,residual);nis=float(residual @ solved)
         result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
         if not result['accepted']:return result
-        K=np.linalg.solve(S,H @ self.P).T;dx=K @ residual;A=np.eye(len(self.P))-K @ H
+        K=np.linalg.solve(S,H @ self.P).T
+        # Known nominal size is a consider parameter: carry its correlations, never fit its mean.
+        K[15]=0.
+        dx=K @ residual;A=np.eye(len(self.P))-K @ H
         covariance=A @ self.P @ A.T+K @ V @ K.T
         self.inject(dx);reset=np.eye(len(self.P));reset[6:9,6:9]-=.5*skew(dx[6:9])
         self.P=reset @ covariance @ reset.T;self.P=.5*(self.P+self.P.T)

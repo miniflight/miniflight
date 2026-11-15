@@ -16,6 +16,20 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_known_size_cannot_absorb_motion_or_projection_error(self):
+        f=filter();expected,_=f.measurement(1,POINTS);variance=f.P[15,15]
+        for _ in range(6):f.observe(1,POINTS,expected*1.01)
+        self.assertEqual(f.size,1.5);self.assertAlmostEqual(f.P[15,15],variance,places=14)
+
+    def test_joint_one_gate_feedback_cannot_run_blind_for_thirty_seconds(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import gate_filter_live,course,sensors
+        c=object.__new__(gate_filter_live.GateController);c.locked=0;c.phase=sensors.Phase.TRACKING
+        c.inertial=SimpleNamespace(time=5.);c.measurement_time=lambda:2.
+        with patch.object(course.GateController,'update',return_value=None):
+            with self.assertRaisesRegex(TimeoutError,'two seconds'):c.update((),(),None)
+
     def test_accelerometer_factor_updates_force_bias_without_interval_assumption(self):
         f=filter();u=np.full(4,.27);expected,H=f.acceleration_measurement(u);eps=1e-6;numeric=[]
         for column in range(len(f.P)):
