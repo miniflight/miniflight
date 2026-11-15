@@ -373,7 +373,7 @@ def one(root, shift, course_gates=None, speed=2.):
             finally:
                 for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
                              "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png", "gate-return.json",
-                             'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg'):
+                             'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())

@@ -80,6 +80,13 @@ def score(root):
         elif row["event"] == "result":
             outcomes.append(row)
     assert accepted <= ALLOWED
+    if settings.get('continuous_course'):
+        import gzip
+        fields=('phase','imu_time','image_id','image_time','position','velocity','camera_orientation','gate_center','remaining_m','target',
+                'gate_number','estimated_gates_passed','visibility_alignment','alignment_relative_gate','alignment_hint','search_hint','camera_observation')
+        with gzip.open(root/'control.jsonl.gz','wt') as stream:
+            for tick in ticks:
+                stream.write(json.dumps({key:tick[key] for key in fields if key in tick},separators=(',',':'))+'\n')
     p = np.asarray(positions)
     clock_regressions = int(np.sum(np.diff(p[:, 0]) < 0))
     p = p[np.r_[True, np.diff(p[:, 0]) > 0]]
