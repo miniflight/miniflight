@@ -16,6 +16,16 @@ The final profile passed two unchanged live repetitions. Position RMS was
 joint takeover. Four earlier failures and the endpoint limits are in
 [joint.validation.json](joint.validation.json).
 
+Return observations of the same mapped gate after a one-second gap:
+
+```sh
+python -m target.aigp.experiments.camera_imu joint OUTPUT --shift -.5 --joint-init reprojection --gate-return
+```
+
+The first and latest measured gate views remain in the fit after the gate leaves
+view. Gate corrections disabled on the same sensor inputs provide a causal replay
+comparison. All trials and failures are in [gate-return.validation.json](gate-return.validation.json).
+
 One gate with camera position/velocity correcting the IMU estimate:
 
 ```sh

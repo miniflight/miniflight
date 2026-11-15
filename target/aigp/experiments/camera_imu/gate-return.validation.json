@@ -1,0 +1,1165 @@
+{
+  "date": "2026-11-15",
+  "implementation_revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+  "protocol": {
+    "recorded_at": "2026-11-15T08:39:35.864012+00:00",
+    "hypothesis": "Returning image observations of the same camera-mapped gate correct gate-relative position and velocity without resetting the joint estimator.",
+    "development": [
+      "development-01"
+    ],
+    "validation_shifts_m": [
+      -0.5,
+      -0.25,
+      0.0,
+      0.25,
+      0.5
+    ],
+    "estimator_inputs": [
+      "camera pixels",
+      "known camera intrinsics/mount and 1.5m nominal gate size",
+      "measured-dt gyro and accelerometer increments"
+    ],
+    "native_motion": "postflight scoring only",
+    "gate_map": "Four static corners from multi-frame camera/IMU initialization; never native geometry.",
+    "intentional_gate_gap": "No gate constraints until one physical second of joint motor feedback; continue background and IMU through the gap.",
+    "association": "Require four red edge supports. Refine around the predicted gate, then search image apertures if needed. Retain original 1px PnP, 0.5 IoU and 40px side admission checks.",
+    "optimizer": {
+      "gate_pixel_sigma": 0.8,
+      "initial_position": "fixed gauge",
+      "initial_velocity": "adjustable with 0.05m/s prior"
+    },
+    "ablation": "Causal gate-off numerical replay using identical background tracks and IMU edges; own fitted states, depths and prediction history. This is conditional on the actual flown trajectory.",
+    "acceptance": {
+      "complete_slow_turn": true,
+      "no_collisions": true,
+      "no_resets": true,
+      "gate_updates": 4,
+      "recovery_window_s": 0.5,
+      "position_gate_relative_m": 0.15,
+      "velocity_m_s": 0.1,
+      "after_return_position_rms_m": 0.15,
+      "after_return_velocity_rms_m_s": 0.1,
+      "process_replay": "exact and poisoned pose/course packets"
+    },
+    "promotion": "Five unchanged live trials across the declared offsets; report paired gate-on/off RMS across all trials, including any failures.",
+    "raw_retention": "128MiB temporary trace cap; remove raw data after scoring/replay. Keep compact optimizer inputs and short clips.",
+    "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+    "source_sha256": {
+      "miniflight/joint.py": "c420a7cb7b6188eb59088642511be2d7f84f16eb056af58720b607ab012cdd69",
+      "target/aigp/experiments/camera_imu/joint_control.py": "09beaca8f988b53cfb23ead3907cfc104123f5109173e940a4821e0a11b666f9",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "7a6ca1c7508abdd8aa874e736fb066d3eaccacf1a9f2fad4961ea379c380083b",
+      "target/aigp/experiments/camera_imu/gate_return_score.py": "295db820a2ca32288ad32292280dedb5738bc488dc2136c35923d980e1972896",
+      "target/aigp/experiments/camera_imu/joint_score.py": "19f9f33e74c9974b6730dc8941e404f86cec46c4352f0d07f8a8c3d83540b7d4",
+      "target/aigp/experiments/camera_imu/runner.py": "ab12c4d98923a0b892603a19f7e2c1470d530cded9c852019e90ebc12b41b27e",
+      "miniflight/initialization.py": "ac77ee3261713fcb7c99b19605eedc8ee498ca781e1d47814aef56ab432ee809",
+      "miniflight/odometry.py": "d5b18eed52beac59f78de7a564d0fe2ed2aa980131c5b935dec2ef2479fdb475",
+      "target/aigp/experiments/camera_imu/vision.py": "a7bda173b84c2e939b079c064abe64215d00c1b2ee14c370d0589af75bb4a923"
+    },
+    "development_already_observed": [
+      "prototype cohort: 3/5",
+      "diagnostic-01: background tracks lost while braking",
+      "development-02: only three gate updates",
+      "development-03: temporary correction forgotten",
+      "development-04: stale IMU before joint takeover",
+      "development-05: retained-gate test passed"
+    ],
+    "checkpoint_claim": "Separate staying within bounds from recovery: record whether error was already within bounds before observations returned.",
+    "improvement_claim": "Require aggregate paired position and velocity RMS to improve before claiming both improved.",
+    "startup_failures": "Retain all attempts; retry at most once if no flight trace/score was produced and native setup timed out.",
+    "gate_evidence": "Retain first and most recent accepted gate view, in addition to the current five-frame window and camera-derived position anchor; at most eight states.",
+    "gate_cadence": "Valid returning-gate measurements can trigger a fit after 50ms; background-only updates retain the 150ms interval.",
+    "acceptance_unchanged": true,
+    "estimator_revision": "2cfc1ab53cc0f6bc8dfd63975b423e8bb7ca6d32",
+    "scoring_fix": "Ignore unpaired capture-view events; required controller image identities still require a complete render/readback timing match.",
+    "previous_batch": "retained/live-01 passed; retained/live-02 is unscored due to capture-parser KeyError. Preserve both; do not infer a flight pass from the unscored attempt."
+  },
+  "device": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "opencv": "5.0.0"
+  },
+  "unit_tests_passed": 34,
+  "command": "python -m target.aigp.experiments.camera_imu joint OUTPUT --shift OFFSET --joint-init reprojection --gate-return",
+  "native_motion_used_only_for_scoring": true,
+  "original_prototype": [
+    {
+      "name": "live-01",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": -0.5,
+      "raw_bytes_removed": 96421640,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 206,
+        "joint_solves": 27,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.02004471147679717,
+        "velocity_rms_m_s": 0.012035271933648275,
+        "tracking_rms_m": 0.0465067470907584,
+        "final_tracking_error_m": 0.046051204351933245,
+        "maximum_command_update_gap_s": 0.05343491700477898,
+        "input_age_ms_median_p95": [
+          8.087496516894888,
+          16.65219369033899
+        ],
+        "gate_return": {
+          "gate_updates": 12,
+          "gate_return_time": 15.081415201,
+          "gate_return_elapsed_s": 1.1427184248971347,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.01781907503730018,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.11777684847246155,
+          "half_second_velocity_error_m_s": 0.006811458070577426,
+          "after_return_position_rms_m": 0.11944120772029415,
+          "off_position_rms_m": 0.06481748857598818,
+          "after_return_velocity_rms_m_s": 0.009138270749371728,
+          "off_velocity_rms_m_s": 0.04123387132801962,
+          "final_position_error_m": 0.10469886502844626,
+          "off_final_position_error_m": 0.1047022095039857
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 730,
+      "corrupted_pose_packets": 3015,
+      "artifact_sha256": {
+        "protocol.json": "605119ae2a2b57f8bc1b8ddcd6bdbb661a37ca0bce0034ff06cfcd84676a057e",
+        "score.json": "46fa71f9642e2ac0c7a323ec1c4621f1ea1b5e24160c0ffd10a4c2c8adea1073",
+        "joint-initialization.json": "e017b7173d770f2e49d9ab41e2fbc3df289c7b9a7ea66ad36064821cefd819df",
+        "joint-replay.json": "5a83bac3041e27108818a6b336d7d73dd5597d2cbd05585c24ad361cc6731a21",
+        "gate-return.json": "5ea1580e5c08427a47d77d4fac569867e80a430598052b6062016dedd7ac24d8",
+        "joint-flight.mp4": "449fba7761fc37aba559312b6c2d38e5eb7cdaa9048fece5f6f898d68029fdee"
+      }
+    },
+    {
+      "name": "live-02",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": -0.25,
+      "raw_bytes_removed": 96505355,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 210,
+        "joint_solves": 27,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.018311827388718723,
+        "velocity_rms_m_s": 0.022540216934889504,
+        "tracking_rms_m": 0.040941941195853274,
+        "final_tracking_error_m": 0.10950968943892467,
+        "maximum_command_update_gap_s": 0.041329249972477555,
+        "input_age_ms_median_p95": [
+          7.433841453960532,
+          15.525742539829231
+        ],
+        "gate_return": {
+          "gate_updates": 10,
+          "gate_return_time": 15.032956049000001,
+          "gate_return_elapsed_s": 1.14298353681054,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.01002106106195555,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.11560521309821785,
+          "half_second_velocity_error_m_s": 0.02205106692559839,
+          "after_return_position_rms_m": 0.1184646641783474,
+          "off_position_rms_m": 0.14205198621391757,
+          "after_return_velocity_rms_m_s": 0.02153445351568631,
+          "off_velocity_rms_m_s": 0.04841552599874915,
+          "final_position_error_m": 0.3000921244960949,
+          "off_final_position_error_m": 0.3000921289098355
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 736,
+      "corrupted_pose_packets": 3008,
+      "artifact_sha256": {
+        "protocol.json": "427ba555f3f2446624cbf74cf894dfbeeffe3838bd4c654d88418aa63009ea4f",
+        "score.json": "d1b2ef5f0683c8e9a5b46de1903924f6a0044f22756c2853b57fde74800aa056",
+        "joint-initialization.json": "14a87ad2040483195e571d16c72d5667bb92148460aeb97e56ca09b6251bf4c2",
+        "joint-replay.json": "4a459b1e12909d33b21f7c80c027b5d7c10db998c5ed398b60d7da9c0d490e1c",
+        "gate-return.json": "fd36a991ec1bdd033c815d5c9edd6b554da3159439f307edc5cb25fecc035d4a",
+        "joint-flight.mp4": "0bd975ce8d7d301c37ad08cb266d6a315de73fb4b80a0f52c0b586b1856a923c"
+      }
+    },
+    {
+      "name": "live-03",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": 0.0,
+      "raw_bytes_removed": 98061656,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 231,
+        "joint_solves": 30,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.02414383746746102,
+        "velocity_rms_m_s": 0.019377555010018917,
+        "tracking_rms_m": 0.0372140633760241,
+        "final_tracking_error_m": 0.0650223811118114,
+        "maximum_command_update_gap_s": 0.048993625037837774,
+        "input_age_ms_median_p95": [
+          7.718216953197299,
+          15.13625847317357
+        ],
+        "gate_return": {
+          "gate_updates": 11,
+          "gate_return_time": 15.073217452000002,
+          "gate_return_elapsed_s": 1.1477137867388763,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.023249012601610275,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.13173935190126135,
+          "half_second_velocity_error_m_s": 0.024053536050449815,
+          "after_return_position_rms_m": 0.12839741610781255,
+          "off_position_rms_m": 0.11082526149993566,
+          "after_return_velocity_rms_m_s": 0.017349055583373452,
+          "off_velocity_rms_m_s": 0.03753515764404841,
+          "final_position_error_m": 0.11369380221323695,
+          "off_final_position_error_m": 0.10120151318155209
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 757,
+      "corrupted_pose_packets": 3078,
+      "artifact_sha256": {
+        "protocol.json": "6d5a193ef318f6a9727012ae95477c8c276768c8edc71813987e26e5fddc46fb",
+        "score.json": "bc38fe363016f5d948342c94dcd7bb3144e5ced20799234fb57a3e790cc311a0",
+        "joint-initialization.json": "1adeee8543673e8da1a6c1577a6d1a63cb62cc33214882182acbf459178030bb",
+        "joint-replay.json": "3352b87956968dcabae2d7775df4c4ee0dc12685d3366b075b70b8509043285f",
+        "gate-return.json": "aaa43d12a518e58c00b7eff3ac572e113559e8fecbb24599e3f7a63524469d94",
+        "joint-flight.mp4": "c4e7d1f719258a34f34b8cd8fa8e7e809cf8a8afba4e92e4a9b5e9c4d1262a94"
+      }
+    },
+    {
+      "name": "live-04",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": 0.25,
+      "raw_bytes_removed": 94504700,
+      "metrics": {
+        "passed_gate_return": false,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 127,
+        "joint_solves": 27,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.026588891606279322,
+        "velocity_rms_m_s": 0.05867768743605855,
+        "tracking_rms_m": 0.09905485310263112,
+        "final_tracking_error_m": 0.23863671514114476,
+        "maximum_command_update_gap_s": 0.1055022919899784,
+        "input_age_ms_median_p95": [
+          16.920433955551317,
+          36.27849269587742
+        ],
+        "gate_return": {
+          "gate_updates": 2,
+          "gate_return_time": 15.236024251000002,
+          "gate_return_elapsed_s": 1.2991390350415433,
+          "passed_recovery": false,
+          "recovery_delay_s": 0.036108264592376926,
+          "already_within_bounds_before_return": false,
+          "half_second_position_error_m": 0.1716741639987967,
+          "half_second_velocity_error_m_s": 0.06154868589746421,
+          "after_return_position_rms_m": 0.1577670531520547,
+          "off_position_rms_m": 0.2515120473072774,
+          "after_return_velocity_rms_m_s": 0.06150880659016117,
+          "off_velocity_rms_m_s": 0.09574852809978114,
+          "final_position_error_m": 0.45208286314311996,
+          "off_final_position_error_m": 0.4520828698088639
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 568,
+      "corrupted_pose_packets": 2895,
+      "artifact_sha256": {
+        "protocol.json": "58ff48c2d1eb95227c788e7ccbd67eb42062ae169d7b6a1ade24f57af5ae756d",
+        "score.json": "f6f3e450d7c2e94424d05cf69cb12cd516b06fca990e97e0fa6fcda8d19935f8",
+        "joint-initialization.json": "b6842d02b5fedc6ee9b4e42bfdefd457c85582a76de8f7a8e7db7f716d5a6ba4",
+        "joint-replay.json": "4523397855ac5c44b0940019eac0daba00a9b6d7ecf10e68bfb724b6a615e4cf",
+        "gate-return.json": "b3dc0c53db2b99d70e3de44df02ede6f55e64ca45ce9a52914e3569abd41982f",
+        "joint-flight.mp4": "d160a6173eac2be4222a5a6e8386d22bdd443edc16e8fffb4325d3709654d6de"
+      }
+    },
+    {
+      "name": "live-05",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 94931607,
+      "metrics": {
+        "passed_gate_return": false,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 140,
+        "joint_solves": 27,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.09385390500602381,
+        "velocity_rms_m_s": 0.0671281424339976,
+        "tracking_rms_m": 0.11687674790309115,
+        "final_tracking_error_m": 0.28520733868711906,
+        "maximum_command_update_gap_s": 0.06894708302570507,
+        "input_age_ms_median_p95": [
+          16.346645979940178,
+          37.158353858133154
+        ],
+        "gate_return": {
+          "gate_updates": 1,
+          "gate_return_time": 15.207461499,
+          "gate_return_elapsed_s": 1.3088106571369718,
+          "passed_recovery": false,
+          "recovery_delay_s": 0.005619143820469574,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.17921631606706354,
+          "half_second_velocity_error_m_s": 0.06371997467580709,
+          "after_return_position_rms_m": 0.20569057376040473,
+          "off_position_rms_m": 0.20145219011338464,
+          "after_return_velocity_rms_m_s": 0.07544743685453868,
+          "off_velocity_rms_m_s": 0.07438222773227715,
+          "final_position_error_m": 0.3714990035442791,
+          "off_final_position_error_m": 0.371499003544274
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 585,
+      "corrupted_pose_packets": 2941,
+      "artifact_sha256": {
+        "protocol.json": "629a5cfc696f26f4e92469a9b0ecb14038286b01c9a9056896ac506e1a45f571",
+        "score.json": "133bf9df186d1db6e4ae6b489dddb650377875c1a1e2c5dd4c46c9bbca935c1c",
+        "joint-initialization.json": "abe61a169ace81bc10d3c6f91f05a8eec326e6d8fec0fee34a9386ef6a846cab",
+        "joint-replay.json": "bdf7c886671aea0af9a1161b1c04be0a21cdf362b269f72f122aa17f13ae71bd",
+        "gate-return.json": "920c3649f94256c5371c89b97fba4c30683d7b3124238b942a3636c0b2f47a4c",
+        "joint-flight.mp4": "aa898839e2235568c2232e421417f64cf1c7bab452a2225104bd7a5b4671cdec"
+      }
+    }
+  ],
+  "development": [
+    {
+      "name": "development-01",
+      "revision": "f8f880fe923b21bf7890205a8aacf0d80a9e7bba",
+      "shift_m": -0.5,
+      "raw_bytes_removed": 95948892,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 211,
+        "joint_solves": 27,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.03870168816034355,
+        "velocity_rms_m_s": 0.015616301423517318,
+        "tracking_rms_m": 0.07958694829627437,
+        "final_tracking_error_m": 0.058496558468173566,
+        "maximum_command_update_gap_s": 0.0394122910220176,
+        "input_age_ms_median_p95": [
+          8.20996597989776,
+          15.358795495036048
+        ],
+        "gate_return": {
+          "gate_updates": 11,
+          "gate_return_time": 15.235985450000001,
+          "gate_return_elapsed_s": 1.3007784369031477,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.004802264775843668,
+          "half_second_position_error_m": 0.11887709371903608,
+          "half_second_velocity_error_m_s": 0.010320654363238603,
+          "after_return_position_rms_m": 0.1196199335799687,
+          "off_position_rms_m": 0.07837690642278043,
+          "after_return_velocity_rms_m_s": 0.007973013893970473,
+          "off_velocity_rms_m_s": 0.04761219430877584,
+          "final_position_error_m": 0.202937855789184,
+          "off_final_position_error_m": 0.20511663705635055
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 740,
+      "corrupted_pose_packets": 2956,
+      "artifact_sha256": {
+        "protocol.json": "e1a27f5296bab7e90ebee8cf72fc8002149f6c4de261ca7615cc8b7afc3768ae",
+        "score.json": "aeaced6607fea2d0392b779e61c3c49667e5094fc913a1e94c28e9bee1ccd4d3",
+        "joint-initialization.json": "c3ff1f16fb110003c788146e0cbdea80c3115882ec1b49f49a06352b9c25b68a",
+        "joint-replay.json": "7377de90a4527d874c72b4b1cbf31bffd36221a0d08aa235a51d47322107f697",
+        "gate-return.json": "6d82efdb9a5ed53a25f134265596c76be3c0fd3c18788fdeb5d9e926dfb26305",
+        "joint-flight.mp4": "734e624014b310ee5397a71bf9bf599451be83b1ae8ac55325637732cc7d464a"
+      }
+    },
+    {
+      "name": "diagnostic-01",
+      "revision": "0930c2c5e99ff2095254f19d23704e7599adbbb2",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 97381994,
+      "metrics": {
+        "passed_gate_return": false,
+        "controller_error": {
+          "type": "RuntimeError",
+          "message": "joint estimator lost its background tracks"
+        },
+        "controller_phase": "TRACKING",
+        "joint_control_updates": 189,
+        "joint_solves": 28,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.03460880730137813,
+        "velocity_rms_m_s": 0.06661275892618128,
+        "tracking_rms_m": 0.13662113323062938,
+        "final_tracking_error_m": 0.400166261253622,
+        "maximum_command_update_gap_s": 0.09700058301677927,
+        "input_age_ms_median_p95": [
+          8.953674973396275,
+          46.11135337391868
+        ],
+        "gate_return": {
+          "gate_updates": 12,
+          "gate_detection_counts": {
+            "no_complete_refinement": 29,
+            "accepted": 63
+          },
+          "mapped_gate_center": [
+            0.04294752476505759,
+            4.554677420253133,
+            13.085404202717788
+          ],
+          "scored_gate_center": [
+            0.06529664498528327,
+            4.545257009553516,
+            12.998642326579482
+          ],
+          "gate_return_time": 15.149581749000001,
+          "gate_return_elapsed_s": 1.1383040266140458,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.01799737121620204,
+          "already_within_bounds_before_return": false,
+          "half_second_position_error_m": 0.08302154055633275,
+          "half_second_velocity_error_m_s": 0.04951734303992497,
+          "after_return_position_rms_m": 0.08291632468997946,
+          "off_position_rms_m": 0.16439925555863638,
+          "after_return_velocity_rms_m_s": 0.06363288655082226,
+          "off_velocity_rms_m_s": 0.15095630697751677,
+          "final_position_error_m": 0.5536361830512926,
+          "off_final_position_error_m": 0.553636183063734
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 715,
+      "corrupted_pose_packets": 3084,
+      "artifact_sha256": {
+        "protocol.json": "9a643fa4fc4c3ac62a4974fc6e3e136ac4adaf44e8bb13c54309e9fc2782ccbf",
+        "score.json": "e42f7664357a4a2c9629cc3b04a8e40d7d188bf4058e8f0edbd5021cbea80f79",
+        "joint-initialization.json": "53797ca06ba2d9ff6738ee24adfe7d787b8d446eee492f00f2bd1509bdf6b73a",
+        "joint-replay.json": "654f10be002db0503c074cffb2e17b3b855fb1cb44df794d797f99d21b96f053",
+        "gate-return.json": "9b49ed0b26e2597086c7138522da8f989c0a418637dfafb54acf97618173286d",
+        "joint-flight.mp4": "220385c11074a2ab9f02fdac21aba3d10798799cfd5f9706c89bb7fdc46cb792"
+      }
+    },
+    {
+      "name": "development-02",
+      "revision": "0c744c833789d27423f63269ec2090dc39d3638d",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 96115463,
+      "metrics": {
+        "passed_gate_return": false,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 144,
+        "joint_solves": 29,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.08899239751882886,
+        "velocity_rms_m_s": 0.07055533222871671,
+        "tracking_rms_m": 0.10799743676818341,
+        "final_tracking_error_m": 0.20938105330135864,
+        "maximum_command_update_gap_s": 0.07598037499701604,
+        "input_age_ms_median_p95": [
+          16.105437996436933,
+          42.837970133847385
+        ],
+        "gate_return": {
+          "gate_updates": 3,
+          "gate_detection_counts": {
+            "no_complete_refinement": 67,
+            "lost": 74,
+            "single_frame_pose": 9,
+            "accepted": 11,
+            "redetected": 2
+          },
+          "mapped_gate_center": [
+            0.320599255550423,
+            4.056066157939627,
+            12.16189552507272
+          ],
+          "scored_gate_center": [
+            0.3391773369523663,
+            4.026244642206505,
+            12.01125962307061
+          ],
+          "gate_return_time": 15.707255451000002,
+          "gate_return_elapsed_s": 1.6236395895731839,
+          "passed_recovery": false,
+          "recovery_delay_s": 0.19817151462014593,
+          "already_within_bounds_before_return": false,
+          "half_second_position_error_m": 0.1178851400328213,
+          "half_second_velocity_error_m_s": 0.05935991519997552,
+          "after_return_position_rms_m": 0.11426396624966331,
+          "off_position_rms_m": 0.17489862192006844,
+          "after_return_velocity_rms_m_s": 0.0727775283565946,
+          "off_velocity_rms_m_s": 0.060077569402311015,
+          "final_position_error_m": 0.11398697473888297,
+          "off_final_position_error_m": 0.11398697473889216
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 600,
+      "corrupted_pose_packets": 3009,
+      "artifact_sha256": {
+        "protocol.json": "e94f7d4b5015e67b47da6725842c84fed8637fc07bff553438e64c8993cdc378",
+        "score.json": "31b1ca1f01caf5f22454275c54859229422c8ede0ad53394a8443b35e01724e4",
+        "joint-initialization.json": "7db65c5d1f129b3544e232b85b8be9375d293ba06161cb50db9abd93244b6e86",
+        "joint-replay.json": "2ef07357b040bb04d45ec7733960a48f34a872f2e5ff85459d85c89ec031a15f",
+        "gate-return.json": "efbb812cf98e79e69489d87b7f8873c40d958ba1ec9987d37d6fcb4fe1469eeb",
+        "joint-flight.mp4": "41c87725bdca9a3ec8aa0a24161535d31845fc50af000c4b69fa69752cd4f806"
+      }
+    },
+    {
+      "name": "development-03",
+      "revision": "3457f39d5d4d8b85592e5f9acee28b52a837acf1",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 94627539,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 141,
+        "joint_solves": 44,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.029313669241405205,
+        "velocity_rms_m_s": 0.022864238210853594,
+        "tracking_rms_m": 0.04967820957538034,
+        "final_tracking_error_m": 0.04786475858220441,
+        "maximum_command_update_gap_s": 0.06738437502644956,
+        "input_age_ms_median_p95": [
+          17.883074932713683,
+          34.760984018584296
+        ],
+        "gate_return": {
+          "gate_updates": 29,
+          "gate_detection_counts": {
+            "no_complete_refinement": 31,
+            "lost": 32,
+            "accepted": 49,
+            "single_frame_pose": 1
+          },
+          "mapped_gate_center": [
+            -0.21120806262698733,
+            4.509552442988737,
+            13.142832752002704
+          ],
+          "scored_gate_center": [
+            -0.19115997636102608,
+            4.501664931374434,
+            13.06348966771002
+          ],
+          "gate_return_time": 15.045469549000002,
+          "gate_return_elapsed_s": 1.1338238565206833,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.006415143799751277,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.09970119722900517,
+          "half_second_velocity_error_m_s": 0.013042632177947188,
+          "after_return_position_rms_m": 0.10143301508364543,
+          "off_position_rms_m": 0.059671717852004064,
+          "after_return_velocity_rms_m_s": 0.017408035477389193,
+          "off_velocity_rms_m_s": 0.06521044001842237,
+          "final_position_error_m": 0.17453587675942767,
+          "off_final_position_error_m": 0.17453588629235525
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 592,
+      "corrupted_pose_packets": 2929,
+      "artifact_sha256": {
+        "protocol.json": "7a8747662ceb275b7753e7be0b8a2097aa8d83ba3bd9f1009a58b2d8359cb286",
+        "score.json": "682213565c3c0ca4732d0889f503b77d6e9e10199ffe1cb4d1a517b5830d6b16",
+        "joint-initialization.json": "f3e90e167bd243fd5fb12a0765fec8e49032a42058b438ab65d87ddf135a487f",
+        "joint-replay.json": "baa62bf802bcc972034368dfeb507b63c4ab4403ce81732893c361adb0e2433b",
+        "gate-return.json": "e83e301c02b8266978e520a8cf790b50cff3f720ebce0d12d7f7dd13e0ed3cfd",
+        "joint-flight.mp4": "3e05793ea0ce8d3217f208e2a70b251d52fb46e8d547305f52148b56390b1ee0"
+      }
+    },
+    {
+      "name": "development-04",
+      "revision": "1771a08b2d643562cacaf31fa9b80229e625830e",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 72973905,
+      "metrics": {
+        "passed_gate_return": false,
+        "controller_error": {
+          "type": "TimeoutError",
+          "message": "controller returned a command for stale IMU telemetry"
+        },
+        "controller_phase": "TRACKING",
+        "joint_control_updates": 0,
+        "joint_solves": 0,
+        "resets": 0,
+        "collisions": []
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 382,
+      "corrupted_pose_packets": 1918,
+      "artifact_sha256": {
+        "protocol.json": "031f3d705e32367e8b0a129242117b8ba22433c9ccaf25805df49b1cf8480a1a",
+        "score.json": "21f36aac013999ab55d0578fa2e566f9c20df7c3d181bd929021f03e89bd834c",
+        "joint-replay.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      }
+    },
+    {
+      "name": "development-05",
+      "revision": "1771a08b2d643562cacaf31fa9b80229e625830e",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 94680784,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 99,
+        "joint_solves": 30,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.025939284853954764,
+        "velocity_rms_m_s": 0.05080504237543037,
+        "tracking_rms_m": 0.10964963039157363,
+        "final_tracking_error_m": 0.1410812954196134,
+        "maximum_command_update_gap_s": 0.08694479096448049,
+        "input_age_ms_median_p95": [
+          23.065066953435576,
+          50.69330634071356
+        ],
+        "gate_return": {
+          "gate_updates": 6,
+          "gate_detection_counts": {
+            "no_complete_refinement": 46,
+            "lost": 54,
+            "single_frame_pose": 19,
+            "redetected": 2,
+            "accepted": 4
+          },
+          "mapped_gate_center": [
+            0.4007180324211098,
+            3.9987836471105496,
+            12.082424003573205
+          ],
+          "scored_gate_center": [
+            0.4215855792741718,
+            3.967749390105477,
+            11.93190605652623
+          ],
+          "gate_return_time": 15.162871102,
+          "gate_return_elapsed_s": 1.1991462039820906,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.028974797291303034,
+          "already_within_bounds_before_return": false,
+          "half_second_position_error_m": 0.14247554550291042,
+          "half_second_velocity_error_m_s": 0.03957071225476721,
+          "after_return_position_rms_m": 0.14555589646345385,
+          "off_position_rms_m": 0.3074468648592879,
+          "after_return_velocity_rms_m_s": 0.05147036147407471,
+          "off_velocity_rms_m_s": 0.11538324299502915,
+          "final_position_error_m": 0.27643974118468456,
+          "off_final_position_error_m": 0.35686885427531767
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 540,
+      "corrupted_pose_packets": 2928,
+      "artifact_sha256": {
+        "protocol.json": "031f3d705e32367e8b0a129242117b8ba22433c9ccaf25805df49b1cf8480a1a",
+        "score.json": "e54756480ed8a60a68c54eef558bc4708ebd43fa3bf630521a392e42e07611e7",
+        "joint-initialization.json": "24a85d9eea665561f0da3274f907b7ff35af290a31ba6004e9b729ba53b10aa6",
+        "joint-replay.json": "2f31a9c4c512d7b5e2412453bf0c92453d70b4c0d90e897a3e75633e5192192b",
+        "gate-return.json": "8b27c352c02018689c606ac6f9f142ba01c225b3786164717531a377b74c6254",
+        "joint-flight.mp4": "03a599e93c56d12817130db104992fc651a33cd5292b789294aa2402ce5eb140"
+      }
+    }
+  ],
+  "interrupted_batch": [
+    {
+      "name": "retained/live-01",
+      "revision": "2cfc1ab53cc0f6bc8dfd63975b423e8bb7ca6d32",
+      "shift_m": -0.5,
+      "raw_bytes_removed": 97259209,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 212,
+        "joint_solves": 45,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.022813513902956408,
+        "velocity_rms_m_s": 0.011681270608056743,
+        "tracking_rms_m": 0.05389937421837784,
+        "final_tracking_error_m": 0.02269413372465989,
+        "maximum_command_update_gap_s": 0.04088429198600352,
+        "input_age_ms_median_p95": [
+          7.5098164488442976,
+          15.652729225999536
+        ],
+        "gate_return": {
+          "gate_updates": 29,
+          "gate_detection_counts": {
+            "no_complete_refinement": 39,
+            "lost": 38,
+            "redetected": 1,
+            "accepted": 57
+          },
+          "mapped_gate_center": [
+            0.40125787459965634,
+            4.329023511705749,
+            12.725384358754313
+          ],
+          "scored_gate_center": [
+            0.4170232062268341,
+            4.306818241170168,
+            12.607270297355884
+          ],
+          "gate_return_time": 15.083296051000001,
+          "gate_return_elapsed_s": 1.136116242240874,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.004424756188186052,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.11918901383031127,
+          "half_second_velocity_error_m_s": 0.00915013103963944,
+          "after_return_position_rms_m": 0.12188274380371171,
+          "off_position_rms_m": 0.1141278451140328,
+          "after_return_velocity_rms_m_s": 0.005559956948385178,
+          "off_velocity_rms_m_s": 0.03746112693762377,
+          "final_position_error_m": 0.0982995042588467,
+          "off_final_position_error_m": 0.30201733563883465
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 734,
+      "corrupted_pose_packets": 3015,
+      "artifact_sha256": {
+        "protocol.json": "0eaa5ac335c39ade96b5c31c903d789f50b8546d8645439e26fc0d2c39cbb577",
+        "score.json": "805090f640f28e851589a4ac8b3c5ca1934881b826fdb35854975e17e97d16a2",
+        "joint-initialization.json": "a9848fa0aa9ac27f9c9bdd6e9d6b51ee7948dde906e3ce0874983f02cc387975",
+        "joint-replay.json": "442060cea1389b0d551c2542e6e01cbf73b329ceffa9f12855fd6ab4f30b1406",
+        "gate-return.json": "6d0ba3c3c504241fd9bd913e50e7e2795620ef282f32e686039c9ba24178b4db",
+        "joint-flight.mp4": "f41058df43fd291a989060c8bf827f7bbc45b1232986eeecd32b15d62c33e9c5"
+      }
+    },
+    {
+      "name": "retained/live-02",
+      "revision": "2cfc1ab53cc0f6bc8dfd63975b423e8bb7ca6d32",
+      "shift_m": -0.25,
+      "raw_bytes_removed": 95938687,
+      "incomplete_error": {
+        "type": "KeyError",
+        "message": "0"
+      },
+      "artifact_sha256": {
+        "protocol.json": "bd435bc630439bd57dfaa972a51e0f3a4babb56f00b68a93c24f2cf88312ba66",
+        "joint-replay.json": "182c1e3637c00910a823931e1d65ca1c818b9e06c9faff72fc68ba6ab6ee3088"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "name": "validation/live-01",
+      "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+      "shift_m": -0.5,
+      "raw_bytes_removed": 96887313,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 210,
+        "joint_solves": 42,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.028758850834503476,
+        "velocity_rms_m_s": 0.01357650975876616,
+        "tracking_rms_m": 0.03700813365170364,
+        "final_tracking_error_m": 0.04926881080173616,
+        "maximum_command_update_gap_s": 0.04047770902980119,
+        "input_age_ms_median_p95": [
+          7.767883470042314,
+          16.189867493235607
+        ],
+        "gate_return": {
+          "gate_updates": 26,
+          "gate_detection_counts": {
+            "no_complete_refinement": 44,
+            "lost": 45,
+            "accepted": 50,
+            "single_frame_pose": 4,
+            "redetected": 2
+          },
+          "mapped_gate_center": [
+            0.375363150254043,
+            4.262042942699819,
+            12.577940129409038
+          ],
+          "scored_gate_center": [
+            0.3909183370241113,
+            4.24769856134249,
+            12.477393769152611
+          ],
+          "gate_return_time": 15.063568300000002,
+          "gate_return_elapsed_s": 1.1460136283695572,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.01842197062970463,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.12356331993254711,
+          "half_second_velocity_error_m_s": 0.014198367421730588,
+          "after_return_position_rms_m": 0.12298524777180597,
+          "off_position_rms_m": 0.12825563392815897,
+          "after_return_velocity_rms_m_s": 0.010835095831699067,
+          "off_velocity_rms_m_s": 0.03130108094552847,
+          "final_position_error_m": 0.12514770324982302,
+          "off_final_position_error_m": 0.20985082030691768
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 738,
+      "corrupted_pose_packets": 3021,
+      "artifact_sha256": {
+        "protocol.json": "3a9cacf9c43b670ef2cd3606ef76424b6534f3bd3191c2c4903cda33ac841424",
+        "score.json": "de3c0ef5d82fe6d0cdfd5e2bf76c75fa3ad93e2e86bae8a1f257fa4554ef6261",
+        "joint-initialization.json": "78324ea46c13857477f3bf66e3f6c51198060b1c471861d01f79f264aa5e170d",
+        "joint-replay.json": "c6bbd2eb7c1e91bee8fcb8b2bb35b8e1461d9f2e070739fad07bb4019b156e32",
+        "gate-return.json": "96bf031852862861a7abe08b0575b35fd2d4ed8890cff83c5868c1b99b00c1ff",
+        "joint-flight.mp4": "e07e78d2e649b97ecce277170352f65ac530d90d2ff4b24cae914dbd7d42f8ab"
+      },
+      "retained_gate_views_at_end": 2
+    },
+    {
+      "name": "validation/live-02",
+      "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+      "shift_m": -0.25,
+      "raw_bytes_removed": 96989773,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 204,
+        "joint_solves": 42,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.025701878389105665,
+        "velocity_rms_m_s": 0.018310776017242857,
+        "tracking_rms_m": 0.049795313417314156,
+        "final_tracking_error_m": 0.06293882674408265,
+        "maximum_command_update_gap_s": 0.05146795796463266,
+        "input_age_ms_median_p95": [
+          8.308566947601292,
+          18.386773834935166
+        ],
+        "gate_return": {
+          "gate_updates": 25,
+          "gate_detection_counts": {
+            "no_complete_refinement": 47,
+            "lost": 47,
+            "accepted": 48
+          },
+          "mapped_gate_center": [
+            0.2057775064437083,
+            4.247188522067566,
+            12.569887152621234
+          ],
+          "scored_gate_center": [
+            0.2201801963959289,
+            4.229818652503526,
+            12.462011339619425
+          ],
+          "gate_return_time": 15.048330402000001,
+          "gate_return_elapsed_s": 1.1351074187509198,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.004244180167518152,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.11756102843048462,
+          "half_second_velocity_error_m_s": 0.014904279064785675,
+          "after_return_position_rms_m": 0.11498149041286444,
+          "off_position_rms_m": 0.1874964081339665,
+          "after_return_velocity_rms_m_s": 0.011541774046286233,
+          "off_velocity_rms_m_s": 0.0676069916189192,
+          "final_position_error_m": 0.11913774200644743,
+          "off_final_position_error_m": 0.37399517647194547
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 729,
+      "corrupted_pose_packets": 3003,
+      "artifact_sha256": {
+        "protocol.json": "8ed7aa4a70244e4750a16f6d5a03bd1aa0d72954873876d52b06febfabaf3b66",
+        "score.json": "971449dbb48c0269cce98ab50f25bc7b0ebe8942810d16070b931c95d374f3b7",
+        "joint-initialization.json": "4d9596e93708203e686c64da3d41fc852cc1d9c56aaca6ec32871f2c45e4f17a",
+        "joint-replay.json": "d16deda0267ef8e8b0e01c0b6fd36d74c847263f69a8efb90f76a1d9139d80fc",
+        "gate-return.json": "06f8dfdc1e6e5eb6e7add324eed2a92c6bc5dddd2c21fdbe54fb6f2cecf9fae8",
+        "joint-flight.mp4": "4f7f0d976f943378172b071ba326b7a503c1a8fd36eae86cdc3df877b450fe2c"
+      },
+      "retained_gate_views_at_end": 2
+    },
+    {
+      "name": "validation/live-03",
+      "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+      "shift_m": 0.0,
+      "raw_bytes_removed": 96632954,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 177,
+        "joint_solves": 39,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.03437597247039381,
+        "velocity_rms_m_s": 0.009982301371618183,
+        "tracking_rms_m": 0.025669912140248143,
+        "final_tracking_error_m": 0.03306011228590701,
+        "maximum_command_update_gap_s": 0.04746070900000632,
+        "input_age_ms_median_p95": [
+          10.693474944790893,
+          24.934477026050672
+        ],
+        "gate_return": {
+          "gate_updates": 22,
+          "gate_detection_counts": {
+            "no_complete_refinement": 49,
+            "lost": 54,
+            "accepted": 41,
+            "single_frame_pose": 17,
+            "redetected": 1
+          },
+          "mapped_gate_center": [
+            0.28826656039089915,
+            4.277541100904401,
+            12.616374959972953
+          ],
+          "scored_gate_center": [
+            0.3069114198474424,
+            4.2644443411400355,
+            12.518965915373084
+          ],
+          "gate_return_time": 15.153624302,
+          "gate_return_elapsed_s": 1.2038524021845678,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.0050205978113790906,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.12214260608661051,
+          "half_second_velocity_error_m_s": 0.009795129098815863,
+          "after_return_position_rms_m": 0.1306873014011671,
+          "off_position_rms_m": 0.14819539918050217,
+          "after_return_velocity_rms_m_s": 0.008421377562499761,
+          "off_velocity_rms_m_s": 0.04194185981095487,
+          "final_position_error_m": 0.11780551855686165,
+          "off_final_position_error_m": 0.20212117608584024
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 705,
+      "corrupted_pose_packets": 3004,
+      "artifact_sha256": {
+        "protocol.json": "fc2335dd14765bdf2dac1ba96a05db408292c7edab5a4bf889f9414c4b80dec1",
+        "score.json": "3d17a990004320ea25c2d46973fd42089d5a20badc879c5f0430faae93792482",
+        "joint-initialization.json": "3f4130052773ec04e84d79744cc2559dd0a9d0bce5a0fbd2ad6749e78b520017",
+        "joint-replay.json": "107f5ec97f414babc5e61b279e76a3617fbaf14d5bf9f921d76f11507ad6ac8a",
+        "gate-return.json": "c061a027f09bfc8281fd8a4042c3f2edee36fb745bd86012daf6e5cc8a05e9ac",
+        "joint-flight.mp4": "1bf12d40724a5dfe871dff7a39867f8b7bd5c7fde128b224527abf2fc92a34a5"
+      },
+      "retained_gate_views_at_end": 2
+    },
+    {
+      "name": "validation/live-04",
+      "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+      "shift_m": 0.25,
+      "raw_bytes_removed": 95253697,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 154,
+        "joint_solves": 38,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.028934121855628783,
+        "velocity_rms_m_s": 0.016418370875629692,
+        "tracking_rms_m": 0.0396097125277422,
+        "final_tracking_error_m": 0.018693136826028738,
+        "maximum_command_update_gap_s": 0.05766391701763496,
+        "input_age_ms_median_p95": [
+          12.11530795850635,
+          28.50963674845709
+        ],
+        "gate_return": {
+          "gate_updates": 18,
+          "gate_detection_counts": {
+            "no_complete_refinement": 51,
+            "lost": 56,
+            "accepted": 31,
+            "single_frame_pose": 14,
+            "redetected": 1
+          },
+          "mapped_gate_center": [
+            0.3233380948774376,
+            4.250638187911243,
+            12.557827273181108
+          ],
+          "scored_gate_center": [
+            0.34305889514936466,
+            4.226446179341169,
+            12.419847434239891
+          ],
+          "gate_return_time": 15.142561199000001,
+          "gate_return_elapsed_s": 1.210704918186357,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.004303780217478348,
+          "already_within_bounds_before_return": true,
+          "half_second_position_error_m": 0.12106042977311879,
+          "half_second_velocity_error_m_s": 0.012962733958244833,
+          "after_return_position_rms_m": 0.13669725719175274,
+          "off_position_rms_m": 0.11743663684062793,
+          "after_return_velocity_rms_m_s": 0.016274664183563332,
+          "off_velocity_rms_m_s": 0.036261321729329145,
+          "final_position_error_m": 0.135384928810798,
+          "off_final_position_error_m": 0.1440658218651149
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 618,
+      "corrupted_pose_packets": 2941,
+      "artifact_sha256": {
+        "protocol.json": "64eaf4b02a5ffc088e981f608648ac61e42c37b5ed1adaab53677b81403f8ada",
+        "score.json": "84b2282b5422df408c0d7ee99ce58ce0781712ea9e3aadf04ea8c6bfd1da88cf",
+        "joint-initialization.json": "1c243dc7d9ec6bcd63c4d30d3c8c838b687a518c6a5bfa9e6e3b4130124f3a5c",
+        "joint-replay.json": "3572d917d3abdfbc56250ff2a9e81a5921f2500e03920552fcc93af29dfb4e65",
+        "gate-return.json": "537e86ea247d4b146ed4f77b39d72946108f9c5af8167e1fcc07c37809211bd3",
+        "joint-flight.mp4": "9138fd250517f14e6b4a650ff34f6cde3d51a09b1075cba9e1f0afd11ced4073"
+      },
+      "retained_gate_views_at_end": 2
+    },
+    {
+      "name": "validation/live-05",
+      "revision": "57db713a4a2ad9389319725163f1264dcc48bd0f",
+      "shift_m": 0.5,
+      "raw_bytes_removed": 95485453,
+      "metrics": {
+        "passed_gate_return": true,
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 131,
+        "joint_solves": 36,
+        "resets": 0,
+        "collisions": [],
+        "position_rms_m": 0.03432508572523544,
+        "velocity_rms_m_s": 0.04370155968549006,
+        "tracking_rms_m": 0.11572129270186816,
+        "final_tracking_error_m": 0.12134115157347498,
+        "maximum_command_update_gap_s": 0.08238062501186505,
+        "input_age_ms_median_p95": [
+          15.402658942733183,
+          49.337550506297845
+        ],
+        "gate_return": {
+          "gate_updates": 15,
+          "gate_detection_counts": {
+            "no_complete_refinement": 54,
+            "lost": 55,
+            "accepted": 16,
+            "single_frame_pose": 3,
+            "redetected": 1
+          },
+          "mapped_gate_center": [
+            -0.10339080404834045,
+            4.161015146567805,
+            12.509575670407909
+          ],
+          "scored_gate_center": [
+            -0.0849871683521229,
+            4.14235274567273,
+            12.397871890710737
+          ],
+          "gate_return_time": 15.111280348000001,
+          "gate_return_elapsed_s": 1.195914510679767,
+          "passed_recovery": true,
+          "recovery_delay_s": 0.025435786652042935,
+          "already_within_bounds_before_return": false,
+          "half_second_position_error_m": 0.1356810725088638,
+          "half_second_velocity_error_m_s": 0.04273991661470604,
+          "after_return_position_rms_m": 0.13389559667869316,
+          "off_position_rms_m": 0.2758449522476365,
+          "after_return_velocity_rms_m_s": 0.03927356144860042,
+          "off_velocity_rms_m_s": 0.09060632537390996,
+          "final_position_error_m": 0.19539542995671164,
+          "off_final_position_error_m": 0.29953592715492655
+        }
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 578,
+      "corrupted_pose_packets": 2972,
+      "artifact_sha256": {
+        "protocol.json": "dabbd1e87e1f577057ed5bae7574194761061daa8b566f1d02ddc3ba58a3cf21",
+        "score.json": "99c9d3c975cb43d0fdce9817efb2727401142bd6fdb6ee8435e65e12a74ad362",
+        "joint-initialization.json": "ad1279e0ab06d0980a500522ab23b373d09ebb90e805957f45d205c04ee329e0",
+        "joint-replay.json": "badb55d1c13b002757b69ae36ca84f820cbfacc77610da9bcf34a602118c7d23",
+        "gate-return.json": "aaf8c9e517fb07fc0e85e5457c100918fbeec2a99017b972921de65ae4531e9b",
+        "joint-flight.mp4": "be309ad613a20d72c134af0ac0143b4b6697c065d2d79aefc215eeeb12aa8ef8"
+      },
+      "retained_gate_views_at_end": 2
+    }
+  ],
+  "validation_successes": 5,
+  "validation_trials": 5,
+  "checkpoint_bounds_passed": true,
+  "scorable_paired_comparisons": 5,
+  "aggregate_equal_weight_per_run": {
+    "after_return_position_rms_m": 0.1280932909939214,
+    "off_position_rms_m": 0.1808027037345734,
+    "after_return_velocity_rms_m_s": 0.020633995119765613,
+    "off_velocity_rms_m_s": 0.058024085067912415,
+    "final_position_error_m": 0.1415926144956895,
+    "off_final_position_error_m": 0.2589360775621364
+  },
+  "position_and_velocity_both_improved": true,
+  "actual_recoveries": 1,
+  "accepted_claim": "Five unchanged native slow turns passed the declared return-observation bounds across lateral offsets -0.5 to +0.5m. Camera/IMU estimates drove motor feedback. Retained gate views preserved corrections after observations stopped. Aggregate position and velocity RMS improved against a causal replay with gate residuals disabled.",
+  "observation": "The recent window forgot gate constraints after dropout. Retaining first/latest measured gate views preserves their information while the state and depth fit continue.",
+  "limitations": "One known gate, one slow turn direction, five controlled starts. Gate-off results are causal numerical replays on the actual flown trajectory. Some estimates were within bounds before the gate returned; those are not large-error recoveries. No map growth, online IMU bias estimation, completed gate passage, course-completion or standard-interface qualification claim.",
+  "next_checkpoint": "Add replacement background landmarks before old tracks disappear, then pass two gates with one continuous camera/IMU estimate.",
+  "retention": {
+    "raw_recordings_retained": false,
+    "raw_bytes_removed": 1706600621,
+    "retained_experiment_bytes": 33264194
+  },
+  "deliverables": {
+    "plot": "work/gate-return-20261115/gate-return-errors.png",
+    "plot_sha256": "1db8aea35f8ce4b9c7db1a96ae4c665b5c62e542cd0b2ad789efce899b1e9c9e"
+  }
+}
