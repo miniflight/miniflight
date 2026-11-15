@@ -72,7 +72,10 @@ class WireClient(ProcessClient):
                 self.filtered+=1
                 continue
             if isinstance(packet.decoded,Frame):
-                frame=self.align_frame(packet.decoded)
+                original=packet.decoded;frame=self.align_frame(original)
+                if self.calls.record is not None:
+                    self.calls.record(event='public_camera',image_id=original.id,header_time_ns=original.time_ns,
+                        estimated_time_ns=None if frame is None else frame.time_ns,received_at=original.received_at,shape=original.bgr.shape)
                 if frame is None:
                     continue
                 self.latest_frame=frame
@@ -90,6 +93,9 @@ class WireClient(ProcessClient):
     @timed('sensor_read')
     def read(self,timeout=1.):
         state=super().read(timeout)
+        if self.calls.record is not None and state.imu_samples:
+            self.calls.record(event='public_imu',samples=[dict(time=s.time,received_at=s.received_at,
+                acceleration=list(s.acceleration),gyro=list(s.gyro)) for s in state.imu_samples])
         increments=[]
         for sample in state.imu_samples:
             if self.last_imu_time is not None and sample.time>self.last_imu_time:
@@ -99,6 +105,10 @@ class WireClient(ProcessClient):
         self.state=replace(state,frame=self.latest_frame,imu_increments=tuple(increments),imu_increment_clock=clock)
         assert self.state.motion is None and self.state.attitude is None and self.state.motors is None
         return self.state
+
+    @timed('motor_send')
+    def send(self,command):
+        return super().send(command)
 
 
 class GateController(base.GateController):
@@ -219,6 +229,7 @@ class Controller(base.single.BaseController):
             self.gate.signal['partial_gate']=self.gate.partial_observation
             self.gate.signal.update(full_image_time=self.gate.full_image_time,partial_retargets=self.gate.partial_retargets,
                 aperture_corners_measured=self.gate.last_image_id is not None,measurement_time=self.gate.measurement_time())
+            self.gate.signal['association_counts']=dict(self.gate.association_counts)
         return command
 
 
@@ -265,6 +276,7 @@ def execute(calls,record,path,reader=None,client=None):
             vehicle.validate(command);vehicle.arm();cleanup.arm_phase=ArmPhase.ARM_REQUESTED
             armed_at=vehicle.state.time
         vehicle.send(command)
+        record(event='profile',scope='motor_send',stages={'motor_send':timing_data(client.timing)['motor_send']})
     try:
         run(read_signals,controller.update,send,hz=50.,clock=calls)
     except StopIteration:

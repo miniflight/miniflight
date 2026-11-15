@@ -262,6 +262,8 @@ class GateController(BaseController):
         self.gravity_observation=None
         self.rim_template=RimTemplate();self.partial_motion=GateMotion(.5);self.partial_observation=None
         self.full_image_time=None;self.partial_retargets=0
+        self.association_counts=dict(full_updates=0,tracked_full_updates=0,partial_updates=0,
+            same_component_full_preferred=0,nearer_partial_proposals=0,farther_full_rejected=0)
         self.camera_fusion_started = False
         self.last_relative_gate=None
         self.last_relative_position=None
@@ -287,12 +289,15 @@ class GateController(BaseController):
         if template is None:return False
         top=outer_top(frame.bgr)
         if top is None:return False
-        if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):return False
+        if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):
+            self.association_counts['same_component_full_preferred']+=1
+            return False
         relative=relative_from_top(top[0],rotation,template['width_m'],template['center_to_top_m'])
         if relative is None or relative @ self.direction<1.:return False
         if full_relative is not None and relative @ self.direction>=full_relative @ self.direction-5.:return False
         prior=self.gate_relative() @ self.direction
         if full_relative is not None and relative @ self.direction<prior-5. and hasattr(self,'nearer_gate'):
+            self.association_counts['nearer_partial_proposals']+=1
             predicted=predicted_aperture(top[0],rotation,template['width_m'],template['center_to_top_m'])
             if predicted is None:return False
             track=self.locked
@@ -326,6 +331,7 @@ class GateController(BaseController):
             top_corners=top[0].tolist(),edge_residual_px=top[1],template=template,velocity=velocity,
             raw_position_relative_gate=(-raw_relative).tolist(),radial_position_gain=.05,bearing_motion=bearing,
             position_correction=delta_p.tolist(),velocity_correction=delta_v.tolist())
+        self.association_counts['partial_updates']+=1
         return True
 
     def gate_remaining(self):
@@ -375,7 +381,9 @@ class GateController(BaseController):
         if self.observe_partial(frame,stamp,rotation,position,full_relative,corners if pose is not None else None):return
         if pose is not None and not tracked and SETTINGS.get('partial_gate') and self.locked is not None and (guess is None or vision.iou(corners,guess)<.25):
             predicted_range=self.gate_relative() @ self.direction
-            if full_relative @ self.direction>predicted_range+max(5.,.5*abs(predicted_range)):pose=None
+            if full_relative @ self.direction>predicted_range+max(5.,.5*abs(predicted_range)):
+                self.association_counts['farther_full_rejected']+=1
+                pose=None
         if pose is None:
             self.previous = None if self.locked is None else self.previous
             return
@@ -410,6 +418,8 @@ class GateController(BaseController):
             self.anchor = np.median(self.centers, axis=0)
         self.last_image_time, self.last_image_id = stamp, frame.id
         self.full_image_time=stamp
+        self.association_counts['full_updates']+=1
+        self.association_counts['tracked_full_updates']+=int(tracked)
         self.last_corners = corners.copy()
         self.last_relative_gate=rotation @ pose[2]
         self.last_relative_position=np.array(position).copy()
