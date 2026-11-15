@@ -89,16 +89,19 @@ def analyze(root):
             metric_age_s=statistics([s['imu_time']-s['measurement_time'] for s in signals if s.get('measurement_time') is not None]),
             startup_allowance_s=protocol['settings'].get('startup_allowance_s'),speed_limit_m_s=protocol['settings'].get('speed_m_s')),
         control=dict(host_command_interval_ms=statistics(np.diff(control_times)*1000),command_count=len(commands),
+            command_intervals_over_25ms=int(np.sum(np.diff(control_times)>.025)),command_intervals_over_40ms=int(np.sum(np.diff(control_times)>.040)),
             rate_tracking_rms_rad_s=None if not len(rate_error) else np.sqrt(np.mean(rate_error**2,axis=0)).tolist(),
             motor_minimum=None if not len(motors) else float(motors.min()),motor_maximum=None if not len(motors) else float(motors.max()),
             motor_sample_saturation_fraction=None if not len(motors) else float(np.mean((motors<=.001)|(motors>=.999)))),
-        timing=dict(inclusive_stages=timing,controller_period_goal_ms=20.,
+        timing=dict(inclusive_stages=timing,controller_period_goal_ms=20.,host_window=dict(start=arm,end=last),
             note='Nested stage times overlap and must not be summed. Profiling is separate telemetry, excluded from control and exact command comparison.'),
         model=dict(supplied_config=protocol['settings'].get('position_config') is not None,sha256=protocol['settings'].get('dynamics_model_sha256')),
         scoring={k:score.get(k) for k in ['native_gates_passed','estimated_gates_passed','native_completed','native_finish_time_s','valid_race','passed_without_reset','controller_error','reset_calls_during_flight']},
         contacts=len(score.get('in_flight_collision_packets',[])),public_input_export='public-inputs.npz',visual_export='public-observations.jsonl.gz')
     (root/'pipeline.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
-    return report
+    from .pipeline_latency import update
+    update(root)
+    return json.loads((root/'pipeline.json').read_text())
 
 
 def render(root):

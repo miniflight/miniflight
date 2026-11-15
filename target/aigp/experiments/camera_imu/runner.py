@@ -386,7 +386,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
                              'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
-                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz'):
+                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz'):
                     if (raw/name).exists():shutil.copyfile(raw/name,root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
                 (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")

@@ -6,6 +6,23 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_client_delay_uses_receipt_and_send_return_without_exposure_claim(self):
+        from target.aigp.experiments.camera_imu.pipeline_latency import measure
+        data=dict(motor_sent_host_time=np.array([9.,10.05,10.15,11.]),imu_received_at=np.array([10.04,10.14]),
+            frame_id=np.array([1,2]),frame_received_at=np.array([10.,10.1]))
+        # Two constraints from one frame count once, after the last constraint is ready.
+        observations=[dict(image_id=1,host_time=10.01),dict(image_id=1,host_time=10.03),
+            dict(image_id=2,host_time=10.12),dict(image_id=3,host_time=10.13)]
+        report,rows=measure(data,observations,10.,10.2)
+        self.assertEqual(len(rows),2);self.assertEqual(report['missing_frame_receipts'],1)
+        self.assertAlmostEqual(report['receipt_to_send_return_ms']['median'],50.)
+        self.assertAlmostEqual(report['receipt_to_candidate_ms']['median'],25.)
+        self.assertAlmostEqual(report['latest_imu_receipt_to_send_return_ms']['median'],10.)
+        self.assertIsNone(report['exposure_to_actuation_ms'])
+        unarmed,_=measure(data,observations)
+        self.assertEqual(unarmed['candidate_images'],0)
+        self.assertEqual(unarmed['latest_imu_receipt_to_send_return_ms']['count'],0)
+
     def test_pipeline_reports_wall_cpu_and_host_time_separately(self):
         from target.aigp.experiments.camera_imu.pipeline import analyze
         rows=[dict(event='call',name='arm',host_time=1000.,arguments=dict(armed=True)),
