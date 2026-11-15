@@ -134,6 +134,8 @@ class Phase(Enum):
 
 class Inertial:
     def __init__(self):
+        self.force_model=None
+        self.prediction_bias=np.zeros(3)
         self.seed = []
         self.rotation = None
         self.position = np.zeros(3)
@@ -153,8 +155,14 @@ class Inertial:
                 self.rotation = stationary_rotation(force.mean(axis=0))
             elif sample.time > self.time:
                 gyro = .5*(np.array(self.gyro)+sample.gyro)
+                previous_body=self.rotation.as_rotation_matrix()
                 self.rotation = gyro_step(self.rotation, gyro, sample.dt)
-                acceleration = self.rotation.as_rotation_matrix() @ sample.acceleration + [0, 0, 9.81]
+                body=self.rotation.as_rotation_matrix()
+                if self.force_model is None:
+                    acceleration = body @ sample.acceleration + [0, 0, 9.81]
+                else:
+                    acceleration=.5*(previous_body @ self.force_model(previous_body,self.velocity)
+                        +body @ self.force_model(body,self.velocity))+[0.,0.,9.81]+self.prediction_bias
                 velocity = self.velocity + acceleration*sample.dt
                 self.position = self.position + .5*(self.velocity+velocity)*sample.dt
                 self.velocity = velocity
@@ -175,7 +183,10 @@ class Inertial:
         return np.array([np.interp(stamp, self.times, column) for column in np.asarray(self.velocities).T])
 
     def correct_velocity(self, stamp, measured, gain):
-        delta = gain*(np.asarray(measured)-self.velocity_at(stamp))
+        innovation=np.asarray(measured)-self.velocity_at(stamp)
+        delta = gain*innovation
+        if self.force_model is not None:
+            self.prediction_bias=np.clip(self.prediction_bias+.3*delta,-3.,3.)
         for i in range(bisect_left(self.times, stamp), len(self.times)):
             self.velocities[i] += delta
             self.positions[i] += delta*(self.times[i]-stamp)

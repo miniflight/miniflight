@@ -161,6 +161,18 @@ def replay(path, poison=False):
                             message.vx, message.vy, message.vz = 200., -300., 400.
                         elif kind == "ATTITUDE":
                             message.roll, message.pitch, message.yaw = 2., -1.5, .75
+                        elif SETTINGS.get('continuous_course') and kind=='ODOMETRY':
+                            message.x,message.y,message.z=11111.,-22222.,33333.
+                            message.vx,message.vy,message.vz=999.,-888.,777.
+                            message.q=[.5,.5,.5,.5]
+                        elif SETTINGS.get('continuous_course') and kind=='DATA_TRANSMISSION_HANDSHAKE':
+                            message.size,message.packets,message.width,message.height=2_000_000_000,50000,50000,50000
+                        elif SETTINGS.get('continuous_course') and kind=='ENCAPSULATED_DATA':
+                            message.data=bytearray([message.data[0]]+[255]*(len(message.data)-1))
+                        elif SETTINGS.get('continuous_course') and kind=='ACTUATOR_OUTPUT_STATUS':
+                            message.actuator=[1234.]*len(message.actuator)
+                        elif SETTINGS.get('continuous_course') and kind=='COLLISION':
+                            message.id,message.action,message.threat_level=65535,0,0
                         else:
                             continue
                         packet["wire"] = base64.b64encode(message.pack(encoder)).decode("ascii")
@@ -204,7 +216,7 @@ def replay(path, poison=False):
         compared["race"]["active_gate_index"] = expected["race"]["active_gate_index"]
     assert compared == expected, (compared, expected)
     return dict(calls=calls.count, wire_commands=client.wire_commands, exact_updates=True,
-                corrupted_pose_packets=changed, native_gate_counter_zeroed=poison, outcome=outcome)
+                corrupted_pose_packets=changed,corrupted_navigation_packets=changed, native_gate_counter_zeroed=poison, outcome=outcome)
 
 
 def live(root, shift):
@@ -343,6 +355,7 @@ def one(root, shift, course_gates=None, speed=2.):
             camera_window_s=1.,
             startup_allowance_s=8.,
             visibility_height_change_m=1.5,
+            motion_prediction='command_model',
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
     try:
@@ -360,7 +373,7 @@ def one(root, shift, course_gates=None, speed=2.):
             finally:
                 for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
                              "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png", "gate-return.json",
-                             'course-camera-imu.mp4','video.json','state-errors.csv'):
+                             'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())

@@ -5,16 +5,54 @@ from pymavlink.dialects.v20 import common
 
 from miniflight.state import Frame
 from miniflight.replay import Calls
-from target.aigp.experiments.camera_imu.course import WireClient, alignment_step
+from target.aigp.experiments.camera_imu.course import WireClient, alignment_step, command_specific_force
 from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
 from target.aigp.experiments.camera_imu.motion import GateMotion
 from target.aigp.experiments.camera_imu import vision
-from target.aigp.experiments.camera_imu.score import scored_gate_passes
+from target.aigp.experiments.camera_imu.score import scored_gate_passes, armed_contacts
 import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_starting_pad_contact_does_not_hide_an_armed_contact(self):
+        records=[dict(host=t) for t in [1.,2.,3.,4.,5.]]
+        self.assertEqual(armed_contacts(records,2.5,4.5),records[2:4])
+        self.assertEqual(armed_contacts(records,None,None),records)
+
+    def test_command_force_matches_thrust_controller_calibration(self):
+        from miniflight.position import PositionConfig,acceleration_control
+        from scipy.spatial.transform import Rotation
+        config=PositionConfig(.266324,50.6777,thrust_curve=(22.991917337356192,51.97762843873237))
+        for acceleration in ([0.,0.,0.],[2.,0.,0.]):
+            pitch=-np.arctan2(acceleration[0],9.81)
+            body=Rotation.from_euler('y',pitch).as_matrix()
+            request=acceleration_control(config,acceleration,[0.,pitch,0.],0.)
+            specific=command_specific_force(config,[request.thrust]*4,body,np.zeros(3))
+            np.testing.assert_allclose(body @ specific+[0.,0.,9.81],acceleration,atol=1e-8)
+
+    def test_model_prediction_is_not_driven_by_a_bad_wire_acceleration(self):
+        from common.math import Quaternion
+        from miniflight.state import ImuIncrement
+        observer=sensors.Inertial();observer.rotation=Quaternion(1.,0.,0.,0.)
+        observer.time=0.;observer.gyro=np.zeros(3)
+        observer.force_model=lambda body,velocity:np.array([0.,0.,-9.81])
+        observer.update([ImuIncrement(.1,.1,(100.,100.,100.),(0.,0.,0.))])
+        np.testing.assert_allclose(observer.velocity,0.,atol=1e-10)
+        np.testing.assert_allclose(observer.position,0.,atol=1e-10)
+
+    def test_camera_velocity_learns_a_constant_model_force_bias(self):
+        from common.math import Quaternion
+        from miniflight.state import ImuIncrement
+        observer=sensors.Inertial();observer.rotation=Quaternion(1.,0.,0.,0.)
+        observer.time=0.;observer.gyro=np.zeros(3)
+        observer.force_model=lambda body,velocity:np.array([0.,0.,-9.31])
+        for i in range(1,1001):
+            observer.update([ImuIncrement(i*.01,.01,(0.,0.,-9.81),(0.,0.,0.))])
+            if i%5==0:observer.correct_velocity(i*.01,np.zeros(3),.2)
+        self.assertLess(abs(observer.velocity[2]),.03)
+        self.assertLess(abs(observer.prediction_bias[2]+.5),.08)
+
     def test_finish_freeze_does_not_hide_an_earlier_missed_gate(self):
         gates=[dict(native_pass=True,crossing_imu_time_s=float(i)) for i in range(6)]
         gates[-1]['crossing_imu_time_s']=None

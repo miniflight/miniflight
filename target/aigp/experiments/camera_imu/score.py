@@ -24,12 +24,18 @@ def scored_gate_passes(gates,completed_finish=False):
         for index,gate in enumerate(gates))
 
 
+def armed_contacts(collisions,armed_at,disarmed_at):
+    if armed_at is None:return list(collisions)
+    return [c for c in collisions if c['host']>=armed_at and (disarmed_at is None or c['host']<=disarmed_at)]
+
+
 def score(root):
     path = root/"flight.jsonl"
     decoder = common.MAVLink(None)
     positions, attitudes, ticks, race, collisions, arms, outcomes = [], [], [], [], [], [], []
     accepted = set()
     resets = 0
+    armed_at,disarmed_at=None,None
     settings = json.loads(path.open().readline())["metadata"]["settings"]
     observations, previous_image, host_offset = [], None, None
     for row in map(json.loads, path.open()):
@@ -38,6 +44,8 @@ def score(root):
                 resets += 1
             elif row["name"] == "arm":
                 arms.append(row["arguments"]["armed"])
+                if row['arguments']['armed'] and armed_at is None:armed_at=row['host_time']
+                elif not row['arguments']['armed']:disarmed_at=row['host_time']
             elif row["name"] == "race":
                 race.extend(row.get("result", []))
             elif row["name"] == "producer_imu" and row.get("result", {}).get("rows"):
@@ -96,6 +104,11 @@ def score(root):
         native_finish_time_s=next((state['finish_time_seconds'] for state in race if state['completed']),None),
         estimated_gates_passed=outcomes[-1].get('estimated_gates_passed',max((tick.get('estimated_gates_passed',0) for tick in ticks),default=0)),
         termination=outcomes[-1].get('termination'))
+    flight_contacts=armed_contacts(collisions,armed_at,disarmed_at)
+    result.update(armed_host_time=armed_at,disarmed_host_time=disarmed_at,
+        in_flight_collision_packets=flight_contacts,prearm_collision_packets=[c for c in collisions if armed_at is not None and c['host']<armed_at])
+    result['final_native_state']=dict(time=float(p[-1,0]),position_ned=p[-1,1:4].tolist(),velocity_ned=p[-1,4:7].tolist())
+    result['prediction_bias']=outcomes[-1].get('prediction_bias')
     trim=lambda s:{k:s[k] for k in ['started','valid','completed','time_seconds','active_gate_index','received_at']}
     result['race_audit']=dict(first=trim(race[0]) if race else None,
         first_invalid=next((trim(s) for s in race if not s['valid']),None),
@@ -144,7 +157,7 @@ def score(root):
     if settings.get('continuous_course') and requested==6:
         passed=passed and native_finish
     result["passed_without_reset"] = (passed and result["controller_error"] is None
-        and result["controller_phase"] == "COMPLETE" and result["valid_race"] and not collisions
+        and result["controller_phase"] == "COMPLETE" and result["valid_race"] and not (flight_contacts if settings.get('continuous_course') else collisions)
         and resets == 0 and arms == [True, False] and clock_regressions == 0 and len(histories) == 1)
     if requested == 2:
         result["passed_two_without_reset"] = result["passed_without_reset"]

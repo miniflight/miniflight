@@ -1,6 +1,7 @@
 """Course pilot using camera and public HIGHRES_IMU; native state is scorer-only."""
 from collections import deque
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import cv2
@@ -8,6 +9,7 @@ import cv2
 from miniflight import vehicle
 from miniflight.loop import run
 from miniflight.state import Frame, ImuClock, ImuIncrement
+from miniflight.position import quadratic_resistance
 from target.aigp.client import HeartbeatCadence
 from target.aigp.experiments.recording import ProcessClient, RaceReader, RecordedController
 from target.aigp.simulator import AIGPSimulator, ArmPhase
@@ -19,6 +21,23 @@ def alignment_step(predicted_height,age,pixel_y,direction):
     if age<=.3:return predicted_height
     if pixel_y is None:return 2.*direction
     return float(np.clip((pixel_y-220.)/80.*2.,-3.,3.))
+
+
+def command_specific_force(config,outputs,body,velocity):
+    """Predict force from our own commands and calibrated vehicle parameters."""
+    if outputs is None:
+        return body.T @ np.array([0.,0.,-9.81])
+    motors=np.asarray(outputs)
+    if config.thrust_curve is not None:
+        linear,quadratic=config.thrust_curve
+        thrust=float(np.mean(linear*motors+quadratic*motors**2))
+    else:
+        thrust=9.81+config.thrust_acceleration*(float(np.mean(motors))-config.hover_thrust)
+    if config.body_resistance_per_m is not None:
+        drag=np.array(quadratic_resistance(body.T @ velocity,config.body_resistance_per_m))
+    else:
+        drag=body.T @ quadratic_resistance(velocity,config.resistance_per_m)
+    return np.array([0.,0.,-thrust])-drag
 
 
 class WireClient(ProcessClient):
@@ -82,6 +101,7 @@ class GateController(base.GateController):
         self.alignment_settled=None
         self.alignment_gate=1
         self.alignment_direction=1.
+        self.motor_outputs=None
 
     def drive(self,target):
         if self.alignment_gate!=self.gate_number:
@@ -143,6 +163,8 @@ class GateController(base.GateController):
         if self.gate_number>1 and self.phase is base.single.Phase.ACQUIRING and self.acquisition_prior is None:
             self.handoff_target=self.search_waypoint(frames)
         request=super().update(telemetry,frames,None)
+        if self.locked is not None and base.SETTINGS.get('motion_prediction')=='command_model' and self.inertial.force_model is None:
+            self.inertial.force_model=lambda body,velocity:command_specific_force(self.config,self.motor_outputs,body,velocity)
         if self.gate_number>1 and self.phase is base.single.Phase.ACQUIRING:
             self.signal['search_hint']=self.search_hint
         if self.gate_number==base.SETTINGS['gates_to_pass'] and self.locked is not None:
@@ -166,7 +188,9 @@ class Controller(base.single.BaseController):
         self.motor=base.single.Motors(position=self.gate)
 
     def update(self,telemetry,frames,race_state):
-        return self.motor.update(telemetry,frames,None)
+        command=self.motor.update(telemetry,frames,None)
+        if command is not None:self.gate.motor_outputs=command.outputs
+        return command
 
 
 def execute(calls,record,path,reader=None,client=None):
@@ -216,6 +240,8 @@ def execute(calls,record,path,reader=None,client=None):
         error=dict(type=type(exception).__name__,message=str(exception))
         record(event='flight_error',error=error)
     finally:
+        if calls.record is not None and client.latest_frame is not None:
+            cv2.imwrite(str(Path(path).parent/'last-camera.jpg'),client.latest_frame.bgr)
         try:
             cleanup.stop()
         finally:
@@ -227,5 +253,7 @@ def execute(calls,record,path,reader=None,client=None):
         final_signal=None if instance is None else instance.gate.signal,race=None,termination=reason,
         estimated_gates_passed=0 if instance is None else len(instance.gate.completed),
         estimated_gate_number=0 if instance is None else instance.gate.gate_number,armed_boot_time=armed_at)
+    if instance is not None:
+        outcome['prediction_bias']=instance.gate.inertial.prediction_bias.tolist()
     record(event='result',**outcome)
     return outcome,client
