@@ -6,6 +6,20 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_pipeline_input_export_drops_native_and_fused_fields(self):
+        from target.aigp.experiments.camera_imu.pipeline import collect
+        rows=[dict(event='public_imu',samples=[dict(time=1.,received_at=1001.,acceleration=[0.,0.,-9.81],gyro=[.1,.2,.3],native_position=[99]*3)]),
+              dict(event='public_camera',image_id=3,header_time_ns=1000000000000,estimated_time_ns=1000000000,received_at=1001.,shape=[360,640,3]),
+              dict(event='call',name='send',host_time=1001.,arguments=dict(kind='MotorControls',outputs=[.25]*4)),
+              dict(event='native_pose',position=[99]*3,velocity=[99]*3),
+              dict(event='update',signals=dict(position=[99]*3,velocity=[99]*3))]
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'flight.jsonl';path.write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            data,_=collect(path)
+            self.assertFalse(any('position' in name or 'velocity' in name for name in data))
+            np.testing.assert_array_equal(data['gyro'],[[.1,.2,.3]])
+            np.testing.assert_array_equal(data['motor_outputs'],[[.25]*4])
+
     def test_pixel_identity_precedes_depth_for_full_and_partial_views(self):
         import cv2
         from target.aigp.experiments.camera_imu.partial import same_red_component
