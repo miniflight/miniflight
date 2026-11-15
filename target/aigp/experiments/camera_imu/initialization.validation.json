@@ -1,0 +1,429 @@
+{
+  "date": "2026-11-15",
+  "implementation_revision": "8b6b849981b4b1668bd3120302c275a8e2f225d8",
+  "protocol": {
+    "recorded_at": "2026-11-15T07:26:55.469945+00:00",
+    "exploratory_run_already_observed": "shadow-01",
+    "hypothesis": "A shared static-gate image fit with measured IMU acceleration reduces the initial motion bias inherited by the anchored joint estimator.",
+    "unchanged": {
+      "gate_side_m": 1.5,
+      "shift_right_m": -0.5,
+      "turn_speed_m_s": 1.0,
+      "trajectory_turn_degrees": 20.0,
+      "direction": "right",
+      "joint_model_version": 2
+    },
+    "sources": {
+      "miniflight/initialization.py": "ac77ee3261713fcb7c99b19605eedc8ee498ca781e1d47814aef56ab432ee809",
+      "miniflight/joint.py": "a5ecbd770a43ecf35d6755283001d7d2c76ad35fb3a2fa11f70e8ef31e7ed83b",
+      "miniflight/odometry.py": "d5b18eed52beac59f78de7a564d0fe2ed2aa980131c5b935dec2ef2479fdb475",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "bf7899d46323c31653efe8e223d3f7042c3d28d12baf0e2cca3327bbbc551f8b",
+      "target/aigp/experiments/camera_imu/joint_control.py": "113882db39b4ef338e439a98eb333fe860a90d1f3aa58f5deccca5a46d66da8f",
+      "target/aigp/experiments/camera_imu/joint_score.py": "1356fed0ca1f3d05b83a56ce6be9ac2c725335d051378dadc88a3570148f5a2e",
+      "target/aigp/experiments/camera_imu/runner.py": "941a6cbd7d6855d3b4514b4704a170a10240c5b2e85c808f108032460d6930a8"
+    },
+    "shadow_protocol": {
+      "runs": [
+        "shadow-01",
+        "shadow-02"
+      ],
+      "control": "linear baseline",
+      "candidate": "reprojection",
+      "promotion": "Both image fits below 0.5 pixel RMS; candidate paired RMS and worst velocity error lower than baseline."
+    },
+    "live_protocol": {
+      "runs": [
+        "live-01",
+        "live-02"
+      ],
+      "control": "reprojection",
+      "required": "Both satisfy unchanged native joint-turn acceptance and exact/poisoned process replay.",
+      "improvement": {
+        "maximum_final_tracking_error_m": 0.4387886871271365,
+        "mean_final_tracking_error_m": 0.25
+      },
+      "stop": "Retain mixed or failed results; do not change thresholds or optimizer parameters between these two live trials."
+    },
+    "sensor_inputs": [
+      "camera pixels",
+      "known intrinsics and mount",
+      "known gate size for initialization",
+      "measured-dt gyro and acceleration",
+      "gravity from at-rest IMU orientation, 9.81m/s2"
+    ],
+    "privileged_motion": "postflight scorer only",
+    "raw_retention": "Temporary trace, 128MiB cap; compact numeric inputs and five-second clip retained."
+  },
+  "device": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "opencv": "5.0.0",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1"
+  },
+  "unit_tests_passed": 30,
+  "passed": true,
+  "scope": "Native closed-loop slow trajectory turn and braking, using the joint estimate for motor feedback.",
+  "native_executable_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "command": "python -m target.aigp.experiments.camera_imu joint OUTPUT --shift -.5 --joint-init reprojection",
+  "simulator_motion_used_only_for_scoring": true,
+  "shadow": [
+    {
+      "name": "shadow-01",
+      "revision": "b042c7787f1934270d5df3ca455e18dadce1e564",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 209,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "initialization": [
+          {
+            "reference_time": 11.553090300410986,
+            "cut_time": 13.584316849708557,
+            "corner_views": 62,
+            "linear_position_error_m": 0.08727576353369526,
+            "linear_velocity_error_m_s": 0.043318879810308644,
+            "numerical_replay_difference": 0.0,
+            "candidate_valid": true,
+            "candidate_position_error_m": 0.020426213724972213,
+            "candidate_velocity_error_m_s": 0.011980548811300529,
+            "reprojection_rms_px": 0.3860356516717348,
+            "fit_ms": 3.5710419761016965
+          }
+        ],
+        "position_rms_m": 0.17698275152926282,
+        "velocity_rms_m_s": 0.03689645925568075,
+        "tracking_rms_m": 0.169496365903202,
+        "maximum_tracking_error_m": 0.20234282164353426,
+        "heading_change_deg": 19.01771999604903,
+        "final_actual_speed_m_s": 0.14254592077390027,
+        "final_tracking_error_m": 0.2507739871271365,
+        "depth_revisions": 27,
+        "depth_change": 0.027275,
+        "solve_ms_min_median_p95_max": [
+          3.2165420125238597,
+          5.607291997876018,
+          11.54437504010275,
+          20.010749984066933
+        ],
+        "maximum_command_update_gap_s": 0.04184374999022111,
+        "maximum_capture_clock_error_s": 2.309203495087786e-09,
+        "input_age_ms_median_p95": [
+          7.505916987561534,
+          15.307023335599006
+        ],
+        "gate_pose_last_used_time": 13.58431685,
+        "joint_control_start_time": 13.952266,
+        "maximum_turn_speed_m_s": 1.0543926692523387,
+        "joint_solves_during_turn": 11,
+        "depth_revisions_during_turn": 11,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 736,
+      "corrupted_pose_packets": 3043,
+      "raw_bytes_removed": 96243009,
+      "artifact_sha256": {
+        "protocol.json": "d4134fa58c8f95dd0971c28def5453b4c38614b8aab86df179cf19ea8a26c0a8",
+        "joint-initialization.json": "33e723e5b1cc90d53a9a55609421a7194f81797b497e503731eb04806c4b60b8",
+        "joint-replay.json": "603a805d497f3da51ef916a50428831deb8a534807fd4172a23b84db0b5160b1",
+        "joint-trajectory.json": "14a6a8e399f002a141ada379cd0675f327fdf9e51b03da47a51868c0518e153c",
+        "joint-flight.mp4": "30708e53ee84f4131c1ab037b3c1d0203760c30361b94bb81ca884d3164fcf1a"
+      }
+    },
+    {
+      "name": "shadow-02-retry",
+      "revision": "8b6b849981b4b1668bd3120302c275a8e2f225d8",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 210,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "initialization": [
+          {
+            "reference_time": 11.574813049286604,
+            "cut_time": 13.607658751308918,
+            "corner_views": 62,
+            "linear_position_error_m": 0.04218977506414734,
+            "linear_velocity_error_m_s": 0.019281085765207408,
+            "numerical_replay_difference": 0.0,
+            "candidate_valid": true,
+            "candidate_position_error_m": 0.056309705676501225,
+            "candidate_velocity_error_m_s": 0.031219484750507336,
+            "reprojection_rms_px": 0.3879038441680028,
+            "fit_ms": 19.01429204735905
+          }
+        ],
+        "position_rms_m": 0.07157455413806431,
+        "velocity_rms_m_s": 0.01567783313012019,
+        "tracking_rms_m": 0.06342499591341538,
+        "maximum_tracking_error_m": 0.12062165192682103,
+        "heading_change_deg": 20.055828978855395,
+        "final_actual_speed_m_s": 0.18891421498204383,
+        "final_tracking_error_m": 0.08418316919631455,
+        "depth_revisions": 27,
+        "depth_change": 0.035157,
+        "solve_ms_min_median_p95_max": [
+          2.688916982151568,
+          6.518082984257489,
+          12.011387507664038,
+          18.493291980121285
+        ],
+        "maximum_command_update_gap_s": 0.04131512495223433,
+        "maximum_capture_clock_error_s": 2.3579627139724835e-09,
+        "input_age_ms_median_p95": [
+          7.523903958610134,
+          15.625933737474353
+        ],
+        "gate_pose_last_used_time": 13.607658751,
+        "joint_control_start_time": 13.964701999999999,
+        "maximum_turn_speed_m_s": 1.0241993052792604,
+        "joint_solves_during_turn": 12,
+        "depth_revisions_during_turn": 12,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 733,
+      "corrupted_pose_packets": 2989,
+      "raw_bytes_removed": 95660562,
+      "artifact_sha256": {
+        "protocol.json": "95ea63718397c9f64e326282ef05dfa40a2af43acfdba63ff00ef23c68eb6b37",
+        "joint-initialization.json": "fb81e5c9caf868e81f51ff5c2ead6ed8ad55dd0ef5c36ae0c42ed5cda033a9bd",
+        "joint-replay.json": "4b2e8fbb3bde37abc2f81beed25a2a9b2d756309f5c8d6f9b6533bdd2dcd4dd7",
+        "joint-trajectory.json": "79e6ce7b123f20b05a1f4c82afd207d5b4a82ade0326a3666a15166f91f8a094",
+        "joint-flight.mp4": "ec2a6d5ad7b69d66957eb451646b02cf91fe87142b388f6a5acd764f7dd16136"
+      }
+    }
+  ],
+  "live": [
+    {
+      "name": "live-01",
+      "revision": "8b6b849981b4b1668bd3120302c275a8e2f225d8",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 206,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "initialization": [
+          {
+            "reference_time": 11.516686499118805,
+            "cut_time": 13.516879200935364,
+            "corner_views": 61,
+            "linear_position_error_m": 0.08052355729403596,
+            "linear_velocity_error_m_s": 0.04070645674021285,
+            "numerical_replay_difference": 0.0,
+            "candidate_valid": true,
+            "candidate_position_error_m": 0.04237868831497473,
+            "candidate_velocity_error_m_s": 0.02197853096523105,
+            "reprojection_rms_px": 0.39306665749251973,
+            "fit_ms": 4.434332950040698
+          }
+        ],
+        "position_rms_m": 0.10574600104074187,
+        "velocity_rms_m_s": 0.03530863558556283,
+        "tracking_rms_m": 0.09655516513689652,
+        "maximum_tracking_error_m": 0.1354359261923622,
+        "heading_change_deg": 20.30264498475754,
+        "final_actual_speed_m_s": 0.13710853731239406,
+        "final_tracking_error_m": 0.2039863472493293,
+        "depth_revisions": 27,
+        "depth_change": 0.020716,
+        "solve_ms_min_median_p95_max": [
+          3.361749986652285,
+          6.25337497331202,
+          18.26395798707381,
+          20.83687501726672
+        ],
+        "maximum_command_update_gap_s": 0.04556458297884092,
+        "maximum_capture_clock_error_s": 2.2545325606415645e-09,
+        "input_age_ms_median_p95": [
+          7.390950001197716,
+          15.843749732824541
+        ],
+        "gate_pose_last_used_time": 13.516879201,
+        "joint_control_start_time": 13.889672,
+        "maximum_turn_speed_m_s": 1.060518694193797,
+        "joint_solves_during_turn": 12,
+        "depth_revisions_during_turn": 12,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 730,
+      "corrupted_pose_packets": 3031,
+      "raw_bytes_removed": 95850953,
+      "artifact_sha256": {
+        "protocol.json": "60d86ccef7b8f630ff5e3a396953a80baa6f52ebfcf35328fd8d206d11c4959d",
+        "joint-initialization.json": "25dafac441c22f44a442b3fcb2c6ea19a28a8c41f626a8460cd27d8812a2f81e",
+        "joint-replay.json": "5dcb9d49ae5afb31f2946a4f35887d601fa7b34407e2f92a7f62f0b33322834d",
+        "joint-trajectory.json": "913519ae96c68abb1d2c22cbe971873af32d5887652393ee6604e6534b33c671",
+        "joint-flight.mp4": "4a8784d895918b37240c594d3c37a792f2bc76b118d71e27aa55af7975b2d32a"
+      }
+    },
+    {
+      "name": "live-02",
+      "revision": "8b6b849981b4b1668bd3120302c275a8e2f225d8",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 207,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "initialization": [
+          {
+            "reference_time": 11.548180598765612,
+            "cut_time": 13.54814749956131,
+            "corner_views": 61,
+            "linear_position_error_m": 0.04813209366164353,
+            "linear_velocity_error_m_s": 0.023576898848404595,
+            "numerical_replay_difference": 0.0,
+            "candidate_valid": true,
+            "candidate_position_error_m": 0.013700616464854752,
+            "candidate_velocity_error_m_s": 0.008318958867857192,
+            "reprojection_rms_px": 0.4136164426912754,
+            "fit_ms": 8.23287502862513
+          }
+        ],
+        "position_rms_m": 0.04192229499755526,
+        "velocity_rms_m_s": 0.02251822875253665,
+        "tracking_rms_m": 0.04156431902121765,
+        "maximum_tracking_error_m": 0.07252573449151056,
+        "heading_change_deg": 21.166280026807474,
+        "final_actual_speed_m_s": 0.1774088624518062,
+        "final_tracking_error_m": 0.11872476252994571,
+        "depth_revisions": 27,
+        "depth_change": 0.068602,
+        "solve_ms_min_median_p95_max": [
+          3.9053329965099692,
+          6.760916963685304,
+          15.356249990873039,
+          18.914500018581748
+        ],
+        "maximum_command_update_gap_s": 0.04732445895206183,
+        "maximum_capture_clock_error_s": 2.2731541093889973e-09,
+        "input_age_ms_median_p95": [
+          8.089508002125712,
+          16.22912556518763
+        ],
+        "gate_pose_last_used_time": 13.5481475,
+        "joint_control_start_time": 13.915139,
+        "maximum_turn_speed_m_s": 1.0333984298300662,
+        "joint_solves_during_turn": 12,
+        "depth_revisions_during_turn": 12,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "motor_commands": 731,
+      "corrupted_pose_packets": 3010,
+      "raw_bytes_removed": 95827969,
+      "artifact_sha256": {
+        "protocol.json": "60d86ccef7b8f630ff5e3a396953a80baa6f52ebfcf35328fd8d206d11c4959d",
+        "joint-initialization.json": "c6f597719a716fef295366e0784da88b3152de855969ca6d6103be79b9050537",
+        "joint-replay.json": "a57dc6a00b3db1bae8927d4edc99c5b9b37e78fae814f59822ab15aac9b2c413",
+        "joint-trajectory.json": "b3206ba7f789600da2f043d1431ae01bd56f42c015076e5a565424fc8bca9d45",
+        "joint-flight.mp4": "d600c7b713e4f7fcda634738d800d4e5d4bb0385ddcfde9e2f28cad9208df9f9"
+      }
+    }
+  ],
+  "startup_failure": {
+    "name": "shadow-02",
+    "error": {
+      "type": "TimeoutError",
+      "message": "sensor-only reset setup"
+    },
+    "stage": "Before flight: native reset was not acknowledged; unchanged retry is shadow-02-retry.",
+    "raw_bytes_removed": 58633323
+  },
+  "shadow_comparison": {
+    "velocity_rms_m_s": {
+      "linear": 0.033528238965872106,
+      "candidate": 0.0236451874374799
+    },
+    "worst_velocity_error_m_s": {
+      "linear": 0.043318879810308644,
+      "candidate": 0.031219484750507336
+    },
+    "promoted": true,
+    "caveat": "Candidate was worse in shadow-02-retry: 3.1 versus 1.9cm/s; lower paired RMS and worst error across the two shadow runs."
+  },
+  "endpoint_comparison": {
+    "previous_pair_m": [
+      0.043901231602062704,
+      0.43878871317901286
+    ],
+    "current_pair_m": [
+      0.2039863472493293,
+      0.11872476252994571
+    ],
+    "frozen_improvement_criteria_passed": true,
+    "caveat": "Fresh native runs of the same setup, not paired identical pixel/IMU inputs; two repetitions do not establish general reliability."
+  },
+  "accepted_claim": "Two unchanged approximately 1m/s rightward turns passed with multi-frame gate/IMU initialization, continued joint position/velocity/depth feedback, and successful braking. Gate measurements were frozen before joint takeover.",
+  "limitations": "One controlled shifted start and one direction. Known 1.5m nominal gate size sets scale. Initial state and landmark bearings remain anchored. No online IMU bias estimation, map growth, gate reacquisition, completed gate passage, full course, or qualification claim.",
+  "next_checkpoint": "Use a newly observed gate to correct remaining drift without resetting the running estimator.",
+  "retention": {
+    "raw_recordings_retained": false,
+    "raw_bytes_removed": 442215816,
+    "retained_experiment_bytes": 6645847
+  },
+  "deliverables": {
+    "video": "work/joint-init-20261115/live-02/joint-flight.mp4",
+    "plot": "work/joint-init-20261115/tracking-errors.png",
+    "plot_sha256": "66d9dd8f38a71cdca52868e2f85a506ae3d83a4a8c3eb06a0db6286f592e79ff"
+  }
+}
