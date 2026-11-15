@@ -90,5 +90,50 @@ def run(root):
     result['heldout']=[dict(source=x['source'],**score(windows(cache[x['path']],p,lag),theta)) for x in manifest['heldout']]
     (root/'fit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 
+
+def shared_drag(root,output):
+    """Reduce weakly identified drag freedom using training-flight CV only."""
+    manifest_path=root/'manifest.json';manifest=json.loads(manifest_path.read_text())
+    separate=json.loads((root/'training-fit.json').read_text())
+    manifest_hash=hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    if manifest_hash!=separate['input_manifest_sha256']:raise ValueError('Training manifest changed')
+    p=manifest['protocol'];lag=separate['selected']['lag_s']
+    def inputs(item):
+        path=root/item['path']
+        if hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:raise ValueError('Input hash changed')
+        return windows(load(path),p,lag)
+    raw=[inputs(item) for item in manifest['training']]
+    train=[[dict(r,design=np.column_stack((r['design'][:,:2],r['design'][:,2]+r['design'][:,3]))) for r in group] for group in raw]
+    folds=[];parameters=[]
+    for i in range(len(train)):
+        theta,_=fit([g for j,g in enumerate(train) if j!=i])
+        folds.append(score(train[i],theta)['rms_m_s']);parameters.append(theta.tolist())
+    theta,condition=fit(train);cv=float(np.mean(folds));eligible=cv<=1.05*separate['selected']['training_cv_rms_m_s']
+    rule='Prefer shared drag if leave-flight-out training RMS is within5% of separate-drag RMS; keep its selected lag.'
+    frozen=dict(rule=rule,input_manifest_sha256=manifest_hash,lag_s=lag,shared_parameters=theta.tolist(),
+        training_cv_rms_m_s=cv,separate_drag_training_cv_rms_m_s=separate['selected']['training_cv_rms_m_s'],
+        fold_rms_m_s=folds,fold_parameters=parameters,condition=condition,eligible=eligible)
+    training_path=root/'shared-drag-training.json';training_path.write_text(json.dumps(frozen,indent=2)+'\n')
+    if not eligible:raise ValueError('Shared drag failed the fixed training selection rule')
+    a,b,drag=theta;theta4=np.array([a,b,drag,drag])
+    # Parameters are frozen on disk before reading any heldout labels.
+    heldout=[dict(source=item['source'],**score(inputs(item),theta4)) for item in manifest['heldout']]
+    hover=2*9.81/(a+np.sqrt(a*a+4*b*9.81));support=[r['mean_motor'] for group in raw for r in group]
+    profile=dict(schema=1,label='public-camera-shared-drag',label_source=separate['label_source'],lag_s=lag,
+        source_fit_sha256=hashlib.sha256(training_path.read_bytes()).hexdigest(),manifest_sha256=manifest_hash,
+        position_config=dict(hover_thrust=float(hover),thrust_acceleration=float(a+2*b*hover),position_gain=4/3,
+            velocity_gain=3.,attitude_gain=8.,max_rate=3.,thrust_curve=[float(a),float(b)],body_resistance_per_m=[float(drag)]*3),
+        training_inputs=manifest['training'],heldout=heldout,selection=rule,
+        limits=dict(training_windows=sum(map(len,raw)),heldout_windows=sum(x['windows'] for x in heldout),
+            fold_parameters=parameters,parameter_units=['m/s2 per u','m/s2 per u2','1/m'],
+            operating_mean_motor_range=[min(support),max(support)],nonnegative_scaled_design_condition=condition),
+        provenance=manifest['provenance'],heldout_status='These heldout flights were previously inspected during model development; fresh native flights are the prospective test.')
+    output.write_text(json.dumps(profile,indent=2)+'\n')
+    print(json.dumps(dict(output=str(output),training_cv_rms_m_s=cv,parameters=theta4.tolist(),heldout=heldout),indent=2))
+    return profile
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('root',type=Path);run(parser.parse_args().root)
+    parser=argparse.ArgumentParser();parser.add_argument('root',type=Path);parser.add_argument('--shared-drag',type=Path,metavar='MODEL')
+    args=parser.parse_args()
+    if args.shared_drag:shared_drag(args.root,args.shared_drag)
+    else:run(args.root)
