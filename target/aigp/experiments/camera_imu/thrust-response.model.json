@@ -1,0 +1,38 @@
+{
+  "schema": 2,
+  "label": "public-camera-thrust-response",
+  "label_source": "Known-size measured gate pixels, public gyro, own sent commands. Raw acceleration only supplies stationary initial gravity; no native labels or fused p/v.",
+  "position_config": {
+    "hover_thrust": 0.2740096079028543,
+    "thrust_acceleration": 53.64539483762455,
+    "position_gain": 1.3333333333333333,
+    "velocity_gain": 3.0,
+    "attitude_gain": 8.0,
+    "max_rate": 3.0,
+    "thrust_curve": [
+      17.957933783450514,
+      65.12082062981247
+    ],
+    "body_resistance_per_m": [
+      0.0476857765387268,
+      0.0476857765387268,
+      0.0476857765387268
+    ]
+  },
+  "lag_s": 0.0,
+  "training_inputs": {
+    "public_inputs_sha256": "2da7141449bbb6aa959891514b598917ea50e9e5fd4a1daa4573ccbda29427f6",
+    "public_controls_sha256": "f4fe910d315321098d9e8700174bae0750b3eded7299afd0c5c0819cc73d0561",
+    "public_observations_sha256": "60adf877bfca454d414a253b78183266ff633fd37695881b67c320dade7db8cb",
+    "images": 2123,
+    "windows": 6
+  },
+  "baseline_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+  "fitter_sha256": "bad38e25ce0d9a95f7902453cdd2a7a54238f780fbfeef7257c44d9dff9a3d2e",
+  "supported_mean_command": [
+    0.21,
+    0.335
+  ],
+  "validation_rule": "Six command levels, no parameter refit: future camera-position RMS<=0.12m, >=15% reduction from prior, each pulse RMS<=0.20m.",
+  "frozen_assumptions": "Camera mount, image clock mapping, drag and instantaneous command model held fixed. Drag linearization uses only pre-pulse images and prior dynamics. Pulse grouping is the validation unit."
+}

@@ -70,7 +70,8 @@ def windows(source,prior):
     ex=[r.get('excitation',{}) for r in rows];groups=sorted({e['index'] for e in ex if e.get('applied')});result=[]
     for key in groups:
         own=np.array([i for i,e in enumerate(ex) if e.get('applied') and e['index']==key]);start=ct[own[0]];end=ct[own[-1]+1]
-        mask=(it>=start-.4)&(it<=end+.65)
+        # Rate hold lasts400ms after the pulse. End before attitude feedback resumes.
+        mask=(it>=start-.4)&(it<=end+.35)
         if sum(mask)<15 or sum(mask&(it<start))<5:continue
         times=it[mask];position=p[mask,2];lo=times[0];grid=np.arange(lo,times[-1]+.0025,.0025)
         R=orient(grid).as_matrix();mi=np.searchsorted(ct,grid,side='right')-1
@@ -112,7 +113,7 @@ def run(source,output,prior,frozen=None):
     if frozen is None:
         prior_data=json.loads(prior.read_text());hover=float(2*9.81/(theta[0]+np.sqrt(theta[0]**2+4*theta[1]*9.81)))
         model=dict(schema=2,label='public-camera-thrust-response',label_source='Known-size measured gate pixels, public gyro, own sent commands. Raw acceleration only supplies stationary initial gravity; no native labels or fused p/v.',
-            position_config=prior_data['position_config'],lag_s=0.,training_inputs=meta,baseline_sha256=digest(prior),
+            position_config=prior_data['position_config'],lag_s=0.,training_inputs=meta,baseline_sha256=digest(prior),fitter_sha256=digest(Path(__file__)),
             supported_mean_command=[min(r['level'] for r in w),max(r['level'] for r in w)],
             validation_rule=RULE,frozen_assumptions='Camera mount, image clock mapping, drag and instantaneous command model held fixed. Drag linearization uses only pre-pulse images and prior dynamics. Pulse grouping is the validation unit.')
         model['position_config'].update(thrust_curve=theta.tolist(),hover_thrust=hover,thrust_acceleration=float(theta[0]+2*theta[1]*hover))
