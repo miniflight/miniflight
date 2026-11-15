@@ -16,6 +16,13 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_own_send_uses_the_causal_public_clock_envelope(self):
+        client=WireClient(Calls())
+        client.imu_offsets.extend([100.010,100.002,100.018])
+        self.assertAlmostEqual(client.command_time(108.030),8.028)
+        client.imu_offsets.append(100.030)
+        self.assertAlmostEqual(client.command_time(108.050),8.048)
+
     def test_final_approach_rejects_the_recorded_gate_four_miss(self):
         from target.aigp.experiments.camera_imu.crossing import CrossingGuard,predict
         # Public estimate from pipeline-validation/trial-01 at blind entry, in its approach basis.

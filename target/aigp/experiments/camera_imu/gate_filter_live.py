@@ -171,5 +171,9 @@ class Controller(course.Controller):
                     position_gate_covariance=f.P[:3,f.gates[self.gate.gate_number][0]:f.gates[self.gate.gate_number][0]+3].tolist())
             self.gate.signal['joint_posterior']=posterior
             self.gate.signal['brake_test_state']=self.gate.brake_state
-            h.command(h.time,command.outputs);self.gate.inertial.sync()
+            if sensors.SETTINGS.get('command_epoch')!='public_send':
+                h.command(h.time,command.outputs);self.gate.inertial.sync()
         return command
+
+    def sent(self,command,stamp):
+        self.gate.inertial.history.command(stamp,command.outputs)

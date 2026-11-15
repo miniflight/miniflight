@@ -138,6 +138,7 @@ def replay(path, poison=False):
     SETTINGS['joint_initialization_shadow'] = metadata['settings'].get('joint_initialization_shadow',False)
     SETTINGS['gate_return'] = metadata['settings'].get('gate_return',False)
     SETTINGS['continuous_course'] = metadata['settings'].get('continuous_course',False)
+    SETTINGS['command_epoch'] = metadata['settings'].get('command_epoch','imu')
     SETTINGS['position_config']=metadata['settings'].get('position_config')
     SETTINGS['visual_initialization']=metadata['settings'].get('visual_initialization',False)
     SETTINGS['partial_gate']=metadata['settings'].get('partial_gate',False)
@@ -373,7 +374,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
             crossing_constraint=crossing_constraint,
             dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
         SETTINGS.update(joint_estimator=joint_estimator,brake_test=brake_test)
-        if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False,continuous_origin=True,moving_start=moving_start)
+        if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False,continuous_origin=True,moving_start=moving_start,command_epoch='public_send')
         if brake_test:SETTINGS['finish_beyond_m']=1.
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:

@@ -16,6 +16,14 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_sent_command_does_not_act_before_its_public_epoch(self):
+        f=GateFilter(np.eye(3),np.zeros(3),[11.81,0.],[0.]*3,CAMERA_FROM_BODY,K)
+        h=GateHistory(f,0.,[0.,0.,0.]);h.command(.025,[1.]*4)
+        np.testing.assert_array_equal(h.filter.v,[0.,0.,0.])
+        h.imu(.1,[0.,0.,0.])
+        np.testing.assert_allclose(h.filter.v,[0.,0.,-.15],atol=1e-12)
+        np.testing.assert_allclose(h.filter.p,[0.,0.,-.075**2],atol=1e-12)
+
     def test_launch_lifts_before_commanding_a_large_rotation(self):
         import json
         from types import SimpleNamespace

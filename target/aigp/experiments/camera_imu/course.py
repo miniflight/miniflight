@@ -91,6 +91,11 @@ class WireClient(ProcessClient):
         stamp=frame.time_ns*1e-9+min(self.camera_offsets)-min(self.imu_offsets)
         return replace(frame,time_ns=round(stamp*1e9))
 
+    def command_time(self,host_time):
+        """Own send epoch on the public IMU clock, using only receipts so far."""
+        if not self.imu_offsets:raise RuntimeError('No public clock for a motor command')
+        return host_time-min(self.imu_offsets)
+
     @timed('sensor_read')
     def read(self,timeout=1.):
         state=super().read(timeout)
@@ -297,6 +302,10 @@ def execute(calls,record,path,reader=None,client=None):
             vehicle.validate(command);vehicle.arm();cleanup.arm_phase=ArmPhase.ARM_REQUESTED
             armed_at=vehicle.state.time
         vehicle.send(command)
+        if base.SETTINGS.get('command_epoch')=='public_send':
+            stamp=client.command_time(calls.monotonic())
+            controller.controller.sent(command,stamp)
+            record(event='own_command_epoch',time=stamp)
         record(event='profile',scope='motor_send',stages={'motor_send':timing_data(client.timing)['motor_send']})
     try:
         run(read_signals,controller.update,send,hz=50.,clock=calls)
