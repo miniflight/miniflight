@@ -38,7 +38,7 @@ def validate_provenance(meta,model,prior_hash):
     if meta['public_inputs_sha256']==model['training_inputs']['public_inputs_sha256']:raise ValueError('Validation must use a separate flight')
     if prior_hash!=model['baseline_sha256']:raise ValueError('Baseline changed after freezing the model')
 
-def windows(source,prior):
+def windows(source,prior,accepted_only=True):
     with np.load(source/'public-inputs.npz',allow_pickle=False) as f:
         if set(f.files)!=PUBLIC:raise ValueError('Unexpected public-input schema')
         d={k:f[k] for k in f.files}
@@ -60,7 +60,7 @@ def windows(source,prior):
     selected={r['image_id'] for r in rows if r.get('image_time') is not None and r.get('full_image_time')==r['image_time']}
     with gzip.open(source/'public-observations.jsonl.gz','rt') as h:observations=[json.loads(l) for l in h]
     for o in observations:
-        if o['kind']!='aperture' or o['image_id'] not in selected or o['image_id'] in seen:continue
+        if o['kind']!='aperture' or (accepted_only and o['image_id'] not in selected) or o['image_id'] in seen:continue
         seen.add(o['image_id']);t=o['capture_time'];corners=np.array(o['points']);side=min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1))
         if not ts[0]<=t<=ts[-1] or side<30 or o['quality']['reprojection_px']>.5:continue
         R=orient(t).as_matrix();seed_pose=upright_seed(corners,C @ R.T @ [0.,0.,1.],K)
@@ -96,8 +96,9 @@ def windows(source,prior):
         public_observations_sha256=digest(source/'public-observations.jsonl.gz'),images=len(images),windows=len(result))
 
 def run(source,output,prior,frozen=None):
-    output.mkdir(parents=True,exist_ok=True);w,meta=windows(source,prior)
-    if len(w)<6 or len({r['level'] for r in w})<6:raise ValueError('Need six public pulse windows covering all declared levels')
+    output.mkdir(parents=True,exist_ok=True);w,meta=windows(source,prior,accepted_only=frozen is None)
+    complete=len(w)>=6 and len({r['level'] for r in w})>=6
+    if not w or (frozen is None and not complete):raise ValueError('Need six public pulse windows covering all declared levels')
     X=np.concatenate([r['design'] for r in w]);y=np.concatenate([r['target'] for r in w]);scale=np.linalg.norm(X,axis=0)
     if frozen is not None:validate_provenance(meta,json.loads(frozen.read_text()),digest(prior))
     theta=fit_parameters(X,y) if frozen is None else np.array(json.loads(frozen.read_text())['position_config']['thrust_curve'])
@@ -108,7 +109,8 @@ def run(source,output,prior,frozen=None):
         folds.append(dict(pulse=r['pulse'],theta=th.tolist(),candidate=stats(r['design'] @ th-r['target']),baseline=stats(r['design'] @ baseline-r['target'])))
     report=dict(inputs=meta,theta=theta.tolist(),condition=float(np.linalg.cond(X/scale)),candidate=stats(X @ theta-y),baseline=stats(X @ baseline-y),folds=folds,
         metric='Future camera-derived vertical position error. Initial position/velocity use only images before each pulse; no future state fit.',
-        prior_sha256=digest(prior),training=frozen is None,
+        prior_sha256=digest(prior),training=frozen is None,complete=complete,
+        image_selection='Accepted training associations' if frozen is None else 'Raw measured aperture corners with geometric quality checks; no estimator acceptance filter',
         windows=[dict(pulse=r['pulse'],level=r['level'],candidate=stats(r['design'] @ theta-r['target']),baseline=stats(r['design'] @ baseline-r['target'])) for r in w])
     if frozen is None:
         prior_data=json.loads(prior.read_text());hover=float(2*9.81/(theta[0]+np.sqrt(theta[0]**2+4*theta[1]*9.81)))
@@ -120,7 +122,7 @@ def run(source,output,prior,frozen=None):
         (output/'model.json').write_text(json.dumps(model,indent=2)+'\n')
     else:
         report.update(model_sha256=digest(frozen),refit=False)
-        report['accepted']=bool(report['candidate']['rms']<=.12 and report['candidate']['rms']<=.85*report['baseline']['rms'] and max(r['candidate']['rms'] for r in report['windows'])<=.2)
+        report['accepted']=bool(complete and report['candidate']['rms']<=.12 and report['candidate']['rms']<=.85*report['baseline']['rms'] and max(r['candidate']['rms'] for r in report['windows'])<=.2)
         report['acceptance_rule']=RULE
     (output/'camera-fit.json').write_text(json.dumps(report,indent=2)+'\n')
     fig,ax=plt.subplots(2,3,figsize=(14,8),layout='constrained')

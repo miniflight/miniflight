@@ -7,7 +7,7 @@ from . import gate_filter_live as joint,sensors
 def sequence(kind):
     levels=[.21,.235,.26,.285,.31,.335]
     order=[2,5,0,4,1,3,5,1,4,0,3,2] if kind=='train' else [4,0,3,5,2,1,0,5,1,3,4,2]
-    return [(levels[k],(.18 if i%2==0 else .30) if kind=='train' else (.24 if i%2==0 else .36)) for i,k in enumerate(order[:6])]
+    return [(levels[k],(.18 if i%2==0 else .30) if kind=='train' else (.24 if i%2==0 or k==0 else .36)) for i,k in enumerate(order[:6])]
 
 
 class GateController(joint.GateController):
@@ -24,9 +24,10 @@ class GateController(joint.GateController):
         if now-self.started>75.:raise TimeoutError('thrust excitation did not settle in75s')
         error=np.linalg.norm(self.inertial.position-self.hold);speed=np.linalg.norm(self.inertial.velocity)
         fresh=now-self.measurement_time()<.2
-        settled=error<.2 and speed<.25 and fresh and np.linalg.norm(self.inertial.gyro)<.15
+        settled=(error<.6 and abs(self.inertial.velocity[2])<.35 and np.linalg.norm(self.inertial.velocity[:2])<.8
+            and fresh and np.linalg.norm(self.inertial.gyro)<.15)
         self.steady=(now if self.steady is None else self.steady) if settled else None
-        if self.pulse_at is None and self.steady is not None and now-self.steady>=.5:
+        if self.pulse_at is None and self.steady is not None and now-self.steady>=.3:
             if self.index==len(self.steps):raise StopIteration('public thrust excitation complete')
             self.pulse_at=now;self.steady=None
         level,duration=self.steps[min(self.index,len(self.steps)-1)]
