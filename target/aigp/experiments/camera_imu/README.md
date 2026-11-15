@@ -96,6 +96,20 @@ was 0.36–0.49 m position, 0.37–0.41 m/s velocity, 0.31–0.56 degrees attitu
 failures and uncertainty limits: [gate-filter.validation.json](gate-filter.validation.json).
 The planner still uses the posterior mean rather than a timed covariance constraint.
 
+Six gates with the same joint observer and no coordinate reset:
+
+```sh
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 \
+  --dynamics-model target/aigp/experiments/camera_imu/dynamics.model.json \
+  --partial-gate --crossing-constraint --joint-estimator --moving-start
+```
+
+The current revision completed one clean lap in 46.41 s. Position/velocity/attitude/
+depth MAE was 1.40 m / 0.34 m/s / 0.53 degrees / 0.40 m, including startup.
+An earlier send-time-only revision failed after four gates. All eight development
+attempts, exact replay checks and limits are in [the course report](gate-filter.course.validation.json)
+and [comparison plots](gate-filter.course.validation.png). This is not an unchanged robustness cohort.
+
 Replay the recorded braking failure; `reference/` is read only by the scorer:
 
 ```sh

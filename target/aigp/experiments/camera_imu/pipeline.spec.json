@@ -79,7 +79,7 @@
         "gate landmark poses and depth",
         "state and landmark covariance"
       ],
-      "required_method": "Fixed-lag error-state EKF with joint vehicle/current-next landmark covariance. Apply raw pixel factors at their estimated image epochs; replay subsequent public gyro, own commands and visual events. Keep a1s history; estimate at the command epoch. Published sample elapsed time supports the gyro/command model, not exact accelerometer preintegration.",
+      "required_method": "Fixed-lag error-state EKF with joint vehicle/current-next landmark covariance. Apply raw pixel factors at their estimated image epochs; replay subsequent public gyro, own commands and visual events. Keep a bounded history and predict to the command epoch. Published sample elapsed time supports the gyro/command model, not exact accelerometer preintegration.",
       "current_method": "Optional joint error-state EKF (--joint-estimator): raw aperture/top pixels and public body specific force update p/v/attitude/biases and gate geometry together. Rewind and replay every later process and measurement event. The default course observer remains complementary.",
       "target_state": {
         "vehicle_error_coordinates": 15,
@@ -208,11 +208,12 @@
     "globally_calibrated_posterior_coverage": null
   },
   "current_gaps": [
-    "Posterior coverage remains uneven on longer recorded flights; the joint observer has live validation for one slow gate.",
+    "Two development revisions completed one clean six-gate lap each; the send-time-only revision failed after four gates. No unchanged multi-start robustness cohort yet; current position MAE is1.40m.",
     "The planner still uses mean-state crossing constraints and coarse visibility waypoints.",
     "Gate binding uses confirmed nearer hypotheses; it does not report calibrated identity probabilities.",
     "True camera exposure and physical IMU integration intervals are unknown. The joint path uses published epochs and body-force observations without exact accelerometer preintegration.",
-    "Force calibration support is narrow; larger speeds and tilt need new validation."
+    "Force calibration support is narrow; larger speeds and tilt need new validation.",
+    "Own commands now use causal public send epochs and public force detects pad release. Actual actuator application time is unknown; the planner still consumes the latest IMU posterior."
   ],
   "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
   "retention": {
@@ -232,7 +233,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Joint observer now implemented; next test two gates without resetting, then consume relative covariance in braking/visibility planning.",
+    "backend": "Identify thrust rise/fall and response over the command range used in flight, from independent own excitation and public force/gyro. Hold drag/camera calibration fixed; validate on separate public data. Then test the frozen observer on repeated full courses and add continuous gate-crossing references.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -240,7 +241,7 @@
       "nominal_3sigma_crossing_interval_coverage": 0.95,
       "controller_p95_compute_ms": 10.0
     },
-    "acceptance": "Five prospective unchanged two-gate flights from both shifts: two native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Velocity/depth diagnostic targets remain goals.",
+    "acceptance": "Five prospective unchanged six-gate flights from both shifts: six native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Report MAE/P95/max by phase and retain every failure. Velocity/depth diagnostic targets remain goals.",
     "planner_condition": "abs(mean crossing offset)+3*sigma_crossing <=0.55m in both transverse axes; calibrate coverage before treating this as a probability. Include position/landmark/velocity cross-covariances."
   },
   "calibration": {
@@ -250,5 +251,6 @@
     "gate_size": "Nominal1.5m aperture is an explicit scale prior, not a fitted native opening dimension.",
     "support": "Mean motor command0.2598\u20130.2970; larger thrust/speed/tilt require new public-data identification and validation."
   },
-  "joint_checkpoint": "gate-filter.validation.json"
+  "joint_checkpoint": "gate-filter.validation.json",
+  "course_checkpoint": "gate-filter.course.validation.json"
 }

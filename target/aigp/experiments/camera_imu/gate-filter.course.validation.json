@@ -1,0 +1,1588 @@
+{
+  "recorded_at": "2026-11-16",
+  "native_binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "unit_tests": 96,
+  "input_boundary": "Camera pixels, public HIGHRES_IMU, public transport acknowledgements and own commands. Native navigation, course geometry and race state are scoring only.",
+  "scoring_alignment": "One fixed initial origin/yaw. No scale fit or per-gate alignment.",
+  "mae_definition": "Mean vector-error norm for position/velocity; mean rotation-error angle; mean absolute active-gate camera-depth error.",
+  "attempts": [
+    {
+      "run": "six-01",
+      "revision": "e4cf5a03189e6ec05154b693c41540bbaf98d935",
+      "protocol_sha256": "3d8e1f7f8a361daba94b131e611c27e2c0fc8efdb2cee580b10966c0c53e1b9f",
+      "gates_requested": 6,
+      "speed_limit_m_s": 5.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "failure": {
+        "type": "TypeError",
+        "message": "Object of type bool is not JSON serializable"
+      },
+      "scoring_status": "No native score; logging failed before trace retention",
+      "retention": {
+        "temporary_bytes_removed": 26314010,
+        "raw_recordings_retained": false
+      }
+    },
+    {
+      "run": "six-02",
+      "revision": "edc1be9383873777abcb37440d13e6d1b9278fde",
+      "protocol_sha256": "7789210987c6a499a2d4323c81c44e8452408eacfd10c6b49598f3419c2ab368",
+      "gates_requested": 6,
+      "speed_limit_m_s": 5.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_finish_time_s": 47.964828491,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "controller_phase": "COMPLETE",
+      "termination": "estimated course complete",
+      "valid_race": true,
+      "trace_sha256": "f7e8d6571cab390b992ef146b2520267127c68166173e186c1d0974a661ad968",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 20.33595073335332,
+          "crossing_offset_width_down_m": [
+            -0.03867841093278863,
+            -0.09810880055939881
+          ],
+          "blind_time_to_crossing_s": 0.6738430853533188,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.004128565307628884,
+            -0.05205763259738891,
+            0.020319435964188
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 26.033786180176097,
+          "crossing_offset_width_down_m": [
+            0.01332972897502268,
+            0.015671093696064453
+          ],
+          "blind_time_to_crossing_s": 0.46907803517609636,
+          "estimated_gate_error_width_down_normal_m": [
+            0.00385425850009837,
+            0.027297575394143132,
+            -0.05580743769792196
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 34.21593020581339,
+          "crossing_offset_width_down_m": [
+            0.02637906533067207,
+            -0.04765537617710257
+          ],
+          "blind_time_to_crossing_s": 0.48648225681338886,
+          "estimated_gate_error_width_down_normal_m": [
+            0.008609692537145974,
+            -0.049989100112824224,
+            -0.13727532300801404
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 44.463712258930755,
+          "crossing_offset_width_down_m": [
+            0.03029895996990445,
+            -0.08324059481199804
+          ],
+          "blind_time_to_crossing_s": 0.5001478869307547,
+          "estimated_gate_error_width_down_normal_m": [
+            0.03547824517373882,
+            -0.04566337672167228,
+            -0.1432542943000774
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.46100734752731,
+          "crossing_offset_width_down_m": [
+            -0.07786611464385923,
+            -0.07693308883936895
+          ],
+          "blind_time_to_crossing_s": 0.5969610605273061,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.02686945556878771,
+            -0.00949629218400615,
+            -0.048666351994804395
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 54.35223579371404,
+          "crossing_offset_width_down_m": [
+            0.1246732856571826,
+            -0.07543494599070466
+          ],
+          "blind_time_to_crossing_s": 0.6235054767140369,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.02271072563988348,
+            -0.023704994455534326,
+            -0.16584003079790316
+          ]
+        }
+      ],
+      "joint_score": {
+        "full": {
+          "samples": 2251,
+          "errors": {
+            "position": {
+              "count": 2251,
+              "mae": 1.0777746655320404,
+              "rms": 1.2650771993462995,
+              "median": 0.9012521983503234,
+              "p95": 2.503576395487916,
+              "maximum": 2.673206036923129
+            },
+            "velocity": {
+              "count": 2251,
+              "mae": 0.28721296255039735,
+              "rms": 0.36201992183993154,
+              "median": 0.2415842346327835,
+              "p95": 0.7094004911163319,
+              "maximum": 1.47560257232606
+            },
+            "attitude": {
+              "count": 2251,
+              "mae": 0.7275363761902258,
+              "rms": 0.8235646704396318,
+              "median": 0.6014781169037081,
+              "p95": 1.4003660042068828,
+              "maximum": 1.8062904364912726
+            },
+            "depth": {
+              "count": 2112,
+              "mae": 0.3856257204552294,
+              "rms": 0.5239598067380722,
+              "median": 0.21489465373228178,
+              "p95": 1.1171095860251399,
+              "maximum": 2.895051042545532
+            }
+          },
+          "depth_available_fraction": 0.938249666814749,
+          "depth_3sigma_coverage": 0.9895833333333334
+        },
+        "startup": {
+          "samples": 306,
+          "errors": {
+            "position": {
+              "count": 306,
+              "mae": 0.6697908458915903,
+              "rms": 0.7664087841640924,
+              "median": 0.6108442405342002,
+              "p95": 1.2866250138208866,
+              "maximum": 1.814554813422189
+            },
+            "velocity": {
+              "count": 306,
+              "mae": 0.612209323706414,
+              "rms": 0.6899690488808506,
+              "median": 0.6255036881891025,
+              "p95": 1.147894568388565,
+              "maximum": 1.47560257232606
+            },
+            "attitude": {
+              "count": 306,
+              "mae": 1.0165479836758886,
+              "rms": 1.0843647294453458,
+              "median": 1.159362257430736,
+              "p95": 1.4208595778482906,
+              "maximum": 1.8062904364912726
+            },
+            "depth": {
+              "count": 306,
+              "mae": 0.4888625321891131,
+              "rms": 0.5699446710290679,
+              "median": 0.41706128997800107,
+              "p95": 1.0237478960032762,
+              "maximum": 1.2269639953460185
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "course": {
+          "samples": 1945,
+          "errors": {
+            "position": {
+              "count": 1945,
+              "mae": 1.1419613230178902,
+              "rms": 1.3265737841120708,
+              "median": 0.9783280604054295,
+              "p95": 2.509687930562932,
+              "maximum": 2.673206036923129
+            },
+            "velocity": {
+              "count": 1945,
+              "mae": 0.2360824296384482,
+              "rms": 0.27709378822939557,
+              "median": 0.21486835481453664,
+              "p95": 0.5187015673352589,
+              "maximum": 0.9814324514474034
+            },
+            "attitude": {
+              "count": 1945,
+              "mae": 0.6820671978402963,
+              "rms": 0.7745805206972499,
+              "median": 0.5603419310686044,
+              "p95": 1.3985429279591253,
+              "maximum": 1.5255644638825197
+            },
+            "depth": {
+              "count": 1806,
+              "mae": 0.3681337689654352,
+              "rms": 0.5157623203706436,
+              "median": 0.20304170449139702,
+              "p95": 1.133479357218639,
+              "maximum": 2.895051042545532
+            }
+          },
+          "depth_available_fraction": 0.9285347043701799,
+          "depth_3sigma_coverage": 0.9878183831672204
+        },
+        "braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "after_braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "brake_resumed": false,
+        "reference_use": "Native scoring only; commanded flight used the joint public-input posterior."
+      },
+      "replay": {
+        "calls": 20984,
+        "wire_commands": 2252,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 20984,
+        "wire_commands": 2252,
+        "exact_updates": true,
+        "corrupted_pose_packets": 16018,
+        "corrupted_navigation_packets": 16018,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 206998308,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 2251,
+        "median": 4.243042,
+        "p95": 10.502333,
+        "maximum": 45.011208,
+        "mean": 4.685682454908929
+      }
+    },
+    {
+      "run": "six-03",
+      "revision": "1ab658cf478523305d4568eb1333df5ff2f48ff1",
+      "protocol_sha256": "ca3108b6fea7c64cb5fa0f10acb64631db80876bac6d9d3e78e58337c24e7faf",
+      "gates_requested": 6,
+      "speed_limit_m_s": 5.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "public_send",
+      "ground_support": false,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 4,
+      "estimated_gates_passed": 4,
+      "native_finish_time_s": null,
+      "passed_without_reset": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "controller_phase": "TRACKING",
+      "termination": null,
+      "valid_race": true,
+      "trace_sha256": "5495ab5c31cd63eb8a32546a305e3c6b1b60b7cf356ab5ede0812d8811c78e73",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 19.319442213254366,
+          "crossing_offset_width_down_m": [
+            -0.10457829522088041,
+            -0.11385833252933518
+          ],
+          "blind_time_to_crossing_s": 0.685784050254366,
+          "estimated_gate_error_width_down_normal_m": [
+            0.009863604159172187,
+            0.008018187559904084,
+            0.035385282697029063
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 27.242369913444954,
+          "crossing_offset_width_down_m": [
+            -0.03183320520614292,
+            0.015981125384799046
+          ],
+          "blind_time_to_crossing_s": 0.9716167764449501,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.032260921132496026,
+            -0.012929407099080942,
+            0.02031383204480874
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 35.63983633903756,
+          "crossing_offset_width_down_m": [
+            0.04943793661868753,
+            0.098154202824129
+          ],
+          "blind_time_to_crossing_s": 0.5371191280375527,
+          "estimated_gate_error_width_down_normal_m": [
+            0.012925601865330556,
+            -0.01687354398323017,
+            -0.10909811961477112
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 45.050760193792335,
+          "crossing_offset_width_down_m": [
+            -0.03679639066773523,
+            0.0268563206824953
+          ],
+          "blind_time_to_crossing_s": 0.5830165867923327,
+          "estimated_gate_error_width_down_normal_m": [
+            0.04846258627745768,
+            -0.033570821520902516,
+            -0.07671281696875638
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null,
+          "estimated_gate_error_width_down_normal_m": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null,
+          "estimated_gate_error_width_down_normal_m": null
+        }
+      ],
+      "joint_score": {
+        "full": {
+          "samples": 2070,
+          "errors": {
+            "position": {
+              "count": 2070,
+              "mae": 3.061795139127324,
+              "rms": 3.1731144640810673,
+              "median": 3.327752409777256,
+              "p95": 3.996562879289529,
+              "maximum": 4.396262960960536
+            },
+            "velocity": {
+              "count": 2070,
+              "mae": 0.44978380386534494,
+              "rms": 0.6003620627546807,
+              "median": 0.31152045253678207,
+              "p95": 1.1342010733647696,
+              "maximum": 2.3121214051207395
+            },
+            "attitude": {
+              "count": 2070,
+              "mae": 1.1070335189528804,
+              "rms": 1.2066687171803203,
+              "median": 1.1613864496929374,
+              "p95": 1.6912346300345333,
+              "maximum": 2.610964330919
+            },
+            "depth": {
+              "count": 2070,
+              "mae": 0.3770798965030798,
+              "rms": 0.64364480707414,
+              "median": 0.13268226275029615,
+              "p95": 1.4277922684668092,
+              "maximum": 4.544401233851897
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.9806763285024155
+        },
+        "startup": {
+          "samples": 303,
+          "errors": {
+            "position": {
+              "count": 303,
+              "mae": 2.083396643176794,
+              "rms": 2.573997480533516,
+              "median": 1.3624199809295237,
+              "p95": 4.123067534187049,
+              "maximum": 4.396262960960536
+            },
+            "velocity": {
+              "count": 303,
+              "mae": 0.9706071381141917,
+              "rms": 1.1281772261948304,
+              "median": 0.8238679187013859,
+              "p95": 2.064224801656319,
+              "maximum": 2.3121214051207395
+            },
+            "attitude": {
+              "count": 303,
+              "mae": 0.5116887702391428,
+              "rms": 0.5417297106821416,
+              "median": 0.5067896032970762,
+              "p95": 0.7821140835229456,
+              "maximum": 0.8800927425854598
+            },
+            "depth": {
+              "count": 303,
+              "mae": 0.7447290498838447,
+              "rms": 1.1968486051626268,
+              "median": -0.12173534358622007,
+              "p95": 2.228756950778563,
+              "maximum": 4.544401233851897
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.8943894389438944
+        },
+        "course": {
+          "samples": 1767,
+          "errors": {
+            "position": {
+              "count": 1767,
+              "mae": 3.2295680560899784,
+              "rms": 3.264825259543127,
+              "median": 3.344522057839792,
+              "p95": 3.9758019266813682,
+              "maximum": 4.360436647489418
+            },
+            "velocity": {
+              "count": 1767,
+              "mae": 0.36047453941859875,
+              "rms": 0.4516498884225297,
+              "median": 0.276542623349536,
+              "p95": 0.8693439949517074,
+              "maximum": 1.3231377059374285
+            },
+            "attitude": {
+              "count": 1767,
+              "mae": 1.2091214979343532,
+              "rms": 1.2866254028542132,
+              "median": 1.385083624556197,
+              "p95": 1.7168454622311946,
+              "maximum": 2.610964330919
+            },
+            "depth": {
+              "count": 1767,
+              "mae": 0.31403649329177713,
+              "rms": 0.48957754396029995,
+              "median": 0.1478874374358865,
+              "p95": 1.104440378483662,
+              "maximum": 1.9095740824056193
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.9954725523486134
+        },
+        "braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "after_braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "brake_resumed": false,
+        "reference_use": "Native scoring only; commanded flight used the joint public-input posterior."
+      },
+      "replay": {
+        "calls": 21453,
+        "wire_commands": 2071,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 21453,
+        "wire_commands": 2071,
+        "exact_updates": true,
+        "corrupted_pose_packets": 14829,
+        "corrupted_navigation_packets": 14829,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 194411483,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 2070,
+        "median": 5.088958,
+        "p95": 11.406835449999999,
+        "maximum": 30.397167,
+        "mean": 5.135187628985507
+      }
+    },
+    {
+      "run": "six-04",
+      "revision": "6415aa2d89c2fe70ddeb07430f2c45b49459e8f4",
+      "protocol_sha256": "8429313ca891eddaaaa92569d24f2073864d41e526070daca83ccd738b5ec7a5",
+      "gates_requested": 6,
+      "speed_limit_m_s": 5.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "public_send",
+      "ground_support": true,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 6,
+      "estimated_gates_passed": 6,
+      "native_finish_time_s": 46.408241272,
+      "passed_without_reset": true,
+      "controller_error": null,
+      "controller_phase": "COMPLETE",
+      "termination": "estimated course complete",
+      "valid_race": true,
+      "trace_sha256": "ad3cdadf054bfb8234fb1e49f32ab2210aaf1e11c2a38a01c6bc44ead6fe7de0",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 18.39186218666349,
+          "crossing_offset_width_down_m": [
+            -0.04693768280754666,
+            -0.06665944344042031
+          ],
+          "blind_time_to_crossing_s": 0.601381668663489,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.022484141329069552,
+            -0.038315608951664755,
+            0.00022263265639467565
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 25.543149831731547,
+          "crossing_offset_width_down_m": [
+            -0.011146253043272466,
+            0.014191840013341292
+          ],
+          "blind_time_to_crossing_s": 0.619826783731547,
+          "estimated_gate_error_width_down_normal_m": [
+            0.0010632222091286737,
+            -0.019341468645463437,
+            -0.1332787115728224
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 33.073450338855274,
+          "crossing_offset_width_down_m": [
+            0.012448588306608879,
+            -0.0247260573698912
+          ],
+          "blind_time_to_crossing_s": 0.48625542585526915,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.03743676716113494,
+            -0.13682400831108088,
+            -0.276455767494533
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 42.817722698820354,
+          "crossing_offset_width_down_m": [
+            -0.028825258269605573,
+            -0.06996665215897398
+          ],
+          "blind_time_to_crossing_s": 0.49225178482035403,
+          "estimated_gate_error_width_down_normal_m": [
+            0.02328878738830502,
+            0.023335535905707208,
+            -0.18321727147469105
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 47.83622107616842,
+          "crossing_offset_width_down_m": [
+            -0.12387381627674672,
+            -0.05862152011090957
+          ],
+          "blind_time_to_crossing_s": 0.5470551581684191,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.043491527341902626,
+            0.017959261622303626,
+            -0.0725907941695766
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 52.77530605879522,
+          "crossing_offset_width_down_m": [
+            0.10504858897546406,
+            -0.06857403555413775
+          ],
+          "blind_time_to_crossing_s": 0.5854946307952176,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.01966124416585201,
+            -0.01922421570542825,
+            -0.15813730982002538
+          ]
+        }
+      ],
+      "joint_score": {
+        "full": {
+          "samples": 2198,
+          "errors": {
+            "position": {
+              "count": 2198,
+              "mae": 1.3959343482320135,
+              "rms": 1.5721687861748408,
+              "median": 1.4303087264387027,
+              "p95": 2.3595794709166698,
+              "maximum": 2.4866261663538016
+            },
+            "velocity": {
+              "count": 2198,
+              "mae": 0.34083021199247665,
+              "rms": 0.4273452131308856,
+              "median": 0.2771373059396643,
+              "p95": 0.8211529735586232,
+              "maximum": 1.2046351428722355
+            },
+            "attitude": {
+              "count": 2198,
+              "mae": 0.5277919822025209,
+              "rms": 0.5580951710698123,
+              "median": 0.5090455516221166,
+              "p95": 0.8348252876500855,
+              "maximum": 1.5121935517681757
+            },
+            "depth": {
+              "count": 2198,
+              "mae": 0.39944800425480353,
+              "rms": 0.6558196722724815,
+              "median": 0.18252856488216285,
+              "p95": 1.3042364399135393,
+              "maximum": 3.8508818060221692
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.9326660600545951
+        },
+        "startup": {
+          "samples": 195,
+          "errors": {
+            "position": {
+              "count": 195,
+              "mae": 0.8545880993341446,
+              "rms": 1.025652566842164,
+              "median": 0.8753462758060508,
+              "p95": 1.5633114461720046,
+              "maximum": 1.602613479223844
+            },
+            "velocity": {
+              "count": 195,
+              "mae": 0.5406410069065121,
+              "rms": 0.6061390903909699,
+              "median": 0.6412341240302293,
+              "p95": 0.9466333189053924,
+              "maximum": 1.0549941862059011
+            },
+            "attitude": {
+              "count": 195,
+              "mae": 0.5096662475559813,
+              "rms": 0.5230445752176268,
+              "median": 0.5240651622359261,
+              "p95": 0.6544943958152429,
+              "maximum": 0.8574588452810674
+            },
+            "depth": {
+              "count": 195,
+              "mae": 0.6040002682734444,
+              "rms": 0.7651862533714335,
+              "median": 0.5429423105788089,
+              "p95": 1.3274796448216974,
+              "maximum": 1.3737896623609736
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "course": {
+          "samples": 2003,
+          "errors": {
+            "position": {
+              "count": 2003,
+              "mae": 1.4486365541906177,
+              "rms": 1.6155287481907692,
+              "median": 1.5693096852057729,
+              "p95": 2.374703200648615,
+              "maximum": 2.4866261663538016
+            },
+            "velocity": {
+              "count": 2003,
+              "mae": 0.32137783804927306,
+              "rms": 0.40575214106098284,
+              "median": 0.2664823440678746,
+              "p95": 0.804949098018929,
+              "maximum": 1.2046351428722355
+            },
+            "attitude": {
+              "count": 2003,
+              "mae": 0.5295565944122439,
+              "rms": 0.561390602822947,
+              "median": 0.5067057551357971,
+              "p95": 0.842112286680591,
+              "maximum": 1.5121935517681757
+            },
+            "depth": {
+              "count": 2003,
+              "mae": 0.3795340294751555,
+              "rms": 0.6441813469128461,
+              "median": 0.17950549051228393,
+              "p95": 1.2527015649707745,
+              "maximum": 3.8508818060221692
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.926110833749376
+        },
+        "braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "after_braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "brake_resumed": false,
+        "reference_use": "Native scoring only; commanded flight used the joint public-input posterior."
+      },
+      "replay": {
+        "calls": 22816,
+        "wire_commands": 2199,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 22816,
+        "wire_commands": 2199,
+        "exact_updates": true,
+        "corrupted_pose_packets": 15633,
+        "corrupted_navigation_packets": 15633,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 203269749,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 2198,
+        "median": 4.9171875,
+        "p95": 10.514903650000003,
+        "maximum": 17.323667,
+        "mean": 4.798171826205642
+      }
+    },
+    {
+      "run": "two-01",
+      "revision": "2625d22937c6697f8bdecdcb332539223c3a5d13",
+      "protocol_sha256": "cd4c68a2639763621e334b35aaabfe5c5d18e604c948b008a61d907a9f23e7f6",
+      "gates_requested": 2,
+      "speed_limit_m_s": 3.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": false,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 0,
+      "estimated_gates_passed": 2,
+      "native_finish_time_s": null,
+      "passed_without_reset": false,
+      "controller_error": null,
+      "controller_phase": "COMPLETE",
+      "termination": "estimated course complete",
+      "valid_race": true,
+      "trace_sha256": "a1d9efa7856b0680ca7c2fae4cec94e3d2013734dc2c45f5a4a57ebd3fe40840",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null,
+          "estimated_gate_error_width_down_normal_m": null
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 36.016431183773854,
+          "crossing_offset_width_down_m": [
+            -0.045094823550570505,
+            -0.007074349649554402
+          ],
+          "blind_time_to_crossing_s": 0.8652335997738518,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.01978677035519985,
+            0.017296673425647956,
+            -0.02807844964722442
+          ]
+        }
+      ],
+      "replay": {
+        "calls": 14041,
+        "wire_commands": 1357,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 14041,
+        "wire_commands": 1357,
+        "exact_updates": true,
+        "corrupted_pose_packets": 10338,
+        "corrupted_navigation_packets": 10338,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 131656534,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 1356,
+        "median": 4.646812,
+        "p95": 8.99293725,
+        "maximum": 14.634,
+        "mean": 4.209413199115043
+      }
+    },
+    {
+      "run": "two-02",
+      "revision": "cd55219a178220db96fcca8fbf2f661febbe8268",
+      "protocol_sha256": "fe7d4b92a7a8002e350673ebd3ca0222d164f8bea0f0328732353f23092934e4",
+      "gates_requested": 2,
+      "speed_limit_m_s": 3.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": false,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 0,
+      "estimated_gates_passed": 0,
+      "native_finish_time_s": null,
+      "passed_without_reset": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "IMU shift and settle exceeded ten seconds"
+      },
+      "controller_phase": "SHIFTING",
+      "termination": null,
+      "valid_race": true,
+      "trace_sha256": "94cef7043c4191d1d9a1645d01785348da5423103cb45fd9184f89988cfca4c0",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null,
+          "estimated_gate_error_width_down_normal_m": null
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "crossing_offset_width_down_m": null,
+          "blind_time_to_crossing_s": null,
+          "estimated_gate_error_width_down_normal_m": null
+        }
+      ],
+      "joint_score": {
+        "scoring_status": "No approach reference; retain startup failure",
+        "brake_resumed": false
+      },
+      "replay": {
+        "calls": 7279,
+        "wire_commands": 496,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 7279,
+        "wire_commands": 496,
+        "exact_updates": true,
+        "corrupted_pose_packets": 5171,
+        "corrupted_navigation_packets": 5171,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 61608680,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 495,
+        "median": 4.792708,
+        "p95": 6.2437831,
+        "maximum": 14.207792,
+        "mean": 3.726633656565657
+      }
+    },
+    {
+      "run": "two-03",
+      "revision": "3136c2c31e427f2040d9f55f9f6ffda566163f85",
+      "protocol_sha256": "5f09240592d30f2eacb7ab0ea885afe9cee2d9e36ddfb442c54190afdce047f9",
+      "gates_requested": 2,
+      "speed_limit_m_s": 3.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 1,
+      "estimated_gates_passed": 2,
+      "native_finish_time_s": null,
+      "passed_without_reset": false,
+      "controller_error": null,
+      "controller_phase": "COMPLETE",
+      "termination": "estimated course complete",
+      "valid_race": true,
+      "trace_sha256": "73c66071035f80775eef53526e0321e9a479b55f9fe97a98ac8011b9a2a3d952",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 20.980771274063713,
+          "crossing_offset_width_down_m": [
+            -0.03804618547334491,
+            -0.12807975919286352
+          ],
+          "blind_time_to_crossing_s": 1.81937201706371,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.15024286594227665,
+            -0.33616284797094326,
+            0.0046115663021565
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 34.74459440936453,
+          "crossing_offset_width_down_m": [
+            -0.005043341850172219,
+            -0.0651595424688546
+          ],
+          "blind_time_to_crossing_s": 0.7889839993645253,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0028117875750763117,
+            -0.08115631455325202,
+            0.03567766342245654
+          ]
+        }
+      ],
+      "joint_score": {
+        "full": {
+          "samples": 1270,
+          "errors": {
+            "position": {
+              "count": 1270,
+              "mae": 0.7137847772334948,
+              "rms": 0.7784028713918523,
+              "median": 0.6103384250632751,
+              "p95": 1.2978087474133215,
+              "maximum": 1.6401328665141537
+            },
+            "velocity": {
+              "count": 1270,
+              "mae": 0.37756990553685255,
+              "rms": 0.46995902642915577,
+              "median": 0.28902714794795875,
+              "p95": 0.9120335844545702,
+              "maximum": 1.2256275626161128
+            },
+            "attitude": {
+              "count": 1270,
+              "mae": 0.6287378795779018,
+              "rms": 0.6661325608113788,
+              "median": 0.6327495960784938,
+              "p95": 0.920557607565311,
+              "maximum": 2.870055914236355
+            },
+            "depth": {
+              "count": 1270,
+              "mae": 0.22127627889593132,
+              "rms": 0.2957829212384131,
+              "median": 0.1631071467891121,
+              "p95": 0.5486851196661995,
+              "maximum": 1.2555182845139505
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.9826771653543307
+        },
+        "startup": {
+          "samples": 154,
+          "errors": {
+            "position": {
+              "count": 154,
+              "mae": 0.43410934969715964,
+              "rms": 0.47434478367409066,
+              "median": 0.47219829573845973,
+              "p95": 0.7074834604837686,
+              "maximum": 0.7274491157992847
+            },
+            "velocity": {
+              "count": 154,
+              "mae": 0.5377410893160149,
+              "rms": 0.5914176130373135,
+              "median": 0.5797081740289167,
+              "p95": 0.9383388441027357,
+              "maximum": 0.9713082049840615
+            },
+            "attitude": {
+              "count": 154,
+              "mae": 0.6657281536258132,
+              "rms": 0.6878731708819686,
+              "median": 0.6897462508917344,
+              "p95": 0.8597509693541123,
+              "maximum": 1.391923069339056
+            },
+            "depth": {
+              "count": 154,
+              "mae": 0.28634621245864944,
+              "rms": 0.35065196056494086,
+              "median": 0.2544842216099461,
+              "p95": 0.6136534722461199,
+              "maximum": 0.8229192573693744
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "course": {
+          "samples": 1116,
+          "errors": {
+            "position": {
+              "count": 1116,
+              "mae": 0.7523779813917343,
+              "rms": 0.811463869466479,
+              "median": 0.6508107789624618,
+              "p95": 1.301862437437888,
+              "maximum": 1.6401328665141537
+            },
+            "velocity": {
+              "count": 1116,
+              "mae": 0.3554674303558571,
+              "rms": 0.45063552271935786,
+              "median": 0.26257794901759024,
+              "p95": 0.9056098324321211,
+              "maximum": 1.2256275626161128
+            },
+            "attitude": {
+              "count": 1116,
+              "mae": 0.6236334869225448,
+              "rms": 0.6630765460497345,
+              "median": 0.6207955674709889,
+              "p95": 0.9308669789154115,
+              "maximum": 2.870055914236355
+            },
+            "depth": {
+              "count": 1116,
+              "mae": 0.21229709451541284,
+              "rms": 0.28739003591796425,
+              "median": 0.16045018708765157,
+              "p95": 0.5383700129542066,
+              "maximum": 1.2555182845139505
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 0.9802867383512545
+        },
+        "braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "after_braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "brake_resumed": false,
+        "reference_use": "Native scoring only; commanded flight used the joint public-input posterior."
+      },
+      "replay": {
+        "calls": 13392,
+        "wire_commands": 1271,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 13392,
+        "wire_commands": 1271,
+        "exact_updates": true,
+        "corrupted_pose_packets": 9951,
+        "corrupted_navigation_packets": 9951,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 126034693,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 1270,
+        "median": 3.3757919999999997,
+        "p95": 10.24826455,
+        "maximum": 67.925458,
+        "mean": 4.32868594015748
+      }
+    },
+    {
+      "run": "two-04",
+      "revision": "c4248df9a04926dd1c847536134944aa2aa33f9c",
+      "protocol_sha256": "6d8af81b33dbb9ce7151578c31ee344b3ea36323a2af2ed725476a9173af042a",
+      "gates_requested": 2,
+      "speed_limit_m_s": 3.0,
+      "shift_right_m": -0.5,
+      "command_epoch": "imu",
+      "ground_support": false,
+      "moving_start": true,
+      "dynamics_model_sha256": "75bc8e6722cdacf15e566fc03029603d198a1398cd547c1f00950733f6ff924d",
+      "native_gates_passed": 2,
+      "estimated_gates_passed": 2,
+      "native_finish_time_s": null,
+      "passed_without_reset": false,
+      "controller_error": null,
+      "controller_phase": "COMPLETE",
+      "termination": "estimated course complete",
+      "valid_race": true,
+      "trace_sha256": "816f6ee5db54bffd0046b3762de56ed27598686d98ec7d3bff857160d65e9fcf",
+      "reset_calls_during_flight": 0,
+      "in_flight_collision_packets": [
+        {
+          "host": 418035.589697625,
+          "data": {
+            "mavpackettype": "COLLISION",
+            "src": 1,
+            "id": 1002,
+            "action": 1,
+            "threat_level": 1,
+            "time_to_minimum_delta": 0.0,
+            "altitude_minimum_delta": 0.01299301628023386,
+            "horizontal_minimum_delta": 0.00013095409667585045
+          }
+        }
+      ],
+      "crossings": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 20.842001225513968,
+          "crossing_offset_width_down_m": [
+            -0.029428544341948904,
+            0.14634986280089204
+          ],
+          "blind_time_to_crossing_s": 1.6751107845139686,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.053114487969045276,
+            0.2319714716943632,
+            0.18374428181612326
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 28.821644289164812,
+          "crossing_offset_width_down_m": [
+            -0.02087352379745115,
+            -0.004987850417974628
+          ],
+          "blind_time_to_crossing_s": 1.2900113821648098,
+          "estimated_gate_error_width_down_normal_m": [
+            0.018273722233825822,
+            0.04624659196067373,
+            -0.03845352119868224
+          ]
+        }
+      ],
+      "joint_score": {
+        "full": {
+          "samples": 1008,
+          "errors": {
+            "position": {
+              "count": 1008,
+              "mae": 1.2821739613834435,
+              "rms": 1.3440248563407806,
+              "median": 1.222717815445575,
+              "p95": 1.8645871702564012,
+              "maximum": 2.1785130305544587
+            },
+            "velocity": {
+              "count": 1008,
+              "mae": 0.28706240517868414,
+              "rms": 0.3971727366299907,
+              "median": 0.19203429132644362,
+              "p95": 0.9521524334966063,
+              "maximum": 1.393549592426355
+            },
+            "attitude": {
+              "count": 1008,
+              "mae": 0.6274220990976029,
+              "rms": 0.6752249103024791,
+              "median": 0.5785953318457613,
+              "p95": 1.1174038163353106,
+              "maximum": 1.7498443975016669
+            },
+            "depth": {
+              "count": 1008,
+              "mae": 0.22503355073486322,
+              "rms": 0.27507678444372075,
+              "median": 0.17690941678607652,
+              "p95": 0.5435481323366158,
+              "maximum": 0.7909194958308063
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "startup": {
+          "samples": 170,
+          "errors": {
+            "position": {
+              "count": 170,
+              "mae": 0.7136356662242304,
+              "rms": 0.8184282627043434,
+              "median": 0.8287826008159784,
+              "p95": 1.1556493878925815,
+              "maximum": 1.1931846102890564
+            },
+            "velocity": {
+              "count": 170,
+              "mae": 0.7235087643264138,
+              "rms": 0.7974030209592,
+              "median": 0.726751616351477,
+              "p95": 1.255396648280675,
+              "maximum": 1.393549592426355
+            },
+            "attitude": {
+              "count": 170,
+              "mae": 0.40501609241566455,
+              "rms": 0.4331660418671735,
+              "median": 0.39739365821373945,
+              "p95": 0.6771114000058231,
+              "maximum": 1.042171101552217
+            },
+            "depth": {
+              "count": 170,
+              "mae": 0.3859424162639345,
+              "rms": 0.42531856768229304,
+              "median": 0.3565665771529254,
+              "p95": 0.725835507624705,
+              "maximum": 0.7909194958308063
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "course": {
+          "samples": 838,
+          "errors": {
+            "position": {
+              "count": 838,
+              "mae": 1.3975098923823293,
+              "rms": 1.4272258157302062,
+              "median": 1.3258846762788117,
+              "p95": 1.902614176937584,
+              "maximum": 2.1785130305544587
+            },
+            "velocity": {
+              "count": 838,
+              "mae": 0.19852316764274855,
+              "rms": 0.2464869734996571,
+              "median": 0.15928693979403663,
+              "p95": 0.5055289857045436,
+              "maximum": 0.6618060802661303
+            },
+            "attitude": {
+              "count": 838,
+              "mae": 0.6725402627442969,
+              "rms": 0.7143922175689698,
+              "median": 0.6774171394632853,
+              "p95": 1.1500417761842603,
+              "maximum": 1.7498443975016669
+            },
+            "depth": {
+              "count": 838,
+              "mae": 0.19239094078266497,
+              "rms": 0.23306680840268196,
+              "median": 0.1658493089162021,
+              "p95": 0.45198900330695385,
+              "maximum": 0.7206603652494792
+            }
+          },
+          "depth_available_fraction": 1.0,
+          "depth_3sigma_coverage": 1.0
+        },
+        "braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "after_braking": {
+          "samples": 0,
+          "errors": {
+            "position": {
+              "count": 0
+            },
+            "velocity": {
+              "count": 0
+            },
+            "attitude": {
+              "count": 0
+            },
+            "depth": {
+              "count": 0
+            }
+          },
+          "depth_available_fraction": null,
+          "depth_3sigma_coverage": null
+        },
+        "brake_resumed": false,
+        "reference_use": "Native scoring only; commanded flight used the joint public-input posterior."
+      },
+      "replay": {
+        "calls": 11648,
+        "wire_commands": 1009,
+        "exact_updates": true,
+        "corrupted_pose_packets": 0,
+        "corrupted_navigation_packets": 0,
+        "native_gate_counter_zeroed": false
+      },
+      "input-independence": {
+        "calls": 11648,
+        "wire_commands": 1009,
+        "exact_updates": true,
+        "corrupted_pose_packets": 8380,
+        "corrupted_navigation_packets": 8380,
+        "native_gate_counter_zeroed": true
+      },
+      "retention": {
+        "temporary_bytes_removed": 105257646,
+        "raw_recordings_retained": false
+      },
+      "controller_compute_ms": {
+        "count": 1008,
+        "median": 4.889896,
+        "p95": 10.2550227,
+        "maximum": 24.00375,
+        "mean": 4.490296757936507
+      }
+    }
+  ],
+  "comparison_runs": [
+    "six-02",
+    "six-03",
+    "six-04"
+  ],
+  "interpretation": "Different revisions, one prospective flight each. A semantic correction is not established as a performance improvement. six-02 and six-04 completed cleanly; six-03 failed after four gates.",
+  "limits": [
+    "No unchanged multi-start robustness cohort for the current revision.",
+    "Position MAE remains above one metre.",
+    "True exposure time and actual actuator application time remain unknown.",
+    "Thrust calibration mean-command support is only0.2598-0.2970; wider commands need public-data validation.",
+    "Planner still stops to align height/velocity; no fast continuous path yet.",
+    "No six-gate sub10s flight."
+  ],
+  "next_experiment": "Independent short thrust excitation in a settled visually tracked flight; measure public force/gyro, command range, rise/fall and lag confidence. Freeze drag/camera calibration; validate on a separate public sequence before native scoring.",
+  "retention": {
+    "temporary_bytes_removed": 1055551103,
+    "raw_recordings_retained": false
+  }
+}
