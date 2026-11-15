@@ -7,6 +7,7 @@ from pymavlink.dialects.v20 import common as mavlink
 from miniflight import MotorControls, vehicle
 from miniflight.mixer import mix
 from miniflight.rate import rate_control
+from miniflight.profiling import timed
 from target.aigp import MOTOR_MIX
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_body_rates import Controller as PositionController
@@ -29,6 +30,7 @@ class Controller(BaseController[MotorControls]):
         self.integral, self.time = (0, 0, 0), None
         self.gyro = self.rate_request = self.torque = self.motor_request = None
 
+    @timed('motor_control_total')
     def update(self, telemetry, frames, race_state) -> MotorControls | None:
         for packet in telemetry:
             message = packet.data

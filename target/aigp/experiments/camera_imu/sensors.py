@@ -17,6 +17,7 @@ from miniflight import vehicle
 from miniflight.attitude import gyro_step, stationary_rotation
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance
 from miniflight.state import Frame
+from miniflight.profiling import timed
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_motors import Controller as Motors
 from target.aigp.experiments.producer_imu import ProducerImuClient
@@ -146,6 +147,7 @@ class Inertial:
         self.raw_position, self.raw_velocity = np.zeros(3), np.zeros(3)
         self.times, self.positions, self.rotations, self.velocities = [], [], [], []
 
+    @timed('prediction')
     def update(self, samples):
         for sample in samples:
             if self.rotation is None:
@@ -185,6 +187,7 @@ class Inertial:
             raise ValueError("velocity measurement is outside the IMU history")
         return np.array([np.interp(stamp, self.times, column) for column in np.asarray(self.velocities).T])
 
+    @timed('velocity_correction')
     def correct_velocity(self, stamp, measured, gain):
         innovation=np.asarray(measured)-self.velocity_at(stamp)
         delta = gain*innovation
@@ -196,6 +199,7 @@ class Inertial:
         self.position, self.velocity = self.positions[-1].copy(), self.velocities[-1].copy()
         return delta
 
+    @timed('position_correction')
     def correct_position(self, stamp, measured, gain):
         pose = self.camera_pose(stamp)
         if pose is None:
@@ -206,6 +210,7 @@ class Inertial:
         self.position = self.positions[-1].copy()
         return delta
 
+    @timed('attitude_correction')
     def correct_orientation(self,stamp,correction):
         matrix=correction.as_matrix()
         for i in range(bisect_left(self.times,stamp),len(self.times)):
@@ -235,6 +240,7 @@ class GateController(BaseController):
         config.update(max_speed=SETTINGS["speed_m_s"], max_acceleration=3., max_horizontal_acceleration=3., max_tilt=.45)
         self.config = PositionConfig(**config)
         self.inertial = Inertial()
+        self.timing={};self.inertial.timing=self.timing
         self.phase = Phase.CALIBRATING
         self.previous = None
         self.track = -1
@@ -274,6 +280,7 @@ class GateController(BaseController):
         stamp=-float('inf') if self.last_image_time is None else self.last_image_time
         return stamp if observed is None else max(stamp,observed['capture_time'])
 
+    @timed('partial_measurement')
     def observe_partial(self,frame,stamp,rotation,position,full_relative=None,full_corners=None):
         if not SETTINGS.get('partial_gate') or self.locked is None:return False
         template=self.rim_template.model()
@@ -326,6 +333,7 @@ class GateController(BaseController):
             return float(self.gate_relative() @ self.direction)
         return float((self.anchor-self.inertial.position) @ self.direction)
 
+    @timed('position_feedback')
     def drive(self, target):
         p, v = self.inertial.position, self.inertial.velocity
         desired_velocity = velocity_target(target-p,self.config.position_gain,self.config.max_speed,
@@ -336,6 +344,7 @@ class GateController(BaseController):
         acceleration += body @ body_drag
         return acceleration_control(self.config, acceleration, self.inertial.rotation.to_euler(), 0.)
 
+    @timed('gate_measurement')
     def observe(self, frame, stamp, position, rotation):
         if SETTINGS.get("camera_correction") and self.camera_motion.observations and stamp <= self.camera_motion.observations[-1][0]:
             return

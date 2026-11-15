@@ -3,6 +3,7 @@
 
 import numpy as np
 import cv2
+from miniflight.profiling import timed
 
 
 from . import sensors as single
@@ -123,6 +124,7 @@ class GateController(single.GateController):
             self.signal["height_alignment"] = True
         return super().drive(target)
 
+    @timed('visual_total')
     def observe(self, frame, stamp, position, rotation):
         if self.handoff_at is not None and stamp <= self.handoff_at:
             return

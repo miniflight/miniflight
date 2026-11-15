@@ -14,6 +14,7 @@ import numpy as np
 from pymavlink.dialects.v20 import common as mavlink
 
 from miniflight import Frame, vehicle
+from miniflight.profiling import timing_data
 from target.aigp.client import ConnectionPhase, Packet, SimulatorClient
 from target.aigp.controllers import BaseController, CommandT, update_controller
 from target.aigp.native import TARGETS, NativeRaceState, launch
@@ -173,6 +174,9 @@ class RecordedController(BaseController[CommandT]):
             self.phase = ControllerPhase.TERMINAL
             self.record(**row, error={"type": type(error).__name__, "message": str(error)})
             raise
+        finally:
+            timing=getattr(self.controller,'timing',None)
+            if timing:self.record(event='profile',scope='controller',stages=timing_data(timing))
         if command is not None and self.signals is not None:
             row["signals"] = self.signals(self.controller)
         self.record(**row, command=command_data(command))

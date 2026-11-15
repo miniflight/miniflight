@@ -10,6 +10,7 @@ from miniflight import vehicle
 from miniflight.loop import run
 from miniflight.state import Frame, ImuClock, ImuIncrement
 from miniflight.position import quadratic_resistance
+from miniflight.profiling import timed,timing_data
 from target.aigp.client import HeartbeatCadence
 from target.aigp.experiments.recording import ProcessClient, RaceReader, RecordedController
 from target.aigp.simulator import AIGPSimulator, ArmPhase
@@ -53,6 +54,7 @@ class WireClient(ProcessClient):
         self.imu_offsets,self.camera_offsets=deque(maxlen=256),deque(maxlen=128)
         self.last_imu_time,self.latest_frame=None,None
         self.filtered=0
+        self.timing={}
 
     def _receive(self,message,now):
         if message.get_type() not in base.ALLOWED:
@@ -62,6 +64,7 @@ class WireClient(ProcessClient):
             self.imu_offsets.append(now-result.time)
         return result
 
+    @timed('sensor_poll')
     def poll(self,timeout=0.):
         output=[]
         for packet in super().poll(timeout):
@@ -84,6 +87,7 @@ class WireClient(ProcessClient):
         stamp=frame.time_ns*1e-9+min(self.camera_offsets)-min(self.imu_offsets)
         return replace(frame,time_ns=round(stamp*1e9))
 
+    @timed('sensor_read')
     def read(self,timeout=1.):
         state=super().read(timeout)
         increments=[]
@@ -109,6 +113,7 @@ class GateController(base.GateController):
         self.alignment_direction=1.
         self.motor_outputs=None
 
+    @timed('goal')
     def drive(self,target):
         if self.alignment_gate!=self.gate_number:
             self.alignment_active=False;self.alignment_settled=None;self.alignment_gate=self.gate_number
@@ -201,8 +206,11 @@ class Controller(base.single.BaseController):
     def __init__(self,calls):
         self.gate=GateController(calls)
         self.motor=base.single.Motors(position=self.gate)
+        self.timing=self.gate.timing;self.motor.timing=self.timing
 
+    @timed('controller_total')
     def update(self,telemetry,frames,race_state):
+        self.timing.clear()
         command=self.motor.update(telemetry,frames,None)
         if command is not None:
             self.gate.motor_outputs=command.outputs
@@ -226,7 +234,9 @@ def execute(calls,record,path,reader=None,client=None):
     vehicle.connect()
     def read_signals(now):
         nonlocal ready,reason
+        client.timing.clear()
         state=vehicle.read(timeout=0)
+        record(event='profile',scope='sensor_io',stages=timing_data(client.timing))
         score_reader.poll()  # Recorded for scoring; no returned value enters navigation or lifecycle.
         heartbeat.send_if_due(client,now)
         if client.connected and ready is None:
