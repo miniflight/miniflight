@@ -6,6 +6,28 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_clipped_frame_retains_two_measured_top_corners(self):
+        import cv2
+        from target.aigp.experiments.camera_imu.partial import outer_top
+        image=cv2.imread(str(Path(__file__).parent/'fixtures/clipped_gate.jpg'))
+        top,residual=outer_top(image)
+        np.testing.assert_allclose(top,[[197.,319.],[354.,319.]],atol=1.)
+        self.assertLess(residual,.8)
+        self.assertIsNone(outer_top(np.zeros_like(image)))
+
+    def test_rim_dimensions_come_from_a_complete_pixel_view(self):
+        from scipy.spatial.transform import Rotation
+        from target.aigp.experiments.camera_imu import vision
+        from target.aigp.experiments.camera_imu.partial import measure_rim
+        camera=Rotation.from_euler('xyz',[.1,-.1,.05]).as_matrix() @ vision.CAMERA_FROM_BODY.T
+        opening=np.array([[10.,-.75,-.75],[10.,.75,-.75],[10.,.75,.75],[10.,-.75,.75]])
+        outer=np.array([[10.,-1.5,-1.6],[10.,1.5,-1.6]])
+        def project(points):
+            pixels=points @ camera @ vision.K.T
+            return pixels[:,:2]/pixels[:,2,None]
+        pose=vision.best_pose(project(opening))
+        np.testing.assert_allclose(measure_rim(project(outer),pose),[3.,1.6],atol=1e-9)
+
     def test_two_top_corners_recover_metric_position_with_gravity(self):
         from scipy.spatial.transform import Rotation
         from target.aigp.experiments.camera_imu import vision
