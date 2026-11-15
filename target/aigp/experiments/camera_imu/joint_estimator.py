@@ -57,6 +57,7 @@ class JointEstimator:
             if mask[y, x] or not valid[y, x]:
                 self.tracker.alive[point] = False
         self.last_id, self.last_time = frame.id, stamp
+        self.last_camera_rotation = np.array(camera_to_world)
         if not self.ready:
             tau = self.integral.at(stamp)[0]-self.reference_tau
             self.initial_frames.append(dict(id=frame.id, time=stamp, tau=tau, pixels=self.tracker.points.copy()))
@@ -125,6 +126,7 @@ class JointEstimator:
         world = np.array([item[1] for item in selected])
         self.rays = world/world[:, 2:]
         self.depth_prior = np.log(world[:, 2])
+        self.initial_depth_prior = self.depth_prior.copy()
         self.depth_sigma = np.array([item[2] for item in selected])
         self.depths = self.depth_prior.copy()
         self.anchor = np.r_[self.initial_frames[-1]['tau']*self.initial_velocity, self.initial_velocity]
@@ -158,7 +160,11 @@ class JointEstimator:
         for i in range(len(self.window)-1):
             dt, dv, dp = self.between(self.window[i]['time'], self.window[i+1]['time'])
             edges.append(dict(first=i, last=i+1, dt=float(dt), dv=dv.tolist(), dp=dp.tolist()))
-        request = dict(intrinsics=vision.K.tolist(), rays=self.rays.tolist(), depth_prior=self.depth_prior.tolist(),
+        depth_prior = self.depth_prior.copy()
+        observed = {point for frame in self.window for point in frame['ids']}
+        inactive = [point for point in range(len(depth_prior)) if point not in observed]
+        depth_prior[inactive] = self.depths[inactive]
+        request = dict(intrinsics=vision.K.tolist(), rays=self.rays.tolist(), depth_prior=depth_prior.tolist(),
             depth_sigma=self.depth_sigma.tolist(), gravity=self.gravity.tolist(), anchor=self.anchor.tolist(),
             states=[self.states[f['id']].tolist() for f in self.window], depths=self.depths.tolist(),
             frames=[dict(ids=f['ids'], pixels=f['pixels']) for f in self.window], edges=edges)
@@ -179,6 +185,8 @@ class JointEstimator:
         if np.linalg.norm(fitted[-1, :3]-predicted[:3]) > .5 or np.linalg.norm(fitted[-1, 3:6]) > 4.:
             raise RuntimeError('joint solution exceeded its correction bound')
         self.depth_revisions += int(np.max(abs(np.array(fit['depths'])-saved['depths'])) > 1e-6)
+        if not self.solutions:
+            self.initial_depth_prior = np.array(saved['depth_prior'])
         for name in ('rays', 'depth_prior', 'depth_sigma', 'gravity', 'anchor'):
             setattr(self, name, np.array(saved[name]))
         self.depths = np.array(fit['depths'])
@@ -188,4 +196,4 @@ class JointEstimator:
         self.solutions += 1
         self.timings.append(fit['solve_ms'])
         self.last_fit = fit
-        self.depth_change = float(np.median(abs(np.exp(self.depths-self.depth_prior)-1)))
+        self.depth_change = float(np.median(abs(np.exp(self.depths[ids]-self.initial_depth_prior[ids])-1)))

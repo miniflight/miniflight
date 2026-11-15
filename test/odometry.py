@@ -4,6 +4,7 @@ import numpy as np
 
 from miniflight.odometry import ImuIntegral
 from miniflight.joint import solve_window
+from target.aigp.experiments.camera_imu.joint_control import reference, slow_reference
 
 
 class IntegralTest(unittest.TestCase):
@@ -36,6 +37,34 @@ class IntegralTest(unittest.TestCase):
 
 
 class JointTest(unittest.TestCase):
+    def test_slow_profile_decelerates_before_turn(self):
+        start, forward = np.zeros(3), np.array([1., 0., 0.])
+        angle = np.radians(20.)
+        for t in np.linspace(1., 2.99, 10):
+            self.assertAlmostEqual(np.linalg.norm(slow_reference(start,forward,2.,angle,t)[1]),1.)
+        for boundary in (1.,3.,4.):
+            a=slow_reference(start,forward,2.,angle,boundary-1e-7)
+            b=slow_reference(start,forward,2.,angle,boundary+1e-7)
+            np.testing.assert_allclose(a[:2],b[:2],atol=1e-6)
+        end=slow_reference(start,forward,2.,angle,5.)
+        self.assertLess(np.linalg.norm(end[0]),4.1)
+        np.testing.assert_allclose(end[1:],0.,atol=1e-10)
+
+    def test_slow_turn_reference_is_continuous_and_stops(self):
+        start, forward = np.zeros(3), np.array([1., 0., 0.])
+        angle = np.radians(20.)
+        for t in [0., .5, 1., 1.999]:
+            p, v, a = reference(start, forward, 2., angle, 2., 1.5, t)
+            self.assertAlmostEqual(np.linalg.norm(v), 2.)
+            self.assertAlmostEqual(p[2], 0.)
+        before = reference(start, forward, 2., angle, 2., 1.5, 2.-1e-6)
+        after = reference(start, forward, 2., angle, 2., 1.5, 2.+1e-6)
+        np.testing.assert_allclose(before[0], after[0], atol=1e-5)
+        np.testing.assert_allclose(before[1], after[1], atol=1e-5)
+        end = reference(start, forward, 2., angle, 2., 1.5, 4.)
+        np.testing.assert_allclose(end[1:], 0., atol=1e-10)
+        self.assertGreater(end[0][1], .5)
+
     @staticmethod
     def problem(acceleration=.6, depth_scale=1.1):
         rng = np.random.default_rng(3)
