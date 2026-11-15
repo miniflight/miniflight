@@ -78,7 +78,8 @@ class JointEstimator:
             if tau >= 2. and len(self.initial_frames) >= 40:
                 self._initialize()
             return
-        if stamp-self.window[-1]['time'] < self.period:
+        period = min(self.period,.05) if self.gate_correction and gate_corners is not None else self.period
+        if stamp-self.window[-1]['time'] < period:
             return
         pixels = []
         if self.gate_correction and gate_corners is not None:
