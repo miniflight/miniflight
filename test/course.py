@@ -10,11 +10,25 @@ from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
 from target.aigp.experiments.camera_imu.motion import GateMotion
 from target.aigp.experiments.camera_imu import vision
+from target.aigp.experiments.camera_imu.gravity import vertical_planes,fit_down
 from target.aigp.experiments.camera_imu.score import scored_gate_passes, armed_contacts
 import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_upright_edges_recover_a_gyro_tilt_error(self):
+        from scipy.spatial.transform import Rotation
+        points=np.array([[8.,-.75,-.75],[8.,.75,-.75],[8.,.75,.75],[8.,-.75,.75]])
+        bias=Rotation.from_euler('y',2.2,degrees=True).as_matrix();planes=[]
+        for roll in [-5.,0.,5.]:
+            camera=Rotation.from_euler('xyz',[roll,-20.,0.],degrees=True).as_matrix() @ vision.CAMERA_FROM_BODY.T
+            pixels=points @ camera @ vision.K.T;pixels=pixels[:,:2]/pixels[:,2,None]
+            planes.extend(vertical_planes(pixels,bias @ camera))
+        down,residual,observability=fit_down(planes)
+        np.testing.assert_allclose(down,bias @ [0.,0.,1.],atol=1e-10)
+        self.assertLess(residual,1e-10)
+        self.assertGreater(observability,.05)
+
     def test_vertical_bearing_does_not_change_with_aircraft_attitude(self):
         from scipy.spatial.transform import Rotation
         for height in [-3.,0.,3.]:
