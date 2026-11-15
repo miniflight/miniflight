@@ -14,6 +14,7 @@ class GateFilter:
     def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics):
         self.p=np.zeros(3);self.v=np.zeros(3);self.R=np.array(rotation)
         self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
+        self.proposals={};self.retargets=0
         self.P=np.diag(np.r_[np.full(3,1e-8),np.full(3,.05**2),np.r_[np.full(2,np.radians(.5)**2),1e-8],
             np.full(3,.001**2),np.full(3,.5**2),.03**2])
         self.thrust_curve=np.array(thrust_curve);self.drag=np.asarray(drag)
@@ -84,6 +85,20 @@ class GateFilter:
         P[:n,n:]=self.P[:,15,None]*scale_derivative;P[n:,:n]=P[:n,n:].T
         P[n:,n:]=np.diag(sigma**2)+np.outer(scale_derivative,scale_derivative)*self.P[15,15]
         self.P=P;self.rim=(n,dimensions)
+
+    def consider_nearer(self,key,identity,stamp,seed):
+        """Mission slots can bind a new visual landmark; the old one remains distinct."""
+        relative=self.R @ self.C.T @ seed[0]*(self.size/1.5)
+        distance=np.linalg.norm(relative);predicted=np.linalg.norm(self.gates[key][1]-self.p)
+        if not 3.<distance<predicted-5.:return False
+        center=self.p+relative;old=self.proposals.get(key,[])
+        if old and (stamp-old[-1][1]>.3 or np.linalg.norm(center-old[-1][2])>max(1.5,.06*distance)):old=[]
+        if not any(r[0]==identity for r in old):old.append((identity,stamp,center))
+        self.proposals[key]=old
+        if len(old)<3:return False
+        index=self.gates[key][0];self.gates[-index-1]=self.gates.pop(key)
+        self.add_gate(key,*seed);self.proposals.pop(key);self.retargets+=1
+        return True
 
     def measurement(self,key,points,rim=False):
         if rim:
@@ -165,11 +180,25 @@ class GateHistory:
             self._advance(stamp)
             for row in self.observations:
                 if row['time']==stamp:
+                    seed=row.get('seed')
+                    if row.get('rim'):
+                        if self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
+                        # Two observed top corners plus upright geometry can seed a nearer hypothesis.
+                        pixels=np.c_[row['pixels'],np.ones(2)];rays=pixels @ np.linalg.inv(self.filter.K).T @ self.filter.C @ self.filter.R.T
+                        z=rays[:,2];width,height=self.filter.rim[1];edge=z[0]*rays[1]-z[1]*rays[0]
+                        if np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
+                            top=rays*(width/np.linalg.norm(edge)*abs(z[::-1]))[:,None]
+                            center=top.mean(axis=0)+[0.,0.,height];right=(top[1]-top[0])/width
+                            camera=self.filter.C @ self.filter.R.T
+                            seed=(camera @ center*(1.5/self.filter.size),camera @ right)
                     if row['key'] not in self.filter.gates:
-                        if row.get('seed') is None:continue
-                        self.filter.add_gate(row['key'],*row['seed'])
-                    if row.get('rim') and self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
-                    self.results[row['id']]=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
+                        if seed is None:continue
+                        self.filter.add_gate(row['key'],*seed)
+                    result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
+                    if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
+                        result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
+                        result['nearer_landmark_bound']=True
+                    self.results[row['id']]=result
             self.snapshots.append((stamp,self.filter.copy()));self.repropagated+=1
         boundary=end-self.seconds;keep=max(0,np.searchsorted([t for t,_ in self.snapshots],boundary)-1)
         self.snapshots=self.snapshots[keep:];oldest=self.snapshots[0][0]

@@ -218,7 +218,7 @@ class GateController(base.GateController):
             # Extrapolate to command time, including ordinary gaps between IMU packets.
             age=max(0.,min(.3,self.calls.monotonic()-vehicle.state.received_at))
             position=self.inertial.position+self.inertial.velocity*age
-            if self.gate_remaining()-(self.inertial.velocity @ self.direction)*age < 0.:
+            if self.gate_remaining()-(self.inertial.velocity @ self.direction)*age < -base.SETTINGS.get('finish_beyond_m',0.):
                 self.phase=base.single.Phase.COMPLETE
                 self.completed.append(dict(gate=self.gate_number,imu_time=self.inertial.time,
                     estimated_center=self.anchor.tolist(),position=position.tolist(),velocity=self.inertial.velocity.tolist(),
@@ -254,7 +254,10 @@ class Controller(base.single.BaseController):
 def execute(calls,record,path,reader=None,client=None):
     """Own sensor/command lifetime; native GO, validity, counters and finish are unused."""
     client=WireClient(calls,record_camera=True) if client is None else client
-    controller=RecordedController(lambda:Controller(calls),record,signals=lambda c:c.gate.signal)
+    controller_type=Controller
+    if base.SETTINGS.get('joint_estimator'):
+        from .gate_filter_live import Controller as controller_type
+    controller=RecordedController(lambda:controller_type(calls),record,signals=lambda c:c.gate.signal)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
     began=calls.monotonic();ready=None;error=None;reason=None;armed_at=None

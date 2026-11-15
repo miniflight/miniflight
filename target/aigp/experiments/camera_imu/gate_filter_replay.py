@@ -15,9 +15,9 @@ FIELDS={'imu_time','imu_received_at','acceleration','gyro','frame_id','frame_hea
 SQUARE=.75*np.array([[0.,-1.,-1.],[0.,1.,-1.],[0.,1.,1.],[0.,-1.,1.]])
 
 
-def run(source,root,model):
+def run(source,root,model,tracks=None):
     root.mkdir(parents=True)
-    data_path=source/'public-inputs.npz';image_path=source/'public-observations.jsonl.gz'
+    data_path=source/'public-inputs.npz';image_path=source/'public-observations.jsonl.gz' if tracks is None else tracks
     with np.load(data_path,allow_pickle=False) as raw:
         if set(raw.files)!=FIELDS:raise ValueError('Exactly the raw public-input schema is required')
         data={k:raw[k] for k in raw.files}
@@ -26,8 +26,10 @@ def run(source,root,model):
     protocol=dict(source=str(source),inputs={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [data_path,image_path,model]},
         source_code={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__),Path('miniflight/gate_filter.py')]},
         method='Joint p/v/attitude/gyro-bias/force-bias, nominal aperture size, rim dimensions and upright gate xyz/yaw EKF;1s rewind and full event replay.',
-        association='Recorded public mission context assigns primary aperture/top candidates; lookahead candidates excluded to isolate fusion. NIS can reject candidates, never choose by native truth.',
+        association=('Recorded public mission context on raw candidates; this includes candidates the pilot rejected.' if tracks is None else
+            'Frozen accepted pixel tracks and own mission IDs. Previous estimated p/v/R are excluded. Availability is conservative send-return time; NIS may reject tracks.'),
         timing='Public timestamp epochs and receipts; published elapsed time is not exact force preintegration. Command epoch uses the preceding public receipt-offset envelope.',
+        binding='Three distinct, consistent images can bind a5m-nearer landmark after innovation rejection. The old landmark stays separate; no native identity labels.',
         noise=dict(acceleration_density_m_s2_sqrt_s=.5,gyro_density_floor_rad_sqrt_s=.001,gyro_bias_walk_rad_s_sqrt_s=.0001,force_bias_walk_m_s2_sqrt_s=.05,pixel_sigma_px=1.,
             gyro='Stationary measured density or0.001 floor, plus per-interval angular-rate variation uncertainty.',rim='Two shared dimension states; public P90-P10 spread supplies prior uncertainty.',aperture_size_prior_m=[1.5,.03]),
         native_inputs=0,raw_images_retained=False)
@@ -79,8 +81,7 @@ def run(source,root,model):
             else:
                 if template is None:ignored['missing_template']+=1;continue
                 w,h=template['width_m'],template['center_to_top_m'];points=np.array([[0.,-w/2,-h],[0.,w/2,-h]])
-                if key not in history.filter.gates:ignored['missing_gate']+=1;continue
-            history.observe(dict(id=counter,time=float(row['capture_time']),key=key,pixels=pixels,points=points,seed=seed_gate,sigma_px=1.,
+            history.observe(dict(id=counter,image_id=row['image_id'],time=float(row['capture_time']),key=key,pixels=pixels,points=points,seed=seed_gate,sigma_px=1.,
                 rim=row['kind']=='outer_top',rim_prior=None if template is None else (template['width_m'],template['center_to_top_m'],template['fractional_spread'])))
             counter+=1
         timings.append((kind,(time.perf_counter()-start)*1000))
@@ -91,7 +92,7 @@ def run(source,root,model):
         for row in outputs:stream.write(json.dumps({k:v.tolist() if isinstance(v,np.ndarray) else v for k,v in row.items()},allow_nan=False)+'\n')
     results=list(history.results.values());accepted=[r for r in results if r['accepted']]
     diagnostics=dict(outputs=len(outputs),image_updates=len(results),accepted=len(accepted),rejected=len(results)-len(accepted),ignored=ignored,
-        late_images_rejected=history.rejected_late,repropagated_nodes=history.repropagated,
+        late_images_rejected=history.rejected_late,repropagated_nodes=history.repropagated,nearer_landmark_bindings=history.filter.retargets,
         minimum_covariance_eigenvalue=min(r['covariance_min_eigenvalue'] for r in outputs),
         processing_ms={str(k):dict(median=float(np.median([t for kind,t in timings if kind==k])),p95=float(np.quantile([t for kind,t in timings if kind==k],.95)),maximum=float(max(t for kind,t in timings if kind==k))) for k in [0,1,2]},
         nis=[r for r in results if 'nis' in r])
@@ -101,5 +102,6 @@ def run(source,root,model):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('source',type=Path);parser.add_argument('output',type=Path)
+    parser.add_argument('--tracks',type=Path)
     parser.add_argument('--model',type=Path,default=Path(__file__).with_name('dynamics.model.json'));args=parser.parse_args()
-    run(args.source,args.output,args.model)
+    run(args.source,args.output,args.model,args.tracks)

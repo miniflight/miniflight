@@ -16,6 +16,40 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_live_origin_shift_preserves_joint_relative_geometry_and_covariance(self):
+        from miniflight.position import PositionConfig
+        from target.aigp.experiments.camera_imu.gate_filter_live import Inertial
+        f=filter();observer=Inertial(PositionConfig(.27,60.,thrust_curve=(8.,106.),body_resistance_per_m=(.05,)*3))
+        observer.history=GateHistory(f,1.,[0.,0.,0.]);observer.times=[1.];observer.positions=[f.p.copy()]
+        observer.velocities=[f.v.copy()];observer.rotations=[f.R @ CAMERA_FROM_BODY.T]
+        before=f.relative(1)[0];cov=f.P.copy();pixels=f.measurement(1,POINTS)[0]
+        observer.reset_origin(np.array([2.,-.5,1.]))
+        np.testing.assert_allclose(observer.history.filter.relative(1)[0],before)
+        np.testing.assert_array_equal(observer.history.filter.P,cov)
+        np.testing.assert_allclose(observer.history.filter.measurement(1,POINTS)[0],pixels)
+
+    def test_nearer_binding_needs_three_distinct_images_and_keeps_old_landmark(self):
+        f=filter();f.gates[1]=(f.gates[1][0],f.p+np.array([40.,0.,0.]),0.)
+        camera=f.C @ f.R.T;seed=(camera @ [12.,0.,0.],camera @ [0.,1.,0.]);before=f.p.copy()
+        for _ in range(3):self.assertFalse(f.consider_nearer(1,7,1.,seed))
+        self.assertFalse(f.consider_nearer(1,8,1.03,seed));self.assertTrue(f.consider_nearer(1,9,1.06,seed))
+        np.testing.assert_allclose(f.gates[1][1]-f.p,[12.,0.,0.]);np.testing.assert_array_equal(f.p,before)
+        self.assertEqual(len(f.gates),2);self.assertEqual(f.retargets,1)
+
+    def test_track_export_is_independent_of_previous_motion_estimates(self):
+        import gzip,json,tempfile
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.gate_filter_inputs import export
+        row=dict(gate_number=1,motor_commands=[.27]*4,position=[100]*3,velocity=[100]*3,camera_orientation=np.eye(3).tolist(),
+            camera_observation=dict(image_id=7,capture_time=1.,corners=[[1,2],[3,2],[3,4],[1,4]],reprojection_rmse_px=.2))
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);np.savez(root/'public-inputs.npz',motor_sent_host_time=[1001.],motor_outputs=[[.27]*4])
+            def write():
+                with gzip.open(root/'control.jsonl.gz','wt') as stream:stream.write(json.dumps(row)+'\n')
+            write();export(root,root/'first.gz');row.update(position=[-999]*3,velocity=[-999]*3,camera_orientation=(-np.eye(3)).tolist())
+            write();export(root,root/'second.gz')
+            with gzip.open(root/'first.gz','rt') as a,gzip.open(root/'second.gz','rt') as b:self.assertEqual(a.read(),b.read())
+
     def test_partial_pixels_jointly_estimate_uncertain_rim_dimensions(self):
         f=filter();f.add_rim(2.84,1.4,.1);expected,H=f.measurement(1,None,rim=True);eps=1e-6
         numeric=[]

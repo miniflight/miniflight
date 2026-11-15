@@ -345,7 +345,7 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
@@ -370,6 +370,9 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
         SETTINGS.update(position_config=position_config,visual_initialization=calibration is not None,partial_gate=partial_gate,
             crossing_constraint=crossing_constraint,
             dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
+        SETTINGS.update(joint_estimator=joint_estimator,brake_test=brake_test)
+        if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False)
+        if brake_test:SETTINGS['finish_beyond_m']=1.
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
@@ -403,6 +406,7 @@ def main():
     parser.add_argument("path", type=Path, nargs="?")
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument('--crossing-constraint',action='store_true')
+    parser.add_argument('--joint-estimator',action='store_true');parser.add_argument('--brake-test',action='store_true')
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
     parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
@@ -420,7 +424,8 @@ def main():
     elif args.mode=='course':
         if args.dynamics_model is None:parser.error('course requires --dynamics-model; see dynamics.model.json for the public-data calibration')
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint)
+        if args.brake_test and (not args.joint_estimator or args.gates!=1):parser.error('brake test requires --joint-estimator --gates 1')
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():

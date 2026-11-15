@@ -521,6 +521,7 @@ class GateController(BaseController):
                     self.last_gate_corners-=self.shift_displacement
                     self.centers=[c-self.shift_displacement for c in self.centers]
                     self.camera_motion.observations.clear();self.camera_observation=None
+                if hasattr(self.inertial,'reset_origin'):self.inertial.reset_origin(self.shift_displacement)
                 self.inertial.position = np.zeros(3)
                 self.inertial.times = [now]
                 self.inertial.positions = [self.inertial.position.copy()]
