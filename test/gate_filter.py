@@ -16,6 +16,16 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_extended_visual_budget_requires_a_far_known_precise_height_maneuver(self):
+        from target.aigp.experiments.camera_imu.gate_filter_live import outage_budget
+        r=np.array([30.,1.,10.]);d=np.array([1.,0.,0.]);P=np.eye(3)*.1**2
+        budget=outage_budget(r,P,d,True);self.assertEqual(budget['budget_s'],4.5)
+        self.assertEqual(outage_budget(r,P,d,False)['budget_s'],2.)
+        self.assertEqual(outage_budget([6.,1.,1.],P,d,True)['budget_s'],2.)
+        self.assertEqual(outage_budget(r,np.eye(3)*5.**2,d,True)['budget_s'],2.)
+        Q=Rotation.from_euler('z',.7).as_matrix();rotated=outage_budget(Q @ r,Q @ P @ Q.T,Q @ d,True)
+        self.assertAlmostEqual(rotated['bearing_3sigma_rad'],budget['bearing_3sigma_rad'])
+
     def test_pad_support_is_not_fitted_as_a_force_bias(self):
         f=GateFilter(np.eye(3),np.zeros(3),[11.81,0.],[0.]*3,CAMERA_FROM_BODY,K,supported=True)
         h=GateHistory(f,0.,[0.,0.,0.]);h.command(.001,[1.]*4)
@@ -143,7 +153,7 @@ class JointGateTest(unittest.TestCase):
         from types import SimpleNamespace
         from unittest.mock import patch
         from target.aigp.experiments.camera_imu import gate_filter_live,course,sensors
-        c=object.__new__(gate_filter_live.GateController);c.locked=0;c.phase=sensors.Phase.TRACKING
+        c=object.__new__(gate_filter_live.GateController);c.locked=0;c.phase=sensors.Phase.TRACKING;c.signal={}
         c.inertial=SimpleNamespace(time=5.);c.measurement_time=lambda:2.
         with patch.object(course.GateController,'update',return_value=None):
             with self.assertRaisesRegex(TimeoutError,'two seconds'):c.update((),(),None)

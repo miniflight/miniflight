@@ -9,6 +9,17 @@ from miniflight.profiling import timed
 from . import course,sensors,vision
 
 
+def outage_budget(relative,covariance,direction,aligning,maximum=4.5):
+    """A mapped far-field height maneuver can outlast the normal visual interval."""
+    right=np.array([-direction[1],direction[0],0.]);axes=np.array([right,[0.,0.,1.]])
+    distance=float(np.asarray(relative) @ direction)
+    spread=3.*np.sqrt(max(0.,float(np.linalg.eigvalsh(axes @ covariance @ axes.T)[-1])))
+    angle=float(np.arctan2(spread,max(.1,distance)))
+    allowed=bool(aligning and distance>8. and angle<.15)
+    return dict(budget_s=maximum if allowed else 2.,mapped_height_alignment=allowed,
+        range_m=distance,transverse_3sigma_m=float(spread),bearing_3sigma_rad=angle,bearing_limit_rad=.15)
+
+
 class Inertial(sensors.Inertial):
     def __init__(self,config):
         super().__init__();self.config=config;self.history=None;self.serial=0
@@ -105,8 +116,14 @@ class GateController(course.GateController):
         h=getattr(self.inertial,'history',None)
         if h is not None and self.locked is not None and self.gate_number not in h.filter.gates and self.last_image_id is not None:
             self.inertial.pixels(self.gate_number,self.last_image_time,self.last_image_id,self.last_corners)
-        if self.locked is not None and self.phase is sensors.Phase.TRACKING and self.inertial.time-self.measurement_time()>2.:
-            raise TimeoutError('joint gate measurement exceeded two seconds')
+        if self.locked is not None and self.phase is sensors.Phase.TRACKING:
+            budget=dict(budget_s=2.)
+            if h is not None and self.gate_number in h.filter.gates:
+                relative,covariance,_,_=h.filter.relative(self.gate_number)
+                budget=outage_budget(relative,covariance,self.direction,self.alignment_active,sensors.SETTINGS['maximum_blind_s'])
+            age=float(self.inertial.time-self.measurement_time());self.signal['visual_outage']=dict(budget,image_age_s=age)
+            if age>budget['budget_s']:
+                raise TimeoutError('joint gate measurement exceeded two seconds' if budget['budget_s']==2. else 'joint gate measurement exceeded its mapped visibility budget')
         return request
 
     def observe(self,frame,stamp,position,rotation):
