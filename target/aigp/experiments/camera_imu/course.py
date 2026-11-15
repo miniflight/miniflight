@@ -321,5 +321,11 @@ def execute(calls,record,path,reader=None,client=None):
         estimated_gate_number=0 if instance is None else instance.gate.gate_number,armed_boot_time=armed_at)
     if instance is not None:
         outcome['prediction_bias']=instance.gate.inertial.prediction_bias.tolist()
+        history=getattr(instance.gate.inertial,'history',None)
+        if history is not None:
+            f=history.filter
+            outcome['estimated_map']=dict(frame='Initial stationary camera/IMU local frame',source='Public pixels, IMU and own commands only',
+                gates=[dict(id=key,center=center.tolist(),yaw=yaw,covariance=f.P[index:index+4,index:index+4].tolist(),last_seen=f.last_visual.get(key))
+                    for key,(index,center,yaw) in f.gates.items() if key>0])
     record(event='result',**outcome)
     return outcome,client

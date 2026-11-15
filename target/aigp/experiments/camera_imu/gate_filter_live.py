@@ -81,6 +81,17 @@ class GateController(course.GateController):
         if h is not None and self.gate_number in h.filter.gates:return h.filter.last_visual.get(self.gate_number,-np.inf)
         return super().measurement_time()
 
+    def fuse_lookahead(self,frame,stamp):
+        observed=self.lookahead;key=self.gate_number+1
+        if (observed is None or observed['frame']!=frame.id or self.lookahead_count<3
+                or key>sensors.SETTINGS['gates_to_pass'] or (frame.id,'full',key) in self.used_joint):return
+        self.used_joint.add((frame.id,'full',key))
+        self.inertial.pixels(key,stamp,frame.id,observed['corners'])
+
+    def observe_ahead(self,frame,stamp,position,rotation):
+        super().observe_ahead(frame,stamp,position,rotation)
+        if self.phase is sensors.Phase.FINAL_IMU:self.fuse_lookahead(frame,stamp)
+
     def gate_relative(self):
         h=self.inertial.history
         if h is not None and self.gate_number in h.filter.gates:return h.filter.relative(self.gate_number)[0]
@@ -112,6 +123,7 @@ class GateController(course.GateController):
         if partial is not None and partial['image_id']==frame.id and partial['gate_number']==self.gate_number and (frame.id,'top',self.gate_number) not in self.used_joint:
             self.used_joint.add((frame.id,'top',self.gate_number));self.inertial.pixels(self.gate_number,stamp,frame.id,partial['top_corners'],partial['template'])
             partial['velocity']=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior')
+        self.fuse_lookahead(frame,stamp)
         f=self.inertial.history.filter
         if self.gate_number in f.gates:
             self.anchor=f.gates[self.gate_number][1].copy();self.last_relative_gate=self.gate_relative();self.last_relative_position=f.p.copy()
@@ -142,13 +154,14 @@ class Controller(course.Controller):
         h=self.gate.inertial.history
         if command is not None and h is not None:
             f=h.filter
+            posterior=dict(position_covariance=f.P[:3,:3].tolist(),velocity_covariance=f.P[3:6,3:6].tolist(),attitude_covariance=f.P[6:9,6:9].tolist(),
+                gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets)
             if self.gate.gate_number in f.gates:
                 relative,cov,camera,camcov=f.relative(self.gate.gate_number)
-                self.gate.signal['joint_posterior']=dict(position_covariance=f.P[:3,:3].tolist(),velocity_covariance=f.P[3:6,3:6].tolist(),
-                    attitude_covariance=f.P[6:9,6:9].tolist(),relative_gate=relative.tolist(),relative_covariance=cov.tolist(),camera_gate=camera.tolist(),camera_covariance=camcov.tolist(),
-                    gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets)
-                self.gate.signal['joint_posterior'].update(gate_yaw=f.gates[self.gate.gate_number][2],last_accepted_image_time=f.last_visual.get(self.gate.gate_number),
+                posterior.update(relative_gate=relative.tolist(),relative_covariance=cov.tolist(),camera_gate=camera.tolist(),camera_covariance=camcov.tolist())
+                posterior.update(gate_yaw=f.gates[self.gate.gate_number][2],last_accepted_image_time=f.last_visual.get(self.gate.gate_number),
                     position_gate_covariance=f.P[:3,f.gates[self.gate.gate_number][0]:f.gates[self.gate.gate_number][0]+3].tolist())
+            self.gate.signal['joint_posterior']=posterior
             self.gate.signal['brake_test_state']=self.gate.brake_state
             h.command(h.time,command.outputs);self.gate.inertial.sync()
         return command

@@ -506,29 +506,35 @@ class GateController(BaseController):
             if visual_setup:
                 target[0]=self.inertial.position[0]
                 distance=np.linalg.norm((target-self.inertial.position)[1:])
-                steady=distance<.1 and np.linalg.norm(self.inertial.velocity[1:])<.15 and abs(self.inertial.velocity[0])<.5
+                start_speed=.5 if SETTINGS.get('moving_start') else .15
+                steady=distance<.1 and np.linalg.norm(self.inertial.velocity[1:])<start_speed and abs(self.inertial.velocity[0])<.5
+                if SETTINGS.get('moving_start'):steady=steady and now-self.measurement_time()<.2
             self.setup_steady = (self.setup_steady or now) if steady else None
             setup_complete=self.setup_steady is not None and now-self.setup_steady>=.4
             if now-self.setup_started > 10. and not setup_complete:
                 raise TimeoutError("IMU shift and settle exceeded ten seconds")
             if setup_complete:
                 self.shift_displacement = self.inertial.position.copy()
-                if visual_setup:
-                    self.anchor-=self.shift_displacement
-                    self.direction=self.anchor*[1.,1.,0.];self.direction/=np.linalg.norm(self.direction)
-                    self.last_relative_position-=self.shift_displacement
-                    p,q,c,pose=self.previous
-                    self.previous=(p-self.shift_displacement,q,c,pose)
-                    self.last_gate_corners-=self.shift_displacement
-                    self.centers=[c-self.shift_displacement for c in self.centers]
-                    self.camera_motion.observations.clear();self.camera_observation=None
-                if hasattr(self.inertial,'reset_origin'):self.inertial.reset_origin(self.shift_displacement)
-                self.inertial.position = np.zeros(3)
-                self.inertial.times = [now]
-                self.inertial.positions = [self.inertial.position.copy()]
-                self.inertial.velocities = [self.inertial.velocity.copy()]
-                self.inertial.raw_position = np.zeros(3)
-                self.inertial.rotations = [self.inertial.rotation.as_rotation_matrix() @ CAMERA_FROM_BODY.T]
+                if not SETTINGS.get('continuous_origin'):
+                    if visual_setup:
+                        self.anchor-=self.shift_displacement
+                        self.direction=self.anchor*[1.,1.,0.];self.direction/=np.linalg.norm(self.direction)
+                        self.last_relative_position-=self.shift_displacement
+                        p,q,c,pose=self.previous
+                        self.previous=(p-self.shift_displacement,q,c,pose)
+                        self.last_gate_corners-=self.shift_displacement
+                        self.centers=[c-self.shift_displacement for c in self.centers]
+                        self.camera_motion.observations.clear();self.camera_observation=None
+                    if hasattr(self.inertial,'reset_origin'):self.inertial.reset_origin(self.shift_displacement)
+                    self.inertial.position = np.zeros(3)
+                    self.inertial.times = [now]
+                    self.inertial.positions = [self.inertial.position.copy()]
+                    self.inertial.velocities = [self.inertial.velocity.copy()]
+                    self.inertial.raw_position = np.zeros(3)
+                    self.inertial.rotations = [self.inertial.rotation.as_rotation_matrix() @ CAMERA_FROM_BODY.T]
+                elif visual_setup:
+                    self.direction=(self.anchor-self.inertial.position)*[1.,1.,0.]
+                    self.direction/=np.linalg.norm(self.direction)
                 self.phase = Phase.TRACKING if visual_setup else Phase.ACQUIRING
                 if visual_setup:self.began=now
                 self.acquire_started = now

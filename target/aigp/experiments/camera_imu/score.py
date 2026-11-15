@@ -106,7 +106,8 @@ def score(root):
     requested = settings.get("gates_to_pass", 2)
     openings = gate_openings()[:requested]
     local_to_native = Rotation.from_euler("z", attitudes[0][3]).as_matrix()
-    approach = [tick for tick in ticks if tick["phase"] in ("TRACKING", "FINAL_IMU", "HANDOFF")]
+    scored_phases=("SHIFTING","TRACKING","FINAL_IMU","HANDOFF") if settings.get('continuous_origin') else ("TRACKING","FINAL_IMU","HANDOFF")
+    approach = [tick for tick in ticks if tick["phase"] in scored_phases]
     histories = {tick["imu_history_start"] for tick in approach}
     samples = [tick["imu_history_samples"] for tick in approach]
     if approach:

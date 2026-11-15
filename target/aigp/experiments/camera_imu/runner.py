@@ -332,6 +332,8 @@ def public_course(root,shift):
                 if count%64==0 and (root/'flight.jsonl').stat().st_size>SETTINGS.get('trace_limit_mib',384)*1024**2:
                     raise RuntimeError('temporary public-sensor trace exceeded its size limit')
             outcome,_=execute(Calls(bounded),bounded,root/'native.jsonl',reader)
+            if outcome.get('estimated_map') is not None:
+                (root/'estimated-map.json').write_text(json.dumps(outcome['estimated_map'],indent=2)+'\n')
             print(json.dumps(outcome),flush=True)
     from .score import score
     result=score(root)
@@ -345,7 +347,7 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
@@ -371,7 +373,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
             crossing_constraint=crossing_constraint,
             dynamics_model_sha256=None if calibration is None else hashlib.sha256(calibration).hexdigest())
         SETTINGS.update(joint_estimator=joint_estimator,brake_test=brake_test)
-        if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False)
+        if joint_estimator:SETTINGS.update(camera_correction=False,visual_gravity=False,continuous_origin=True,moving_start=moving_start)
         if brake_test:SETTINGS['finish_beyond_m']=1.
     try:
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
@@ -391,7 +393,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
                              'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
-                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz','architecture-score.json'):
+                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz','architecture-score.json','estimated-map.json'):
                     if (raw/name).exists():shutil.copyfile(raw/name,root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
                 (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")
@@ -407,6 +409,7 @@ def main():
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument('--crossing-constraint',action='store_true')
     parser.add_argument('--joint-estimator',action='store_true');parser.add_argument('--brake-test',action='store_true')
+    parser.add_argument('--moving-start',action='store_true')
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
     parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
@@ -425,7 +428,7 @@ def main():
         if args.dynamics_model is None:parser.error('course requires --dynamics-model; see dynamics.model.json for the public-data calibration')
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
         if args.brake_test and (not args.joint_estimator or args.gates!=1):parser.error('brake test requires --joint-estimator --gates 1')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test)
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():

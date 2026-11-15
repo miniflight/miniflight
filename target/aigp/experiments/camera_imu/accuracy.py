@@ -9,7 +9,7 @@ def statistics(values):
     values = np.asarray(values, dtype=float)
     if not len(values):
         return dict(count=0)
-    return dict(count=len(values), median=float(np.median(values)), p95=float(np.quantile(values, .95)),
+    return dict(count=len(values),mae=float(np.mean(abs(values))),median=float(np.median(values)), p95=float(np.quantile(abs(values), .95)),
                 maximum=float(np.max(values)), rms=float(np.sqrt(np.mean(values**2))))
 
 

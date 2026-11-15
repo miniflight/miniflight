@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation,Slerp
 
 def statistics(x):
     x=np.asarray(x,float);x=x[np.isfinite(x)]
-    return dict(count=len(x),rms=float(np.sqrt(np.mean(x*x))),median=float(np.median(x)),p95=float(np.quantile(abs(x),.95)),maximum=float(max(abs(x)))) if len(x) else dict(count=0)
+    return dict(count=len(x),mae=float(np.mean(abs(x))),rms=float(np.sqrt(np.mean(x*x))),median=float(np.median(x)),p95=float(np.quantile(abs(x),.95)),maximum=float(max(abs(x)))) if len(x) else dict(count=0)
 
 
 def score(source,root,render=True):
@@ -116,16 +116,20 @@ def score_live(root):
     if not (root/'state-errors.csv').exists():
         result=dict(scoring_status='No approach reference; retain startup failure',brake_resumed=False)
         (root/'joint-score.json').write_text(json.dumps(result)+'\n');return result
-    with gzip.open(root/'control.jsonl.gz','rt') as f:rows=[r for r in map(json.loads,f) if r['phase'] in ['TRACKING','FINAL_IMU','HANDOFF'] and r.get('joint_posterior')]
+    settings=json.loads((root/'protocol.json').read_text())['settings']
+    phases=['SHIFTING','TRACKING','FINAL_IMU','HANDOFF'] if settings.get('continuous_origin') else ['TRACKING','FINAL_IMU','HANDOFF']
+    with gzip.open(root/'control.jsonl.gz','rt') as f:rows=[r for r in map(json.loads,f) if r['phase'] in phases and r.get('joint_posterior')]
     n=np.genfromtxt(root/'state-errors.csv',delimiter=',',names=True)
     assert len(rows)==len(n);np.testing.assert_array_equal([r['imu_time'] for r in rows],n['time'])
     t=n['time'];post=[r['joint_posterior'] for r in rows];gate=gate_openings().mean(axis=1)[np.array([r['gate_number'] for r in rows])-1]
     nr=Rotation.from_euler('xyz',np.column_stack([n['native_attitude_'+a+'_deg'] for a in ['roll','pitch','yaw']]),degrees=True).as_matrix()
     pos=np.column_stack([n['native_position_'+a] for a in 'ned']);vel=np.column_stack([n['native_velocity_'+a] for a in 'ned'])
-    truth=np.einsum('ij,nkj,nk->ni',CAMERA_FROM_BODY,nr,gate-pos);depth=np.array([p['camera_gate'][2] for p in post]);ds=np.sqrt([p['camera_covariance'][2][2] for p in post]);de=depth-truth[:,2]
+    truth=np.einsum('ij,nkj,nk->ni',CAMERA_FROM_BODY,nr,gate-pos);depth=np.array([p['camera_gate'][2] if 'camera_gate' in p else np.nan for p in post]);ds=np.sqrt([p['camera_covariance'][2][2] if 'camera_covariance' in p else np.nan for p in post]);de=depth-truth[:,2]
     braking=np.array([bool(r.get('brake_test_active')) for r in rows]);resumed=np.array([r.get('brake_test_state')=='resumed' for r in rows])
     errors=dict(position=n['position_error_m'],velocity=n['velocity_error_m_s'],attitude=n['attitude_error_deg'],depth=de)
-    result={name:dict(samples=int(mask.sum()),errors={key:statistics(value[mask]) for key,value in errors.items()},depth_3sigma_coverage=float(np.mean(abs(de[mask])<=3*ds[mask])) if mask.any() else None) for name,mask in [('full',np.ones(len(t),bool)),('braking',braking),('after_braking',resumed)]}
+    masks=dict(full=np.ones(len(t),bool),startup=np.array([r['phase']=='SHIFTING' for r in rows]),course=np.array([r['phase']!='SHIFTING' for r in rows]),braking=braking,after_braking=resumed)
+    result={name:dict(samples=int(mask.sum()),errors={key:statistics(value[mask]) for key,value in errors.items()},depth_available_fraction=float(np.mean(np.isfinite(depth[mask]))) if mask.any() else None,
+        depth_3sigma_coverage=float(np.mean(abs(de[mask&np.isfinite(de)])<=3*ds[mask&np.isfinite(de)])) if (mask&np.isfinite(de)).any() else None) for name,mask in masks.items()}
     if braking.any():result['braking_interval_s']=[float(min(t[braking])),float(max(t[braking]))]
     result['brake_resumed']=bool(resumed.any());result['reference_use']='Native scoring only; commanded flight used the joint public-input posterior.'
     (root/'joint-score.json').write_text(json.dumps(result,indent=2)+'\n')
