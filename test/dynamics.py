@@ -57,7 +57,7 @@ class PublicCalibrationTest(unittest.TestCase):
     def test_two_top_corners_recover_metric_position_with_gravity(self):
         from scipy.spatial.transform import Rotation
         from target.aigp.experiments.camera_imu import vision
-        from target.aigp.experiments.camera_imu.partial import relative_from_top
+        from target.aigp.experiments.camera_imu.partial import relative_from_top,predicted_aperture
         width,offset=3.,1.6
         for center in [np.array([10.,2.,3.]),np.array([8.,-1.,-2.])]:
             for yaw in [-.2,.1]:
@@ -66,6 +66,11 @@ class PublicCalibrationTest(unittest.TestCase):
                 camera=Rotation.from_euler('xyz',[.1,-.2,.05]).as_matrix() @ vision.CAMERA_FROM_BODY.T
                 pixels=points @ camera @ vision.K.T;pixels=pixels[:,:2]/pixels[:,2,None]
                 np.testing.assert_allclose(relative_from_top(pixels,camera,width,offset),center,atol=1e-10)
+                predicted,pose=predicted_aperture(pixels,camera,width,offset)
+                opening=center+.75*np.array([-right-[0,0,1],right-[0,0,1],right+[0,0,1],-right+[0,0,1]])
+                reference=opening @ camera @ vision.K.T
+                np.testing.assert_allclose(predicted,reference[:,:2]/reference[:,2,None],atol=1e-9)
+                self.assertIsNone(pose[0])
         points=np.array([[8.,-1.5,0.],[8.,1.5,0.]])
         pixels=points @ vision.CAMERA_FROM_BODY.T @ vision.K.T;pixels=pixels[:,:2]/pixels[:,2,None]
         self.assertIsNone(relative_from_top(pixels,vision.CAMERA_FROM_BODY.T,width,offset))

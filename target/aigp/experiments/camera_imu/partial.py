@@ -61,7 +61,7 @@ class RimTemplate:
         return self.frozen
 
 
-def relative_from_top(top,camera,width,center_to_top):
+def top_points(top,camera,width):
     rays=np.c_[top,np.ones(2)] @ K_INV.T @ camera.T
     vertical=rays[:,2]
     if np.min(abs(vertical)/np.linalg.norm(rays,axis=1))<.04 or np.prod(vertical)<=0:return None
@@ -69,5 +69,23 @@ def relative_from_top(top,camera,width,center_to_top):
     length=np.linalg.norm(edge)
     if length<1e-9:return None
     depths=width/length*abs(vertical[::-1])
-    center=np.mean(rays*depths[:,None],axis=0)+[0.,0.,center_to_top]
-    return center if np.all(depths>0) and np.linalg.norm(center)<50. else None
+    return rays*depths[:,None] if np.all(depths>0) else None
+
+
+def relative_from_top(top,camera,width,center_to_top):
+    points=top_points(top,camera,width)
+    if points is None:return None
+    center=np.mean(points,axis=0)+[0.,0.,center_to_top]
+    return center if np.linalg.norm(center)<50. else None
+
+
+def predicted_aperture(top,camera,width,center_to_top):
+    """Predict missing aperture vertices; none are admitted as measured corners."""
+    points=top_points(top,camera,width)
+    if points is None:return None
+    center=points.mean(axis=0)+[0.,0.,center_to_top];right=(points[1]-points[0])/width
+    xyz=(center+.75*np.array([-right-[0,0,1],right-[0,0,1],right+[0,0,1],-right+[0,0,1]])) @ camera
+    if np.min(xyz[:,2])<=.05:return None
+    from .vision import K
+    pixels=xyz @ K.T
+    return pixels[:,:2]/pixels[:,2,None],(None,xyz,center @ camera)
