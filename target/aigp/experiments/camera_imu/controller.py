@@ -44,13 +44,14 @@ class GateController(single.GateController):
         self.retargets=0
 
     def nearer_gate(self,frame,stamp,position,rotation,corners,pose,center):
+        if frame.id in self.nearer_frames:return
         if self.nearer_centers and np.linalg.norm(center-np.median(self.nearer_centers,axis=0))>max(1.5,.06*np.linalg.norm(center-position)):
             self.nearer_centers,self.nearer_frames=[],[]
         self.nearer_centers.append(center);self.nearer_frames.append(frame.id)
         if len(self.nearer_centers)<SETTINGS['lock_frames']:
             return
         old=self.previous
-        if old is not None and vision.iou(corners,self.last_corners)<.6:
+        if old is not None and self.last_image_id is not None and vision.iou(corners,self.last_corners)<.6:
             self.lookahead=dict(frame=self.last_image_id,time=self.last_image_time,position=old[0].copy(),
                 rotation=old[1].copy(),corners=old[2].copy(),pose=old[3],center=self.anchor.copy())
             self.lookahead_count=self.count
@@ -61,6 +62,7 @@ class GateController(single.GateController):
         self.direction/=np.linalg.norm(self.direction)
         self.previous=(position,rotation,corners,pose)
         self.last_image_time,self.last_image_id=stamp,frame.id
+        self.full_image_time=stamp
         self.last_corners=corners.copy();self.last_gate_corners=pose[1] @ rotation.T+position
         self.last_relative_gate=rotation @ pose[2]
         self.last_relative_position=np.array(position).copy()
@@ -159,6 +161,7 @@ class GateController(single.GateController):
             self.anchor = self.direction = None
             self.pending = []
             self.last_image_time = self.last_image_id = None
+            self.full_image_time=None
             self.last_corners = self.last_gate_corners = None
             self.final_at = self.began = None
             if SETTINGS.get('continuous_course'):
@@ -185,6 +188,7 @@ class GateController(single.GateController):
                 self.count = self.lookahead_count
                 self.centers = list(self.lookahead_centers)
                 self.last_image_time, self.last_image_id = observed["time"], observed["frame"]
+                self.full_image_time=observed['time']
                 self.last_corners = observed["corners"].copy()
                 self.last_gate_corners = observed["pose"][1] @ observed["rotation"].T+observed["position"]
                 self.last_relative_gate=observed['rotation'] @ observed['pose'][2]

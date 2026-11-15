@@ -129,7 +129,8 @@ class GateController(base.GateController):
                     self.alignment_active=False
                 else:
                     self.signal.update(visibility_alignment=True,alignment_relative_gate=relative.tolist(),
-                        alignment_image_age_s=self.inertial.time-self.last_image_time,alignment_metric_age_s=age,alignment_hint=self.search_hint)
+                        alignment_image_age_s=None if self.full_image_time is None else self.inertial.time-self.full_image_time,
+                        alignment_metric_age_s=age,alignment_hint=self.search_hint)
                     if age>base.SETTINGS['maximum_blind_s']:
                         raise TimeoutError('height alignment could not regain the mapped gate')
                     correction=alignment_step(relative[2],age,self.hint_bearing(),self.alignment_direction)
@@ -208,6 +209,8 @@ class Controller(base.single.BaseController):
             self.gate.signal.update(gyro=self.motor.gyro,rate_request=self.motor.rate_request,rate_integral=self.motor.integral)
             self.gate.signal['visual_gravity']=self.gate.gravity_observation
             self.gate.signal['partial_gate']=self.gate.partial_observation
+            self.gate.signal.update(full_image_time=self.gate.full_image_time,partial_retargets=self.gate.partial_retargets,
+                aperture_corners_measured=self.gate.last_image_id is not None,measurement_time=self.gate.measurement_time())
         return command
 
 

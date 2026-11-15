@@ -29,7 +29,7 @@ def plot(root):
     ticks=[t for t in ticks if 'camera_orientation' in t and 'position' in t]
     time=np.array([t['imu_time'] for t in ticks]);position=vec(ticks,'position');velocity=vec(ticks,'velocity')
     gate=np.array([t.get('gate_number',1) for t in ticks]);alignment=np.array([t.get('visibility_alignment',False) for t in ticks])
-    age=np.array([t['imu_time']-t.get('image_time',t['imu_time']) for t in ticks]);center=vec(ticks,'gate_center')
+    age=np.array([np.nan if t.get('full_image_time',t.get('image_time')) is None else t['imu_time']-t.get('full_image_time',t.get('image_time')) for t in ticks]);center=vec(ticks,'gate_center')
     body=np.array([t['camera_orientation'] for t in ticks]) @ CAMERA_FROM_BODY
     euler=Rotation.from_matrix(body).as_euler('xyz',degrees=True)
     errors=csv_data(root/'state-errors.csv');camera=csv_data(root/'camera-errors.csv');score=json.loads((root/'score.json').read_text())
@@ -129,7 +129,10 @@ def plot(root):
                 ax[2,1].plot(c[:,0],c[:,3],label='old pixel-row height step');ax[2,1].plot(c[:,0],c[:,4],label='world-bearing height step');ax[2,1].set_ylabel('bounded vertical step [m]')
                 ax[3,1].plot(c[:,0],c[:,2],label='partial-red centroid row');ax[3,1].axhline(220,color='k',linestyle='--',label='old image target row');ax[3,1].axhline(359,color='r',linestyle='--',label='image bottom');ax[3,1].set_ylabel('pixels, down+')
         finish(fig,ax,output,f'gate-{g}.png')
-        transitions.append(dict(gate=g,alignment_duration_s=float(np.sum(np.clip(np.diff(time,append=time[-1]),0,.1)*selected)),maximum_full_pose_age_s=float(age[selected].max()),horizontal_speed_at_end_m_s=float(np.linalg.norm(velocity[selected][-1,:2])),relative_height_at_end_m=float(rel[selected][-1,2])))
+        transitions.append(dict(gate=g,alignment_duration_s=float(np.sum(np.clip(np.diff(time,append=time[-1]),0,.1)*selected)),
+            maximum_full_pose_age_s=float(np.nanmax(age[selected])) if np.isfinite(age[selected]).any() else None,
+            full_pose_missing_ticks=int(np.sum(~np.isfinite(age[selected]))),
+            horizontal_speed_at_end_m_s=float(np.linalg.norm(velocity[selected][-1,:2])),relative_height_at_end_m=float(rel[selected][-1,2])))
     metrics=dict(name=root.name,native_gates=score['native_gates_passed'],clean=score['passed_without_reset'],contacts=len(score['in_flight_collision_packets']),finish_s=score['native_finish_time_s'],local_state_errors=score['local_state_errors'],recovery=transitions,motor_saturation=saturation,missing_motor_trace=saturation is None,plots=[p.name for p in sorted(output.glob('*.png'))])
     (output/'metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
     print(json.dumps(dict(name=root.name,plots=len(metrics['plots']),recovery=transitions)))

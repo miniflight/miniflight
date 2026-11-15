@@ -52,7 +52,7 @@ def render(root):
     clock = {}
     for row in updates:
         state = row["signals"]
-        if state.get("image_id") is not None and "image_corners" in state:
+        if state.get('aperture_corners_measured',True) and state.get("image_id") is not None and "image_corners" in state:
             accepted.setdefault((state["gate_number"], state["image_id"]), row)
         candidate = state.get("lookahead")
         if candidate is not None:

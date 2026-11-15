@@ -6,6 +6,43 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_nearer_partial_target_needs_distinct_images_and_rejects_farther_aperture(self):
+        from unittest.mock import patch
+        from common.math import Quaternion
+        from miniflight.state import Frame
+        from target.aigp.experiments.camera_imu import sensors,controller,vision
+        camera=vision.CAMERA_FROM_BODY.T;near=np.array([15.,0.,3.]);far=np.array([40.,0.,2.])
+        top_world=near+np.array([[0.,-1.5,-1.6],[0.,1.5,-1.6]])
+        projected=top_world @ camera @ vision.K.T;top=projected[:,:2]/projected[:,2,None]
+        far_opening=far+.75*np.array([[0,-1,-1],[0,1,-1],[0,1,1],[0,-1,1]])
+        far_xyz=far_opening @ camera;pixels=far_xyz @ vision.K.T;far_corners=pixels[:,:2]/pixels[:,2,None]
+        far_pose=(.1,far_xyz,far @ camera)
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),partial_gate=True):
+            c=controller.GateController();c.phase=sensors.Phase.TRACKING;c.gate_number=4;c.completed=[{}, {}, {}]
+            c.inertial.rotation=Quaternion();c.inertial.time=1.2;c.inertial.times=[.5,1.,1.1,1.2]
+            c.inertial.positions=[np.zeros(3) for _ in c.inertial.times];c.inertial.velocities=[np.zeros(3) for _ in c.inertial.times]
+            c.inertial.rotations=[camera.copy() for _ in c.inertial.times]
+            c.anchor=far.copy();c.direction=np.array([1.,0.,0.]);c.locked=c.track=0;c.count=3
+            c.last_relative_gate=far.copy();c.last_relative_position=np.zeros(3)
+            c.last_image_id=10;c.last_image_time=.5;c.full_image_time=.5;c.last_corners=far_corners.copy()
+            c.previous=(np.zeros(3),camera.copy(),far_corners.copy(),far_pose);c.used_frames=[8,9,10]
+            c.camera_observation=dict(capture_time=.5);c.centers=[far.copy() for _ in range(3)]
+            c.rim_template.frozen=dict(width_m=3.,center_to_top_m=1.6,samples=10,fractional_spread=0.)
+            image=np.zeros((360,640,3),np.uint8)
+            with patch.object(sensors,'outer_top',return_value=(top,.1)):
+                frame=Frame(21,1_000_000_000,1001.,image)
+                for _ in range(3):c.observe_partial(frame,1.,camera,np.zeros(3),far)
+                np.testing.assert_allclose(c.anchor,far)
+                for image_id,stamp in [(22,1.1),(23,1.2)]:
+                    c.observe_partial(Frame(image_id,round(stamp*1e9),1000+stamp,image),stamp,camera,np.zeros(3),far)
+            np.testing.assert_allclose(c.anchor,near,atol=1e-9);np.testing.assert_allclose(c.inertial.position,0.,atol=1e-9)
+            self.assertIsNone(c.last_image_id);self.assertIsNone(c.full_image_time);self.assertEqual(len(c.completed),3)
+            self.assertEqual(c.partial_retargets,1);np.testing.assert_allclose(c.lookahead['center'],far)
+            c.inertial.time=1.3;c.inertial.times.append(1.3);c.inertial.positions.append(np.zeros(3));c.inertial.velocities.append(np.zeros(3));c.inertial.rotations.append(camera.copy())
+            with patch.object(sensors,'outer_top',return_value=None),patch.object(vision,'refine',return_value=None),patch.object(vision,'nearest_aperture',return_value=far_corners),patch.object(vision,'best_pose',return_value=far_pose):
+                c.observe(Frame(24,1_300_000_000,1001.3,image),1.3,np.zeros(3),camera)
+            np.testing.assert_allclose(c.anchor,near,atol=1e-9);self.assertIsNone(c.last_image_id)
+
     def test_partial_measurement_cannot_keep_a_different_gate_fresh(self):
         from target.aigp.experiments.camera_imu import sensors
         c=object.__new__(sensors.GateController);c.gate_number=3;c.last_image_time=1.

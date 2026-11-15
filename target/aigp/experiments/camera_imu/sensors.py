@@ -25,7 +25,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 from . import vision
 from .motion import GateMotion,transverse_velocity
 from .gravity import GateGravity
-from .partial import RimTemplate,outer_top,relative_from_top
+from .partial import RimTemplate,outer_top,relative_from_top,predicted_aperture
 from target.aigp.native import BASE
 
 
@@ -255,6 +255,7 @@ class GateController(BaseController):
         self.gravity=GateGravity()
         self.gravity_observation=None
         self.rim_template=RimTemplate();self.partial_motion=GateMotion(.5);self.partial_observation=None
+        self.full_image_time=None;self.partial_retargets=0
         self.camera_fusion_started = False
         self.last_relative_gate=None
         self.last_relative_position=None
@@ -273,21 +274,31 @@ class GateController(BaseController):
         stamp=-float('inf') if self.last_image_time is None else self.last_image_time
         return stamp if observed is None else max(stamp,observed['capture_time'])
 
-    def observe_partial(self,frame,stamp,rotation):
-        if not SETTINGS.get('partial_gate') or self.locked is None:return
+    def observe_partial(self,frame,stamp,rotation,position,full_relative=None):
+        if not SETTINGS.get('partial_gate') or self.locked is None:return False
         template=self.rim_template.model()
-        if template is None:return
+        if template is None:return False
         top=outer_top(frame.bgr)
-        if top is None:return
+        if top is None:return False
         relative=relative_from_top(top[0],rotation,template['width_m'],template['center_to_top_m'])
-        if relative is None or relative @ self.direction<1.:return
+        if relative is None or relative @ self.direction<1.:return False
+        if full_relative is not None and relative @ self.direction>=full_relative @ self.direction-5.:return False
         prior=self.gate_relative() @ self.direction
-        if abs(relative @ self.direction-prior)>max(5.,.5*abs(prior)):return
+        if relative @ self.direction<prior-5. and hasattr(self,'nearer_gate'):
+            predicted=predicted_aperture(top[0],rotation,template['width_m'],template['center_to_top_m'])
+            if predicted is None:return False
+            track=self.locked
+            self.nearer_gate(frame,stamp,position,rotation,*predicted,position+relative)
+            if self.locked==track:return True
+            self.last_image_id=None;self.full_image_time=None;self.partial_retargets+=1
+            self.partial_motion.observations.clear();self.partial_observation=None
+            prior=self.gate_relative() @ self.direction
+        if abs(relative @ self.direction-prior)>max(5.,.5*abs(prior)):return False
         raw_relative=relative.copy()
         distance=prior+.05*(relative @ self.direction-prior)
         ray=rotation @ (vision.K_INV @ np.r_[np.mean(top[0],axis=0),1.])
         forward_ray=ray @ self.direction
-        if forward_ray<=.1:return
+        if forward_ray<=.1:return False
         relative_top=ray/forward_ray*distance
         relative=relative_top+[0.,0.,template['center_to_top_m']]
         gate=getattr(self,'gate_number',1);old=self.partial_observation
@@ -307,6 +318,7 @@ class GateController(BaseController):
             top_corners=top[0].tolist(),edge_residual_px=top[1],template=template,velocity=velocity,
             raw_position_relative_gate=(-raw_relative).tolist(),radial_position_gain=.05,bearing_motion=bearing,
             position_correction=delta_p.tolist(),velocity_correction=delta_v.tolist())
+        return True
 
     def gate_remaining(self):
         if SETTINGS.get('continuous_course') and self.last_relative_gate is not None:
@@ -347,8 +359,13 @@ class GateController(BaseController):
                 self.track += 1
                 self.count, self.centers = 0, []
         pose = vision.best_pose(corners)
+        if pose is not None and SETTINGS.get('continuous_course') and pose[0]>1.:pose=None
+        full_relative=None if pose is None else rotation @ pose[2]
+        if self.observe_partial(frame,stamp,rotation,position,full_relative):return
+        if pose is not None and SETTINGS.get('partial_gate') and self.locked is not None:
+            predicted_range=self.gate_relative() @ self.direction
+            if full_relative @ self.direction>predicted_range+max(5.,.5*abs(predicted_range)):pose=None
         if pose is None:
-            self.observe_partial(frame,stamp,rotation)
             self.previous = None if self.locked is None else self.previous
             return
         if SETTINGS.get('continuous_course') and pose[0]>1.:
@@ -381,6 +398,7 @@ class GateController(BaseController):
         if not SETTINGS.get("camera_correction") or not self.camera_fusion_started:
             self.anchor = np.median(self.centers, axis=0)
         self.last_image_time, self.last_image_id = stamp, frame.id
+        self.full_image_time=stamp
         self.last_corners = corners.copy()
         self.last_relative_gate=rotation @ pose[2]
         self.last_relative_position=np.array(position).copy()
