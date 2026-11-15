@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from miniflight.odometry import ImuIntegral
+from miniflight.joint import solve_window
 
 
 class IntegralTest(unittest.TestCase):
@@ -32,6 +33,47 @@ class IntegralTest(unittest.TestCase):
         integral.append(1., .01, [0., 0., 0.])
         with self.assertRaises(ValueError):
             integral.append(.9, .01, [0., 0., 0.])
+
+
+class JointTest(unittest.TestCase):
+    @staticmethod
+    def problem(acceleration=.6, depth_scale=1.1):
+        rng = np.random.default_rng(3)
+        k = np.array([[320., 0, 320], [0, 320, 180], [0, 0, 1.]])
+        world = rng.uniform([-2., -1., 5.], [2., 1., 12.], (16, 3))
+        prior = np.log(world[:, 2]*depth_scale)
+        gravity = np.array([0., 9.81, 0.])
+        states, frames, edges = [], [], []
+        for i, t in enumerate(np.arange(5)*.1):
+            p = np.array([.5*acceleration*t*t, 0., 1.5+2*t])
+            states.append(np.r_[[0., 0., 1.5+2*t], [0., 0., 2.], [0., 0., 0.]].tolist())
+            camera = world-p
+            h = camera @ k.T
+            frames.append(dict(ids=list(range(16)) if i else [],
+                               pixels=(h[:, :2]/h[:, 2:]).tolist() if i else []))
+            if i:
+                force = np.array([acceleration, 0., 0.])-gravity
+                edges.append(dict(first=i-1, last=i, dt=.1, dv=(force*.1).tolist(), dp=(force*.005).tolist()))
+        return dict(intrinsics=k.tolist(), rays=(world/world[:, 2:]).tolist(), depth_prior=prior.tolist(),
+            depth_sigma=np.full(16, .2).tolist(), states=states, frames=frames, edges=edges,
+            gravity=gravity.tolist(), anchor=states[0][:6], depths=prior.tolist()), world
+
+    def test_acceleration_updates_velocity_and_depth(self):
+        request, world = self.problem()
+        result = solve_window(request, check_jacobian=True)
+        last = np.array(result['states'])[-1]
+        self.assertTrue(result['finite'])
+        self.assertLess(result['jacobian_check_error'], 1e-4)
+        np.testing.assert_allclose(last[:3], [.048, 0., 2.3], atol=.07)
+        np.testing.assert_allclose(last[3:6], [.24, 0., 2.], atol=.08)
+        self.assertLess(np.mean(abs(np.exp(result['depths'])/world[:, 2]-1)), .05)
+        self.assertLess(result['reprojection_rms_px'], .1)
+
+    def test_coasting_with_gravity_stays_consistent(self):
+        request, world = self.problem(0., 1.)
+        result = solve_window(request)
+        np.testing.assert_allclose(result['states'], request['states'], atol=1e-6)
+        np.testing.assert_allclose(np.exp(result['depths']), world[:, 2], atol=1e-6)
 
 
 if __name__ == '__main__':
