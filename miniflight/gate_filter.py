@@ -15,6 +15,7 @@ class GateFilter:
         self.p=np.zeros(3);self.v=np.zeros(3);self.R=np.array(rotation)
         self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
         self.proposals={};self.retargets=0
+        self.last_force_time=-np.inf;self.force_accepted=0;self.force_rejected=0
         self.P=np.diag(np.r_[np.full(3,1e-8),np.full(3,.05**2),np.r_[np.full(2,np.radians(.5)**2),1e-8],
             np.full(3,.001**2),np.full(3,.5**2),.03**2])
         self.thrust_curve=np.array(thrust_curve);self.drag=np.asarray(drag)
@@ -125,16 +126,32 @@ class GateFilter:
         if prediction is None:return dict(accepted=False,reason='behind_camera')
         expected,H=prediction;residual=(np.asarray(pixels)-expected).ravel()
         V=np.eye(len(residual))*sigma_px**2 if noise is None else np.asarray(noise)
+        result=self.correct(residual,H,V,18.467 if len(residual)==4 else 26.125)
+        result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
+        return result
+
+    def correct(self,residual,H,V,threshold):
         S=H @ self.P @ H.T+V
         solved=np.linalg.solve(S,residual);nis=float(residual @ solved)
-        # Chi-square 99.9% thresholds for four or eight pixel coordinates.
-        threshold=18.467 if len(residual)==4 else 26.125
-        result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual),innovation_rms_px=float(np.sqrt(np.mean(residual**2))))
+        result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
         if not result['accepted']:return result
         K=np.linalg.solve(S,H @ self.P).T;dx=K @ residual;A=np.eye(len(self.P))-K @ H
         covariance=A @ self.P @ A.T+K @ V @ K.T
         self.inject(dx);reset=np.eye(len(self.P));reset[6:9,6:9]-=.5*skew(dx[6:9])
         self.P=reset @ covariance @ reset.T;self.P=.5*(self.P+self.P.T)
+        return result
+
+    def acceleration_measurement(self,motors):
+        u=np.asarray(motors);a,b=self.thrust_curve;local=self.R.T @ self.v;bias=self.R.T @ self.ba
+        D=np.diag(2*self.drag*abs(local));expected=np.array([0.,0.,-np.mean(a*u+b*u*u)])-self.drag*abs(local)*local+bias
+        H=np.zeros((3,len(self.P)));H[:,3:6]=-D @ self.R.T;H[:,6:9]=-D @ skew(local)+skew(bias);H[:,12:15]=self.R.T
+        return expected,H
+
+    def observe_acceleration(self,measurement,motors,sigma):
+        expected,H=self.acceleration_measurement(motors)
+        result=self.correct(np.asarray(measurement)-expected,H,np.eye(3)*sigma**2,16.266)
+        if result['accepted']:self.force_accepted+=1
+        else:self.force_rejected+=1
         return result
 
     def relative(self,key):
@@ -150,6 +167,7 @@ class GateHistory:
     def __init__(self,filter,stamp,gyro,seconds=1.):
         self.filter=filter;self.time=stamp;self.seconds=seconds
         self.gyros=[(stamp,np.asarray(gyro))];self.commands=[];self.observations=[]
+        self.accelerations=[]
         self.snapshots=[(stamp,filter.copy())];self.rejected_late=0;self.repropagated=0
         self.results={}
 
@@ -178,6 +196,15 @@ class GateHistory:
             {o['time'] for o in self.observations if self.time<o['time']<=end})
         for stamp in nodes:
             self._advance(stamp)
+            for at,acceleration in self.accelerations:
+                if at==stamp and stamp-self.filter.last_force_time>=.05:
+                    motors=self._motor(stamp-1e-9)
+                    if motors is not None:
+                        recent=[u for t,u in self.commands if stamp-.08<=t<stamp]
+                        spread=max((float(np.max(abs(u-motors))) for u in recent),default=0.)
+                        slope=self.filter.thrust_curve[0]+2*self.filter.thrust_curve[1]*float(np.mean(motors))
+                        self.filter.observe_acceleration(acceleration,motors,float(np.hypot(.5,slope*spread)))
+                        self.filter.last_force_time=stamp
             for row in self.observations:
                 if row['time']==stamp:
                     seed=row.get('seed')
@@ -203,12 +230,15 @@ class GateHistory:
         boundary=end-self.seconds;keep=max(0,np.searchsorted([t for t,_ in self.snapshots],boundary)-1)
         self.snapshots=self.snapshots[keep:];oldest=self.snapshots[0][0]
         self.observations=[o for o in self.observations if o['time']>oldest]
+        self.accelerations=[r for r in self.accelerations if r[0]>oldest]
         i=max(0,np.searchsorted([r[0] for r in self.gyros],oldest)-1);self.gyros=self.gyros[i:]
         i=max(0,np.searchsorted([r[0] for r in self.commands],oldest)-1);self.commands=self.commands[i:]
 
-    def imu(self,stamp,gyro):
+    def imu(self,stamp,gyro,acceleration=None):
         if stamp<=self.gyros[-1][0]:return
-        self.gyros.append((stamp,np.asarray(gyro)));self._replay(stamp)
+        self.gyros.append((stamp,np.asarray(gyro)))
+        if acceleration is not None:self.accelerations.append((stamp,np.asarray(acceleration)))
+        self._replay(stamp)
 
     def command(self,stamp,motors):
         self.commands.append((stamp,np.asarray(motors)));self.commands.sort(key=lambda r:r[0])

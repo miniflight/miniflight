@@ -25,13 +25,14 @@ def run(source,root,model,tracks=None):
     profile=json.loads(model.read_text());config=profile['position_config']
     protocol=dict(source=str(source),inputs={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [data_path,image_path,model]},
         source_code={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__),Path('miniflight/gate_filter.py')]},
-        method='Joint p/v/attitude/gyro-bias/force-bias, nominal aperture size, rim dimensions and upright gate xyz/yaw EKF;1s rewind and full event replay.',
+        method='Joint p/v/attitude/gyro-bias/force-bias, nominal aperture size, rim dimensions and upright gate xyz/yaw EKF;1s rewind and full event replay. Body specific-force observations at20Hz, without acceleration preintegration.',
         association=('Recorded public mission context on raw candidates; this includes candidates the pilot rejected.' if tracks is None else
             'Frozen accepted pixel tracks and own mission IDs. Previous estimated p/v/R are excluded. Availability is conservative send-return time; NIS may reject tracks.'),
         timing='Public timestamp epochs and receipts; published elapsed time is not exact force preintegration. Command epoch uses the preceding public receipt-offset envelope.',
         binding='Three distinct, consistent images can bind a5m-nearer landmark after innovation rejection. The old landmark stays separate; no native identity labels.',
         noise=dict(acceleration_density_m_s2_sqrt_s=.5,gyro_density_floor_rad_sqrt_s=.001,gyro_bias_walk_rad_s_sqrt_s=.0001,force_bias_walk_m_s2_sqrt_s=.05,pixel_sigma_px=1.,
-            gyro='Stationary measured density or0.001 floor, plus per-interval angular-rate variation uncertainty.',rim='Two shared dimension states; public P90-P10 spread supplies prior uncertainty.',aperture_size_prior_m=[1.5,.03]),
+            gyro='Stationary measured density or0.001 floor, plus per-interval angular-rate variation uncertainty.',rim='Two shared dimension states; public P90-P10 spread supplies prior uncertainty.',aperture_size_prior_m=[1.5,.03],
+            acceleration_observation_sigma_floor_m_s2=.5,acceleration_observation_period_s=.05,acceleration_timing='Instantaneous body force; uncertainty grows with recent own-command changes.'),
         native_inputs=0,raw_images_retained=False)
     (root/'protocol.json').write_text(json.dumps(protocol,indent=2)+'\n')
     events=[]
@@ -64,7 +65,7 @@ def run(source,root,model,tracks=None):
                 f=GateFilter(rotation,rates.mean(axis=0),config['thrust_curve'],config['body_resistance_per_m'],vision.CAMERA_FROM_BODY,vision.K)
                 dt=np.median(np.diff([s[0] for s in seed]));f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(dt)))
                 history=GateHistory(f,stamp,gyro)
-            else:history.imu(stamp,gyro)
+            else:history.imu(stamp,gyro,acc)
         elif history is None:ignored['uninitialized']+=1;continue
         elif kind==2:
             # Record the causal estimate before applying this newly issued own command.
@@ -93,6 +94,7 @@ def run(source,root,model,tracks=None):
     results=list(history.results.values());accepted=[r for r in results if r['accepted']]
     diagnostics=dict(outputs=len(outputs),image_updates=len(results),accepted=len(accepted),rejected=len(results)-len(accepted),ignored=ignored,
         late_images_rejected=history.rejected_late,repropagated_nodes=history.repropagated,nearer_landmark_bindings=history.filter.retargets,
+        acceleration_updates=history.filter.force_accepted,acceleration_rejections=history.filter.force_rejected,
         minimum_covariance_eigenvalue=min(r['covariance_min_eigenvalue'] for r in outputs),
         processing_ms={str(k):dict(median=float(np.median([t for kind,t in timings if kind==k])),p95=float(np.quantile([t for kind,t in timings if kind==k],.95)),maximum=float(max(t for kind,t in timings if kind==k))) for k in [0,1,2]},
         nis=[r for r in results if 'nis' in r])

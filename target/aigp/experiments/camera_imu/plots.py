@@ -34,7 +34,8 @@ def plot(root):
     euler=Rotation.from_matrix(body).as_euler('xyz',degrees=True)
     errors=csv_data(root/'state-errors.csv');camera=csv_data(root/'camera-errors.csv');score=json.loads((root/'score.json').read_text())
     output=root/'plots';output.mkdir(exist_ok=True)
-    title=f"{root.name}: native {score['native_gates_passed']}/6; contacts {len(score['in_flight_collision_packets'])}; clean {score['passed_without_reset']}"
+    requested=json.loads((root/'protocol.json').read_text())['settings']['gates_to_pass']
+    title=f"{root.name}: native {score['native_gates_passed']}/{requested}; contacts {len(score['in_flight_collision_packets'])}; clean {score['passed_without_reset']}"
     fig,ax=plt.subplots(4,2,figsize=(14,12),layout='constrained');fig.suptitle(title)
     for i,name in enumerate(['north','east','down']):
         ax[0,0].plot(time,position[:,i],label=f'estimated {name}')

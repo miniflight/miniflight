@@ -23,7 +23,7 @@ class Inertial(sensors.Inertial):
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
             elif sample.time>self.time:
-                self.history.imu(sample.time,sample.gyro);self.times.append(sample.time)
+                self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)
                 self.positions.append(np.zeros(3));self.velocities.append(np.zeros(3));self.rotations.append(np.eye(3))
             self.gyro=sample.gyro;self.sync()
 
@@ -69,6 +69,12 @@ class GateController(course.GateController):
         h=self.inertial.history
         if h is not None and self.gate_number in h.filter.gates:return h.filter.relative(self.gate_number)[0]
         return super().gate_relative()
+
+    def update(self,telemetry,frames,race_state):
+        request=super().update(telemetry,frames,None)
+        if self.locked is not None and self.phase is sensors.Phase.TRACKING and self.inertial.time-self.measurement_time()>2.:
+            raise TimeoutError('joint gate measurement exceeded two seconds')
+        return request
 
     def observe(self,frame,stamp,position,rotation):
         super().observe(frame,stamp,position,rotation)

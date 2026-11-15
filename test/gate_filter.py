@@ -16,6 +16,16 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_accelerometer_factor_updates_force_bias_without_interval_assumption(self):
+        f=filter();u=np.full(4,.27);expected,H=f.acceleration_measurement(u);eps=1e-6;numeric=[]
+        for column in range(len(f.P)):
+            a=f.copy();b=f.copy();step=np.eye(len(f.P))[column]*eps;a.inject(step);b.inject(-step)
+            numeric.append((a.acceleration_measurement(u)[0]-b.acceleration_measurement(u)[0])/(2*eps))
+        np.testing.assert_allclose(H,np.array(numeric).T,atol=2e-7)
+        before=np.linalg.norm(expected-(expected+[0.,0.,-.3]))
+        f.observe_acceleration(expected+[0.,0.,-.3],u,.5)
+        self.assertLess(np.linalg.norm(f.acceleration_measurement(u)[0]-(expected+[0.,0.,-.3])),before)
+
     def test_live_origin_shift_preserves_joint_relative_geometry_and_covariance(self):
         from miniflight.position import PositionConfig
         from target.aigp.experiments.camera_imu.gate_filter_live import Inertial
@@ -90,7 +100,7 @@ class JointGateTest(unittest.TestCase):
             rows.append(dict(id=len(rows),time=stamp,key=1,points=POINTS,pixels=truth.measurement(1,POINTS)[0]))
         for i in range(1,101):
             stamp=i*.01;gyro=[0.,-.1 if stamp<.5 else .1,0.]
-            a.imu(stamp,gyro);b.imu(stamp,gyro)
+            a.imu(stamp,gyro,[0.,0.,-9.81]);b.imu(stamp,gyro,[0.,0.,-9.81])
             for row in rows:
                 if abs(stamp-row['time'])<1e-9:a.observe(row)
                 if abs(stamp-row['time']-.13)<1e-9:b.observe(row)
