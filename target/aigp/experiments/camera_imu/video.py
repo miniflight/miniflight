@@ -61,8 +61,7 @@ def render(root):
         if row["event"] == "call" and row["name"] == "camera_clock":
             clock.update({(frame, stamp):(low+high)/2 for frame, stamp, low, high in row.get("result", [])})
     if course:
-        from .joint_score import rendered_views
-        clock={key:value[2] for key,value in rendered_views(root/'events.bin').items()}
+        public_clock={frame['id']:frame['time_ns']*1e-9 for row in updates for frame in row['frames']}
     scored_race=[state for row in map(json.loads,path.open()) if row['event']=='call' and row['name']=='race' for state in row.get('result',[])]
     race_times=[state['received_at'] for state in scored_race]
     hosts = [row["host_time"] for row in updates]
@@ -98,7 +97,7 @@ def render(root):
                 frame = camera.receive(base64.b64decode(packet["wire"]), packet["received_at"])
                 if not isinstance(frame, Frame):
                     continue
-                t = clock.get((frame.id, frame.time_ns))
+                t = public_clock.get(frame.id) if course else clock.get((frame.id, frame.time_ns))
                 if t is None or not start <= t <= end:
                     continue
                 current = updates[max(0, bisect_right(hosts, frame.received_at)-1)]

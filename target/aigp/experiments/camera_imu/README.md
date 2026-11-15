@@ -1,5 +1,36 @@
 # camera + imu
 
+Public-sensor course pilot:
+
+```sh
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 2
+```
+
+```mermaid
+flowchart LR
+  C[Public camera pixels] --> G[Gate corners and metric pose]
+  I[Public gyro and accelerometer] --> A[Local attitude and motion prediction]
+  G --> E[Delayed position and velocity corrections]
+  A --> E
+  E --> M[Gate map and estimated crossings]
+  M --> P[Approach and visibility waypoints]
+  E --> P
+  P --> R[Body rates and motor mixer]
+  R --> D[Drone]
+  D --> C
+  D --> I
+  N[Native pose, course and race state] --> S[Postflight scorer]
+```
+
+The pilot receives no native pose, attitude, course geometry, gate counter, GO or
+finish state. Its start uses a fixed allowance after an acknowledged reset. Its
+own crossing estimates advance the mission. Clock alignment uses public sensor
+timestamps and packet arrival times. Public IMU timestamp intervals are estimates
+of integration time; the native IMU and camera hooks run only for scoring.
+Position and heading use a local frame chosen at the stationary start.
+`replay --poison` also falsifies native race start, validity and finish for this
+profile. Raw traces are temporary and bounded; the course video and scores remain.
+
 Joint position, velocity and depth feedback for one slow 20-degree turn:
 
 ```sh

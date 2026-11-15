@@ -210,6 +210,8 @@ def replay(path, poison=False):
 def live(root, shift):
     if not math.isfinite(shift):
         raise ValueError("The sideways setup shift must be finite")
+    if SETTINGS.get('continuous_course'):
+        return public_course(root,shift)
     binaries = build()
     root.mkdir(parents=True)
     SETTINGS["shift_right_m"] = shift
@@ -291,6 +293,38 @@ def live(root, shift):
         return scored
     from .score import score
     return score(root)
+
+
+def public_course(root,shift):
+    """Run the ordinary camera/MAVLink interface; no capture/IMU DLLs are loaded."""
+    root.mkdir(parents=True)
+    SETTINGS['shift_right_m']=shift
+    sources=tuple(sorted(HERE.glob('*.py')))
+    metadata=dict(process='public_camera_imu_course',revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+        settings=SETTINGS,shift_right_m=shift,position_used_for='offline scoring',native_taps_loaded=False,
+        sources={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources})
+    (root/'protocol.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    for source in sources:
+        dest=root/'source'/source.name;dest.parent.mkdir(exist_ok=True);dest.write_bytes(source.read_bytes())
+    with native.launch('vq1.r1',('-RenderOffScreen',),race_status_path=root/'native.jsonl'), closing(native.RaceStateReader(root/'native.jsonl',.3)) as reader:
+        reset_ack(root/'reset.jsonl')
+        with recording(root/'flight.jsonl',metadata) as record:
+            count=0
+            def bounded(**row):
+                nonlocal count
+                record(**row);count+=1
+                if count%64==0 and (root/'flight.jsonl').stat().st_size>SETTINGS.get('trace_limit_mib',384)*1024**2:
+                    raise RuntimeError('temporary public-sensor trace exceeded its size limit')
+            outcome,_=execute(Calls(bounded),bounded,root/'native.jsonl',reader)
+            print(json.dumps(outcome),flush=True)
+    from .score import score
+    result=score(root)
+    if any(g.get('first_lock_time_s') is not None for g in result['gates']):
+        from .video import render
+        render(root)
+    checked=replay(root/'flight.jsonl')
+    (root/'replay.json').write_text(json.dumps(checked,indent=2)+'\n')
+    return result
 
 
 def one(root, shift, course_gates=None, speed=2.):
