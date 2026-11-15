@@ -6,6 +6,22 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_two_top_corners_recover_metric_position_with_gravity(self):
+        from scipy.spatial.transform import Rotation
+        from target.aigp.experiments.camera_imu import vision
+        from target.aigp.experiments.camera_imu.partial import relative_from_top
+        width,offset=3.,1.6
+        for center in [np.array([10.,2.,3.]),np.array([8.,-1.,-2.])]:
+            for yaw in [-.2,.1]:
+                right=np.array([-np.sin(yaw),np.cos(yaw),0.])
+                points=center+np.array([-width/2*right-[0,0,offset],width/2*right-[0,0,offset]])
+                camera=Rotation.from_euler('xyz',[.1,-.2,.05]).as_matrix() @ vision.CAMERA_FROM_BODY.T
+                pixels=points @ camera @ vision.K.T;pixels=pixels[:,:2]/pixels[:,2,None]
+                np.testing.assert_allclose(relative_from_top(pixels,camera,width,offset),center,atol=1e-10)
+        points=np.array([[8.,-1.5,0.],[8.,1.5,0.]])
+        pixels=points @ vision.CAMERA_FROM_BODY.T @ vision.K.T;pixels=pixels[:,:2]/pixels[:,2,None]
+        self.assertIsNone(relative_from_top(pixels,vision.CAMERA_FROM_BODY.T,width,offset))
+
     def test_visual_setup_produces_no_command_without_a_gate(self):
         from unittest.mock import patch
         from types import SimpleNamespace
