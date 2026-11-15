@@ -14,7 +14,7 @@ class GateFilter:
     def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics):
         self.p=np.zeros(3);self.v=np.zeros(3);self.R=np.array(rotation)
         self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
-        self.proposals={};self.retargets=0
+        self.proposals={};self.retargets=0;self.last_visual={};self.last_full_visual={}
         self.last_force_time=-np.inf;self.force_accepted=0;self.force_rejected=0
         self.P=np.diag(np.r_[np.full(3,1e-8),np.full(3,.05**2),np.r_[np.full(2,np.radians(.5)**2),1e-8],
             np.full(3,.001**2),np.full(3,.5**2),.03**2])
@@ -228,6 +228,9 @@ class GateHistory:
                     if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
                         result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
                         result['nearer_landmark_bound']=True
+                    if result['accepted']:
+                        self.filter.last_visual[row['key']]=stamp
+                        if not row.get('rim'):self.filter.last_full_visual[row['key']]=stamp
                     self.results[row['id']]=result
             self.snapshots.append((stamp,self.filter.copy()));self.repropagated+=1
         boundary=end-self.seconds;keep=max(0,np.searchsorted([t for t,_ in self.snapshots],boundary)-1)

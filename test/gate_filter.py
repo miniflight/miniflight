@@ -16,6 +16,24 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_joint_anchor_always_reads_the_current_posterior(self):
+        from types import SimpleNamespace
+        from target.aigp.experiments.camera_imu.gate_filter_live import GateController
+        f=filter();c=object.__new__(GateController);c.gate_number=1;c.inertial=SimpleNamespace(history=GateHistory(f,0.,[0.,0.,0.]))
+        c.anchor=np.array([999.]*3)
+        np.testing.assert_array_equal(c.anchor,f.gates[1][1])
+        index=f.gates[1][0];step=np.zeros(len(f.P));step[index]=.7;f.inject(step)
+        np.testing.assert_array_equal(c.anchor,f.gates[1][1])
+        copied=c.anchor;copied[:]=0.;self.assertGreater(np.linalg.norm(c.anchor),1.)
+
+    def test_rejected_pixels_do_not_refresh_the_joint_measurement_clock(self):
+        f=filter();history=GateHistory(f,0.,[0.,0.,0.]);history.imu(.1,[0.,0.,0.])
+        pixels=f.measurement(1,POINTS)[0]
+        history.observe(dict(id=1,time=.05,key=1,points=POINTS,pixels=pixels))
+        self.assertEqual(history.filter.last_visual[1],.05)
+        history.observe(dict(id=2,time=.08,key=1,points=POINTS,pixels=pixels+10000))
+        self.assertFalse(history.results[2]['accepted']);self.assertEqual(history.filter.last_visual[1],.05)
+
     def test_recorded_braking_failure_improves_all_four_quantities(self):
         import contextlib,io,tempfile
         from pathlib import Path
