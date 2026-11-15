@@ -78,7 +78,12 @@ def execute(calls, record, path, reader=None, producer=None, camera=None, client
     if client is None:
         client = SensorClient(calls, producer_read=producer, camera_clock=camera, record_camera=True)
     controller_type = Controller
-    if SETTINGS.get('turn_test'):
+    if SETTINGS.get('joint_control'):
+        import cv2
+        cv2.setNumThreads(1)
+        from .joint_control import Controller as JointController
+        controller_type = lambda:JointController(calls)
+    elif SETTINGS.get('turn_test'):
         from .turn import Controller as controller_type
     controller = RecordedController(controller_type, record, signals=signals)
     simulator = AIGPSimulator(controller, client=client, race_reader=RaceReader(calls, reader),
@@ -234,9 +239,15 @@ def live(root, shift):
     finally:
         native.prepare = prepare
         prepare("vq1")
+    scored = None
+    if SETTINGS.get('joint_control'):
+        from .joint_score import score as score_joint
+        scored = score_joint(root)
     result = replay(root/"flight.jsonl")
     (root/"replay.json").write_text(json.dumps(result, indent=2)+"\n")
     print("replay", json.dumps(result), flush=True)
+    if scored is not None:
+        return scored
     from .score import score
     return score(root)
 
@@ -261,7 +272,8 @@ def one(root, shift):
                 (root/"failure.json").write_text(json.dumps(dict(type=type(error).__name__, message=str(error)), indent=2)+"\n")
                 raise
             finally:
-                for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv"):
+                for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
+                             "joint-trajectory.json", "joint-replay.json", "joint-flight.mp4", "joint-preview.png"):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
@@ -273,15 +285,20 @@ def one(root, shift):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("build", "one", "live", "replay", "score", "video"))
+    parser.add_argument("mode", choices=("build", "one", "joint", "live", "replay", "score", "video"))
     parser.add_argument("path", type=Path, nargs="?")
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument("--poison", action="store_true")
+    parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
     args = parser.parse_args()
     if args.mode == "build":
         print(build())
     elif args.path is None:
         parser.error("live, replay, score and video require a path")
+    elif args.mode == 'joint':
+        SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign)
+        if not one(args.path.resolve(), args.shift)['passed_joint_turn']:
+            raise SystemExit(1)
     elif args.mode in ("live", "one"):
         run = one if args.mode == "one" else live
         result = run(args.path.resolve(), args.shift)

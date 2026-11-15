@@ -1,5 +1,17 @@
 # camera + imu
 
+Joint position, velocity and depth feedback for one slow 20-degree turn:
+
+```sh
+python -m target.aigp.experiments.camera_imu joint OUTPUT --shift -.5
+python -m target.aigp.experiments.camera_imu.joint_score OUTPUT
+```
+
+The turn runs at 1 m/s after camera initialization. Gate pose updates stop before
+takeover. The same joint estimate drives the turn and braking. The second command
+recomputes retained optimizer inputs; native pose is used only by the flight scorer.
+Raw traces are temporary; only compact scores, optimizer inputs and a short clip remain.
+
 One gate with camera position/velocity correcting the IMU estimate:
 
 ```sh
