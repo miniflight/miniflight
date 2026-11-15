@@ -1,0 +1,571 @@
+{
+  "date": "2026-11-15",
+  "protocol": {
+    "date": "2026-11-15",
+    "revision": "3b492c3c0e92e27e25051ae694a19c4d5db95d72",
+    "source_sha256": {
+      "miniflight/joint.py": "a5ecbd770a43ecf35d6755283001d7d2c76ad35fb3a2fa11f70e8ef31e7ed83b",
+      "miniflight/odometry.py": "d5b18eed52beac59f78de7a564d0fe2ed2aa980131c5b935dec2ef2479fdb475",
+      "target/aigp/experiments/patch_track.py": "809f72427cf3f56a6cdd809bd2db0b0cbcb32345bec0d196f7dbbd1bf6631835",
+      "target/aigp/experiments/camera_imu/joint_estimator.py": "9536488fe054f0e1588a0cee2d4565b524568f7471738ff01067b5f19ccf118f",
+      "target/aigp/experiments/camera_imu/joint_control.py": "5ec3c709b035c92ec6c481a1f97dc026395d9390abc6ff69302effcbaed160cf",
+      "target/aigp/experiments/camera_imu/joint_score.py": "558406d0d39c38f7725cb8852185a0708739f5baf9d1daed7592c2d3fdc1b0e7",
+      "target/aigp/experiments/camera_imu/runner.py": "4ae334268890ace42d83c67fc251127c5df02f386b7ff67cc29efb821add068f"
+    },
+    "initialization": "Known gate size, camera pixels and gyro; two seconds of steady approach then two joint warm-up updates",
+    "joint": "Newer position/velocity states and landmark log-depths jointly optimized; sensor-derived metric initialization remains anchored.",
+    "prediction": "Measured-dt IMU specific-force integrals; gravity/constant force offset from the initial straight segment",
+    "control": "Joint predicted position/velocity and visual-corrected IMU attitude; no gate pose measurements after initialization",
+    "path": {
+      "slowdown_seconds": 1.0,
+      "turn_speed_m_s": 1.0,
+      "turn_degrees": 20.0,
+      "turn_seconds": 2.0,
+      "brake_seconds": 1.0,
+      "sign": 1
+    },
+    "estimated_finish": {
+      "max_speed_m_s": 0.2,
+      "max_reference_error_m": 0.45,
+      "hold_seconds": 0.25,
+      "timeout_seconds": 6.0
+    },
+    "scored_acceptance": {
+      "position_rms_m": 0.35,
+      "velocity_rms_m_s": 0.25,
+      "maximum_tracking_error_m": 0.6,
+      "final_tracking_error_m": 0.6,
+      "maximum_final_speed_m_s": 0.3,
+      "heading_change_deg": [
+        12,
+        35
+      ],
+      "maximum_turn_speed_m_s": 1.5,
+      "minimum_joint_updates_during_turn": 8,
+      "minimum_depth_revisions_during_turn": 4,
+      "maximum_control_gap_s": 0.15,
+      "collisions": 0,
+      "resets": 0,
+      "exact_and_poisoned_replay": true,
+      "numeric_replay_tolerance": 1e-05
+    },
+    "development_failures": {
+      "live-01": "Two-metre/s turn completed but strict 0.2m parking guard timed out",
+      "live-02": "Rate-feedback cadence exceeded 0.3s before joint takeover",
+      "live-03": "Late braking lost background support and exceeded the estimator correction bound",
+      "live-04": "Controller completed, but estimated motion drifted from the native score; model coupling and weighting were rejected."
+    },
+    "validation": [
+      "live-05",
+      "live-06"
+    ],
+    "raw_recording_policy": "128MiB temporary trace cap; delete raw traces after scoring and replay; retain a five-second clip and compact results",
+    "model_version": 2,
+    "force_frames": "World-frame IMU force integrals are not rotated by camera-only residual corrections; attitude control uses the IMU gyro estimate.",
+    "likelihood": "Image residuals use Huber loss; IMU, initialization and depth regularization remain quadratic.",
+    "imu_process_noise": {
+      "acceleration_density": 0.01,
+      "velocity_floor": 0.003,
+      "position_floor": 0.003
+    },
+    "depth_regularization_log_sigma_min": 0.5
+  },
+  "device": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.14",
+    "opencv": "5.0.0",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1"
+  },
+  "unit_tests_passed": 29,
+  "scope": "Native closed-loop flight: the joint position/velocity estimate drives motor feedback during one slow trajectory turn and braking.",
+  "estimator_inputs": [
+    "camera pixels",
+    "known camera intrinsics/mount",
+    "known 1.5m gate aperture during initialization",
+    "full-rate measured-dt IMU increments"
+  ],
+  "simulator_motion_used_only_for_scoring": true,
+  "validation": [
+    {
+      "name": "live-05",
+      "revision": "3b492c3c0e92e27e25051ae694a19c4d5db95d72",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "5ec3c709b035c92ec6c481a1f97dc026395d9390abc6ff69302effcbaed160cf",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "9536488fe054f0e1588a0cee2d4565b524568f7471738ff01067b5f19ccf118f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "558406d0d39c38f7725cb8852185a0708739f5baf9d1daed7592c2d3fdc1b0e7",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "4ae334268890ace42d83c67fc251127c5df02f386b7ff67cc29efb821add068f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "optimizer_input_sha256": "b2c6f0be91707905428583deee2f96a802b11c23f89085e9687f2a40d53e671f",
+      "trajectory_sha256": "f6b5617c05541402eab1b9e1aedccee3852af12675499eaa4f0536ae56432c7d",
+      "video_sha256": "cebcc2ca2b2baa26d9b2943c5fd4b673f290e06f708b672008f7da7697ab9c49",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 212,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "position_rms_m": 0.03993310899662864,
+        "velocity_rms_m_s": 0.015116054268691979,
+        "tracking_rms_m": 0.03381381415902589,
+        "maximum_tracking_error_m": 0.07000204478028346,
+        "heading_change_deg": 19.842689009905303,
+        "final_actual_speed_m_s": 0.17438084535847248,
+        "final_tracking_error_m": 0.043901231602062704,
+        "depth_revisions": 27,
+        "depth_change": 0.02898,
+        "solve_ms_min_median_p95_max": [
+          3.19837499409914,
+          4.433208028785884,
+          9.63450640265364,
+          17.281582986470312
+        ],
+        "maximum_command_update_gap_s": 0.034624624997377396,
+        "maximum_capture_clock_error_s": 2.2995969573003094e-09,
+        "input_age_ms_median_p95": [
+          6.718607971961887,
+          13.071515961703373
+        ],
+        "gate_pose_last_used_time": 13.537583001000002,
+        "joint_control_start_time": 13.888812999999999,
+        "maximum_turn_speed_m_s": 1.0179937560861907,
+        "joint_solves_during_turn": 11,
+        "depth_revisions_during_turn": 11,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "motor_commands": 735,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 3004,
+      "native_gate_counter_zeroed": true,
+      "raw_recording_bytes_removed": 95667855,
+      "raw_recordings_retained": false
+    },
+    {
+      "name": "live-06",
+      "revision": "3b492c3c0e92e27e25051ae694a19c4d5db95d72",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "5ec3c709b035c92ec6c481a1f97dc026395d9390abc6ff69302effcbaed160cf",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "9536488fe054f0e1588a0cee2d4565b524568f7471738ff01067b5f19ccf118f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "558406d0d39c38f7725cb8852185a0708739f5baf9d1daed7592c2d3fdc1b0e7",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "4ae334268890ace42d83c67fc251127c5df02f386b7ff67cc29efb821add068f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "optimizer_input_sha256": "2d737d3901a554f21c10091b3caa4215935e664fb74de0f562c561a91270d40a",
+      "trajectory_sha256": "938ffdfe2f6cf52d26c2610eb9156a1d11190f0bfa8420dff923f287581e5def",
+      "video_sha256": "59e70e8335a76b07a489a9e5f140339c7d0d9e79bad6ef970a4f1548c44ec63b",
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 206,
+        "joint_solves": 27,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": true,
+        "position_rms_m": 0.22740755381075853,
+        "velocity_rms_m_s": 0.0798642276147922,
+        "tracking_rms_m": 0.23882145605069538,
+        "maximum_tracking_error_m": 0.30281283073883764,
+        "heading_change_deg": 18.276440329145217,
+        "final_actual_speed_m_s": 0.0881082334769426,
+        "final_tracking_error_m": 0.43878871317901286,
+        "depth_revisions": 27,
+        "depth_change": 0.031851,
+        "solve_ms_min_median_p95_max": [
+          3.210292023140937,
+          5.423708993475884,
+          12.687791022472084,
+          17.34487502835691
+        ],
+        "maximum_command_update_gap_s": 0.04849000001559034,
+        "maximum_capture_clock_error_s": 2.301334234289243e-09,
+        "input_age_ms_median_p95": [
+          7.3935789627572746,
+          15.516829237149032
+        ],
+        "gate_pose_last_used_time": 13.547589052000001,
+        "joint_control_start_time": 13.911983999999999,
+        "maximum_turn_speed_m_s": 1.0880822331442734,
+        "joint_solves_during_turn": 12,
+        "depth_revisions_during_turn": 12,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "motor_commands": 732,
+      "poisoned_pose_replay": true,
+      "corrupted_pose_packets": 2955,
+      "native_gate_counter_zeroed": true,
+      "raw_recording_bytes_removed": 95885922,
+      "raw_recordings_retained": false
+    }
+  ],
+  "development": [
+    {
+      "name": "live-01",
+      "revision": "92a6f4162f6434ac8962a2123063cced9454e848",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "ab339a1bbfd0abdbe884d7ab486fd28291eabce6473aa6d6e05612f25710b492",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "1581771b323bb3d3f412efb6938366fb038a0ffb2f34d4d89104443b0aefea53",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "308b21e4183eeb99c6585c58239df45894b1ae86ee7b899cf3fde3cfd3fb13dd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "c31242eb57ee02560333494b728bad19a6251e2080ac20bf292aec7b1e8caaea",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "metrics": {
+        "controller_error": {
+          "type": "TimeoutError",
+          "message": "joint turn did not settle within six seconds"
+        },
+        "controller_phase": "TRACKING",
+        "joint_control_updates": 299,
+        "joint_solves": 38,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": false,
+        "position_rms_m": 0.15753576364297606,
+        "velocity_rms_m_s": 0.11543794855822614,
+        "tracking_rms_m": 0.11190136029254075,
+        "maximum_tracking_error_m": 0.19245782693717203,
+        "heading_change_deg": 16.778151321269767,
+        "final_actual_speed_m_s": 0.1290990053849481,
+        "final_tracking_error_m": 0.39250332945508437,
+        "depth_revisions": 38,
+        "depth_change": 0.0,
+        "solve_ms_min_median_p95_max": [
+          2.4576669675298035,
+          4.6276249922811985,
+          8.669292030390352,
+          13.233583013061434
+        ],
+        "maximum_command_update_gap_s": 0.05172120896168053,
+        "maximum_capture_clock_error_s": 2.1291519658461766e-09,
+        "input_age_ms_median_p95": [
+          7.28195795330322,
+          12.67205576871788
+        ],
+        "gate_pose_last_used_time": 13.549809750000001,
+        "joint_control_start_time": 13.907338999999999
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "rejection": "Two-metre/s turn completed but strict 0.2m parking guard timed out",
+      "raw_recording_bytes_removed": 102867219
+    },
+    {
+      "name": "live-02",
+      "revision": "92a6f4162f6434ac8962a2123063cced9454e848",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "7942b00b2444daeeac397da47685441be2a0959219138044f1f6217c3feaac18",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "f20c610846808c600cf68147c93e892aced6b7944f24b30c53061694b2cf28a8",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "01318a4658d26652cfdfc099b1ce0829d3f6eed32184a08bc37edfc6460bf58b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "c31242eb57ee02560333494b728bad19a6251e2080ac20bf292aec7b1e8caaea",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "metrics": {
+        "controller_error": {
+          "type": "TimeoutError",
+          "message": "rate feedback lost its cadence"
+        },
+        "controller_phase": "TRACKING",
+        "joint_control_updates": 0,
+        "joint_solves": 0,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": false
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "rejection": "Rate-feedback cadence exceeded 0.3s before joint takeover",
+      "raw_recording_bytes_removed": 72787184
+    },
+    {
+      "name": "live-03",
+      "revision": "92a6f4162f6434ac8962a2123063cced9454e848",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "ea14a00d2ac849686d0e17e9c13872c9a8a766c98a79df6e839c4dc0887b7122",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "f20c610846808c600cf68147c93e892aced6b7944f24b30c53061694b2cf28a8",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "01318a4658d26652cfdfc099b1ce0829d3f6eed32184a08bc37edfc6460bf58b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "4ae334268890ace42d83c67fc251127c5df02f386b7ff67cc29efb821add068f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "metrics": {
+        "controller_error": {
+          "type": "RuntimeError",
+          "message": "joint solution exceeded its correction bound"
+        },
+        "controller_phase": "TRACKING",
+        "joint_control_updates": 291,
+        "joint_solves": 37,
+        "controller_packets": [
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": false,
+        "position_rms_m": 0.16392381296478542,
+        "velocity_rms_m_s": 0.1329092940858797,
+        "tracking_rms_m": 0.07939019535984679,
+        "maximum_tracking_error_m": 0.15493776022684203,
+        "heading_change_deg": 26.26527042879456,
+        "final_actual_speed_m_s": 1.6630413488258855,
+        "final_tracking_error_m": 2.514859022392964,
+        "depth_revisions": 36,
+        "depth_change": 0.114277,
+        "solve_ms_min_median_p95_max": [
+          2.379082958213985,
+          4.368834022898227,
+          7.207958027720451,
+          7.581167039461434
+        ],
+        "maximum_command_update_gap_s": 0.036082416016142815,
+        "maximum_capture_clock_error_s": 2.3419133299285022e-09,
+        "input_age_ms_median_p95": [
+          6.9638499868176496,
+          12.716533454780965
+        ],
+        "gate_pose_last_used_time": 13.868868353000002,
+        "joint_control_start_time": 14.227231
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "rejection": "Late braking lost background support and exceeded the estimator correction bound",
+      "raw_recording_bytes_removed": 102963932
+    },
+    {
+      "name": "live-04",
+      "revision": "ab7bc0d55032eb60c0f0573df730277b25e8e40e",
+      "source_sha256": {
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__init__.py": "996d3cf72c3d7f51f182c438195c5e158b5b894f33d648c4ccd14d7864c890a4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/__main__.py": "982976b5921afbc741885fea6bf3377366cd60bec745f35f456b973dc67f08cd",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/accuracy.py": "2a817b0ee2355d2f19fab5ea319b06ab91422e4803bdad4b179bb91cfded6716",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background.py": "63dc348263632f897f210d4fda80e31f0e64d7ecb26f584c9030267867c0fdca",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/background_score.py": "00f0bc95fb676347a54896abee0a2a51a9b063f932b4000eb733e89d32c8fc54",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/controller.py": "f6f3ffc2d691ccc6ff7eddf0ba0c24b7b289cbd19b7359805458fc947f96f67a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/geometry.py": "3e6c4dfa4cd4f41b8786689948a453880412129c3bc06920fd0deb5e2d8d8b26",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_control.py": "b9c9d90c2b13169ccf61192ede88ad9da871d653b099f7c48624f47328832d69",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_estimator.py": "f20c610846808c600cf68147c93e892aced6b7944f24b30c53061694b2cf28a8",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/joint_score.py": "7d54433e2999b6870d69394ec58d0eac07ac2b9b9f4b8a3dc3f52112bf60a07c",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/motion.py": "76d022c3ee1fcf869bfdcf63ae45c56deea6621d3e389c63622b6df26d10ae29",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/probes.py": "6913a0c913f78f6dcaaff64d142369c6d93f88fbc2d95aef6c41ee2508af3464",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/runner.py": "4ae334268890ace42d83c67fc251127c5df02f386b7ff67cc29efb821add068f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/score.py": "9899f8015bfc71a076ef4824c417dc93f7f6949132b7511b82745ac00694cfdc",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/sensors.py": "56dffcda9a85bb4e0cf05c8fdf787ce844664e5e768d7029ae10ebc2c263c19b",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/turn.py": "1f69d1d55ce2f7397fccc0673afe96a1d2cb061c43f18f4a800f67b6d5865fc4",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/video.py": "3a19c500360c460df303ac30af369398aa4f020d33b367bd253586762a5dd258",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/vision.py": "250a7c56bb45beea3e12a5c27fcb3d9f272c68d0430bcd62be1541956a381c6f",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/camera.c": "e19d7371f6f63cf2f8456aa7b9a310673bfacd24d629d03b2b67b4621ed1a586",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/identify.lua": "9bf81f853b9d98dafcfab13d8a3230f36675edda8af5814e0ec386fd68fbf19a",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/imu.c": "88cf0f11ba5e85c9ce968b3c3fd1e1d3be9195ecaeba931534b4c55d22ead419",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/load.c": "2dd314d8fdf546543a90ff8953abfa045b0d9886ef652d9829151b58a5453328",
+        "/Users/hawking/Desktop/stuff/miniflight/target/aigp/experiments/camera_imu/native/snapshot.S": "c32d257d68c9441d74a0d2e25bac1c45b6d188f46faa0bab7e29120318db7e11"
+      },
+      "metrics": {
+        "controller_error": null,
+        "controller_phase": "COMPLETE",
+        "joint_control_updates": 220,
+        "joint_solves": 28,
+        "controller_packets": [
+          "COMMAND_ACK",
+          "HEARTBEAT",
+          "HIGHRES_IMU"
+        ],
+        "arm_calls": [
+          true,
+          false
+        ],
+        "resets": 0,
+        "collisions": [],
+        "numerical_replay_max_difference": 0.0,
+        "passed_joint_turn": false,
+        "position_rms_m": 0.7702357975177622,
+        "velocity_rms_m_s": 0.3433800067559834,
+        "tracking_rms_m": 0.3989359656192952,
+        "maximum_tracking_error_m": 0.8294464438561696,
+        "heading_change_deg": 9.578547646946067,
+        "final_actual_speed_m_s": 0.6067229112568544,
+        "final_tracking_error_m": 1.6376505525514584,
+        "depth_revisions": 28,
+        "depth_change": 0.126768,
+        "solve_ms_min_median_p95_max": [
+          2.2097910405136645,
+          6.163875048514456,
+          8.76241602236405,
+          11.452500009909272
+        ],
+        "maximum_command_update_gap_s": 0.037094582978170365,
+        "maximum_capture_clock_error_s": 2.2836470492393346e-09,
+        "input_age_ms_median_p95": [
+          7.614058467668272,
+          15.227670747710675
+        ],
+        "gate_pose_last_used_time": 13.508656850000001,
+        "joint_control_start_time": 13.870051,
+        "maximum_turn_speed_m_s": 1.3992437884325317,
+        "joint_solves_during_turn": 12,
+        "depth_revisions_during_turn": 12,
+        "gate_pose_frozen": true
+      },
+      "exact_process_replay": true,
+      "poisoned_pose_replay": true,
+      "rejection": "Controller completed, but estimated motion drifted from the native score; model coupling and weighting were rejected.",
+      "raw_recording_bytes_removed": 96374867
+    }
+  ],
+  "passed": true,
+  "aggregate": {
+    "position_rms_m": 0.16326182763329838,
+    "velocity_rms_m_s": 0.05747516833016402,
+    "tracking_rms_m": 0.17055653300028611
+  },
+  "accepted_claim": "Two unchanged repetitions of the same approximately 1m/s, 20-degree rightward trajectory turn using joint camera/IMU feedback; successful braking, no collisions, no resets.",
+  "limitations": "One direction and one controlled start. Initial metric position/velocity remain anchored to camera initialization. Bearings are fixed; only depths of retained landmarks are refined. No online IMU-bias estimation, map growth, long-duration stability, six-gate or sub-10-second claim. Repeat endpoint tracking error was 0.44m.",
+  "retention": {
+    "raw_recordings_retained": false,
+    "raw_bytes_removed": 566546979,
+    "retained_experiment_bytes": 10004411
+  },
+  "deliverables": {
+    "video": "work/joint-turn-20261115/joint-turn-proof.mp4",
+    "video_sha256": "2c27fe2714773a1c6ddc4a52544f2db64963f3c3a8ea53bbc3e718149f06ccdc",
+    "plot_sha256": "b185a32f4b941e7bb3bfbef465e0f36e8cf3a8ed4ec434f0d89a3e77e9fb45db"
+  }
+}

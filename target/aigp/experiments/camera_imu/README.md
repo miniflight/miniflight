@@ -11,6 +11,10 @@ The turn runs at 1 m/s after camera initialization. Gate pose updates stop befor
 takeover. The same joint estimate drives the turn and braking. The second command
 recomputes retained optimizer inputs; native pose is used only by the flight scorer.
 Raw traces are temporary; only compact scores, optimizer inputs and a short clip remain.
+The final profile passed two unchanged live repetitions. Position RMS was
+0.04/0.23 m and velocity RMS 0.015/0.080 m/s. Gate pose observations stopped before
+joint takeover. Four earlier failures and the endpoint limits are in
+[joint.validation.json](joint.validation.json).
 
 One gate with camera position/velocity correcting the IMU estimate:
 
@@ -32,7 +36,8 @@ The mixed fresh-turn result is in [uncertainty.validation.json](uncertainty.vali
 weighting remains optional.
 
 Two fresh turn comparisons are in [multiview.validation.json](multiview.validation.json).
-The background estimator runs in replay; it does not drive the flight controller.
+Those background-map comparisons ran in replay. The newer `joint` mode above
+uses a continuously updated position, velocity and depth fit for live feedback.
 
 This runs at 2 m/s. Gate size and pixels supply translation; IMU rotation puts
 measurements in one local frame. A 0.5 s camera history supplies velocity.
