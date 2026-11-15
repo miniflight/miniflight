@@ -145,6 +145,7 @@ class GateController(single.GateController):
         try:
             request = super().update(telemetry, frames, None)
         except StopIteration:
+            if self.phase is not single.Phase.COMPLETE:raise
             self.completed.append(dict(gate=self.gate_number, imu_time=self.inertial.time,
                 estimated_center=self.anchor.tolist(), position=self.inertial.position.tolist(),
                 velocity=self.inertial.velocity.tolist(), image_id=self.last_image_id,
