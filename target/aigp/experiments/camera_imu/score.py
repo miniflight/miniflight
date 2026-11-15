@@ -1,6 +1,7 @@
 """Score two native gate crossings without feeding pose to the controller."""
 
 import base64
+import csv
 import hashlib
 import json
 from pathlib import Path
@@ -8,11 +9,19 @@ import sys
 
 import numpy as np
 from pymavlink.dialects.v20 import common
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation, Slerp
 
 from .controller import ALLOWED
 from .geometry import gate_openings
-from .accuracy import score_estimates
+from .accuracy import score_estimates, statistics
+from .vision import CAMERA_FROM_BODY
+
+
+def scored_gate_passes(gates,completed_finish=False):
+    """The simulator can freeze at its finish volume before publishing a centre crossing."""
+    return bool(gates) and all(gate['native_pass'] and
+        (gate['crossing_imu_time_s'] is not None or (completed_finish and index==len(gates)-1))
+        for index,gate in enumerate(gates))
 
 
 def score(root):
@@ -85,8 +94,13 @@ def score(root):
         trace_sha256=hashlib.sha256(path.read_bytes()).hexdigest(), gates=[])
     result.update(native_completed=any(state['completed'] for state in race),
         native_finish_time_s=next((state['finish_time_seconds'] for state in race if state['completed']),None),
-        estimated_gates_passed=outcomes[-1].get('final_signal',{}).get('estimated_gates_passed',0),
+        estimated_gates_passed=outcomes[-1].get('estimated_gates_passed',max((tick.get('estimated_gates_passed',0) for tick in ticks),default=0)),
         termination=outcomes[-1].get('termination'))
+    trim=lambda s:{k:s[k] for k in ['started','valid','completed','time_seconds','active_gate_index','received_at']}
+    result['race_audit']=dict(first=trim(race[0]) if race else None,
+        first_invalid=next((trim(s) for s in race if not s['valid']),None),
+        first_running=next((trim(s) for s in race if s['started'] and s['time_seconds']>=0),None),
+        last=trim(race[-1]) if race else None,armed_boot_time=outcomes[-1].get('armed_boot_time'))
     for number, opening in enumerate(openings, 1):
         center = opening.mean(axis=0)
         width, vertical = opening[1]-opening[0], opening[3]-opening[0]
@@ -123,7 +137,12 @@ def score(root):
                     camera_updates_during_final=0,
                     estimated_gate_error_width_down_normal_m=(basis @ (estimate-truth)).tolist())
         result["gates"].append(gate)
-    passed = all(gate["native_pass"] and gate["crossing_imu_time_s"] is not None for gate in result["gates"])
+    native_finish=bool(settings.get('continuous_course') and requested==6 and result['native_completed'] and result['valid_race']
+                       and result['native_gates_passed']>=6 and result['estimated_gates_passed']==6)
+    result['finish_verified_by_native_event']=native_finish
+    passed = scored_gate_passes(result['gates'],native_finish)
+    if settings.get('continuous_course') and requested==6:
+        passed=passed and native_finish
     result["passed_without_reset"] = (passed and result["controller_error"] is None
         and result["controller_phase"] == "COMPLETE" and result["valid_race"] and not collisions
         and resets == 0 and arms == [True, False] and clock_regressions == 0 and len(histories) == 1)
@@ -134,6 +153,26 @@ def score(root):
     if settings.get("camera_correction"):
         result["estimation"] = score_estimates(root, p, approach, openings.mean(axis=1), local_to_native, observations)
         result['estimation']['capture_age_uses_estimated_sensor_clock']=settings.get('continuous_course',False)
+    if settings.get('continuous_course') and approach:
+        a=np.array(attitudes);a=a[np.r_[True,np.diff(a[:,0])>0]]
+        orientations=Slerp(a[:,0],Rotation.from_euler('xyz',a[:,1:4]))
+        origin=position_at(approach[0]['imu_history_start'])
+        rows=[]
+        for tick in approach:
+            stamp=tick['imu_time']
+            estimated=local_to_native @ tick['position']+origin
+            actual=position_at(stamp)
+            velocity=np.array([np.interp(stamp,p[:,0],col) for col in p[:,4:7].T])
+            body=local_to_native @ np.array(tick['camera_orientation']) @ CAMERA_FROM_BODY
+            actual_body=orientations(np.clip(stamp,a[0,0],a[-1,0])).as_matrix()
+            rows.append(dict(time=stamp,gate=tick.get('gate_number'),
+                position_error_m=float(np.linalg.norm(estimated-actual)),
+                velocity_error_m_s=float(np.linalg.norm(local_to_native @ tick['velocity']-velocity)),
+                attitude_error_deg=float(np.degrees(Rotation.from_matrix(body.T @ actual_body).magnitude()))))
+        with (root/'state-errors.csv').open('w') as stream:
+            writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
+        result['local_state_errors']={key:statistics([row[key] for row in rows]) for key in ['position_error_m','velocity_error_m_s','attitude_error_deg']}
+        result['state_alignment']='One fixed yaw/origin alignment at stationary start; no scale fit.'
     (root/"score.json").write_text(json.dumps(result, indent=2)+"\n")
     print(json.dumps(result, indent=2))
     return result

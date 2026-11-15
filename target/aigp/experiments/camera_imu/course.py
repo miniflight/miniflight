@@ -14,6 +14,13 @@ from target.aigp.simulator import AIGPSimulator, ArmPhase
 from . import controller as base
 
 
+def alignment_step(predicted_height,age,pixel_y,direction):
+    """A partial image supplies a steering cue, not a fabricated metric pose."""
+    if age<=.3:return predicted_height
+    if pixel_y is None:return 2.*direction
+    return float(np.clip((pixel_y-220.)/80.*2.,-3.,3.))
+
+
 class WireClient(ProcessClient):
     """Map sensor clocks from public timestamps/arrivals; never read a native tap."""
     def __init__(self,calls,**kwargs):
@@ -79,27 +86,34 @@ class GateController(base.GateController):
     def drive(self,target):
         if self.alignment_gate!=self.gate_number:
             self.alignment_active=False;self.alignment_settled=None;self.alignment_gate=self.gate_number
+            self.search_hint=None
         if self.gate_number>1 and self.phase is base.single.Phase.TRACKING and self.last_relative_gate is not None:
             age=self.inertial.time-self.last_image_time
             relative=self.gate_relative()
-            if self.alignment_active or (abs(relative[2])>.5 and self.gate_remaining()>8.):
+            if self.alignment_active or (abs(relative[2])>base.SETTINGS.get('visibility_height_change_m',1.5) and self.gate_remaining()>8.):
                 if not self.alignment_active:
                     self.alignment_direction=float(np.sign(relative[2]))
                 self.alignment_active=True
-                settled=abs(relative[2])<.35 and abs(self.inertial.velocity[2])<.5 and age<.25
+                visual=None if self.camera_observation is None else self.camera_observation.get('velocity')
+                settled=(abs(relative[2])<.35 and abs(self.inertial.velocity[2])<.5 and age<.25
+                         and visual is not None and abs(visual['velocity'][2])<.5)
                 self.alignment_settled=(self.alignment_settled or self.inertial.time) if settled else None
                 if self.alignment_settled is not None and self.inertial.time-self.alignment_settled>.2:
                     self.alignment_active=False
                 else:
+                    self.signal.update(visibility_alignment=True,alignment_relative_gate=relative.tolist(),
+                        alignment_image_age_s=age,alignment_hint=self.search_hint)
                     if age>base.SETTINGS['maximum_blind_s']:
                         raise TimeoutError('height alignment could not regain the mapped gate')
-                    correction=relative[2]
-                    if age>.6 and abs(correction)<1.:
-                        correction=self.alignment_direction
-                        if self.search_hint is not None:
-                            correction=float(np.clip((self.search_hint['pixel'][1]-220.)/80.*2.,-1.5,1.5))
-                    target=self.inertial.position.copy();target[2]+=correction
+                    pixel=None if self.search_hint is None or self.inertial.time-self.search_hint['time']>.6 else self.search_hint['pixel'][1]
+                    correction=alignment_step(relative[2],age,pixel,self.alignment_direction)
+                    horizontal_speed=np.linalg.norm(self.inertial.velocity[:2])
+                    braking=8.+horizontal_speed**2/(2*self.config.max_horizontal_acceleration)
+                    advance=base.SETTINGS['height_alignment_distance_m'] if self.gate_remaining()>braking else 0.
+                    target=self.inertial.position+advance*self.direction
+                    target[2]=self.inertial.position[2]+correction
                     self.signal['visibility_alignment']=True
+                    self.signal['alignment_relative_gate']=relative.tolist()
                     return base.single.GateController.drive(self,target)
         self.signal['visibility_alignment']=False
         return super().drive(target)
@@ -116,7 +130,8 @@ class GateController(base.GateController):
             candidates=[i for i in range(1,count) if stats[i,cv2.CC_STAT_AREA]>=8 and 3<=stats[i,cv2.CC_STAT_WIDTH]<=180]
             if candidates:
                 index=max(candidates,key=lambda i:stats[i,cv2.CC_STAT_AREA])
-                self.search_hint=dict(pixel=centers[index].tolist(),area=int(stats[index,cv2.CC_STAT_AREA]))
+                self.search_hint=dict(pixel=centers[index].tolist(),area=int(stats[index,cv2.CC_STAT_AREA]),
+                    time=self.inertial.time,frame_id=max(frames,key=lambda f:f.id).id)
         target=self.inertial.position+self.search_direction
         pixel=340. if self.search_hint is None else self.search_hint['pixel'][1]
         target[2]+=float(np.clip((pixel-220.)/80.*2.,-3.,3.))
@@ -160,7 +175,7 @@ def execute(calls,record,path,reader=None,client=None):
     controller=RecordedController(lambda:Controller(calls),record,signals=lambda c:c.gate.signal)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
-    began=calls.monotonic();ready=None;error=None;reason=None
+    began=calls.monotonic();ready=None;error=None;reason=None;armed_at=None
     heartbeat=HeartbeatCadence()
     vehicle.bind(client)
     vehicle.connect()
@@ -170,7 +185,7 @@ def execute(calls,record,path,reader=None,client=None):
         score_reader.poll()  # Recorded for scoring; no returned value enters navigation or lifecycle.
         heartbeat.send_if_due(client,now)
         if client.connected and ready is None:
-            ready=now+4.  # Fixed startup allowance after the acknowledged reset.
+            ready=now+base.SETTINGS.get('startup_allowance_s',8.)
             controller()
         if now-began>base.SETTINGS.get('course_timeout_s',180.):
             raise TimeoutError('sensor-only course deadline exceeded')
@@ -184,12 +199,14 @@ def execute(calls,record,path,reader=None,client=None):
         frames=tuple(p.decoded for p in client.packets if isinstance(p.decoded,Frame))
         return telemetry,frames,None
     def send(command):
+        nonlocal armed_at
         if command is None:
             return
         if calls.monotonic()-vehicle.state.received_at>.3:
             raise TimeoutError('sensor-only command exceeded IMU age limit')
         if cleanup.arm_phase is ArmPhase.IDLE:
             vehicle.validate(command);vehicle.arm();cleanup.arm_phase=ArmPhase.ARM_REQUESTED
+            armed_at=vehicle.state.time
         vehicle.send(command)
     try:
         run(read_signals,controller.update,send,hz=50.,clock=calls)
@@ -207,6 +224,8 @@ def execute(calls,record,path,reader=None,client=None):
     instance=controller.controller
     outcome=dict(error=error,connection_closed=not client.connected,filtered_packets=client.filtered,
         phase=None if instance is None else instance.gate.phase.name,
-        final_signal=None if instance is None else instance.gate.signal,race=None,termination=reason)
+        final_signal=None if instance is None else instance.gate.signal,race=None,termination=reason,
+        estimated_gates_passed=0 if instance is None else len(instance.gate.completed),
+        estimated_gate_number=0 if instance is None else instance.gate.gate_number,armed_boot_time=armed_at)
     record(event='result',**outcome)
     return outcome,client

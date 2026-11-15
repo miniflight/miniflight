@@ -77,7 +77,7 @@ class GateController(single.GateController):
         if stamp-self.lookahead_scan_at < SETTINGS["lookahead_interval_s"]:
             return
         self.lookahead_scan_at = stamp
-        candidates = list(single.vision.aperture_candidates(frame.bgr, close_gaps=True))
+        candidates = list(single.vision.aperture_candidates(frame.bgr, close_gaps=True,strict=SETTINGS.get('continuous_course',False)))
         candidates.sort(key=lambda corners: cv2.contourArea(np.asarray(corners, np.float32)), reverse=True)
         for corners in candidates:
             pose = single.vision.best_pose(corners)

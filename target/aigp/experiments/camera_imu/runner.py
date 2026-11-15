@@ -338,8 +338,11 @@ def one(root, shift, course_gates=None, speed=2.):
         SETTINGS.update(continuous_course=True,sensor_interface='public_camera_and_HIGHRES_IMU',
             gates_to_pass=course_gates,speed_m_s=speed,joint_control=False,gate_return=False,
             beyond_m=4.,finish_beyond_m=0.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
-            camera_position_min_side_px=20.,camera_velocity_min_side_px=60.,
+            camera_position_min_side_px=20.,camera_velocity_min_side_px=20.,
             vertical_speed_limit_m_s=3.,
+            camera_window_s=1.,
+            startup_allowance_s=8.,
+            visibility_height_change_m=1.5,
             lookahead_enabled=True,lookahead_during_final=True,height_alignment=True,
             control_inputs='camera pixels, public gyro/accelerometer, public timestamps and arrivals; no native taps or race state')
     try:
@@ -357,7 +360,7 @@ def one(root, shift, course_gates=None, speed=2.):
             finally:
                 for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
                              "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png", "gate-return.json",
-                             'course-camera-imu.mp4','video.json'):
+                             'course-camera-imu.mp4','video.json','state-errors.csv'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())

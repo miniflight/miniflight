@@ -8,6 +8,30 @@ class GateMotion:
         self.window = window
         self.observations = []
 
+    def bearing_motion(self,direction):
+        if len(self.observations)<4 or self.observations[-1][0]-self.observations[0][0]<.15:
+            return None
+        forward=np.asarray(direction);right=np.cross([0.,0.,1.],forward)
+        stamps=np.array([r[0] for r in self.observations]);times=stamps-stamps[-1]
+        positions=np.array([r[1] for r in self.observations])
+        x=positions @ forward
+        if np.any(x>=-1.):return None
+        angles=np.column_stack((positions @ right,positions[:,2]))/x[:,None]
+        design=np.column_stack((np.ones(len(times)),times));weights=np.ones(len(times))
+        for _ in range(4):
+            root=np.sqrt(weights);fit=np.linalg.lstsq(design*root[:,None],angles*root[:,None],rcond=None)[0]
+            residual=np.linalg.norm(design @ fit-angles,axis=1)
+            weights=np.minimum(1.,(.8/320)/np.maximum(residual,1e-12))
+        rms=float(np.sqrt(np.average(np.sum((design @ fit-angles)**2,axis=1),weights=weights)))
+        if rms>.003:return None
+        centered=times-np.average(times,weights=weights)
+        effective=np.average(times,weights=weights)+np.sum(weights*centered**3)/(2*np.sum(weights*centered**2))
+        root=np.sqrt(weights)
+        range_fit=np.linalg.lstsq(design*root[:,None],-x*root,rcond=None)[0]
+        return dict(time=float(stamps[-1]+effective),range_m=float(range_fit @ [1.,effective]),
+            bearing=(np.array([1.,effective]) @ fit).tolist(),bearing_rate=fit[1].tolist(),
+            observations=len(times),window_s=float(-times[0]),residual_rad=rms)
+
     def observe(self, stamp, position):
         if self.observations and stamp <= self.observations[-1][0]:
             return None

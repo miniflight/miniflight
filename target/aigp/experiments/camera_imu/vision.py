@@ -13,7 +13,7 @@ tilt = np.radians(20)
 CAMERA_FROM_BODY = np.array([[0, 1, 0], [np.sin(tilt), 0, np.cos(tilt)],
                              [np.cos(tilt), 0, -np.sin(tilt)]])
 
-def refine(image, corners, minimum_supported=2):
+def refine(image, corners, minimum_supported=2, red_edges=False):
     corners = np.asarray(corners, dtype=float)
     if np.any(corners < 1) or np.any(corners[:, 0] >= image.shape[1]-1) or np.any(corners[:, 1] >= image.shape[0]-1):
         return None
@@ -33,7 +33,16 @@ def refine(image, corners, minimum_supported=2):
         samples = centers[:, None]+offsets[None, :, None]*normal
         x, y = (samples[:, :, i].astype(np.float32) for i in (0, 1))
         response = -cv2.remap(gx, x, y, cv2.INTER_LINEAR)*normal[0]-cv2.remap(gy, x, y, cv2.INTER_LINEAR)*normal[1]
-        best = response.argmax(axis=1)
+        if red_edges:
+            rim_signal=cv2.remap(signal,x-np.float32(2*normal[0]),y-np.float32(2*normal[1]),cv2.INTER_LINEAR)
+            eligible=rim_signal>.08
+            best=np.where(eligible,response,-1e6).argmax(axis=1)
+            rows=np.arange(len(centers))
+            supported_rows=eligible[rows,best] & (response[rows,best]>.03)
+            if np.sum(supported_rows)<16:return None
+        else:
+            best = response.argmax(axis=1)
+            supported_rows=np.ones(len(centers),dtype=bool)
         rows = np.arange(len(centers))
         before = response[rows, np.maximum(best-1, 0)]
         after = response[rows, np.minimum(best+1, len(offsets)-1)]
@@ -44,7 +53,7 @@ def refine(image, corners, minimum_supported=2):
         outside = (points-2*normal).astype(np.float32)
         rim = cv2.remap(signal, outside[:, 0, None], outside[:, 1, None], cv2.INTER_LINEAR)
         supported += np.median(rim) > .08
-        vx, vy, x0, y0 = cv2.fitLine(points.astype(np.float32), cv2.DIST_HUBER, 0, .01, .01).ravel()
+        vx, vy, x0, y0 = cv2.fitLine(points[supported_rows].astype(np.float32), cv2.DIST_HUBER, 0, .01, .01).ravel()
         lines.append([-vy, vx, vy*x0-vx*y0])
     if supported < minimum_supported:
         return None
@@ -84,7 +93,7 @@ def warped(previous, position, orientation, method):
     return pixels[:, :2] / pixels[:, 2:]
 
 
-def aperture_candidates(image, close_gaps=False, largest_rim=False):
+def aperture_candidates(image, close_gaps=False, largest_rim=False, strict=False):
     # An enclosed hole uses all four sides of the rim. Prefer the largest hole
     # that survives the same edge fitter rather than the strongest red peak.
     blue, green, red = cv2.split(image.astype(np.float32) / 255)
@@ -111,13 +120,14 @@ def aperture_candidates(image, close_gaps=False, largest_rim=False):
         fit = fit_outline(contours[index], image.shape)
         if fit is None:
             continue
-        corners = refine(image, fit[0])
-        if best_pose(corners) is not None:
+        corners = refine(image, fit[0],minimum_supported=4 if strict else 2,red_edges=strict)
+        pose=best_pose(corners)
+        if pose is not None and (not strict or (pose[0]<=1. and np.all(corners>=1) and np.all(corners<[639,359]))):
             yield corners
 
 
-def nearest_aperture(image, close_gaps=False, largest_rim=False):
-    return next(aperture_candidates(image, close_gaps, largest_rim), None)
+def nearest_aperture(image, close_gaps=False, largest_rim=False, strict=False):
+    return next(aperture_candidates(image, close_gaps, largest_rim,strict), None)
 
 
 def iou(a, b):

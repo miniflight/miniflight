@@ -9,6 +9,7 @@ from pathlib import Path
 import struct
 
 import numpy as np
+import cv2
 from scipy.spatial.transform import Rotation, Slerp
 
 from miniflight import vehicle
@@ -255,15 +256,22 @@ class GateController(BaseController):
         if SETTINGS.get("camera_correction") and self.camera_motion.observations and stamp <= self.camera_motion.observations[-1][0]:
             return
         corners = None
+        guess=None
         if self.previous is not None:
             guess = vision.warped(self.previous, position, rotation, 'rotation' if SETTINGS.get('continuous_course') else "rotation_and_motion")
             if guess is not None:
-                corners = vision.refine(frame.bgr, guess)
+                strict=SETTINGS.get('continuous_course',False)
+                corners = vision.refine(frame.bgr, guess,minimum_supported=4 if strict else 2,red_edges=strict)
+                if strict and corners is not None:
+                    check=vision.best_pose(corners)
+                    if check is None or check[0]>1.:corners=None
+                    elif cv2.contourArea(corners.astype(np.float32))<.5*cv2.contourArea(np.asarray(guess,np.float32)):
+                        corners=None
                 if SETTINGS.get('continuous_course') and corners is not None and (np.any(corners<1) or np.any(corners>=[639,359])):
                     corners=None
         if corners is None and (self.locked is None or SETTINGS.get('continuous_course')):
             corners = vision.nearest_aperture(frame.bgr, close_gaps=SETTINGS["acquisition_close_gaps"],
-                                             largest_rim=SETTINGS["acquisition_largest_rim"])
+                                             largest_rim=SETTINGS["acquisition_largest_rim"],strict=SETTINGS.get('continuous_course',False))
             if corners is not None:
                 self.track += 1
                 self.count, self.centers = 0, []
@@ -271,11 +279,16 @@ class GateController(BaseController):
         if pose is None:
             self.previous = None if self.locked is None else self.previous
             return
+        if SETTINGS.get('continuous_course') and pose[0]>1.:
+            return
+        if SETTINGS.get('continuous_course') and self.locked is not None and guess is not None:
+            if cv2.contourArea(corners.astype(np.float32))<.5*cv2.contourArea(np.asarray(guess,np.float32)):
+                return
         if SETTINGS.get('continuous_course') and getattr(self,'gate_number',1)==1 and self.locked is None:
             if np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1))<16.:
                 return
         center = position + rotation @ pose[2]
-        if self.locked is not None:
+        if self.locked is not None and not SETTINGS.get('continuous_course'):
             limit = max(.5, .05*np.linalg.norm(self.anchor-position))
             if np.linalg.norm(center-self.anchor) > limit:
                 return
@@ -302,18 +315,33 @@ class GateController(BaseController):
             side_px = float(np.min(np.linalg.norm(np.roll(corners, -1, axis=0)-corners, axis=1)))
             trusted = self.locked is not None and side_px >= SETTINGS.get('camera_position_min_side_px',60.) and pose[0] <= 1.
             if trusted and not self.camera_fusion_started:
-                self.camera_motion.observations.clear()
+                if not SETTINGS.get('continuous_course'):
+                    self.camera_motion.observations.clear()
                 self.camera_fusion_started = True
-            velocity = self.camera_motion.observe(stamp, measured) if trusted else None
+            sampled=trusted or (SETTINGS.get('continuous_course') and self.locked is not None and side_px>=12. and pose[0]<=1.)
+            velocity = self.camera_motion.observe(stamp, measured) if sampled else None
             delta_v = np.zeros(3)
+            bearing=self.camera_motion.bearing_motion(self.direction) if sampled and SETTINGS.get('continuous_course') else None
+            if bearing is not None and side_px<SETTINGS.get('camera_velocity_min_side_px',60.):
+                forward=self.direction;right=np.cross([0.,0.,1.],forward)
+                vf=float(self.inertial.velocity_at(bearing['time']) @ forward)
+                transverse=np.array(bearing['bearing'])*vf-bearing['range_m']*np.array(bearing['bearing_rate'])
+                measured_v=vf*forward+transverse[0]*right+[0.,0.,transverse[1]]
+                if np.linalg.norm(measured_v)<=8.:
+                    delta_v=self.inertial.correct_velocity(bearing['time'],measured_v,.15)
             if velocity is not None and side_px>=SETTINGS.get('camera_velocity_min_side_px',60.) and np.linalg.norm(velocity["velocity"]) <= 8.:
-                delta_v = self.inertial.correct_velocity(velocity["time"], velocity["velocity"], .15)
+                gain=.15
+                if SETTINGS.get('continuous_course'):
+                    gain*=min(1.,.15/max(velocity['residual_m'],.15))
+                delta_v = self.inertial.correct_velocity(velocity["time"], velocity["velocity"],gain)
             delta_p = self.inertial.correct_position(stamp, self.anchor+measured, .2) if trusted else np.zeros(3)
             self.camera_observation = dict(image_id=frame.id, capture_time=stamp, used_at=self.inertial.time,
                 position_relative_gate=measured.tolist(), velocity=velocity,
                 position_correction=delta_p.tolist(), velocity_correction=delta_v.tolist(),
                 corners=corners.tolist(), reprojection_rmse_px=float(pose[0]),
                 minimum_side_px=side_px, correction_enabled=trusted)
+            if SETTINGS.get('continuous_course'):
+                self.camera_observation['bearing_motion']=bearing
             self.previous = (self.inertial.camera_pose(stamp)[0], rotation, corners, pose)
             self.last_relative_position=self.inertial.camera_pose(stamp)[0].copy()
 
