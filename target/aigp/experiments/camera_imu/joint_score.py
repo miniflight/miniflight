@@ -35,7 +35,7 @@ def rendered_views(path):
             origin = struct.unpack('<d', struct.pack('<Q', d[5]))[0]
             scale = struct.unpack('<d', struct.pack('<Q', d[6]))[0]
             captures[identity] = d[4], origin, scale
-        elif kind == 8:
+        elif kind == 8 and identity in captures:
             low, origin, scale = captures[identity]
             capture_time = .5*(low+d[2])*scale+16777216-origin
             views[identity] = (np.array(struct.unpack_from('<3f', raw)),

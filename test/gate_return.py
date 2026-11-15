@@ -9,6 +9,20 @@ from target.aigp.experiments.camera_imu.vision import mapped_aperture
 
 
 class GateReturnTest(unittest.TestCase):
+    def test_unpaired_capture_does_not_fabricate_a_scoring_view(self):
+        import struct
+        import tempfile
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.joint_score import rendered_views
+        for identity in (0,17):
+            blob=bytearray(4096+2*512)
+            struct.pack_into('<Q',blob,0,1)
+            record=[0]*16;record[0]=8;record[11]=identity;record[15]=1
+            struct.pack_into('<16Q',blob,4096,*record)
+            with tempfile.TemporaryDirectory() as temporary:
+                path=Path(temporary)/'events.bin';path.write_bytes(blob)
+                self.assertEqual(rendered_views(path),{})
+
     def test_redetection_recovers_shifted_prediction_and_preserves_identity(self):
         image = np.zeros((360,640,3),np.uint8)
         cv2.rectangle(image,(200,130),(360,290),(0,0,220),-1)
