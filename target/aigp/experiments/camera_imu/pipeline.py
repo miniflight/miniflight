@@ -1,5 +1,5 @@
 """End-to-end measurements. Public inputs are exported before scoring references."""
-import json
+import json,gzip
 from pathlib import Path
 import numpy as np
 
@@ -11,7 +11,7 @@ def statistics(values):
 
 
 def collect(path):
-    imu=[];camera=[];sends=[];profiles=[];updates=[];arms=[]
+    imu=[];camera=[];sends=[];profiles=[];updates=[];arms=[];observations=[]
     with path.open() as stream:
         for row in map(json.loads,stream):
             event=row.get('event')
@@ -19,6 +19,7 @@ def collect(path):
                 imu.extend([[s['time'],s['received_at'],*s['acceleration'],*s['gyro']] for s in row['samples']])
             elif event=='public_camera':camera.append(row)
             elif event=='profile':profiles.append(row)
+            elif event=='visual_measurement':observations.append(row)
             elif event=='update':updates.append(row)
             elif event=='call':
                 if row['name']=='send' and row['arguments'].get('kind')=='MotorControls':sends.append(row)
@@ -32,4 +33,4 @@ def collect(path):
         frame_shape_hw=np.array([r['shape'][:2] for r in camera],dtype=np.int32).reshape(-1,2),
         motor_sent_host_time=np.array([r['host_time'] for r in sends]),
         motor_outputs=np.array([r['arguments']['outputs'] for r in sends]).reshape(-1,4))
-    return arrays,dict(profiles=profiles,updates=updates,sends=sends,arms=arms)
+    return arrays,dict(profiles=profiles,updates=updates,sends=sends,arms=arms,observations=observations)

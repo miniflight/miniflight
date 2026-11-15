@@ -282,13 +282,20 @@ class GateController(BaseController):
         stamp=-float('inf') if self.last_image_time is None else self.last_image_time
         return stamp if observed is None else max(stamp,observed['capture_time'])
 
+    def record_visual(self,frame,stamp,kind,points,**quality):
+        calls=getattr(self,'calls',None)
+        if calls is not None and calls.record is not None:
+            calls.record(event='visual_measurement',image_id=frame.id,capture_time=stamp,kind=kind,
+                points=np.asarray(points).tolist(),claimed_gate=getattr(self,'gate_number',1),quality=quality)
+
     @timed('partial_measurement')
     def observe_partial(self,frame,stamp,rotation,position,full_relative=None,full_corners=None):
         if not SETTINGS.get('partial_gate') or self.locked is None:return False
-        template=self.rim_template.model()
-        if template is None:return False
         top=outer_top(frame.bgr)
         if top is None:return False
+        template=self.rim_template.model()
+        self.record_visual(frame,stamp,'outer_top',top[0],edge_residual_px=top[1],template=template)
+        if template is None:return False
         if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):
             self.association_counts['same_component_full_preferred']+=1
             return False
@@ -377,6 +384,7 @@ class GateController(BaseController):
                 self.count, self.centers = 0, []
         pose = vision.best_pose(corners)
         if pose is not None and SETTINGS.get('continuous_course') and pose[0]>1.:pose=None
+        if pose is not None:self.record_visual(frame,stamp,'aperture',corners,reprojection_px=pose[0],tracked=tracked)
         full_relative=None if pose is None else rotation @ pose[2]
         if self.observe_partial(frame,stamp,rotation,position,full_relative,corners if pose is not None else None):return
         if pose is not None and not tracked and SETTINGS.get('partial_gate') and self.locked is not None and (guess is None or vision.iou(corners,guess)<.25):

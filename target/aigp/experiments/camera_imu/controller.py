@@ -84,6 +84,7 @@ class GateController(single.GateController):
         candidates.sort(key=lambda corners: cv2.contourArea(np.asarray(corners, np.float32)), reverse=True)
         for corners in candidates:
             pose = single.vision.best_pose(corners)
+            self.record_visual(frame,stamp,'lookahead_aperture',corners,reprojection_px=pose[0])
             center = position+rotation @ pose[2]
             if (SETTINGS.get('continuous_course') and (center-position) @ self.direction>3.
                     and (center-self.anchor) @ self.direction < -5.):
