@@ -1,0 +1,31 @@
+{
+  "source_revision": "5c7852c77a1bba1a14d2f7df98bed0d1d2865192",
+  "case": "Recorded gate4 braking failure; native3/6, camera/IMU pilot. Reference files are scorer-only.",
+  "navigation_inputs": [
+    "public-inputs.npz",
+    "public-tracks.jsonl.gz"
+  ],
+  "reference_inputs": [
+    "reference/control.jsonl.gz",
+    "reference/state-errors.csv.gz"
+  ],
+  "association": "Accepted pixel tracks and previous pilot mission hypotheses; p/v/R fields never enter replay.",
+  "files": {
+    "public-inputs.npz": {
+      "bytes": 260397,
+      "sha256": "ccd55b9bfc58379fa4afdadbbbaa49b1ae53303246f103ed19554ae0c4c9ad76"
+    },
+    "public-tracks.jsonl.gz": {
+      "bytes": 80924,
+      "sha256": "bbe1f4e4d762d43f4052b92b6c517ee13534e2f7c1a72427fe27aefe08b68895"
+    },
+    "reference/state-errors.csv.gz": {
+      "bytes": 381800,
+      "sha256": "12232ffc2db4ee45917a5e2049467294175409c37574d8c4a99b76dbf55461a2"
+    },
+    "reference/control.jsonl.gz": {
+      "bytes": 1241232,
+      "sha256": "55c1b264839ecf4098623eea84e2101a3c7e1a6b8e5ab3f1e661dd339836bbf1"
+    }
+  }
+}

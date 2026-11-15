@@ -80,22 +80,33 @@
         "state and landmark covariance"
       ],
       "required_method": "Fixed-lag error-state EKF with joint vehicle/current-next landmark covariance. Apply raw pixel factors at their estimated image epochs; replay subsequent public gyro, own commands and visual events. Keep a1s history; estimate at the command epoch. Published sample elapsed time supports the gyro/command model, not exact accelerometer preintegration.",
-      "current_method": "Complementary position/velocity corrections and gyro/visual tilt history; joint covariance and complete dynamics repropagation remain absent",
+      "current_method": "Optional joint error-state EKF (--joint-estimator): raw aperture/top pixels and public body specific force update p/v/attitude/biases and gate geometry together. Rewind and replay every later process and measurement event. The default course observer remains complementary.",
       "target_state": {
         "vehicle_error_coordinates": 15,
+        "known_aperture_consider_coordinates": 1,
+        "shared_rim_coordinates": 2,
         "gate_coordinates_each": 4,
-        "total_current_next_error_coordinates": 23,
+        "total": "18+4N after rim initialization",
         "vehicle": [
           "position3",
           "velocity3",
           "attitude_error3",
           "gyro_bias3",
-          "command_force_residual3"
+          "model_force_residual3"
         ],
-        "landmark": [
-          "center_or_bearing_inverse_depth3",
-          "upright_plane_yaw1"
+        "gate": [
+          "center3",
+          "upright_yaw1"
         ]
+      },
+      "fixed_lag_s": {
+        "live": 2.0,
+        "offline": 1.0
+      },
+      "aperture_prior": {
+        "mean_m": 1.5,
+        "sigma_m": 0.03,
+        "mean_updated": false
       }
     },
     {
@@ -193,15 +204,15 @@
   "measured_unknowns": {
     "true_camera_exposure_timestamp": null,
     "true_native_physics_sample_interval": null,
-    "posterior_state_covariance": null,
-    "vehicle_body_clearance": null
+    "vehicle_body_clearance": null,
+    "globally_calibrated_posterior_coverage": null
   },
   "current_gaps": [
-    "Full joint covariance is missing",
-    "Delayed attitude correction does not fully repropagate p/v dynamics",
-    "Public elapsed sample times are currently exposed through an increment interface whose legacy contract implies measured integration intervals",
-    "The planner does not forecast observation quality or optimize a timed trajectory",
-    "Calibration support is narrow; extrapolation uncertainty is not yet consumed by planning"
+    "Posterior coverage remains uneven on longer recorded flights; the joint observer has live validation for one slow gate.",
+    "The planner still uses mean-state crossing constraints and coarse visibility waypoints.",
+    "Gate binding uses confirmed nearer hypotheses; it does not report calibrated identity probabilities.",
+    "True camera exposure and physical IMU integration intervals are unknown. The joint path uses published epochs and body-force observations without exact accelerometer preintegration.",
+    "Force calibration support is narrow; larger speeds and tilt need new validation."
   ],
   "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
   "retention": {
@@ -221,7 +232,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Joint gate-aided fixed-lag error-state EKF",
+    "backend": "Joint observer now implemented; next test two gates without resetting, then consume relative covariance in braking/visibility planning.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -229,7 +240,7 @@
       "nominal_3sigma_crossing_interval_coverage": 0.95,
       "controller_p95_compute_ms": 10.0
     },
-    "acceptance": "Five prospective unchanged runs from both shifts: six native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Targets are proposed; none is claimed achieved.",
+    "acceptance": "Five prospective unchanged two-gate flights from both shifts: two native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Velocity/depth diagnostic targets remain goals.",
     "planner_condition": "abs(mean crossing offset)+3*sigma_crossing <=0.55m in both transverse axes; calibrate coverage before treating this as a probability. Include position/landmark/velocity cross-covariances."
   },
   "calibration": {
@@ -238,5 +249,6 @@
     "native_fitted_course_default_allowed": false,
     "gate_size": "Nominal1.5m aperture is an explicit scale prior, not a fitted native opening dimension.",
     "support": "Mean motor command0.2598\u20130.2970; larger thrust/speed/tilt require new public-data identification and validation."
-  }
+  },
+  "joint_checkpoint": "gate-filter.validation.json"
 }

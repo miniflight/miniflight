@@ -16,6 +16,23 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_recorded_braking_failure_improves_all_four_quantities(self):
+        import contextlib,io,tempfile
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.gate_filter_replay import run
+        from target.aigp.experiments.camera_imu.gate_filter_score import score
+        source=Path(__file__).parent/'fixtures/joint_braking'
+        model=Path(__file__).parents[1]/'target/aigp/experiments/camera_imu/dynamics.model.json'
+        with tempfile.TemporaryDirectory() as directory,contextlib.redirect_stdout(io.StringIO()):
+            output=Path(directory)/'replay';d=run(source,output,model,source/'public-tracks.jsonl.gz');s=score(source,output,render=False)
+            for quantity in ['position','velocity','attitude','depth']:
+                self.assertLess(s['braking']['joint'][quantity]['rms'],s['braking']['baseline'][quantity]['rms'],quantity)
+            self.assertGreater(d['minimum_covariance_eigenvalue'],-1e-9)
+            self.assertEqual(d['late_images_rejected'],0)
+            with np.load(output/'estimates.npz',allow_pickle=False) as data:
+                self.assertGreater(data['gate_available'].sum(),0)
+                self.assertTrue(np.isfinite(data['camera_gate'][data['gate_available']]).all())
+
     def test_settling_completion_wins_on_the_deadline_tick(self):
         from types import SimpleNamespace
         from unittest.mock import patch

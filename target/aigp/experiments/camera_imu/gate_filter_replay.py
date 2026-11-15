@@ -15,7 +15,7 @@ FIELDS={'imu_time','imu_received_at','acceleration','gyro','frame_id','frame_hea
 SQUARE=.75*np.array([[0.,-1.,-1.],[0.,1.,-1.],[0.,1.,1.],[0.,-1.,1.]])
 
 
-def run(source,root,model,tracks=None):
+def run(source,root,model,tracks=None,force=True):
     root.mkdir(parents=True)
     data_path=source/'public-inputs.npz';image_path=source/'public-observations.jsonl.gz' if tracks is None else tracks
     with np.load(data_path,allow_pickle=False) as raw:
@@ -25,7 +25,7 @@ def run(source,root,model,tracks=None):
     profile=json.loads(model.read_text());config=profile['position_config']
     protocol=dict(source=str(source),inputs={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [data_path,image_path,model]},
         source_code={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__),Path('miniflight/gate_filter.py')]},
-        method='Joint p/v/attitude/gyro-bias/force-bias, nominal aperture size, rim dimensions and upright gate xyz/yaw EKF;1s rewind and full event replay. Body specific-force observations at20Hz, without acceleration preintegration.',
+        method='Joint p/v/attitude/gyro-bias/force-bias, fixed nominal-size consider parameter, rim dimensions and upright gate xyz/yaw EKF;1s rewind and full event replay. Optional body specific-force observations at20Hz, without acceleration preintegration.',
         association=('Recorded public mission context on raw candidates; this includes candidates the pilot rejected.' if tracks is None else
             'Frozen accepted pixel tracks and own mission IDs. Previous estimated p/v/R are excluded. Availability is conservative send-return time; NIS may reject tracks.'),
         timing='Public timestamp epochs and receipts; published elapsed time is not exact force preintegration. Command epoch uses the preceding public receipt-offset envelope.',
@@ -33,7 +33,7 @@ def run(source,root,model,tracks=None):
         noise=dict(acceleration_density_m_s2_sqrt_s=.5,gyro_density_floor_rad_sqrt_s=.001,gyro_bias_walk_rad_s_sqrt_s=.0001,force_bias_walk_m_s2_sqrt_s=.05,pixel_sigma_px=1.,
             gyro='Stationary measured density or0.001 floor, plus per-interval angular-rate variation uncertainty.',rim='Two shared dimension states; public P90-P10 spread supplies prior uncertainty.',aperture_size_prior_m=[1.5,.03],
             acceleration_observation_sigma_floor_m_s2=.5,acceleration_observation_period_s=.05,acceleration_timing='Instantaneous body force; uncertainty grows with recent own-command changes.'),
-        native_inputs=0,raw_images_retained=False)
+        native_inputs=0,raw_images_retained=False,force_observations_enabled=force,aperture_mean_fixed=True)
     (root/'protocol.json').write_text(json.dumps(protocol,indent=2)+'\n')
     events=[]
     for i,t in enumerate(data['imu_received_at']):events.append((t,0,i))
@@ -65,7 +65,7 @@ def run(source,root,model,tracks=None):
                 f=GateFilter(rotation,rates.mean(axis=0),config['thrust_curve'],config['body_resistance_per_m'],vision.CAMERA_FROM_BODY,vision.K)
                 dt=np.median(np.diff([s[0] for s in seed]));f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(dt)))
                 history=GateHistory(f,stamp,gyro)
-            else:history.imu(stamp,gyro,acc)
+            else:history.imu(stamp,gyro,acc if force else None)
         elif history is None:ignored['uninitialized']+=1;continue
         elif kind==2:
             # Record the causal estimate before applying this newly issued own command.
@@ -88,6 +88,11 @@ def run(source,root,model,tracks=None):
         timings.append((kind,(time.perf_counter()-start)*1000))
     # Freeze estimates and diagnostics before any scorer is invoked.
     keys=set.intersection(*(set(x) for x in outputs));arrays={k:np.array([r[k] for r in outputs]) for k in keys}
+    # A gate may be born after the first command. Preserve its later outputs with an explicit validity mask.
+    shapes=dict(gate_center=(3,),gate_yaw=(),relative_gate=(3,),relative_covariance=(3,3),camera_gate=(3,),camera_gate_covariance=(3,3),position_gate_covariance=(3,3))
+    for key,shape in shapes.items():arrays[key]=np.array([r.get(key,np.full(shape,np.nan)) for r in outputs])
+    arrays['gate_available']=np.array(['camera_gate' in r for r in outputs])
+    arrays['gate']=np.array([-1 if r['gate'] is None else r['gate'] for r in outputs],dtype=np.int32)
     np.savez_compressed(root/'estimates.npz',**arrays)
     with gzip.open(root/'estimates.jsonl.gz','wt') as stream:
         for row in outputs:stream.write(json.dumps({k:v.tolist() if isinstance(v,np.ndarray) else v for k,v in row.items()},allow_nan=False)+'\n')
@@ -105,5 +110,6 @@ def run(source,root,model,tracks=None):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('source',type=Path);parser.add_argument('output',type=Path)
     parser.add_argument('--tracks',type=Path)
+    parser.add_argument('--no-force',action='store_true',help='Ablate dynamic accelerometer factors; retain stationary gravity initialization')
     parser.add_argument('--model',type=Path,default=Path(__file__).with_name('dynamics.model.json'));args=parser.parse_args()
-    run(args.source,args.output,args.model,args.tracks)
+    run(args.source,args.output,args.model,args.tracks,not args.no_force)

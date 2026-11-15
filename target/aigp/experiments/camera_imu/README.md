@@ -15,8 +15,9 @@ Native reference curves are scorer outputs; they never enter navigation.
 wall/thread CPU time, host command intervals and actuation. Raw public sensor
 inputs and measured pixel constraints remain separate from scoring references.
 [pipeline.spec.json](pipeline.spec.json) defines state ownership, limits and the
-remaining estimator/planner gaps. It specifies the next joint fixed-lag filter;
-the current pilot still uses complementary corrections without joint covariance.
+remaining estimator/planner gaps. It defines the joint fixed-lag filter;
+the default pilot uses complementary corrections; `--joint-estimator` enables
+the joint filter below.
 Host receipt-to-send delay, estimated sensor clock age and velocity-fit age are
 separate measurements. Actual exposure-to-actuation delay remains unknown.
 
@@ -76,6 +77,32 @@ source hashes and pipeline measurements are in
 Earlier [course](course.validation.json) and [gravity](gravity.validation.json)
 results used native-fitted force constants. The `joint` experiments below also
 used instrumented sensor timing. They remain archived comparisons.
+
+Joint feedback with one slow gate and an explicit brake/resume:
+
+```sh
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 1 --speed 2 \
+  --dynamics-model target/aigp/experiments/camera_imu/dynamics.model.json \
+  --partial-gate --crossing-constraint --joint-estimator --brake-test
+```
+
+Raw pixels and public body-force measurements update position, velocity,
+attitude and gate geometry in one covariance. Delayed images rewind and replay
+the subsequent gyro, command and measurement history. The nominal 1.5 m gate
+size stays fixed; its uncertainty remains in the covariance. Three unchanged
+live trials braked, resumed and crossed without contact or resets. Braking RMS
+was 0.36–0.49 m position, 0.37–0.41 m/s velocity, 0.31–0.56 degrees attitude and
+0.15–0.17 m camera depth. All normal and poisoned replays matched. Earlier
+failures and uncertainty limits: [gate-filter.validation.json](gate-filter.validation.json).
+The planner still uses the posterior mean rather than a timed covariance constraint.
+
+Replay the recorded braking failure; `reference/` is read only by the scorer:
+
+```sh
+python -m target.aigp.experiments.camera_imu.gate_filter_replay \
+  test/fixtures/joint_braking OUTPUT --tracks test/fixtures/joint_braking/public-tracks.jsonl.gz
+python -m target.aigp.experiments.camera_imu.gate_filter_score test/fixtures/joint_braking OUTPUT
+```
 
 Joint position, velocity and depth feedback for one slow 20-degree turn:
 

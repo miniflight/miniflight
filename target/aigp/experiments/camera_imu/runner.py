@@ -431,6 +431,9 @@ def main():
         if (args.path/'pipeline.json').exists():
             from .pipeline import render
             render(args.path.resolve())
+        if args.joint_estimator:
+            from .gate_filter_score import score_live
+            score_live(args.path.resolve())
         if not result['passed_without_reset']:
             raise SystemExit(1)
     elif args.mode == 'joint':
