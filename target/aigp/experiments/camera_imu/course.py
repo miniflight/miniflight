@@ -25,7 +25,8 @@ def alignment_step(predicted_height,age,bearing,direction):
     """A partial image supplies a steering cue, not a fabricated metric pose."""
     if age<=.3:return predicted_height
     if bearing is None:return 2.*direction
-    return float(np.clip(8.*bearing,-3.,3.))
+    # Keep the partial rim above the horizon until the full aperture returns.
+    return float(np.clip(8.*(bearing+.1),-3.,3.))
 
 
 def command_specific_force(config,outputs,body,velocity):
@@ -120,7 +121,7 @@ class GateController(base.GateController):
                     self.alignment_direction=float(np.sign(relative[2]))
                 self.alignment_active=True
                 visual=None if self.camera_observation is None else self.camera_observation.get('velocity')
-                settled=(abs(relative[2])<.35 and abs(self.inertial.velocity[2])<.5 and age<.25
+                settled=(abs(relative[2])<base.SETTINGS.get('visibility_height_change_m',1.5) and abs(self.inertial.velocity[2])<.5 and age<.25
                          and visual is not None and abs(visual['velocity'][2])<.5)
                 self.alignment_settled=(self.alignment_settled or self.inertial.time) if settled else None
                 if self.alignment_settled is not None and self.inertial.time-self.alignment_settled>.2:

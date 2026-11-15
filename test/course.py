@@ -75,6 +75,7 @@ class WireBoundaryTest(unittest.TestCase):
         self.assertGreater(alignment_step(-5.,1.,.3,1.),0.)
         self.assertLess(alignment_step(5.,1.,-.3,-1.),0.)
         self.assertEqual(alignment_step(5.,.1,-.3,-1.),5.)
+        self.assertAlmostEqual(alignment_step(0.,1.,-.1,1.),0.)
 
     def test_recovery_uses_attitude_at_the_image_time(self):
         from types import SimpleNamespace
@@ -83,7 +84,7 @@ class WireBoundaryTest(unittest.TestCase):
         gate.inertial=SimpleNamespace(time=1.,camera_pose=Mock(return_value=(np.zeros(3),vision.CAMERA_FROM_BODY.T)))
         ray=vision.CAMERA_FROM_BODY @ [10.,0.,0.]
         gate.search_hint=dict(time=.9,pixel=((vision.K @ ray)[:2]/ray[2]).tolist())
-        self.assertAlmostEqual(alignment_step(-1.,1.,gate.hint_bearing(),1.),0.)
+        self.assertAlmostEqual(alignment_step(-1.,1.,gate.hint_bearing(),1.),.8)
         gate.inertial.camera_pose.assert_called_once_with(.9)
         gate.inertial.time=2.
         self.assertIsNone(gate.hint_bearing())
