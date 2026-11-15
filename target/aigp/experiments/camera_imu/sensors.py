@@ -23,7 +23,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 
 
 from . import vision
-from .motion import GateMotion
+from .motion import GateMotion,transverse_velocity
 from .gravity import GateGravity
 from .partial import RimTemplate,outer_top,relative_from_top
 from target.aigp.native import BASE
@@ -283,16 +283,29 @@ class GateController(BaseController):
         if relative is None or relative @ self.direction<1.:return
         prior=self.gate_relative() @ self.direction
         if abs(relative @ self.direction-prior)>max(5.,.5*abs(prior)):return
+        raw_relative=relative.copy()
+        distance=prior+.05*(relative @ self.direction-prior)
+        ray=rotation @ (vision.K_INV @ np.r_[np.mean(top[0],axis=0),1.])
+        forward_ray=ray @ self.direction
+        if forward_ray<=.1:return
+        relative_top=ray/forward_ray*distance
+        relative=relative_top+[0.,0.,template['center_to_top_m']]
         gate=getattr(self,'gate_number',1);old=self.partial_observation
         if old is None or old['gate_number']!=gate or stamp-old['capture_time']>.15:self.partial_motion.observations.clear()
-        velocity=self.partial_motion.observe(stamp,-relative)
+        self.partial_motion.observe(stamp,-relative_top)
+        bearing=self.partial_motion.bearing_motion(self.direction);velocity=None
         delta_v=np.zeros(3)
-        if velocity is not None and velocity['residual_m']<=.15 and np.linalg.norm(velocity['velocity'])<=8.:
-            delta_v=self.inertial.correct_velocity(velocity['time'],velocity['velocity'],.15)
+        if bearing is not None:
+            speed=float(self.inertial.velocity_at(bearing['time']) @ self.direction)
+            measured_v=transverse_velocity(bearing,self.direction,speed)
+            velocity=dict(time=bearing['time'],velocity=measured_v.tolist(),window_s=bearing['window_s'],
+                observations=bearing['observations'],residual_m=bearing['range_m']*bearing['residual_rad'],radial_component='model carried')
+            if np.linalg.norm(measured_v)<=8.:delta_v=self.inertial.correct_velocity(velocity['time'],measured_v,.15)
         delta_p=self.inertial.correct_position(stamp,self.anchor-relative,.2)
         self.last_relative_gate=relative;self.last_relative_position=self.inertial.camera_pose(stamp)[0].copy()
         self.partial_observation=dict(gate_number=gate,image_id=frame.id,capture_time=stamp,position_relative_gate=(-relative).tolist(),
             top_corners=top[0].tolist(),edge_residual_px=top[1],template=template,velocity=velocity,
+            raw_position_relative_gate=(-raw_relative).tolist(),radial_position_gain=.05,bearing_motion=bearing,
             position_correction=delta_p.tolist(),velocity_correction=delta_v.tolist())
 
     def gate_remaining(self):
@@ -393,10 +406,8 @@ class GateController(BaseController):
             bearing=self.camera_motion.bearing_motion(self.direction) if sampled and SETTINGS.get('continuous_course') else None
             velocity_side=60. if self.phase is Phase.SHIFTING else SETTINGS.get('camera_velocity_min_side_px',60.)
             if bearing is not None and side_px<velocity_side:
-                forward=self.direction;right=np.cross([0.,0.,1.],forward)
-                vf=float(self.inertial.velocity_at(bearing['time']) @ forward)
-                transverse=np.array(bearing['bearing'])*vf-bearing['range_m']*np.array(bearing['bearing_rate'])
-                measured_v=vf*forward+transverse[0]*right+[0.,0.,transverse[1]]
+                vf=float(self.inertial.velocity_at(bearing['time']) @ self.direction)
+                measured_v=transverse_velocity(bearing,self.direction,vf)
                 if np.linalg.norm(measured_v)<=8.:
                     delta_v=self.inertial.correct_velocity(bearing['time'],measured_v,.15)
             if velocity is not None and side_px>=velocity_side and np.linalg.norm(velocity["velocity"]) <= 8.:

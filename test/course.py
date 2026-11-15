@@ -8,7 +8,7 @@ from miniflight.replay import Calls
 from target.aigp.experiments.camera_imu.course import WireClient, GateController, alignment_step, command_specific_force, vertical_bearing
 from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
-from target.aigp.experiments.camera_imu.motion import GateMotion
+from target.aigp.experiments.camera_imu.motion import GateMotion,transverse_velocity
 from target.aigp.experiments.camera_imu import vision
 from target.aigp.experiments.camera_imu.gravity import vertical_planes,fit_down,GateGravity
 from target.aigp.experiments.camera_imu.score import scored_gate_passes, armed_contacts
@@ -182,8 +182,8 @@ class WireBoundaryTest(unittest.TestCase):
             position=np.array([-40.+5*t,-2.+.3*t,-10.+2*t])
             raw=observer.observe(float(t),position*(1.08 if t>=.25 else 1.))
         angular=observer.bearing_motion([1.,0.,0.])
-        measured=np.array(angular['bearing'])*5.-angular['range_m']*np.array(angular['bearing_rate'])
-        np.testing.assert_allclose(measured,[.3,2.],atol=.1)
+        measured=transverse_velocity(angular,[1.,0.,0.],5.)
+        np.testing.assert_allclose(measured,[5.,.3,2.],atol=.1)
         self.assertGreater(abs(raw['velocity'][2]-2.),.5)
 
     def test_descent_does_not_reduce_forward_velocity_target(self):

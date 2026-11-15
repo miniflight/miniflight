@@ -3,6 +3,12 @@
 import numpy as np
 
 
+def transverse_velocity(bearing,forward,forward_speed):
+    forward=np.asarray(forward);right=np.cross([0.,0.,1.],forward)
+    transverse=np.array(bearing['bearing'])*forward_speed-bearing['range_m']*np.array(bearing['bearing_rate'])
+    return forward_speed*forward+transverse[0]*right+[0.,0.,transverse[1]]
+
+
 class GateMotion:
     def __init__(self, window=.25):
         self.window = window
