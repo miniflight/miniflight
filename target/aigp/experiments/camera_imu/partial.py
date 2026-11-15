@@ -5,6 +5,26 @@ from .vision import K_INV
 from target.aigp.experiments.gate_pose import fit_outline
 
 
+def same_red_component(image,aperture,top):
+    """Associate two feature types in pixels before comparing their noisy depth."""
+    blue,green,red=cv2.split(image.astype(np.float32)/255)
+    mask=np.uint8(red-(blue+green)/2>.08)*255
+    mask=cv2.morphologyEx(mask,cv2.MORPH_CLOSE,np.ones((3,3),np.uint8))
+    _,labels=cv2.connectedComponents(mask)
+    def identify(points):
+        points=np.round(points).astype(int);valid=(points[:,0]>=0)&(points[:,0]<image.shape[1])&(points[:,1]>=0)&(points[:,1]<image.shape[0])
+        ids=labels[points[valid,1],points[valid,0]];ids=ids[ids>0]
+        return None if not len(ids) else int(np.bincount(ids).argmax())
+    fractions=np.array([.25,.5,.75])[:,None]
+    edge=top[1]-top[0];normal=np.array([-edge[1],edge[0]])/np.linalg.norm(edge)
+    outer=identify(top[0]+fractions*edge+2*normal)
+    samples=[]
+    for start,end in zip(aperture,np.roll(aperture,-1,axis=0)):
+        edge=end-start;normal=np.array([-edge[1],edge[0]])/max(np.linalg.norm(edge),1e-9)
+        samples.extend(start+fractions*edge-2*normal)
+    return outer is not None and outer==identify(np.array(samples))
+
+
 def outer_top(image,opening=None):
     blue,green,red=cv2.split(image.astype(np.float32)/255)
     mask=np.uint8(red-(blue+green)/2>.08)*255

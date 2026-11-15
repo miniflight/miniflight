@@ -6,6 +6,20 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_pixel_identity_precedes_depth_for_full_and_partial_views(self):
+        import cv2
+        from target.aigp.experiments.camera_imu.partial import same_red_component
+        image=np.zeros((360,640,3),np.uint8)
+        cv2.rectangle(image,(100,120),(300,359),(0,0,220),-1)
+        cv2.rectangle(image,(125,145),(275,335),(0,0,0),-1)
+        aperture=np.array([[125.,145.],[275.,145.],[275.,335.],[125.,335.]])
+        top=np.array([[100.,120.],[300.,120.]])
+        self.assertTrue(same_red_component(image,aperture,top))
+        cv2.rectangle(image,(170,195),(230,275),(0,0,220),-1)
+        cv2.rectangle(image,(178,203),(222,267),(0,0,0),-1)
+        farther=np.array([[178.,203.],[222.,203.],[222.,267.],[178.,267.]])
+        self.assertFalse(same_red_component(image,farther,top))
+
     def test_nearer_partial_target_needs_distinct_images_and_rejects_farther_aperture(self):
         from unittest.mock import patch
         from common.math import Quaternion
@@ -17,7 +31,7 @@ class PublicCalibrationTest(unittest.TestCase):
         far_opening=far+.75*np.array([[0,-1,-1],[0,1,-1],[0,1,1],[0,-1,1]])
         far_xyz=far_opening @ camera;pixels=far_xyz @ vision.K.T;far_corners=pixels[:,:2]/pixels[:,2,None]
         far_pose=(.1,far_xyz,far @ camera)
-        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),partial_gate=True):
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),partial_gate=True,continuous_course=True):
             c=controller.GateController();c.phase=sensors.Phase.TRACKING;c.gate_number=4;c.completed=[{}, {}, {}]
             c.inertial.rotation=Quaternion();c.inertial.time=1.2;c.inertial.times=[.5,1.,1.1,1.2]
             c.inertial.positions=[np.zeros(3) for _ in c.inertial.times];c.inertial.velocities=[np.zeros(3) for _ in c.inertial.times]

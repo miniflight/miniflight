@@ -25,7 +25,7 @@ from target.aigp.experiments.producer_imu import ProducerImuClient
 from . import vision
 from .motion import GateMotion,transverse_velocity
 from .gravity import GateGravity
-from .partial import RimTemplate,outer_top,relative_from_top,predicted_aperture
+from .partial import RimTemplate,outer_top,relative_from_top,predicted_aperture,same_red_component
 from target.aigp.native import BASE
 
 
@@ -274,17 +274,18 @@ class GateController(BaseController):
         stamp=-float('inf') if self.last_image_time is None else self.last_image_time
         return stamp if observed is None else max(stamp,observed['capture_time'])
 
-    def observe_partial(self,frame,stamp,rotation,position,full_relative=None):
+    def observe_partial(self,frame,stamp,rotation,position,full_relative=None,full_corners=None):
         if not SETTINGS.get('partial_gate') or self.locked is None:return False
         template=self.rim_template.model()
         if template is None:return False
         top=outer_top(frame.bgr)
         if top is None:return False
+        if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):return False
         relative=relative_from_top(top[0],rotation,template['width_m'],template['center_to_top_m'])
         if relative is None or relative @ self.direction<1.:return False
         if full_relative is not None and relative @ self.direction>=full_relative @ self.direction-5.:return False
         prior=self.gate_relative() @ self.direction
-        if relative @ self.direction<prior-5. and hasattr(self,'nearer_gate'):
+        if full_relative is not None and relative @ self.direction<prior-5. and hasattr(self,'nearer_gate'):
             predicted=predicted_aperture(top[0],rotation,template['width_m'],template['center_to_top_m'])
             if predicted is None:return False
             track=self.locked
@@ -352,6 +353,7 @@ class GateController(BaseController):
                         corners=None
                 if SETTINGS.get('continuous_course') and corners is not None and (np.any(corners<1) or np.any(corners>=[639,359])):
                     corners=None
+        tracked=corners is not None
         if corners is None and (self.locked is None or SETTINGS.get('continuous_course')):
             corners = vision.nearest_aperture(frame.bgr, close_gaps=SETTINGS["acquisition_close_gaps"],
                                              largest_rim=SETTINGS["acquisition_largest_rim"],strict=SETTINGS.get('continuous_course',False))
@@ -361,8 +363,8 @@ class GateController(BaseController):
         pose = vision.best_pose(corners)
         if pose is not None and SETTINGS.get('continuous_course') and pose[0]>1.:pose=None
         full_relative=None if pose is None else rotation @ pose[2]
-        if self.observe_partial(frame,stamp,rotation,position,full_relative):return
-        if pose is not None and SETTINGS.get('partial_gate') and self.locked is not None:
+        if self.observe_partial(frame,stamp,rotation,position,full_relative,corners if pose is not None else None):return
+        if pose is not None and not tracked and SETTINGS.get('partial_gate') and self.locked is not None and (guess is None or vision.iou(corners,guess)<.25):
             predicted_range=self.gate_relative() @ self.direction
             if full_relative @ self.direction>predicted_range+max(5.,.5*abs(predicted_range)):pose=None
         if pose is None:
