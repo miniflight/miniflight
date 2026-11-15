@@ -1,0 +1,96 @@
+{
+  "recorded_at": "2026-11-15T12:58:03.485777+00:00",
+  "training": [
+    {
+      "path": "inputs/training-01.npz",
+      "source": "gravity-01",
+      "sha256": "8c6f6584fc78718856111b4f5b2647c5ce287b7df5c3f8706a7bb6682445d04f",
+      "source_control_sha256": "b311aa962c612094dea706ce99f5b7d7afde52dea416e11bd4b84db5bcf326a3",
+      "ticks": 2009,
+      "images": 728,
+      "bytes": 238092
+    },
+    {
+      "path": "inputs/training-02.npz",
+      "source": "gravity-validation/validation-02",
+      "sha256": "cda4bce5e7d5a4b8892068f5fbdef940732173f05c5b3980662ef128017eccc6",
+      "source_control_sha256": "bee555c9e33903a98cb9e18756b7d97057f849df0b830ba760ac172b27f031e3",
+      "ticks": 1988,
+      "images": 708,
+      "bytes": 235250
+    },
+    {
+      "path": "inputs/training-03.npz",
+      "source": "gravity-validation/validation-03",
+      "sha256": "26d2b36069a638a8d9628522e060f42cc8e373ca08aaa1d5e6a0e9c195b2f171",
+      "source_control_sha256": "4bcbb4deb8ac756dd7125310eacac999fa4525729a4491be7ddf09ffcd3b8466",
+      "ticks": 1982,
+      "images": 796,
+      "bytes": 237845
+    }
+  ],
+  "heldout": [
+    {
+      "path": "inputs/heldout-01.npz",
+      "source": "gravity-validation/validation-04",
+      "sha256": "2d968e38bd794241a28d7693269ad85ffacac191a2f930bb29a37804ac53848c",
+      "source_control_sha256": "8cbb60a75272421d6ef411f3c43ce32dba4ad470bd2df2c84ed853cc04e4fc71",
+      "ticks": 1847,
+      "images": 786,
+      "bytes": 223343
+    },
+    {
+      "path": "inputs/heldout-02.npz",
+      "source": "gravity-validation/validation-05",
+      "sha256": "45ca698d372815acbc6c35b5bfb4aed5be285bed17aa23f5ef98510eb62dddd8",
+      "source_control_sha256": "860d306a0b2ce87358396948449914be5acefbf1798b7e3411c4797379def76e",
+      "ticks": 2016,
+      "images": 793,
+      "bytes": 241197
+    },
+    {
+      "path": "inputs/heldout-03.npz",
+      "source": "gravity-validation/validation-06",
+      "sha256": "c01b8349580392372db1f58cc3043854c2f865ac0cfb32a0a0bf86deb57c14cd",
+      "source_control_sha256": "bef81c6c87a3037f893ff95c1e34b49de4940530c018ff12deeb8c0753cf4829",
+      "ticks": 2037,
+      "images": 794,
+      "bytes": 243624
+    },
+    {
+      "path": "inputs/heldout-04.npz",
+      "source": "speed6-01",
+      "sha256": "d64b2afa81b738e436aa02fba6997c3b79491b4d3bc3693e6b6353b5204c42a7",
+      "source_control_sha256": "c522937b495197662f5eec03d4affd8bd15f59c3d3746619f1727edb164221ba",
+      "ticks": 1854,
+      "images": 717,
+      "bytes": 221099
+    }
+  ],
+  "input_boundary": "Only public-image corners/timestamps, public-gyro and upright-edge-derived camera orientation, own motor commands, and own gate identity. No fused p/v, native reports, scorer CSVs, or old force coefficients.",
+  "provenance": "Data were excited by the earlier calibrated pilot. Its model outputs and coefficients are not fitting inputs. New coefficients must be validated on fresh flights.",
+  "protocol": {
+    "minimum_side_px": 40.0,
+    "maximum_reprojection_px": 0.5,
+    "velocity_fit_window_s": 0.4,
+    "minimum_fit_images": 8,
+    "maximum_image_gap_s": 0.12,
+    "velocity_change_window_s": 0.5,
+    "pair_stride_s": 0.1,
+    "parameters": [
+      "linear_thrust",
+      "quadratic_thrust",
+      "horizontal_body_drag",
+      "vertical_body_drag"
+    ],
+    "bounds": "All four nonnegative",
+    "lag_candidates_s": [
+      0.0,
+      0.02,
+      0.04,
+      0.06
+    ],
+    "selection": "Leave one of the three training flights out; heldout flights do not select coefficients or lag.",
+    "heldout_target_velocity_change_rms_m_s": 0.5
+  }
+}

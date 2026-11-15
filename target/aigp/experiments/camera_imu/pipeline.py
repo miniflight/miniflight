@@ -101,6 +101,8 @@ def analyze(root):
     (root/'pipeline.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     from .pipeline_latency import update
     update(root)
+    from .pipeline_score import score as score_architecture
+    score_architecture(root)
     return json.loads((root/'pipeline.json').read_text())
 
 

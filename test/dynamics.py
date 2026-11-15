@@ -6,6 +6,13 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_public_course_rejects_native_fitted_default_before_launch(self):
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import runner,sensors
+        with patch.dict(sensors.SETTINGS,position_config=None),patch.object(runner.native,'launch',side_effect=AssertionError('launched')):
+            with self.assertRaisesRegex(ValueError,'publicly identified'):
+                runner.public_course(Path('/unused'),-.5)
+
     def test_client_delay_uses_receipt_and_send_return_without_exposure_claim(self):
         from target.aigp.experiments.camera_imu.pipeline_latency import measure
         data=dict(motor_sent_host_time=np.array([9.,10.05,10.15,11.]),imu_received_at=np.array([10.04,10.14]),

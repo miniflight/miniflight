@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "label": "public-camera-shared-drag",
+  "label_source": "Camera corner pose differences with public gyro/visual attitude; no fused p/v or native fields",
+  "lag_s": 0.0,
+  "source_fit_sha256": "35cd71703cd496439aedb10c6cfb939e043fef22f40eced44b8163a8f20b9339",
+  "manifest_sha256": "e4b78fc874831d1af955f3d53fb465dbb46486e748fcb3b35c8f873f34e6ddef",
+  "position_config": {
+    "hover_thrust": 0.2689414998653758,
+    "thrust_acceleration": 65.16151372941489,
+    "position_gain": 1.3333333333333333,
+    "velocity_gain": 3.0,
+    "attitude_gain": 8.0,
+    "max_rate": 3.0,
+    "thrust_curve": [
+      7.79115445240604,
+      106.65955106543015
+    ],
+    "body_resistance_per_m": [
+      0.0476857765387268,
+      0.0476857765387268,
+      0.0476857765387268
+    ]
+  },
+  "training_inputs": [
+    {
+      "path": "inputs/training-01.npz",
+      "source": "gravity-01",
+      "sha256": "8c6f6584fc78718856111b4f5b2647c5ce287b7df5c3f8706a7bb6682445d04f",
+      "source_control_sha256": "b311aa962c612094dea706ce99f5b7d7afde52dea416e11bd4b84db5bcf326a3",
+      "ticks": 2009,
+      "images": 728,
+      "bytes": 238092
+    },
+    {
+      "path": "inputs/training-02.npz",
+      "source": "gravity-validation/validation-02",
+      "sha256": "cda4bce5e7d5a4b8892068f5fbdef940732173f05c5b3980662ef128017eccc6",
+      "source_control_sha256": "bee555c9e33903a98cb9e18756b7d97057f849df0b830ba760ac172b27f031e3",
+      "ticks": 1988,
+      "images": 708,
+      "bytes": 235250
+    },
+    {
+      "path": "inputs/training-03.npz",
+      "source": "gravity-validation/validation-03",
+      "sha256": "26d2b36069a638a8d9628522e060f42cc8e373ca08aaa1d5e6a0e9c195b2f171",
+      "source_control_sha256": "4bcbb4deb8ac756dd7125310eacac999fa4525729a4491be7ddf09ffcd3b8466",
+      "ticks": 1982,
+      "images": 796,
+      "bytes": 237845
+    }
+  ],
+  "heldout": [
+    {
+      "source": "gravity-validation/validation-04",
+      "windows": 55,
+      "rms_m_s": 0.36240471946984254,
+      "median_m_s": 0.21963615793016916,
+      "p95_m_s": 0.5774187517060274,
+      "constant_velocity_rms_m_s": 1.0658504705548748,
+      "axis_rms_m_s": [
+        0.20942579558906427,
+        0.08370598986724385,
+        0.2836746800407954
+      ]
+    },
+    {
+      "source": "gravity-validation/validation-05",
+      "windows": 49,
+      "rms_m_s": 0.4248052730473987,
+      "median_m_s": 0.25538690806662356,
+      "p95_m_s": 1.0124809309967788,
+      "constant_velocity_rms_m_s": 1.2284525011274754,
+      "axis_rms_m_s": [
+        0.2648800660959183,
+        0.04923945890338668,
+        0.3284410849464461
+      ]
+    },
+    {
+      "source": "gravity-validation/validation-06",
+      "windows": 59,
+      "rms_m_s": 0.4602981456347251,
+      "median_m_s": 0.19802056472540072,
+      "p95_m_s": 1.0408298233318292,
+      "constant_velocity_rms_m_s": 1.1809732383353002,
+      "axis_rms_m_s": [
+        0.35671996834015995,
+        0.0880651230716802,
+        0.27725400116234883
+      ]
+    },
+    {
+      "source": "speed6-01",
+      "windows": 29,
+      "rms_m_s": 0.2874914899215235,
+      "median_m_s": 0.20104128996725773,
+      "p95_m_s": 0.4645966673353569,
+      "constant_velocity_rms_m_s": 1.1252108206770872,
+      "axis_rms_m_s": [
+        0.20594083059944993,
+        0.049092063631567665,
+        0.19449858703265746
+      ]
+    }
+  ],
+  "selection": "Prefer shared drag if leave-flight-out training RMS is within5% of separate-drag RMS; keep its selected lag.",
+  "limits": {
+    "training_windows": 86,
+    "heldout_windows": 192,
+    "fold_parameters": [
+      [
+        9.668921357940393,
+        100.00737078281522,
+        0.04854660553932455
+      ],
+      [
+        4.63515726521516,
+        118.17869625630524,
+        0.04926821947110341
+      ],
+      [
+        7.501579233287971,
+        107.47260198089847,
+        0.045388327356220504
+      ]
+    ],
+    "parameter_units": [
+      "m/s2 per u",
+      "m/s2 per u2",
+      "1/m"
+    ],
+    "operating_mean_motor_range": [
+      0.25980515336577514,
+      0.2970326177554642
+    ],
+    "nonnegative_scaled_design_condition": 61.93471495452745
+  },
+  "provenance": "Data were excited by the earlier calibrated pilot. Its model outputs and coefficients are not fitting inputs. New coefficients must be validated on fresh flights.",
+  "heldout_status": "These heldout flights were previously inspected during model development; fresh native flights are the prospective test."
+}

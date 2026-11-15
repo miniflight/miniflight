@@ -312,6 +312,7 @@ def live(root, shift):
 
 def public_course(root,shift):
     """Run the ordinary camera/MAVLink interface; no capture/IMU DLLs are loaded."""
+    if SETTINGS.get('position_config') is None:raise ValueError('Public course requires a publicly identified dynamics model')
     root.mkdir(parents=True)
     SETTINGS['shift_right_m']=shift
     sources=tuple(sorted(HERE.glob('*.py')))
@@ -387,7 +388,7 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
                              'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
-                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz'):
+                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz','architecture-score.json'):
                     if (raw/name).exists():shutil.copyfile(raw/name,root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
                 (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")
@@ -417,6 +418,7 @@ def main():
     elif args.path is None:
         parser.error("live, replay, score and video require a path")
     elif args.mode=='course':
+        if args.dynamics_model is None:parser.error('course requires --dynamics-model; see dynamics.model.json for the public-data calibration')
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
         result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint)
         from .plots import plot

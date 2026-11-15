@@ -79,8 +79,24 @@
         "gate landmark poses and depth",
         "state and landmark covariance"
       ],
-      "required_method": "Fixed-lag rewind, measurement update, and repropagation of recorded process and subsequent measurement events",
-      "current_method": "Complementary position/velocity corrections and gyro/visual tilt history; joint covariance and complete dynamics repropagation remain absent"
+      "required_method": "Fixed-lag error-state EKF with joint vehicle/current-next landmark covariance. Apply raw pixel factors at their estimated image epochs; replay subsequent public gyro, own commands and visual events. Keep a1s history; estimate at the command epoch. Published sample elapsed time supports the gyro/command model, not exact accelerometer preintegration.",
+      "current_method": "Complementary position/velocity corrections and gyro/visual tilt history; joint covariance and complete dynamics repropagation remain absent",
+      "target_state": {
+        "vehicle_error_coordinates": 15,
+        "gate_coordinates_each": 4,
+        "total_current_next_error_coordinates": 23,
+        "vehicle": [
+          "position3",
+          "velocity3",
+          "attitude_error3",
+          "gyro_bias3",
+          "command_force_residual3"
+        ],
+        "landmark": [
+          "center_or_bearing_inverse_depth3",
+          "upright_plane_yaw1"
+        ]
+      }
     },
     {
       "stage": "planning",
@@ -88,7 +104,7 @@
       "produces": "Time-indexed position, velocity and acceleration reference",
       "owns": "Flight objective and feasibility constraints",
       "required_method": "Choose minimum-time feasible short trajectory with crossing margin, actuator and camera-visibility constraints",
-      "current_method": "Position waypoints with coarse visibility alignment and threshold-based braking"
+      "current_method": "Position waypoints with coarse visibility alignment, plus optional predictive crossing constraint. Near a gate, brake and align in the transverse plane if the constant-velocity crossing prediction exceeds0.55m. Joint posterior chance constraints and a timed trajectory remain absent."
     },
     {
       "stage": "control",
@@ -148,6 +164,12 @@
       "per-stage wall and thread CPU time",
       "rate tracking error rad/s",
       "normalized motor range/saturation"
+    ],
+    "timing": [
+      "Image final-packet receipt to candidate-ready and next send-return on host monotonic clock",
+      "Latest retained IMU receipt to send-return",
+      "Estimated image clock age and velocity-fit effective age separately",
+      "Exposure-to-actuation remains unknown"
     ]
   },
   "budgets": {
@@ -160,7 +182,13 @@
     "alignment_metric_gap_limit_s": 4.5,
     "nominal_horizontal_acceleration_limit_m_s2": 3.0,
     "vertical_speed_limit_m_s": 3.0,
-    "tilt_limit_rad": 0.45
+    "tilt_limit_rad": 0.45,
+    "predicted_crossing_centerline_limit_m": 0.55,
+    "crossing_settle_position_m": 0.25,
+    "crossing_settle_transverse_speed_m_s": 0.3,
+    "crossing_settle_duration_s": 0.2,
+    "crossing_settle_measurement_age_s": 0.3,
+    "constant_velocity_forecast_horizon_s": 2.0
   },
   "measured_unknowns": {
     "true_camera_exposure_timestamp": null,
@@ -187,7 +215,28 @@
       "pipeline-timing.csv.gz",
       "scored error CSVs",
       "plots",
-      "compact continuous video"
+      "compact continuous video",
+      "client-latency.csv.gz",
+      "architecture-score.json"
     ]
+  },
+  "next_checkpoint": {
+    "backend": "Joint gate-aided fixed-lag error-state EKF",
+    "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
+    "diagnostic_targets": {
+      "velocity_rms_m_s": 0.3,
+      "crossing_prediction_p95_error_m": 0.2,
+      "nominal_3sigma_crossing_interval_coverage": 0.95,
+      "controller_p95_compute_ms": 10.0
+    },
+    "acceptance": "Five prospective unchanged runs from both shifts: six native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Targets are proposed; none is claimed achieved.",
+    "planner_condition": "abs(mean crossing offset)+3*sigma_crossing <=0.55m in both transverse axes; calibrate coverage before treating this as a probability. Include position/landmark/velocity cross-covariances."
+  },
+  "calibration": {
+    "model": "dynamics.model.json",
+    "public_inputs": "test/fixtures/public_dynamics",
+    "native_fitted_course_default_allowed": false,
+    "gate_size": "Nominal1.5m aperture is an explicit scale prior, not a fitted native opening dimension.",
+    "support": "Mean motor command0.2598\u20130.2970; larger thrust/speed/tilt require new public-data identification and validation."
   }
 }
