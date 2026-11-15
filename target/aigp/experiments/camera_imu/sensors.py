@@ -11,6 +11,7 @@ import struct
 import numpy as np
 import cv2
 from scipy.spatial.transform import Rotation, Slerp
+from common.math import Quaternion
 
 from miniflight import vehicle
 from miniflight.attitude import gyro_step, stationary_rotation
@@ -202,6 +203,13 @@ class Inertial:
             self.positions[i] += delta
         self.position = self.positions[-1].copy()
         return delta
+
+    def correct_orientation(self,stamp,correction):
+        matrix=correction.as_matrix()
+        for i in range(bisect_left(self.times,stamp),len(self.times)):
+            self.rotations[i]=matrix @ self.rotations[i]
+        x,y,z,w=correction.as_quat()
+        self.rotation=Quaternion(w,x,y,z)*self.rotation
 
     def camera_pose(self, stamp):
         index = bisect_right(self.times, stamp)-1

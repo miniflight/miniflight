@@ -16,6 +16,18 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_delayed_tilt_correction_preserves_earlier_orientation(self):
+        from common.math import Quaternion
+        from scipy.spatial.transform import Rotation
+        inertial=sensors.Inertial();inertial.rotation=Quaternion()
+        inertial.times=[0.,1.,2.];camera=vision.CAMERA_FROM_BODY.T
+        inertial.rotations=[camera.copy() for _ in inertial.times]
+        correction=Rotation.from_euler('y',2.2,degrees=True)
+        inertial.correct_orientation(1.,correction)
+        np.testing.assert_allclose(inertial.rotations[0],camera)
+        np.testing.assert_allclose(inertial.rotations[1],correction.as_matrix() @ camera)
+        np.testing.assert_allclose(inertial.rotation.as_rotation_matrix(),correction.as_matrix(),atol=1e-12)
+
     def test_visual_gravity_correction_is_bounded_and_needs_support(self):
         from scipy.spatial.transform import Rotation
         camera=Rotation.from_euler('y',-20.,degrees=True).as_matrix() @ vision.CAMERA_FROM_BODY.T
