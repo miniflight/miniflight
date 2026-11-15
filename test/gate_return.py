@@ -2,11 +2,27 @@ import copy
 import unittest
 
 import numpy as np
+import cv2
 
 from miniflight.joint import solve_window
+from target.aigp.experiments.camera_imu.vision import mapped_aperture
 
 
 class GateReturnTest(unittest.TestCase):
+    def test_redetection_recovers_shifted_prediction_and_preserves_identity(self):
+        image = np.zeros((360,640,3),np.uint8)
+        cv2.rectangle(image,(200,130),(360,290),(0,0,220),-1)
+        cv2.rectangle(image,(220,150),(340,270),(0,0,0),-1)
+        cv2.rectangle(image,(430,90),(600,260),(0,0,220),-1)
+        cv2.rectangle(image,(450,110),(580,240),(0,0,0),-1)
+        predicted = np.array([[220.,150.],[340.,150.],[340.,270.],[220.,270.]])+[24.,0.]
+        corners,source,_ = mapped_aperture(image,predicted)
+        self.assertEqual(source,'redetected')
+        np.testing.assert_allclose(corners.mean(axis=0),[280.,210.],atol=.6)
+        image[120:301,190:226] = 0
+        corners,_,_ = mapped_aperture(image,predicted)
+        self.assertIsNone(corners)
+
     def test_returning_square_corrects_velocity_and_depth_scale(self):
         rng = np.random.default_rng(7)
         k = np.array([[320., 0, 320], [0, 320., 180], [0, 0, 1.]])

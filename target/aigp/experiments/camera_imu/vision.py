@@ -13,7 +13,7 @@ tilt = np.radians(20)
 CAMERA_FROM_BODY = np.array([[0, 1, 0], [np.sin(tilt), 0, np.cos(tilt)],
                              [np.cos(tilt), 0, -np.sin(tilt)]])
 
-def refine(image, corners):
+def refine(image, corners, minimum_supported=2):
     corners = np.asarray(corners, dtype=float)
     if np.any(corners < 1) or np.any(corners[:, 0] >= image.shape[1]-1) or np.any(corners[:, 1] >= image.shape[0]-1):
         return None
@@ -46,7 +46,7 @@ def refine(image, corners):
         supported += np.median(rim) > .08
         vx, vy, x0, y0 = cv2.fitLine(points.astype(np.float32), cv2.DIST_HUBER, 0, .01, .01).ravel()
         lines.append([-vy, vx, vy*x0-vx*y0])
-    if supported < 2:
+    if supported < minimum_supported:
         return None
     intersections = np.array([np.cross(lines[i-1], lines[i]) for i in range(4)])
     if np.any(abs(intersections[:, 2]) < 1e-9):
@@ -127,3 +127,27 @@ def iou(a, b):
     overlap, _ = cv2.intersectConvexConvex(a, b)
     union = cv2.contourArea(a)+cv2.contourArea(b)-overlap
     return overlap/union if union > 0 else 0.
+
+
+def mapped_aperture(image, predicted):
+    """Observe a mapped gate; recover from a failed local prediction in pixels."""
+    def candidates():
+        yield 'accepted', refine(image,predicted,minimum_supported=4)
+        for corners in aperture_candidates(image,close_gaps=True):
+            yield 'redetected', refine(image,corners,minimum_supported=4)
+    rejected = []
+    for source,corners in candidates():
+        if corners is None or np.any(corners < 1) or np.any(corners >= [639,359]):
+            reason = 'no_complete_refinement'
+        else:
+            pose = best_pose(corners)
+            if pose is None or pose[0] > 1.:
+                reason = 'single_frame_pose'
+            elif iou(corners,predicted) < .5:
+                reason = 'association'
+            elif np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1)) < 40.:
+                reason = 'size'
+            else:
+                return corners, source, rejected
+        rejected.append(reason)
+    return None, 'lost', rejected

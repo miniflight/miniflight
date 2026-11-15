@@ -66,17 +66,10 @@ class GateController(base.GateController):
             return self.gate_detection('behind')
         h = camera @ base.vision.K.T
         predicted = h[:,:2]/h[:,2:]
-        corners = base.vision.refine(frame.bgr,predicted)
-        if corners is None or np.any(corners < 1) or np.any(corners >= [639,359]):
-            return self.gate_detection('no_complete_refinement')
-        pose = base.vision.best_pose(corners)
-        if pose is None or pose[0] > 1.:
-            return self.gate_detection('single_frame_pose')
-        if base.vision.iou(corners,predicted) < .5:
-            return self.gate_detection('association')
-        if np.min(np.linalg.norm(corners-np.roll(corners,1,axis=0),axis=1)) < 40.:
-            return self.gate_detection('size')
-        return self.gate_detection('accepted',corners)
+        corners,source,rejected = base.vision.mapped_aperture(frame.bgr,predicted)
+        for reason in rejected:
+            self.gate_detection(reason)
+        return self.gate_detection(source,corners)
 
     def _imu(self):
         remaining = []
