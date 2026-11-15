@@ -5,7 +5,7 @@ from pymavlink.dialects.v20 import common
 
 from miniflight.state import Frame
 from miniflight.replay import Calls
-from target.aigp.experiments.camera_imu.course import WireClient, alignment_step, command_specific_force
+from target.aigp.experiments.camera_imu.course import WireClient, alignment_step, command_specific_force, vertical_bearing
 from target.aigp.experiments.camera_imu.controller import acquisition_waypoint
 from target.aigp.experiments.camera_imu import sensors
 from target.aigp.experiments.camera_imu.motion import GateMotion
@@ -15,6 +15,16 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_vertical_bearing_does_not_change_with_aircraft_attitude(self):
+        from scipy.spatial.transform import Rotation
+        for height in [-3.,0.,3.]:
+            point=np.array([15.,2.,height])
+            for angles in [(0.,0.,0.),(12.,-10.,20.),(-15.,10.,-10.)]:
+                orientation=Rotation.from_euler('xyz',angles,degrees=True).as_matrix() @ vision.CAMERA_FROM_BODY.T
+                ray=orientation.T @ point
+                pixel=(vision.K @ ray)[:2]/ray[2]
+                self.assertAlmostEqual(vertical_bearing(pixel,orientation),height/np.hypot(15.,2.))
+
     def test_starting_pad_contact_does_not_hide_an_armed_contact(self):
         records=[dict(host=t) for t in [1.,2.,3.,4.,5.]]
         self.assertEqual(armed_contacts(records,2.5,4.5),records[2:4])

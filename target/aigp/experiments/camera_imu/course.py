@@ -16,6 +16,11 @@ from target.aigp.simulator import AIGPSimulator, ArmPhase
 from . import controller as base
 
 
+def vertical_bearing(pixel,orientation):
+    ray=orientation @ (base.vision.K_INV @ np.r_[pixel,1.])
+    return float(ray[2]/max(np.linalg.norm(ray[:2]),1e-6))
+
+
 def alignment_step(predicted_height,age,pixel_y,direction):
     """A partial image supplies a steering cue, not a fabricated metric pose."""
     if age<=.3:return predicted_height
