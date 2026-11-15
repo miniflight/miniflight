@@ -13,23 +13,26 @@ class GateFilter:
     """Error coordinates: p,v,right attitude error,gyro bias,force bias,gate(xyz,yaw)."""
     def __init__(self,rotation,gyro_bias,thrust_curve,drag,camera_from_body,intrinsics):
         self.p=np.zeros(3);self.v=np.zeros(3);self.R=np.array(rotation)
-        self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={}
+        self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
         self.P=np.diag(np.r_[np.full(3,1e-8),np.full(3,.05**2),np.r_[np.full(2,np.radians(.5)**2),1e-8],
-            np.full(3,.005**2),np.full(3,.5**2)])
+            np.full(3,.001**2),np.full(3,.5**2),.03**2])
         self.thrust_curve=np.array(thrust_curve);self.drag=np.asarray(drag)
         self.C=np.array(camera_from_body);self.K=np.array(intrinsics)
-        self.acceleration_noise=1.;self.gyro_noise=.01
-        self.gyro_bias_walk=.0005;self.force_bias_walk=.05
+        self.acceleration_noise=.5;self.gyro_noise=.001
+        self.gyro_bias_walk=.0001;self.force_bias_walk=.05
 
     def copy(self):return deepcopy(self)
 
     def inject(self,dx):
         self.p+=dx[:3];self.v+=dx[3:6];self.R=self.R @ Rotation.from_rotvec(dx[6:9]).as_matrix()
         self.bg+=dx[9:12];self.ba+=dx[12:15]
+        self.size+=dx[15]
         for key,(index,center,yaw) in list(self.gates.items()):
             self.gates[key]=(index,center+dx[index:index+3],yaw+dx[index+3])
+        if self.rim is not None:
+            index,dimensions=self.rim;self.rim=(index,dimensions+dx[index:index+2])
 
-    def predict(self,dt,gyro,motors):
+    def predict(self,dt,gyro,motors,angle_uncertainty=None):
         if not 0.<dt<=.15:raise ValueError('Process interval must be positive elapsed public time, <=150ms')
         n=len(self.P);F=np.eye(n);Q=np.zeros((n,n));omega=np.asarray(gyro)-self.bg
         rotation_step=Rotation.from_rotvec(omega*dt).as_matrix()
@@ -56,6 +59,7 @@ class GateFilter:
         Q[:3,:3]=np.eye(3)*density*dt**3/3;Q[:3,3:6]=Q[3:6,:3]=np.eye(3)*density*dt**2/2
         Q[3:6,3:6]=np.eye(3)*density*dt
         Q[6:9,6:9]=np.eye(3)*self.gyro_noise**2*dt
+        if angle_uncertainty is not None:Q[6:9,6:9]+=np.diag(np.asarray(angle_uncertainty)**2)
         Q[9:12,9:12]=np.eye(3)*self.gyro_bias_walk**2*dt
         Q[12:15,12:15]=np.eye(3)*self.force_bias_walk**2*dt
         self.p+=self.v*dt+.5*acceleration*dt*dt;self.v+=acceleration*dt;self.R=self.R @ rotation_step
@@ -64,14 +68,27 @@ class GateFilter:
 
     def add_gate(self,key,relative_camera,right_camera):
         if key in self.gates:return
-        world_camera=self.R @ self.C.T;center=self.p+world_camera @ relative_camera
+        world_camera=self.R @ self.C.T;center=self.p+world_camera @ relative_camera*(self.size/1.5)
         right=world_camera @ right_camera;yaw=float(np.arctan2(-right[0],right[1]))
         n=len(self.P);P=np.zeros((n+4,n+4));P[:n,:n]=self.P
         # PnP seeds the nonlinear mean only. A broad prior avoids counting the pixels twice.
         P[n:,n:]=np.diag([100.**2]*3+[np.pi**2]);self.P=P
         self.gates[key]=(n,center,yaw)
 
-    def measurement(self,key,points):
+    def add_rim(self,width,height,fractional_spread):
+        if self.rim is not None:return
+        n=len(self.P);P=np.zeros((n+2,n+2));P[:n,:n]=self.P
+        # P90-P10 spread is about2.563 standard deviations for a Gaussian.
+        scale_derivative=np.array([width,height])/1.5;dimensions=scale_derivative*self.size
+        sigma=dimensions*max(.01,fractional_spread/2.563)
+        P[:n,n:]=self.P[:,15,None]*scale_derivative;P[n:,:n]=P[:n,n:].T
+        P[n:,n:]=np.diag(sigma**2)+np.outer(scale_derivative,scale_derivative)*self.P[15,15]
+        self.P=P;self.rim=(n,dimensions)
+
+    def measurement(self,key,points,rim=False):
+        if rim:
+            width,height=self.rim[1];points=np.array([[0.,-width/2,-height],[0.,width/2,-height]])
+        else:points=np.asarray(points)*(self.size/1.5)
         index,center,yaw=self.gates[key];gate=Rotation.from_euler('z',yaw).as_matrix()
         directions=np.asarray(points) @ gate.T;world=directions+center
         body=(world-self.p) @ self.R;camera=body @ self.C.T
@@ -82,10 +99,14 @@ class GateFilter:
             rows=slice(2*i,2*i+2);world_J=J @ self.C @ self.R.T
             H[rows,:3]=-world_J;H[rows,6:9]=J @ self.C @ skew(b)
             H[rows,index:index+3]=world_J;H[rows,index+3]=world_J @ np.cross([0.,0.,1.],offset)
+            if rim:
+                H[rows,self.rim[0]]=world_J @ gate @ [0.,-.5 if i==0 else .5,0.]
+                H[rows,self.rim[0]+1]=world_J @ [0.,0.,-1.]
+            else:H[rows,15]=world_J @ (offset/self.size)
         return pixels,H
 
-    def observe(self,key,points,pixels,sigma_px=1.,noise=None):
-        prediction=self.measurement(key,points)
+    def observe(self,key,points,pixels,sigma_px=1.,noise=None,rim=False):
+        prediction=self.measurement(key,points,rim)
         if prediction is None:return dict(accepted=False,reason='behind_camera')
         expected,H=prediction;residual=(np.asarray(pixels)-expected).ravel()
         V=np.eye(len(residual))*sigma_px**2 if noise is None else np.asarray(noise)
@@ -130,7 +151,8 @@ class GateHistory:
             steps=max(1,int(np.ceil((stamp-self.time)/.02)))
             for end in np.linspace(self.time,stamp,steps+1)[1:]:
                 middle=(self.time+end)/2
-                self.filter.predict(end-self.time,.5*(self._rate(self.time)+self._rate(end)),self._motor(middle));self.time=end
+                first,last=self._rate(self.time),self._rate(end);dt=end-self.time
+                self.filter.predict(dt,.5*(first+last),self._motor(middle),(last-first)*dt/np.sqrt(12));self.time=end
 
     def _replay(self,changed):
         choices=[i for i,(t,_) in enumerate(self.snapshots) if t<changed]
@@ -146,7 +168,8 @@ class GateHistory:
                     if row['key'] not in self.filter.gates:
                         if row.get('seed') is None:continue
                         self.filter.add_gate(row['key'],*row['seed'])
-                    self.results[row['id']]=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.))
+                    if row.get('rim') and self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
+                    self.results[row['id']]=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
             self.snapshots.append((stamp,self.filter.copy()));self.repropagated+=1
         boundary=end-self.seconds;keep=max(0,np.searchsorted([t for t,_ in self.snapshots],boundary)-1)
         self.snapshots=self.snapshots[keep:];oldest=self.snapshots[0][0]

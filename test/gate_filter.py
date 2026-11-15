@@ -16,6 +16,18 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_partial_pixels_jointly_estimate_uncertain_rim_dimensions(self):
+        f=filter();f.add_rim(2.84,1.4,.1);expected,H=f.measurement(1,None,rim=True);eps=1e-6
+        numeric=[]
+        for column in range(len(f.P)):
+            a=f.copy();b=f.copy();step=np.eye(len(f.P))[column]*eps;a.inject(step);b.inject(-step)
+            numeric.append((a.measurement(1,None,True)[0]-b.measurement(1,None,True)[0]).ravel()/(2*eps))
+        np.testing.assert_allclose(H,np.array(numeric).T,atol=2e-7)
+        before=f.P.copy();result=f.observe(1,None,expected+[.1,-.2],rim=True)
+        self.assertTrue(result['accepted']);self.assertLess(np.trace(f.P),np.trace(before))
+        index=f.gates[1][0];rim=f.rim[0]
+        self.assertGreater(np.linalg.norm(f.P[index:index+4,rim:rim+2]),1e-8)
+
     def test_raw_pixel_jacobian_includes_attitude_and_gate_depth(self):
         f=filter();pixels,H=f.measurement(1,POINTS);numeric=[];eps=1e-6
         for column in range(len(f.P)):
@@ -28,7 +40,7 @@ class JointGateTest(unittest.TestCase):
         F=nominal.predict(.013,gyro,u);numeric=[];eps=1e-6
         def difference(a,b):
             tail=np.concatenate([np.r_[a.gates[k][1]-b.gates[k][1],a.gates[k][2]-b.gates[k][2]] for k in a.gates])
-            return np.r_[a.p-b.p,a.v-b.v,Rotation.from_matrix(b.R.T @ a.R).as_rotvec(),a.bg-b.bg,a.ba-b.ba,tail]
+            return np.r_[a.p-b.p,a.v-b.v,Rotation.from_matrix(b.R.T @ a.R).as_rotvec(),a.bg-b.bg,a.ba-b.ba,a.size-b.size,tail]
         for column in range(len(F)):
             a=before.copy();b=before.copy();step=np.eye(len(F))[column]*eps;a.inject(step);b.inject(-step)
             a.predict(.013,gyro,u);b.predict(.013,gyro,u)
