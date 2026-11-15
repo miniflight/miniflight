@@ -217,7 +217,13 @@ class JointEstimator:
         predicted = self.predict(stamp)
         self.window.append(dict(id=image_id, time=stamp, ids=ids, pixels=self.tracker.points[ids].tolist(), gate_pixels=list(gate_pixels)))
         self.states[image_id] = predicted
-        self.window = self.window[:1]+self.window[1:][-self.recent:]
+        recent = self.window[1:][-self.recent:]
+        if self.gate_correction:
+            gates = [f for f in self.window if f.get('gate_pixels')]
+            retained = {f['id']:f for f in self.window[:1]+gates[:1]+gates[-1:]+recent}
+            self.window = sorted(retained.values(),key=lambda f:f['time'])
+        else:
+            self.window = self.window[:1]+recent
         self.states = {frame['id']:self.states[frame['id']] for frame in self.window}
         edges = []
         for i in range(len(self.window)-1):
