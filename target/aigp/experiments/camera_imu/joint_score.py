@@ -10,6 +10,7 @@ import numpy as np
 from pymavlink.dialects.v20 import common
 
 from miniflight.joint import solve_window
+from miniflight.initialization import fit_gate_motion
 from miniflight.state import Frame
 from target.aigp.client import _Camera
 from .sensors import ALLOWED
@@ -65,7 +66,7 @@ def rendered_views(path):
 def score(root):
     path = root/'flight.jsonl'
     decoder = common.MAVLink(None)
-    positions, updates, calls, arms, collisions, results = [], [], [], [], [], []
+    positions, updates, calls, arms, collisions, results, initializations = [], [], [], [], [], [], []
     accepted, resets, offset = set(), 0, None
     for row in map(json.loads, path.open()):
         if row['event'] == 'call':
@@ -88,6 +89,8 @@ def score(root):
                 resets += 1
             elif name == 'joint_solve' and 'result' in row:
                 calls.append(row)
+            elif name == 'joint_gate_fit' and 'result' in row:
+                initializations.append(row['result'])
         elif row['event'] == 'update' and row.get('signals'):
             signal = row['signals']
             assert not signal['motion_available'] and not signal['attitude_available']
@@ -112,6 +115,8 @@ def score(root):
         numerical_replay_max_difference=max(numerical_errors,default=0.), passed_joint_turn=False)
     replay_data = [dict(arguments=row['arguments'], request=row['result']['request'], fit=row['result']['fit']) for row in calls]
     (root/'joint-replay.json').write_text(json.dumps(replay_data,indent=2)+'\n')
+    if initializations:
+        result['initialization'] = score_initializations(root,initializations,positions)
     if not updates:
         (root/'score.json').write_text(json.dumps(result,indent=2)+'\n')
         print(json.dumps(result,indent=2),flush=True)
@@ -192,6 +197,41 @@ def score(root):
     return result
 
 
+def score_initializations(root, initializations, positions):
+    views = {key[0]:value for key,value in rendered_views(root/'events.bin').items()}
+    data = np.array(positions)
+    data = data[np.r_[True,np.diff(data[:,0])>0]]
+    at = lambda stamp,start:np.array([np.interp(stamp,data[:,0],column) for column in data[:,start:start+3].T])
+    scored = []
+    for item in initializations:
+        request, recorded = item['request'], item['result']
+        replayed = fit_gate_motion(request)
+        assert (replayed is None)==(recorded is None)
+        difference = None
+        if replayed is not None:
+            difference = max(float(np.max(abs(np.array(replayed[key])-recorded[key]))) for key in ('velocity','center'))
+            assert difference < 1e-5, 'initialization numerical replay differs'
+        meta = request['meta']
+        q = views[meta['reference_id']][1] @ np.diag([1.,-1.,1.])
+        reference_time, cut_time = views[meta['reference_id']][2], views[meta['cut_id']][2]
+        true_position = (at(cut_time,1)-at(reference_time,1))*[1.,1.,-1.] @ q
+        true_velocity = at(cut_time,4)*[1.,1.,-1.] @ q
+        row = dict(reference_time=reference_time,cut_time=cut_time,corner_views=len(request['times']),
+            linear_position_error_m=float(np.linalg.norm(np.array(meta['linear_position'])-true_position)),
+            linear_velocity_error_m_s=float(np.linalg.norm(np.array(meta['linear_velocity'])-true_velocity)),
+            numerical_replay_difference=difference,candidate_valid=recorded is not None)
+        if recorded is not None:
+            velocity=np.array(recorded['velocity']);dt=meta['duration'];gravity=np.array(meta['gravity'])
+            position=velocity*dt+meta['delta_position']+.5*gravity*dt**2
+            velocity=velocity+meta['delta_velocity']+gravity*dt
+            row.update(candidate_position_error_m=float(np.linalg.norm(position-true_position)),
+                candidate_velocity_error_m_s=float(np.linalg.norm(velocity-true_velocity)),
+                reprojection_rms_px=recorded['reprojection_rms_px'],fit_ms=recorded['fit_ms'])
+        scored.append(row)
+    (root/'joint-initialization.json').write_text(json.dumps(dict(records=initializations,scores=scored),indent=2)+'\n')
+    return scored
+
+
 def render(root, updates, views, trajectory):
     start = updates[0]['signal']['imu_time']-.3
     end = min(updates[-1]['signal']['imu_time'], start+5.)
@@ -239,4 +279,12 @@ if __name__ == '__main__':
         errors.append(max(float(np.max(abs(np.array(result[key])-row['fit'][key]))) for key in ('states','depths')))
     maximum=max(errors,default=0.)
     assert maximum<1e-5
-    print(json.dumps(dict(solves=len(rows),maximum_numeric_difference=maximum)))
+    initializations=0
+    if args.path.is_dir() and (args.path/'joint-initialization.json').exists():
+        for item in json.loads((args.path/'joint-initialization.json').read_text())['records']:
+            result=fit_gate_motion(item['request']);expected=item['result']
+            assert (result is None)==(expected is None)
+            if result is not None:
+                np.testing.assert_allclose(result['velocity'],expected['velocity'],atol=1e-5)
+            initializations+=1
+    print(json.dumps(dict(solves=len(rows),initializations=initializations,maximum_numeric_difference=maximum)))

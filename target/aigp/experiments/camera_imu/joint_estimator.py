@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 
 from miniflight.joint import solve_window
+from miniflight.initialization import fit_gate_motion
 from miniflight.odometry import ImuIntegral
 from miniflight.vision import landmark_covariance, triangulate_views
 from target.aigp.experiments.patch_track import seeds, Tracker
@@ -10,7 +11,8 @@ from . import vision
 
 
 class JointEstimator:
-    def __init__(self, call=None, period=.15, recent=5, points=24):
+    def __init__(self, call=None, period=.15, recent=5, points=24,
+                 initialization='linear', init_shadow=False, world_gravity=None):
         self.call = call or (lambda name, args, function:function())
         self.period, self.recent, self.maximum_points = period, recent, points
         self.integral = ImuIntegral()
@@ -20,6 +22,9 @@ class JointEstimator:
         self.solutions, self.depth_revisions = 0, 0
         self.last_time, self.last_id = None, None
         self.timings = []
+        self.initialization, self.init_shadow = initialization, init_shadow
+        self.world_gravity = None if world_gravity is None else np.array(world_gravity)
+        self.gate_pixels = []
 
     def imu(self, stamp, dt, specific_force_world):
         self.integral.append(stamp, dt, specific_force_world)
@@ -36,7 +41,7 @@ class JointEstimator:
         valid = cv2.warpPerspective(np.ones((360, 640), np.uint8), homography, (640, 360), flags=cv2.INTER_NEAREST)
         return gray, cv2.dilate(mask, np.ones((19, 19), np.uint8)), cv2.erode(valid, np.ones((19, 19), np.uint8))
 
-    def observe(self, frame, camera_to_world, gate_translation=None):
+    def observe(self, frame, camera_to_world, gate_translation=None, gate_corners=None):
         stamp = frame.time_ns*1e-9
         if self.last_id is not None and (frame.id <= self.last_id or stamp <= self.last_time):
             return
@@ -63,6 +68,9 @@ class JointEstimator:
             self.initial_frames.append(dict(id=frame.id, time=stamp, tau=tau, pixels=self.tracker.points.copy()))
             if gate_translation is not None:
                 self.gates.append((stamp, tau, self.reference.T @ camera_to_world @ gate_translation))
+                if gate_corners is not None:
+                    self.gate_pixels.append(dict(time=stamp,tau=tau,pixels=np.array(gate_corners),
+                        rotation=camera_to_world.T @ self.reference))
             if tau >= 2. and len(self.initial_frames) >= 40:
                 self._initialize()
             return
@@ -83,8 +91,54 @@ class JointEstimator:
             errors = np.linalg.norm(design @ fit-values, axis=1)
             weights = np.minimum(1., .08/np.maximum(errors, 1e-9))
         self.initial_velocity = -fit[1]
+        duration, force, displacement = self.between(self.reference_time, self.last_time)
+        self.gravity = -force/duration
+        velocity_reference = self.initial_velocity.copy()
+        accelerated = False
+        if self.init_shadow or self.initialization == 'reprojection':
+            if len(self.gate_pixels) < 12:
+                raise RuntimeError('gate reprojection initialization needs twelve corner observations')
+            gravity = self.gravity if self.world_gravity is None else self.reference.T @ self.world_gravity
+            offsets = []
+            for observation in self.gate_pixels:
+                dt, _, dp = self.between(self.reference_time, observation['time'])
+                offsets.append(dp+.5*gravity*dt**2)
+            seeds = []
+            first = self.gate_pixels[0]
+            for pose in vision.estimate(first['pixels'],1.5,vision.K):
+                rotation = first['rotation'].T @ cv2.Rodrigues(np.array(pose['rotation_vector_rad']))[0]
+                seeds.append(dict(center=fit[0].tolist(),rotation=cv2.Rodrigues(rotation)[0].ravel().tolist(),
+                                  velocity=velocity_reference.tolist()))
+            request = dict(square=vision.SQUARE.tolist(),intrinsics=vision.K.tolist(),
+                times=[o['tau'] for o in self.gate_pixels],pixels=[o['pixels'].tolist() for o in self.gate_pixels],
+                rotations=[o['rotation'].tolist() for o in self.gate_pixels],offsets=np.array(offsets).tolist(),seeds=seeds,
+                meta=dict(reference_id=self.reference_id,reference_time=self.reference_time,
+                    cut_id=self.last_id,cut_time=self.last_time,duration=duration,
+                    delta_velocity=force.tolist(),delta_position=displacement.tolist(),gravity=gravity.tolist(),
+                    linear_position=(duration*self.initial_velocity).tolist(),linear_velocity=self.initial_velocity.tolist()))
+            reply = self.call('joint_gate_fit',dict(image_id=int(self.last_id),capture_ns=round(self.last_time*1e9)),
+                lambda:dict(request=request,result=fit_gate_motion(request)))
+            for key in ('square','intrinsics','times','pixels','rotations','offsets'):
+                np.testing.assert_allclose(reply['request'][key],request[key],rtol=1e-8,atol=1e-6)
+            candidate = reply['result']
+            self.initialization_fit = candidate
+            if self.initialization == 'reprojection':
+                if candidate is None or candidate['reprojection_rms_px'] > .5:
+                    raise RuntimeError('gate reprojection initialization failed its image fit')
+                self.gravity = np.array(reply['request']['meta']['gravity'])
+                velocity_reference = np.array(candidate['velocity'])
+                self.initial_velocity = velocity_reference+force+self.gravity*duration
+                accelerated = True
         key = np.unique(np.round(np.linspace(0, len(self.initial_frames)-1, 12)).astype(int))
-        positions = np.array([self.initial_frames[i]['tau']*self.initial_velocity for i in key])
+        positions = []
+        for i in key:
+            observation = self.initial_frames[i]
+            position = observation['tau']*velocity_reference
+            if accelerated:
+                dt, _, dp = self.between(self.reference_time,observation['time'])
+                position += dp+.5*self.gravity*dt**2
+            positions.append(position)
+        positions = np.array(positions)
         rotations = np.repeat(np.eye(3)[None], len(key), axis=0)
         candidates = []
         for index in np.flatnonzero(self.tracker.alive):
@@ -129,9 +183,7 @@ class JointEstimator:
         self.initial_depth_prior = self.depth_prior.copy()
         self.depth_sigma = np.array([item[2] for item in selected])
         self.depths = self.depth_prior.copy()
-        self.anchor = np.r_[self.initial_frames[-1]['tau']*self.initial_velocity, self.initial_velocity]
-        duration, force, _ = self.between(self.reference_time, self.last_time)
-        self.gravity = -force/duration
+        self.anchor = np.r_[positions[-1], self.initial_velocity]
         self.window = [dict(id=self.last_id, time=self.last_time, ids=[], pixels=[])]
         self.states = {self.last_id:np.r_[self.anchor, np.zeros(3)]}
         self.solution_time = self.last_time

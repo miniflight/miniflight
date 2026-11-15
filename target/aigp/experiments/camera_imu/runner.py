@@ -112,6 +112,8 @@ def replay(path, poison=False):
     SETTINGS["lookahead_during_final"] = metadata["settings"].get("lookahead_during_final", False)
     SETTINGS["height_alignment"] = metadata["settings"].get("height_alignment", False)
     SETTINGS.update(metadata["settings"])
+    SETTINGS['joint_initialization'] = metadata['settings'].get('joint_initialization','linear')
+    SETTINGS['joint_initialization_shadow'] = metadata['settings'].get('joint_initialization_shadow',False)
     updates = [row for row in map(json.loads, path.open()) if row["event"] == "update"]
     outcomes = [row for row in map(json.loads, path.open()) if row["event"] == "result"]
     decoder = mavlink.MAVLink(None)
@@ -273,7 +275,7 @@ def one(root, shift):
                 raise
             finally:
                 for name in ("protocol.json", "clock.json", "score.json", "replay.json", "camera-errors.csv",
-                             "joint-trajectory.json", "joint-replay.json", "joint-flight.mp4", "joint-preview.png"):
+                             "joint-trajectory.json", "joint-replay.json", "joint-initialization.json", "joint-flight.mp4", "joint-preview.png"):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
@@ -290,13 +292,16 @@ def main():
     parser.add_argument("--shift", type=float, default=-.5)
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
+    parser.add_argument('--joint-init',choices=('linear','reprojection'),default='linear')
+    parser.add_argument('--init-shadow',action='store_true')
     args = parser.parse_args()
     if args.mode == "build":
         print(build())
     elif args.path is None:
         parser.error("live, replay, score and video require a path")
     elif args.mode == 'joint':
-        SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign)
+        SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign,
+            joint_initialization=args.joint_init,joint_initialization_shadow=args.init_shadow)
         if not one(args.path.resolve(), args.shift)['passed_joint_turn']:
             raise SystemExit(1)
     elif args.mode in ("live", "one"):

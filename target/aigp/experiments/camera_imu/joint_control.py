@@ -39,7 +39,8 @@ def slow_reference(start, forward, initial_speed, angle, elapsed):
 class GateController(base.GateController):
     def __init__(self, calls):
         super().__init__()
-        self.joint = JointEstimator(call=calls)
+        self.joint = JointEstimator(call=calls,initialization=base.SETTINGS.get('joint_initialization','linear'),
+            init_shadow=base.SETTINGS.get('joint_initialization_shadow',False),world_gravity=[0.,0.,9.81])
         self.raw_imu = []
         self.active = False
         self.settled = None
@@ -70,14 +71,15 @@ class GateController(base.GateController):
         if self.began is None or self.inertial.time-self.began < 5.5:
             return
         self._imu()
-        gate = None
+        gate, corners = None, None
         if not self.joint.ready and self.last_image_id == frame.id:
             pose = base.vision.best_pose(self.last_corners)
             if pose is not None:
                 gate = pose[2]
+                corners = self.last_corners
                 self.last_joint_gate_time = stamp
         was_empty = self.joint.reference is None
-        self.joint.observe(frame, rotation, gate)
+        self.joint.observe(frame, rotation, gate, corners)
         if was_empty and self.joint.reference is not None:
             self.reference_position = np.array(position)
 
@@ -142,6 +144,7 @@ class GateController(base.GateController):
                 reference_rotation=self.joint.reference.tolist(), reference_position=self.reference_position.tolist(),
                 position_camera=state[:3].tolist(), velocity_camera=state[3:6].tolist(),
                 solutions=self.joint.solutions, depth_revisions=self.joint.depth_revisions,
+                initialization=self.joint.initialization,
                 depth_change=round(self.joint.depth_change, 6), points=int(self.joint.tracker.alive.sum()),
                 solution_time=self.joint.solution_time, age_s=age, solve_ms=self.joint.timings[-1],
                 image_id=self.joint.last_id, measured_points=self.joint.tracker.points[self.joint.tracker.alive].tolist(),
