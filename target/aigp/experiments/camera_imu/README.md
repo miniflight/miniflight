@@ -3,7 +3,9 @@
 Public-sensor course pilot:
 
 ```sh
-python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 \
+  --dynamics-model target/aigp/experiments/camera_imu/dynamics.model.json \
+  --partial-gate --crossing-constraint
 ```
 
 Each course run writes `plots/` and `plots/metrics.json` after scoring and replay.
@@ -13,7 +15,10 @@ Native reference curves are scorer outputs; they never enter navigation.
 wall/thread CPU time, host command intervals and actuation. Raw public sensor
 inputs and measured pixel constraints remain separate from scoring references.
 [pipeline.spec.json](pipeline.spec.json) defines state ownership, limits and the
-remaining estimator/planner gaps.
+remaining estimator/planner gaps. It specifies the next joint fixed-lag filter;
+the current pilot still uses complementary corrections without joint covariance.
+Host receipt-to-send delay, estimated sensor clock age and velocity-fit age are
+separate measurements. Actual exposure-to-actuation delay remains unknown.
 
 ```mermaid
 flowchart LR
@@ -52,23 +57,25 @@ profile. Raw traces are temporary and bounded; the course video and scores remai
 | Gate poses and order | Known-size image geometry and current/next-gate hypotheses |
 | Gate progress | Camera-range crossing estimates propagated with estimated displacement |
 
-Native race, pose, course, actuator and contact data remain in the recorder and
-postflight scorer. The pilot receives heartbeat/ACK transport events and sensors.
-Five unchanged six-gate trials produced three native-valid finishes and two
-contact-free passes: 52.80 s and 47.87 s. One finish included contact; two trials
-stopped after gate three. All five normal and poisoned replays matched exactly.
-Across the two clean runs, local position RMS was 1.10/1.56 m, velocity RMS
-0.34/0.57 m/s and attitude RMS 0.24/0.37 degrees. Timing uses estimated public
-sensor clock alignment. These are direct-arena results, above the ten-second
-target. Protocol, source hashes and failures: [course.validation.json](course.validation.json).
-The earlier `joint` experiments below use instrumented sensor timing.
+The force model now comes from public image geometry, gyro-derived attitude and
+our commands. No native or fused translation labels enter its fit. The 1.64 MB
+input fixture is `test/fixtures/public_dynamics`; `dynamics.py` reproduces its fit
+and `--shared-drag MODEL` writes the selected three-parameter model. Larger thrust
+and speed remain outside its narrow calibration support. New course runs require
+an explicit model.
 
-Upright gate edges now correct gyro tilt. Five flown repetitions passed six gates
-without contact at 46.06–49.90 s; a sixth attempt failed before arming. One 6 m/s
-trial passed in 43.41 s. [gravity.validation.json](gravity.validation.json) retains
-the failures and plots. Runtime navigation excludes native state, but the current
-thrust/drag constants came from earlier native-data fits. Public-sensor dynamics
-identification is the next checkpoint.
+The crossing constraint checks predicted transverse position before blind entry.
+Three frozen trials passed twice, at 51.64/52.61 s with no contact; one stopped at
+gate four after losing usable measurements. The preceding baseline passed once
+in three trials. All six normal and poisoned replays matched. These small cohorts
+have independent timing/noise. All 18 public-model development attempts, failures,
+source hashes and pipeline measurements are in
+[public-dynamics.validation.json](public-dynamics.validation.json).
+[Crossing measurements](crossing.validation.png) show the observed failure.
+
+Earlier [course](course.validation.json) and [gravity](gravity.validation.json)
+results used native-fitted force constants. The `joint` experiments below also
+used instrumented sensor timing. They remain archived comparisons.
 
 Joint position, velocity and depth feedback for one slow 20-degree turn:
 
