@@ -208,11 +208,11 @@
     "globally_calibrated_posterior_coverage": null
   },
   "current_gaps": [
-    "Two development revisions completed one clean six-gate lap each; the send-time-only revision failed after four gates. No unchanged multi-start robustness cohort yet; current position MAE is1.40m.",
-    "The planner still uses mean-state crossing constraints and coarse visibility waypoints.",
+    "The new visibility policy completed 1/2 full-course trials. The latest complete lap has position MAE 2.75 m and P95 7.05 m; global accuracy remains poor.",
+    "Crossings still use a mean-state projection and coarse visibility waypoints. Mapped height changes have a covariance-bounded visual outage interval; close-gate visual failures remain.",
     "Gate binding uses confirmed nearer hypotheses; it does not report calibrated identity probabilities.",
     "True camera exposure and physical IMU integration intervals are unknown. The joint path uses published epochs and body-force observations without exact accelerometer preintegration.",
-    "Force calibration support is narrow; larger speeds and tilt need new validation.",
+    "Mean motor command 0.21-0.335 has a public response fit and one complete independent validation flight. Mixed rotor commands, larger speeds and tilt need more validation; some startup commands exceed this interval.",
     "Own commands now use causal public send epochs and public force detects pad release. Actual actuator application time is unknown; the planner still consumes the latest IMU posterior."
   ],
   "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
@@ -233,7 +233,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Identify thrust rise/fall and response over the command range used in flight, from independent own excitation and public force/gyro. Hold drag/camera calibration fixed; validate on separate public data. Then test the frozen observer on repeated full courses and add continuous gate-crossing references.",
+    "backend": "Keep the validated thrust curve frozen. Diagnose global body/map drift and dynamic public-IMU force residuals by phase, resolve close-gate visual losses, then compare a continuous3D crossing reference with the stop-and-align planner.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -245,12 +245,15 @@
     "planner_condition": "abs(mean crossing offset)+3*sigma_crossing <=0.55m in both transverse axes; calibrate coverage before treating this as a probability. Include position/landmark/velocity cross-covariances."
   },
   "calibration": {
-    "model": "dynamics.model.json",
-    "public_inputs": "test/fixtures/public_dynamics",
+    "model": "thrust-response.model.json",
+    "public_inputs": "test/fixtures/thrust_response",
     "native_fitted_course_default_allowed": false,
     "gate_size": "Nominal1.5m aperture is an explicit scale prior, not a fitted native opening dimension.",
-    "support": "Mean motor command0.2598\u20130.2970; larger thrust/speed/tilt require new public-data identification and validation."
+    "support": "Six command levels 0.21-0.335; independent vertical-response RMS 0.039 m versus 0.100 m for the prior. This is not full navigation accuracy or a measured actuator delay.",
+    "base_model": "dynamics.model.json",
+    "drag_inputs": "test/fixtures/public_dynamics"
   },
   "joint_checkpoint": "gate-filter.validation.json",
-  "course_checkpoint": "gate-filter.course.validation.json"
+  "course_checkpoint": "gate-filter.course.validation.json",
+  "thrust_checkpoint": "thrust-response.validation.json"
 }

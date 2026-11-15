@@ -4,7 +4,7 @@ Public-sensor course pilot:
 
 ```sh
 python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 \
-  --dynamics-model target/aigp/experiments/camera_imu/dynamics.model.json \
+  --dynamics-model target/aigp/experiments/camera_imu/thrust-response.model.json \
   --partial-gate --crossing-constraint
 ```
 
@@ -104,11 +104,25 @@ python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 \
   --partial-gate --crossing-constraint --joint-estimator --moving-start
 ```
 
-The current revision completed one clean lap in 46.41 s. Position/velocity/attitude/
-depth MAE was 1.40 m / 0.34 m/s / 0.53 degrees / 0.40 m, including startup.
-An earlier send-time-only revision failed after four gates. All eight development
-attempts, exact replay checks and limits are in [the course report](gate-filter.course.validation.json)
-and [comparison plots](gate-filter.course.validation.png). This is not an unchanged robustness cohort.
+The wider public thrust fit covers mean commands 0.21–0.335. A separate flight,
+with different pulse order/durations and no refit, reduced short-window vertical
+response RMS from 0.100 m to 0.039 m. The latest lap passed 6/6 in 45.56 s without
+contact or resets. Position/velocity/attitude/depth MAE was 2.75 m / 0.36 m/s /
+0.74 degrees / 0.40 m. Earlier attempts stopped at 3/6 and 2/6; navigation accuracy
+and reliability remain poor. [All outcomes](thrust-response.validation.json),
+[response validation](thrust-response.validation.png), [course plots](thrust-response.overview.png).
+Earlier development runs remain in [the original course report](gate-filter.course.validation.json).
+
+For response collection, use the joint course flags above with `--gates 1 --speed 2
+--shift 0 --thrust-excitation train` or `validate`. Fit before launching validation:
+
+```sh
+python -m target.aigp.experiments.camera_imu.thrust_response TRAIN FIT --prior target/aigp/experiments/camera_imu/dynamics.model.json
+python -m target.aigp.experiments.camera_imu.thrust_response VALID CHECK --prior target/aigp/experiments/camera_imu/dynamics.model.json --frozen FIT/model.json
+```
+
+`test/fixtures/thrust_response/training` reproduces the coefficients without the
+simulator. It contains under 1 MB of public numeric data and corners, with no images.
 
 Replay the recorded braking failure; `reference/` is read only by the scorer:
 
