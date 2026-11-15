@@ -286,7 +286,7 @@ class GateController(BaseController):
         calls=getattr(self,'calls',None)
         if calls is not None and calls.record is not None:
             calls.record(event='visual_measurement',image_id=frame.id,capture_time=stamp,kind=kind,
-                points=np.asarray(points).tolist(),claimed_gate=getattr(self,'gate_number',1),quality=quality)
+                points=np.asarray(points).tolist(),context_gate=getattr(self,'gate_number',1),quality=quality)
 
     @timed('partial_measurement')
     def observe_partial(self,frame,stamp,rotation,position,full_relative=None,full_corners=None):

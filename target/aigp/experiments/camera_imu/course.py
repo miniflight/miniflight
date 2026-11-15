@@ -227,8 +227,9 @@ class Controller(base.single.BaseController):
             self.gate.signal.update(gyro=self.motor.gyro,rate_request=self.motor.rate_request,rate_integral=self.motor.integral)
             self.gate.signal['visual_gravity']=self.gate.gravity_observation
             self.gate.signal['partial_gate']=self.gate.partial_observation
+            stamp=self.gate.measurement_time()
             self.gate.signal.update(full_image_time=self.gate.full_image_time,partial_retargets=self.gate.partial_retargets,
-                aperture_corners_measured=self.gate.last_image_id is not None,measurement_time=self.gate.measurement_time())
+                aperture_corners_measured=self.gate.last_image_id is not None,measurement_time=float(stamp) if np.isfinite(stamp) else None)
             self.gate.signal['association_counts']=dict(self.gate.association_counts)
         return command
 

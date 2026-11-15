@@ -9,6 +9,11 @@ python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5
 Each course run writes `plots/` and `plots/metrics.json` after scoring and replay.
 Rebuild them with `python -m target.aigp.experiments.camera_imu.plots OUTPUT`.
 Native reference curves are scorer outputs; they never enter navigation.
+`pipeline.json` records input cadence, observation quality, state errors, stage
+wall/thread CPU time, host command intervals and actuation. Raw public sensor
+inputs and measured pixel constraints remain separate from scoring references.
+[pipeline.spec.json](pipeline.spec.json) defines state ownership, limits and the
+remaining estimator/planner gaps.
 
 ```mermaid
 flowchart LR

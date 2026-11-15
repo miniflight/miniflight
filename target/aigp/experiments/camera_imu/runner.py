@@ -339,6 +339,8 @@ def public_course(root,shift):
         render(root)
     checked=replay(root/'flight.jsonl')
     (root/'replay.json').write_text(json.dumps(checked,indent=2)+'\n')
+    from .pipeline import analyze
+    analyze(root)
     return result
 
 
@@ -384,6 +386,8 @@ def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_ga
                              'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
+                for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz'):
+                    if (raw/name).exists():shutil.copyfile(raw/name,root/name)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
                 (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")
     finally:
@@ -415,6 +419,9 @@ def main():
         result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
+        if (args.path/'pipeline.json').exists():
+            from .pipeline import render
+            render(args.path.resolve())
         if not result['passed_without_reset']:
             raise SystemExit(1)
     elif args.mode == 'joint':

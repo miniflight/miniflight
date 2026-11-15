@@ -1,0 +1,193 @@
+{
+  "objective": {
+    "minimize": "native finish time",
+    "hard": {
+      "ordered_gates": 6,
+      "inflight_contacts": 0,
+      "inflight_resets": 0,
+      "privileged_navigation_inputs": 0
+    },
+    "time_goal_s": 10.0
+  },
+  "priors": {
+    "camera": {
+      "width_px": 640,
+      "height_px": 360,
+      "fx_px": 320.0,
+      "fy_px": 320.0,
+      "cx_px": 320.0,
+      "cy_px": 180.0,
+      "uptilt_deg": 20.0
+    },
+    "gate": {
+      "nominal_aperture_m": 1.5,
+      "upright": true,
+      "shared_frame_shape_learned_from_images": true
+    },
+    "gravity_m_s2": 9.81,
+    "frame": "Local gravity-aligned frame; origin and initial yaw are chosen, not recovered absolute coordinates."
+  },
+  "interfaces": [
+    {
+      "stage": "input",
+      "receives": [
+        "public JPEG camera stream/header timestamps",
+        "public HIGHRES_IMU sample timestamps, gyro and acceleration",
+        "our sent motor commands"
+      ],
+      "produces": "Raw public-input replay dataset",
+      "owns": "Clock mapping and delivery order",
+      "invariants": [
+        "Preserve header, estimated device and host receipt times separately",
+        "Published time differences are not verified physics integration intervals",
+        "Native pose/course/race/actuator reports do not enter the navigator"
+      ]
+    },
+    {
+      "stage": "perception",
+      "receives": "Image pixels",
+      "produces": "Measured pixel constraints with image ID, timestamp, type and quality",
+      "owns": "Actual observed points only",
+      "invariants": [
+        "Full aperture has four observed corners",
+        "Clipped outer top has two observed corners",
+        "Predicted aperture vertices stay predictions",
+        "Log candidates before association"
+      ]
+    },
+    {
+      "stage": "association",
+      "receives": "Pixel constraints and predicted tracks",
+      "produces": "Landmark-track assignment or unresolved hypothesis",
+      "owns": "Persistent visual identity; mission ordinal is separate",
+      "invariants": [
+        "Full/partial features of the same red component refer to the same object",
+        "Compare depth ordering only for distinct objects",
+        "Require three distinct images for a nearer target change",
+        "Strong tracked pixel correspondence can correct uncertain depth"
+      ]
+    },
+    {
+      "stage": "estimation",
+      "receives": "Assigned raw constraints, public gyro and own command/model history",
+      "produces": "Timestamped joint state and uncertainty",
+      "owns": [
+        "position",
+        "velocity",
+        "attitude",
+        "gyro/model biases",
+        "gate landmark poses and depth",
+        "state and landmark covariance"
+      ],
+      "required_method": "Fixed-lag rewind, measurement update, and repropagation of recorded process and subsequent measurement events",
+      "current_method": "Complementary position/velocity corrections and gyro/visual tilt history; joint covariance and complete dynamics repropagation remain absent"
+    },
+    {
+      "stage": "planning",
+      "receives": "Relative gate posterior, motion state, model uncertainty and feature visibility",
+      "produces": "Time-indexed position, velocity and acceleration reference",
+      "owns": "Flight objective and feasibility constraints",
+      "required_method": "Choose minimum-time feasible short trajectory with crossing margin, actuator and camera-visibility constraints",
+      "current_method": "Position waypoints with coarse visibility alignment and threshold-based braking"
+    },
+    {
+      "stage": "control",
+      "receives": "Reference and estimated state",
+      "produces": "Four own motor commands",
+      "owns": "Position/attitude feedback, public-gyro rate PI, mixer and limits",
+      "invariants": [
+        "Every requested rate and motor value is recorded",
+        "Control timing measurements do not influence decisions"
+      ]
+    },
+    {
+      "stage": "scoring",
+      "receives": "Frozen pilot decisions, public data and privileged native references",
+      "produces": "One pipeline report, plots and acceptance outcome",
+      "owns": "Truth labels and comparison only",
+      "invariants": [
+        "Retain failed and startup attempts",
+        "Use one fixed origin/yaw alignment; no scale fit",
+        "Exact normal and poisoned replay verify runtime independence",
+        "Model-training provenance is audited separately from poisoned replay"
+      ]
+    }
+  ],
+  "measurement_map": {
+    "input": [
+      "sample/frame counts",
+      "published and arrival intervals",
+      "nonincreasing clocks",
+      "camera alignment availability"
+    ],
+    "perception": [
+      "corner/edge residual pixels",
+      "frame size/support",
+      "full/partial counts",
+      "raw candidate observations"
+    ],
+    "association": [
+      "same-component preferences",
+      "nearer proposals and accepted changes",
+      "farther full rejections",
+      "retrospective wrong-gate score"
+    ],
+    "estimation": [
+      "position m, velocity m/s, attitude deg against scorer",
+      "measurement age and correction magnitude",
+      "innovation/covariance coverage when covariance exists"
+    ],
+    "planning": [
+      "time below1m/s",
+      "visibility/usable-measurement gaps",
+      "predicted and actual crossing margins",
+      "phase time and finish time"
+    ],
+    "control": [
+      "host command intervals",
+      "per-stage wall and thread CPU time",
+      "rate tracking error rad/s",
+      "normalized motor range/saturation"
+    ]
+  },
+  "budgets": {
+    "controller_period_ms": 20.0,
+    "host_imu_freshness_limit_ms": 300.0,
+    "full_reprojection_limit_px": 1.0,
+    "partial_edge_fit_limit_px": 0.8,
+    "partial_vertical_ray_minimum": 0.04,
+    "normal_metric_gap_limit_s": 2.0,
+    "alignment_metric_gap_limit_s": 4.5,
+    "nominal_horizontal_acceleration_limit_m_s2": 3.0,
+    "vertical_speed_limit_m_s": 3.0,
+    "tilt_limit_rad": 0.45
+  },
+  "measured_unknowns": {
+    "true_camera_exposure_timestamp": null,
+    "true_native_physics_sample_interval": null,
+    "posterior_state_covariance": null,
+    "vehicle_body_clearance": null
+  },
+  "current_gaps": [
+    "Full joint covariance is missing",
+    "Delayed attitude correction does not fully repropagate p/v dynamics",
+    "Public elapsed sample times are currently exposed through an increment interface whose legacy contract implies measured integration intervals",
+    "The planner does not forecast observation quality or optimize a timed trajectory",
+    "Calibration support is narrow; extrapolation uncertainty is not yet consumed by planning"
+  ],
+  "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
+  "retention": {
+    "raw_trace_cap_mib": 384,
+    "raw_retained": false,
+    "retained": [
+      "public-inputs.npz",
+      "public-observations.jsonl.gz",
+      "control.jsonl.gz",
+      "pipeline.json",
+      "pipeline-timing.csv.gz",
+      "scored error CSVs",
+      "plots",
+      "compact continuous video"
+    ]
+  }
+}

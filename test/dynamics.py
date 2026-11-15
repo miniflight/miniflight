@@ -6,6 +6,22 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_pipeline_reports_wall_cpu_and_host_time_separately(self):
+        from target.aigp.experiments.camera_imu.pipeline import analyze
+        rows=[dict(event='call',name='arm',host_time=1000.,arguments=dict(armed=True)),
+              dict(event='call',name='send',host_time=1000.5,arguments=dict(kind='MotorControls',outputs=[.25]*4)),
+              dict(event='profile',scope='controller',host_time=1001.,stages=dict(controller_total=dict(wall_ns=3000000,thread_cpu_ns=2000000,calls=1)))]
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'flight.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            (root/'score.json').write_text(json.dumps(dict(passed_without_reset=False)))
+            (root/'protocol.json').write_text(json.dumps(dict(revision='test',settings={})))
+            report=analyze(root);stage=report['timing']['inclusive_stages']['controller_total']
+            self.assertEqual(stage['wall_ms']['median'],3.)
+            self.assertEqual(stage['thread_cpu_ms']['median'],2.)
+            self.assertIsNone(report['input_contract']['true_camera_exposure_time_ns'])
+            self.assertIsNone(report['control']['host_command_interval_ms']['median'])
+            self.assertTrue((root/'public-inputs.npz').exists())
+
     def test_pipeline_input_export_drops_native_and_fused_fields(self):
         from target.aigp.experiments.camera_imu.pipeline import collect
         rows=[dict(event='public_imu',samples=[dict(time=1.,received_at=1001.,acceleration=[0.,0.,-9.81],gyro=[.1,.2,.3],native_position=[99]*3)]),
