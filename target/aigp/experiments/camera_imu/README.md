@@ -6,6 +6,10 @@ Public-sensor course pilot:
 python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5
 ```
 
+Each course run writes `plots/` and `plots/metrics.json` after scoring and replay.
+Rebuild them with `python -m target.aigp.experiments.camera_imu.plots OUTPUT`.
+Native reference curves are scorer outputs; they never enter navigation.
+
 ```mermaid
 flowchart LR
   C[Public camera pixels] --> G[Gate corners and metric pose]

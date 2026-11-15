@@ -402,7 +402,10 @@ def main():
         parser.error("live, replay, score and video require a path")
     elif args.mode=='course':
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
-        if not one(args.path.resolve(),args.shift,args.gates,args.speed)['passed_without_reset']:
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed)
+        from .plots import plot
+        plot(args.path.resolve())
+        if not result['passed_without_reset']:
             raise SystemExit(1)
     elif args.mode == 'joint':
         SETTINGS.update(joint_control=True, joint_turn_sign=args.turn_sign,
