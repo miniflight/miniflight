@@ -7,6 +7,7 @@ from miniflight.control import BodyRates
 from miniflight.gate_filter import GateFilter,GateHistory
 from miniflight.profiling import timed
 from . import course,sensors,vision
+from .gate_filter_events import state as estimator_state
 
 
 def outage_budget(relative,covariance,direction,aligning,maximum=4.5):
@@ -21,8 +22,15 @@ def outage_budget(relative,covariance,direction,aligning,maximum=4.5):
 
 
 class Inertial(sensors.Inertial):
-    def __init__(self,config):
-        super().__init__();self.config=config;self.history=None;self.serial=0
+    def __init__(self,config,record=None):
+        super().__init__();self.config=config;self.history=None;self.serial=0;self.record=record;self.input_count=0
+
+    def event(self,kind,**values):
+        self.input_count+=1
+        if self.record is not None:self.record(event='estimator_input',sequence=self.input_count,kind=kind,**values)
+
+    def command(self,stamp,motors):
+        self.event('command',time=float(stamp),motors=list(motors));self.history.command(stamp,motors)
 
     @timed('prediction')
     def update(self,samples):
@@ -36,7 +44,11 @@ class Inertial(sensors.Inertial):
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
                 f.attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False)
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
+                self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
+                    thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
+                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,history_s=2.))
             elif sample.time>self.time:
+                self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)
                 self.positions.append(np.zeros(3));self.velocities.append(np.zeros(3));self.rotations.append(np.eye(3))
             self.gyro=sample.gyro;self.sync()
@@ -66,6 +78,7 @@ class Inertial(sensors.Inertial):
             seed=(pose[2],(pose[1][1]-pose[1][0])/1.5)
         points=None if rim else .75*np.array([[0,-1,-1],[0,1,-1],[0,1,1],[0,-1,1]])
         identity=self.serial
+        self.event('pixels',time=float(stamp),gate=int(key),image_id=int(image_id),pixels=np.asarray(pixels).tolist(),template=template)
         self.history.observe(dict(id=identity,image_id=image_id,time=stamp,key=key,pixels=np.asarray(pixels),points=points,seed=seed,
             rim=rim,rim_prior=None if template is None else (template['width_m'],template['center_to_top_m'],template['fractional_spread'])))
         self.serial+=1;self.sync()
@@ -78,7 +91,7 @@ class Inertial(sensors.Inertial):
 
 class GateController(course.GateController):
     def __init__(self,calls):
-        super().__init__(calls);self.inertial=Inertial(self.config);self.inertial.timing=self.timing
+        super().__init__(calls);self.inertial=Inertial(self.config,getattr(calls,'record',None));self.inertial.timing=self.timing
         self.brake_state='waiting';self.brake_steady=None;self.used_joint=set();self.launch_cleared=False
 
     @property
@@ -191,8 +204,10 @@ class Controller(course.Controller):
             self.gate.signal['joint_posterior']=posterior
             self.gate.signal['brake_test_state']=self.gate.brake_state
             if sensors.SETTINGS.get('command_epoch')!='public_send':
-                h.command(h.time,command.outputs);self.gate.inertial.sync()
+                self.gate.inertial.command(h.time,command.outputs);self.gate.inertial.sync()
+            if self.gate.inertial.record is not None:
+                self.gate.inertial.record(event='estimator_state',sequence=self.gate.inertial.input_count,state=estimator_state(h))
         return command
 
     def sent(self,command,stamp):
-        self.gate.inertial.history.command(stamp,command.outputs)
+        self.gate.inertial.command(stamp,command.outputs)

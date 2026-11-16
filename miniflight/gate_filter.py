@@ -30,6 +30,7 @@ class GateFilter:
         self.bg=np.array(gyro_bias);self.ba=np.zeros(3);self.gates={};self.rim=None;self.size=1.5
         self.proposals={};self.retargets=0;self.last_visual={};self.last_full_visual={}
         self.last_force_time=-np.inf;self.force_accepted=0;self.force_rejected=0
+        self.last_force_result=None
         self.P=np.diag(np.r_[np.full(3,1e-8),np.full(3,.05**2),np.r_[np.full(2,np.radians(.5)**2),1e-8],
             np.full(3,.001**2),np.full(3,.5**2),.03**2])
         self.thrust_curve=np.array(thrust_curve);self.drag=np.asarray(drag)
@@ -145,6 +146,7 @@ class GateFilter:
         V=np.eye(len(residual))*sigma_px**2 if noise is None else np.asarray(noise)
         result=self.correct(residual,H,V,18.467 if len(residual)==4 else 26.125)
         result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
+        result['gate_index']=self.gates[key][0]
         return result
 
     def correct(self,residual,H,V,threshold):
@@ -174,6 +176,7 @@ class GateFilter:
     def observe_acceleration(self,measurement,motors,sigma):
         expected,H=self.acceleration_measurement(motors)
         result=self.correct(np.asarray(measurement)-expected,H,np.eye(3)*sigma**2,16.266)
+        self.last_force_result=result
         if result['accepted']:self.force_accepted+=1
         else:self.force_rejected+=1
         return result

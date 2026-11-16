@@ -37,6 +37,8 @@ def collect(path):
 
 
 def analyze(root):
+    from .gate_filter_events import export
+    export(root/'flight.jsonl',root)
     arrays,events=collect(root/'flight.jsonl')
     np.savez_compressed(root/'public-inputs.npz',**arrays)
     with gzip.open(root/'public-observations.jsonl.gz','wt') as stream:
