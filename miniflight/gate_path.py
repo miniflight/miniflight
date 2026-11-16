@@ -59,7 +59,7 @@ class SpeedReference:
         steps=max(1,int(np.ceil(dt/.02)));step=dt/steps
         for _ in range(steps):
             error=target-self.speed
-            wanted=np.sign(error)*min(self.maximum_acceleration,np.sqrt(2*self.maximum_jerk*abs(error)))
-            change=float(np.clip(wanted-self.acceleration,-self.maximum_jerk*step,self.maximum_jerk*step))
-            self.speed+=self.acceleration*step+.5*change*step;self.acceleration+=change
+            jerk=float(np.clip(4.*error-4.*self.acceleration,-self.maximum_jerk,self.maximum_jerk))
+            new=float(np.clip(self.acceleration+jerk*step,-self.maximum_acceleration,self.maximum_acceleration))
+            self.speed+=.5*(self.acceleration+new)*step;self.acceleration=new
         return self.speed,self.acceleration

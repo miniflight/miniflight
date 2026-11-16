@@ -28,6 +28,7 @@ class GatePathTest(unittest.TestCase):
         for target in [5.]*250+[8.]*250+[3.]*250:
             speed,a=r.update(target,.02);self.assertLessEqual(abs(a),3.+1e-10);self.assertLessEqual(abs(a-last_a)/.02,6.+1e-8);last_a=a
         self.assertLess(abs(speed-3.),.03)
+        self.assertLess(abs(a),.01)
 
     def test_reference_acceleration_matches_the_spatial_derivative(self):
         c=GateCurve([-30.,0.,-10.],[1.,0.,0.],unit([1.,0.,.2]));u=.4;_,t,k,s=c.geometry(u);speed=5.;dt=1e-5
