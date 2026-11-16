@@ -39,3 +39,9 @@ class ContinuousControlTest(unittest.TestCase):
             self.assertGreaterEqual(request.thrust,.21);self.assertLessEqual(request.thrust,.325)
         self.assertGreater(c.signal['reference']['velocity'][0],0.)
         self.assertFalse(c.signal['crossing_alignment']);self.assertFalse(c.signal['visibility_alignment'])
+
+    def test_hover_balances_the_estimated_force_error(self):
+        c,f=self.controller();f.ba[2]=.5;c.inertial.sync()
+        request=c.drive(None);a,b=f.thrust_curve
+        upward=a*request.thrust+b*request.thrust**2
+        self.assertAlmostEqual(9.81-upward+f.ba[2],0.,places=10)

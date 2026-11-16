@@ -68,7 +68,7 @@ class GateController(joint.GateController):
             kp=self.config.position_gain*self.config.velocity_gain,ki=0.,kd=self.config.velocity_gain,integral_limit=0.)
         acceleration=np.array(acceleration);acceleration[:2]*=min(1.,4.5/max(np.linalg.norm(acceleration[:2]),1e-9));acceleration[2]=np.clip(acceleration[2],-3.,3.)
         R=self.inertial.rotation.as_rotation_matrix();drag=R @ quadratic_resistance(R.T @ self.inertial.velocity,self.config.body_resistance_per_m)
-        compensation=acceleration+drag;compensation[2]=np.clip(compensation[2],-5.,5.)
+        compensation=acceleration+drag-self.inertial.prediction_bias;compensation[2]=np.clip(compensation[2],-5.,5.)
         a,b=self.config.thrust_curve;maximum=a*.325+b*.325**2;up=min(maximum,9.81-compensation[2]);compensation[2]=9.81-up
         horizontal=np.sqrt(max(0.,maximum*maximum-up*up));compensation[:2]*=min(1.,horizontal/max(np.linalg.norm(compensation[:2]),1e-9))
         request=acceleration_control(self.tracking_config,compensation,self.inertial.rotation.to_euler(),0.)
