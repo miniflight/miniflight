@@ -56,11 +56,12 @@ class Inertial(sensors.Inertial):
                 f.broad_rim=sensors.SETTINGS.get('joint_rim',False)
                 f.partial_gate_births=not sensors.SETTINGS.get('joint_rim',False)
                 f.image_time_sigma=.01 if sensors.SETTINGS.get('image_time_uncertainty',False) else 0.
+                f.upright_attitude=sensors.SETTINGS.get('upright_attitude',False)
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
                 self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
                     thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
                     intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,
-                    image_time_sigma_s=f.image_time_sigma,history_s=2.))
+                    image_time_sigma_s=f.image_time_sigma,upright_attitude=f.upright_attitude,history_s=2.))
             elif sample.time>self.time:
                 self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)
@@ -236,6 +237,7 @@ class Controller(course.Controller):
             posterior=dict(position_covariance=f.P[:3,:3].tolist(),velocity_covariance=f.P[3:6,3:6].tolist(),attitude_covariance=f.P[6:9,6:9].tolist(),
                 gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets,airborne=f.airborne,
                 rim_dimensions=None if f.rim is None else f.rim[1].tolist())
+            if f.upright_attitude:posterior['gravity_image_time']=float(f.last_gravity_time) if np.isfinite(f.last_gravity_time) else None
             if self.gate.gate_number in f.gates:
                 relative,cov,camera,camcov=f.relative(self.gate.gate_number)
                 posterior.update(relative_gate=relative.tolist(),relative_covariance=cov.tolist(),camera_gate=camera.tolist(),camera_covariance=camcov.tolist())

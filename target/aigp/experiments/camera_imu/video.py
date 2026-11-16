@@ -137,9 +137,12 @@ def render(root):
                     mode,color='partial rim + gyro',(245,115,245)
                     detail='two measured top corners; frame size learned from complete views'
                 elif (gate,frame.id) in detected:
-                    draw_measured(image,np.array(detected[(gate,frame.id)]['signals']['image_corners']),(70,100,255))
+                    observed=detected[(gate,frame.id)]['signals'];draw_measured(image,np.array(observed['image_corners']),(70,100,255))
                     mode,color='filter rejected',(70,100,255)
                     detail='measured aperture corners; not admitted to the estimate'
+                    used=observed.get('joint_posterior',{}).get('gravity_image_time')
+                    if used is not None and abs(used-observed['image_time'])<1e-6:
+                        mode,color='upright edges',BLUE;detail='gravity correction; metric gate update rejected'
                 elif "gate_corners" in state:
                     p = np.array([np.interp(t, times, axis) for axis in positions.T])
                     xyz = (np.array(state["gate_corners"])-p) @ rotation(t).as_matrix()

@@ -3,6 +3,8 @@ from copy import deepcopy
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+NIS={1:10.828,2:13.816,3:16.266,4:18.467,5:20.515,6:22.458,7:24.322,8:26.125}
+
 
 def skew(x):
     a,b,c=x
@@ -43,6 +45,7 @@ class GateFilter:
         self.partial_gate_births=True
         self.image_time_sigma=0.;self.image_time_index=None;self.image_time_offset=0.
         self.angular_velocity=np.zeros(3)
+        self.upright_attitude=False;self.last_gravity_time=-np.inf;self.gravity_accepted=0
 
     def copy(self):return deepcopy(self)
 
@@ -167,11 +170,22 @@ class GateFilter:
         return pixels,H
 
     def observe(self,key,points,pixels,sigma_px=1.,noise=None,rim=False):
+        gravity=None;split=None
+        V=np.eye(np.asarray(pixels).size)*sigma_px**2 if noise is None else np.asarray(noise)
+        if self.upright_attitude and not rim:
+            from miniflight.upright import split_upright
+            split=split_upright(pixels,self.R,self.C,self.K,V,self.angular_velocity,self.image_time_offset)
+            H=np.zeros((len(split['residual']),len(self.P)));H[:,6:9]=split['attitude']
+            if self.image_time_index is not None:H[:,self.image_time_index]=split['time']
+            gravity=self.correct(split['residual'],H,np.eye(len(H)),NIS[len(H)],gravity=True)
+            if gravity['accepted']:self.gravity_accepted+=1
         prediction=self.measurement(key,points,rim)
-        if prediction is None:return dict(accepted=False,reason='behind_camera')
+        if prediction is None:return dict(accepted=False,reason='behind_camera',**({} if gravity is None else dict(gravity=gravity)))
         expected,H=prediction;residual=(np.asarray(pixels)-expected).ravel()
-        V=np.eye(len(residual))*sigma_px**2 if noise is None else np.asarray(noise)
-        result=self.correct(residual,H,V,18.467 if len(residual)==4 else 26.125)
+        if split is not None:
+            Q=split['remaining'];result=self.correct(Q @ residual,Q @ H,np.eye(len(Q)),NIS[len(Q)])
+            result['gravity']=gravity
+        else:result=self.correct(residual,H,V,NIS[len(residual)])
         result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
         result['gate_index']=self.gates[key][0]
         result['rim_index']=None if self.rim is None else self.rim[0]
@@ -179,13 +193,15 @@ class GateFilter:
             result.update(image_time_offset_s=float(self.image_time_offset),image_time_sigma_s=float(self.image_time_sigma))
         return result
 
-    def correct(self,residual,H,V,threshold):
+    def correct(self,residual,H,V,threshold,*,gravity=False):
         S=H @ self.P @ H.T+V
         solved=np.linalg.solve(S,residual);nis=float(residual @ solved)
         result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
         if not result['accepted']:return result
         K=np.linalg.solve(S,H @ self.P).T
-        if not self.attitude_corrections:K[6:9]=0.
+        if not self.attitude_corrections:
+            down=self.R.T @ [0.,0.,1.]
+            K[6:9]=(np.eye(3)-np.outer(down,down)) @ K[6:9] if gravity else 0.
         # Weak planar views cannot separate real yaw from gyro bias. Keep the calibration prior.
         K[9:12]=0.
         # Known nominal size is a consider parameter: carry its correlations, never fit its mean.
@@ -270,6 +286,7 @@ class GateHistory:
         if result['accepted']:
             self.filter.last_visual[row['key']]=stamp
             if not row.get('rim'):self.filter.last_full_visual[row['key']]=stamp
+        if result.get('gravity',{}).get('accepted'):self.filter.last_gravity_time=stamp
         self.results[row['id']]=result
 
     def _replay(self,changed):

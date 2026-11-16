@@ -9,11 +9,11 @@ from target.aigp.experiments.camera_imu.gate_filter_events import export,replay,
 
 
 class EstimatorEventTest(unittest.TestCase):
-    def trace(self,root,image_time=False):
+    def trace(self,root,image_time=False,upright=False):
         rows=[]
         def record(**row):rows.append(dict(host_time=0.,**row))
         c=gate_filter_live.Inertial(PositionConfig(.27,60.,thrust_curve=(9.81/.27,0.),body_resistance_per_m=(.047,)*3),record)
-        with patch.dict(sensors.SETTINGS,gyro_attitude=True,ground_support=False,image_time_uncertainty=image_time):
+        with patch.dict(sensors.SETTINGS,gyro_attitude=True,ground_support=False,image_time_uncertainty=image_time,upright_attitude=upright):
             c.update([ImuIncrement(float(t),.01,(0.,0.,-9.81),(0.,0.,0.)) for t in np.arange(0.,.511,.01)])
         c.command(.52,[.27]*4);c.update([ImuIncrement(.55,.04,(0.,0.,-9.81),(0.,.6 if image_time else 0.,0.))])
         points=.75*np.array([[0,-1,-1],[0,1,-1],[0,1,1],[0,-1,1]])+[10.,0.,0.]
@@ -40,6 +40,11 @@ class EstimatorEventTest(unittest.TestCase):
     def test_uncertain_image_epoch_replays_after_delayed_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);self.trace(root,image_time=True);result=replay(root,root/'replayed')
+            self.assertEqual(result['matched_live_states'],1);self.assertTrue(result['exact_mean_and_covariance'])
+
+    def test_upright_rows_replay_every_mean_and_covariance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);self.trace(root,image_time=True,upright=True);result=replay(root,root/'replayed')
             self.assertEqual(result['matched_live_states'],1);self.assertTrue(result['exact_mean_and_covariance'])
 
     def test_native_fields_are_rejected_at_the_input_boundary(self):

@@ -141,6 +141,11 @@ an uncertainty hypothesis based on the public frame cadence, not a measured dela
 or a timestamp shift. It remains optional: development replay improved the fast
 first-gate velocity estimate but worsened full-flight world-position error.
 
+`--upright-attitude` uses measured vertical gate edges to correct tilt while
+holding the other attitude corrections. Their noise directions are removed from
+the remaining pixel update, so the four corners contribute information once.
+It requires `--gyro-attitude`; gate location and nominal size are not tilt labels.
+
 For response collection, use the joint course flags above with `--gates 1 --speed 2
 --shift 0 --thrust-excitation train` or `validate`. Fit before launching validation:
 
