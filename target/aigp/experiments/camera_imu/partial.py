@@ -59,6 +59,19 @@ def measure_rim(top,pose):
     return np.array([np.linalg.norm(points[1]-points[0]),np.mean((points-translation) @ up)])
 
 
+def rim_from_opening(top,corners,maximum_rms_px=3.):
+    """Check a symmetric coplanar frame in pixels, independently of PnP attitude."""
+    square=np.float32([[-.75,-.75],[.75,-.75],[.75,.75],[-.75,.75]])
+    homography=cv2.getPerspectiveTransform(np.float32(corners),square)
+    measured=cv2.perspectiveTransform(np.float64(top)[None],homography)[0]
+    width=measured[1,0]-measured[0,0];height=-np.mean(measured[:,1])
+    if not (1.5<width<6. and .75<height<4.5):return None
+    ideal=np.float64([[-width/2,-height],[width/2,-height]])
+    predicted=cv2.perspectiveTransform(ideal[None],np.linalg.inv(homography))[0]
+    if np.sqrt(np.mean((predicted-top)**2))>maximum_rms_px:return None
+    return np.array([width,height])
+
+
 class RimTemplate:
     def __init__(self):
         self.samples=[];self.frames=set();self.frozen=None

@@ -28,6 +28,21 @@ class JointGateTest(unittest.TestCase):
         measured=full_rim_observation(image,aperture,best_pose(aperture));self.assertIsNotNone(measured)
         np.testing.assert_allclose(measured[0],outer[:2],atol=1.3)
         np.testing.assert_allclose([measured[1]['width_m'],measured[1]['center_to_top_m']],[2.8,1.35],atol=.08)
+        from unittest.mock import patch
+        bad=measured[0].copy();bad[0,0]-=35.
+        with patch('target.aigp.experiments.camera_imu.gate_filter_live.outer_top',return_value=(bad,.1)),patch('target.aigp.experiments.camera_imu.gate_filter_live.same_red_component',return_value=True):
+            self.assertIsNone(full_rim_observation(image,aperture,best_pose(aperture)))
+
+    def test_partial_pixels_cannot_replace_a_metric_landmark_in_joint_rim_mode(self):
+        from unittest.mock import patch
+        f=filter();f.v[:]=0.;f.partial_gate_births=False;f.add_rim(2.8,1.35,.1)
+        aperture=f.measurement(1,POINTS)[0]
+        for _ in range(8):f.observe(1,POINTS,aperture)
+        near=f.copy();i,g,yaw=near.gates[1];near.gates[1]=(i,near.p+.4*(g-near.p),yaw)
+        pixels=near.measurement(1,None,rim=True)[0];h=GateHistory(f,0.,[0.,0.,0.]);h.imu(.1,[0.,0.,0.])
+        with patch.object(GateFilter,'consider_nearer',side_effect=AssertionError('partial rebound')):
+            for k in range(3):h.observe(dict(id=k,image_id=k,time=.02+.02*k,key=1,pixels=pixels,points=None,seed=None,rim=True,rim_prior=(2.8,1.35,.1)))
+        self.assertEqual(h.filter.retargets,0);self.assertTrue(all(k>0 for k in h.filter.gates))
 
     def test_joint_aperture_and_rim_measurements_learn_shape_from_broad_seeds(self):
         for scale in [.7,1.3]:

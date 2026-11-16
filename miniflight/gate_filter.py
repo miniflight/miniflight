@@ -40,6 +40,7 @@ class GateFilter:
         self.airborne=not supported
         self.attitude_corrections=True
         self.broad_rim=False
+        self.partial_gate_births=True
 
     def copy(self):return deepcopy(self)
 
@@ -250,13 +251,15 @@ class GateHistory:
                         # Two observed top corners plus upright geometry can seed a nearer hypothesis.
                         pixels=np.c_[row['pixels'],np.ones(2)];rays=pixels @ np.linalg.inv(self.filter.K).T @ self.filter.C @ self.filter.R.T
                         z=rays[:,2];width,height=self.filter.rim[1];edge=z[0]*rays[1]-z[1]*rays[0]
-                        if np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
+                        if self.filter.partial_gate_births and np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
                             top=rays*(width/np.linalg.norm(edge)*abs(z[::-1]))[:,None]
                             center=top.mean(axis=0)+[0.,0.,height];right=(top[1]-top[0])/width
                             camera=self.filter.C @ self.filter.R.T
                             seed=(camera @ center*(1.5/self.filter.size),camera @ right)
                     if row['key'] not in self.filter.gates:
-                        if seed is None:continue
+                        if seed is None:
+                            self.results[row['id']]=dict(accepted=False,reason='missing_full_landmark')
+                            continue
                         self.filter.add_gate(row['key'],*seed)
                     result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
                     if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
