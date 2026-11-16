@@ -37,6 +37,7 @@ class GateFilter:
         self.acceleration_noise=.5;self.gyro_noise=.001
         self.gyro_bias_walk=.0001;self.force_bias_walk=.05
         self.airborne=not supported
+        self.attitude_corrections=True
 
     def copy(self):return deepcopy(self)
 
@@ -152,6 +153,7 @@ class GateFilter:
         result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
         if not result['accepted']:return result
         K=np.linalg.solve(S,H @ self.P).T
+        if not self.attitude_corrections:K[6:9]=0.
         # Weak planar views cannot separate real yaw from gyro bias. Keep the calibration prior.
         K[9:12]=0.
         # Known nominal size is a consider parameter: carry its correlations, never fit its mean.
@@ -160,6 +162,7 @@ class GateFilter:
         covariance=A @ self.P @ A.T+K @ V @ K.T
         self.inject(dx);reset=np.eye(len(self.P));reset[6:9,6:9]-=.5*skew(dx[6:9])
         self.P=reset @ covariance @ reset.T;self.P=.5*(self.P+self.P.T)
+        result['delta_state']=dx.tolist()
         return result
 
     def acceleration_measurement(self,motors):

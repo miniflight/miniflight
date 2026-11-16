@@ -34,6 +34,7 @@ class Inertial(sensors.Inertial):
                     self.config.thrust_curve,self.config.body_resistance_per_m,vision.CAMERA_FROM_BODY,vision.K,
                     supported=sensors.SETTINGS.get('ground_support',False))
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
+                f.attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False)
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
             elif sample.time>self.time:
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)

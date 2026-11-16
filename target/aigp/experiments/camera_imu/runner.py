@@ -140,6 +140,7 @@ def replay(path, poison=False):
     SETTINGS['continuous_course'] = metadata['settings'].get('continuous_course',False)
     SETTINGS['command_epoch'] = metadata['settings'].get('command_epoch','imu')
     SETTINGS['ground_support'] = metadata['settings'].get('ground_support',False)
+    SETTINGS['gyro_attitude'] = metadata['settings'].get('gyro_attitude',False)
     SETTINGS['position_config']=metadata['settings'].get('position_config')
     SETTINGS['visual_initialization']=metadata['settings'].get('visual_initialization',False)
     SETTINGS['partial_gate']=metadata['settings'].get('partial_gate',False)
@@ -349,13 +350,13 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
     root.mkdir(parents=True)
     original = dict(SETTINGS)
-    SETTINGS.update(thrust_excitation=excitation,render_video=excitation is None)
+    SETTINGS.update(thrust_excitation=excitation,render_video=excitation is None,gyro_attitude=gyro_attitude)
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
                     beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
@@ -414,6 +415,7 @@ def main():
     parser.add_argument('--crossing-constraint',action='store_true')
     parser.add_argument('--joint-estimator',action='store_true');parser.add_argument('--brake-test',action='store_true')
     parser.add_argument('--moving-start',action='store_true')
+    parser.add_argument('--gyro-attitude',action='store_true')
     parser.add_argument('--thrust-excitation',choices=('train','validate'))
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
@@ -434,7 +436,7 @@ def main():
         if not 0<args.speed<=8.:parser.error('course speed must be in (0,8]m/s')
         if args.brake_test and (not args.joint_estimator or args.gates!=1):parser.error('brake test requires --joint-estimator --gates 1')
         if args.thrust_excitation and (not args.joint_estimator or args.gates!=1):parser.error('thrust excitation requires --joint-estimator --gates 1')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation)
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():

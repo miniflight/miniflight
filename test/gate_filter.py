@@ -16,6 +16,15 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_consider_attitude_keeps_its_mean_and_measurement_uncertainty(self):
+        f=filter();f.attitude_corrections=False;R=f.R.copy();P=f.P[6:9,6:9].copy()
+        pixels=f.measurement(1,POINTS)[0]
+        for _ in range(4):
+            f.observe(1,POINTS,pixels+[.4,-.3]);expected,_=f.acceleration_measurement([.28]*4)
+            f.observe_acceleration(expected+[.2,-.1,.1],[.28]*4,.5)
+        np.testing.assert_array_equal(f.R,R);np.testing.assert_allclose(f.P[6:9,6:9],P,atol=1e-15)
+        self.assertGreater(np.linalg.norm(f.P[:6,6:9]),0.)
+
     def test_extended_visual_budget_requires_a_far_known_precise_height_maneuver(self):
         from target.aigp.experiments.camera_imu.gate_filter_live import outage_budget
         r=np.array([30.,1.,10.]);d=np.array([1.,0.,0.]);P=np.eye(3)*.1**2
