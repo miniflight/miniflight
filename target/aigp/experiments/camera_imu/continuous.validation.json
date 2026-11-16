@@ -1,0 +1,2489 @@
+{
+  "date": "2026-11-16",
+  "native_binary_sha256": "d5bec020a98a0def0bf5b124b57d38189e78fbb173a5ec81697aad25c0efbec9",
+  "dynamics_sha256": "65a824eaa20ae011dd53cc3ea54cf09554b94bb83d970738abdf6f1b0b2618d7",
+  "attempts": [
+    {
+      "name": "gyro-01",
+      "revision": "7d2bca22241e38427a6261a9654b27fd6cfec1f1",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": false,
+        "direct_launch": false,
+        "continuous_path": false
+      },
+      "native_gates": 3,
+      "native_finish_s": null,
+      "contacts": 0,
+      "clean": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "scored_samples": 1864,
+      "errors": {
+        "position": {
+          "count": 1864,
+          "mae": 1.5239944361729514,
+          "rms": 1.8645243846432962,
+          "median": 1.2424611851924277,
+          "p95": 3.361821941492686,
+          "maximum": 4.87122060946302
+        },
+        "velocity": {
+          "count": 1864,
+          "mae": 0.3984190009547084,
+          "rms": 0.5025076913009126,
+          "median": 0.3056218481132226,
+          "p95": 0.8975988751287755,
+          "maximum": 1.5962290315659589
+        },
+        "attitude": {
+          "count": 1864,
+          "mae": 0.4347105474519508,
+          "rms": 0.4775052710072296,
+          "median": 0.4928254380500686,
+          "p95": 0.7209044402796185,
+          "maximum": 1.2953485270601854
+        },
+        "depth": {
+          "count": 1864,
+          "mae": 0.5455981065026926,
+          "rms": 0.8324036581263398,
+          "median": 0.18244838971372213,
+          "p95": 2.2797685447120086,
+          "maximum": 3.1195330828623646
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 18.878057562362947,
+          "first_lock_time_s": 13.268004,
+          "first_lock_image_id": 381,
+          "crossing_position_ned_m": [
+            -23.29796775564163,
+            -0.4717192532541776,
+            -1.319055943709898
+          ],
+          "crossing_offset_width_down_m": [
+            -0.07181706708735378,
+            -0.21886680371475892
+          ],
+          "last_image_id": 531,
+          "last_image_time_s": 18.242999326,
+          "blind_time_to_crossing_s": 0.6350582363629478,
+          "final_phase_to_crossing_s": 0.47910656236294713,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.049008638973418665,
+            -0.15286657575775245,
+            -9.633012459316797e-05
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 28.81712622679057,
+          "first_lock_time_s": 19.351924,
+          "first_lock_image_id": 564,
+          "crossing_position_ned_m": [
+            -46.893749095598444,
+            -2.3003980945536537,
+            3.9684163640708348
+          ],
+          "crossing_offset_width_down_m": [
+            0.1995919956542331,
+            -0.031394336938453234
+          ],
+          "last_image_id": 833,
+          "last_image_time_s": 28.310051917000003,
+          "blind_time_to_crossing_s": 0.5070743097905677,
+          "final_phase_to_crossing_s": 0.47352622679057177,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.01504260566017044,
+            -0.011703318595179348,
+            -0.1382030107068836
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 38.550591029182755,
+          "first_lock_time_s": 29.045489,
+          "first_lock_image_id": 837,
+          "crossing_position_ned_m": [
+            -74.59374986190683,
+            1.200127878281694,
+            12.540165366033033
+          ],
+          "crossing_offset_width_down_m": [
+            0.00011803655637339894,
+            -0.0596447383494816
+          ],
+          "last_image_id": 1126,
+          "last_image_time_s": 38.076684696,
+          "blind_time_to_crossing_s": 0.47390633318275377,
+          "final_phase_to_crossing_s": 0.4736670291827565,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.042705920390401046,
+            -0.015385408262305141,
+            -0.0985379285787299
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 38.794722,
+          "first_lock_image_id": 1091
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "notes": "Gyro attitude held; old tightly initialized rim; gate4 visual timeout.",
+      "hashes": {
+        "protocol.json": "788c73d8187cdf445d959f6103f3dd219117eb4c5fe6c0654f3c4d43cb1bcbe9",
+        "score.json": "d6e4e356062b7d08f4075b7614c207554dfa491317ed3d872f20af25066c6aab",
+        "joint-score.json": "772fb7eaf76af8bb73828cfac67db6e601a64951de20f81bcf57f687be3ae82f",
+        "input-independence.json": "eb475faa3efc6d0905fb53b494f3e76312c12bfed5e402933698d0e14d8b9fd8",
+        "estimator-inputs.jsonl.gz": "bc6956dd8fc53a85866ca965feead9544e2221fb0f74c1f5e4aa55c7aa787cef"
+      },
+      "estimator_replay": {
+        "inputs": 6084,
+        "outputs": 1864,
+        "matched_live_states": 1864,
+        "exact_mean_and_covariance": true,
+        "gyro_attitude_override": null,
+        "native_inputs": 0,
+        "late_pixels": 0
+      }
+    },
+    {
+      "name": "rim-01",
+      "revision": "8f397d95916dae4496931b2d246276de6df7c289",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": false,
+        "continuous_path": false
+      },
+      "native_gates": 0,
+      "native_finish_s": null,
+      "contacts": 0,
+      "clean": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "IMU shift and settle exceeded ten seconds"
+      },
+      "scored_samples": 428,
+      "errors": {
+        "position": {
+          "count": 428,
+          "mae": 0.41009107902689584,
+          "rms": 0.4384914677884116,
+          "median": 0.4301725145379285,
+          "p95": 0.6123876152515875,
+          "maximum": 0.7654261557506813
+        },
+        "velocity": {
+          "count": 428,
+          "mae": 0.4461660512857455,
+          "rms": 0.5001659090483983,
+          "median": 0.40563859348519027,
+          "p95": 0.9042342920379993,
+          "maximum": 1.401170424255735
+        },
+        "attitude": {
+          "count": 428,
+          "mae": 0.24856303743193464,
+          "rms": 0.27680115364186186,
+          "median": 0.2570653363581047,
+          "p95": 0.4165988041506681,
+          "maximum": 0.8101121838835335
+        },
+        "depth": {
+          "count": 428,
+          "mae": 0.2988933040165493,
+          "rms": 0.42136310710538666,
+          "median": 0.08207093235405338,
+          "p95": 0.9760188512880639,
+          "maximum": 1.2774174510913703
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "notes": "Broad joint rim; old hover requirement timed out before gate1.",
+      "hashes": {
+        "protocol.json": "7f887f1e1aca0adacc4c53dbd0a3d862b21ffa7a3d34e32406e5c3db61ab06e9",
+        "score.json": "7f862f2311ad9ba999536bab8c4310b57ace7ecf4d4882a12960e5c54493c04c",
+        "joint-score.json": "43bae1b30d32e868e3541137c174cd5edbd0f1007353c2c05563790dda85a024",
+        "input-independence.json": "9bc69e23bea66b6bb3ab4d5758e0e179b7d6009ab9f689171f96b942028df451",
+        "estimator-inputs.jsonl.gz": "740cffce8ff540af0ac5a55f64f86e45aed0e2caf0b985668c928e9a4ea34e06"
+      }
+    },
+    {
+      "name": "rim-02",
+      "revision": "e42595a37b69b35c75bdb58f0e5bf2d3d722e1b9",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": true,
+        "continuous_path": false
+      },
+      "native_gates": 1,
+      "native_finish_s": null,
+      "contacts": 0,
+      "clean": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "joint gate measurement exceeded two seconds"
+      },
+      "scored_samples": 567,
+      "errors": {
+        "position": {
+          "count": 567,
+          "mae": 0.7051349323453109,
+          "rms": 0.7677748031802425,
+          "median": 0.6746673273376392,
+          "p95": 1.2850303464103021,
+          "maximum": 1.4490485969980775
+        },
+        "velocity": {
+          "count": 567,
+          "mae": 0.4595277325983876,
+          "rms": 0.5460494298851593,
+          "median": 0.4091795691326378,
+          "p95": 1.118575832452349,
+          "maximum": 1.2585837927364394
+        },
+        "attitude": {
+          "count": 567,
+          "mae": 0.30889005932483315,
+          "rms": 0.33630429426339337,
+          "median": 0.2902348846115841,
+          "p95": 0.5438213131023721,
+          "maximum": 0.9071789953205376
+        },
+        "depth": {
+          "count": 567,
+          "mae": 1.6015493458363024,
+          "rms": 3.117461282993618,
+          "median": 0.13229044261927747,
+          "p95": 7.905035912979043,
+          "maximum": 9.678408794050464
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.97564459971229,
+          "first_lock_time_s": 10.714094,
+          "first_lock_image_id": 306,
+          "crossing_position_ned_m": [
+            -23.297967756137115,
+            -0.4492027545152542,
+            -1.3087140001189679
+          ],
+          "crossing_offset_width_down_m": [
+            -0.04930056708223607,
+            -0.20852486288058977
+          ],
+          "last_image_id": 476,
+          "last_image_time_s": 16.358171776000002,
+          "blind_time_to_crossing_s": 1.617472823712287,
+          "final_phase_to_crossing_s": 1.11724459971229,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.018418704117063457,
+            -0.24473789787606598,
+            -0.09634948246197189
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 18.266969,
+          "first_lock_image_id": 533
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "notes": "Direct launch; ambiguous partial contour rebound gate2 about10m nearer.",
+      "hashes": {
+        "protocol.json": "9d49bd932ca1e3b7906970f7da8a7986478ea5b814cfe8997b911d90e0994888",
+        "score.json": "0e28bff888474a9eb4bf649ede19a54f9ad61e3a3888050fcb904f33509c7ba4",
+        "joint-score.json": "546f350128eb2532676968a510c063a00251489a25cfcff6914398282d92f470",
+        "input-independence.json": "66b8711cc82796a410cb80950670d9a75eccaa4b4c718f9d3b47a3a715d78fed",
+        "estimator-inputs.jsonl.gz": "260eb2dcf1d33f6d48b96d55b2a73ccf6510fa4e793bfa7cd01fe8f1b2dcd8ef"
+      },
+      "estimator_replay": {
+        "inputs": 1942,
+        "outputs": 567,
+        "matched_live_states": 567,
+        "exact_mean_and_covariance": true,
+        "gyro_attitude_override": null,
+        "native_inputs": 0,
+        "late_pixels": 0
+      }
+    },
+    {
+      "name": "rim-03",
+      "revision": "a27d7c6b547d28df02ba625155929fd28a75f395",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": true,
+        "continuous_path": false
+      },
+      "native_gates": 6,
+      "native_finish_s": 59.090034485,
+      "contacts": 0,
+      "clean": true,
+      "controller_error": null,
+      "scored_samples": 2522,
+      "errors": {
+        "position": {
+          "count": 2522,
+          "mae": 1.6092841845647528,
+          "rms": 1.9059106650546733,
+          "median": 1.6945179433935618,
+          "p95": 3.130711490795303,
+          "maximum": 3.813949596185582
+        },
+        "velocity": {
+          "count": 2522,
+          "mae": 0.3647705035953138,
+          "rms": 0.42688884785675135,
+          "median": 0.31539627462564,
+          "p95": 0.8168316857786041,
+          "maximum": 1.3683672136824137
+        },
+        "attitude": {
+          "count": 2522,
+          "mae": 0.6114249995403347,
+          "rms": 0.7042816509650554,
+          "median": 0.4944640868911865,
+          "p95": 1.1523077918915117,
+          "maximum": 1.8076476987968368
+        },
+        "depth": {
+          "count": 2522,
+          "mae": 0.2856779132181156,
+          "rms": 0.463805173070565,
+          "median": 0.12768812559440335,
+          "p95": 0.8880417465496144,
+          "maximum": 3.472857300090965
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 17.335443934493192,
+          "first_lock_time_s": 10.566063,
+          "first_lock_image_id": 301,
+          "crossing_position_ned_m": [
+            -23.29796775243374,
+            -0.40670245746493916,
+            -1.327080456729487
+          ],
+          "crossing_offset_width_down_m": [
+            -0.006800272280580484,
+            -0.22689132469454507
+          ],
+          "last_image_id": 425,
+          "last_image_time_s": 14.679223329000001,
+          "blind_time_to_crossing_s": 2.656220605493191,
+          "final_phase_to_crossing_s": 1.3024009344931926,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.030551855893012604,
+            -0.22408832558571135,
+            0.07482736668409566
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 25.767719692111374,
+          "first_lock_time_s": 17.613203,
+          "first_lock_image_id": 513,
+          "crossing_position_ned_m": [
+            -46.893749104934855,
+            -2.5923693587649743,
+            3.9630474553344976
+          ],
+          "crossing_offset_width_down_m": [
+            -0.0923792692144167,
+            -0.03676320992789067
+          ],
+          "last_image_id": 743,
+          "last_image_time_s": 25.274561952000003,
+          "blind_time_to_crossing_s": 0.49315774011137137,
+          "final_phase_to_crossing_s": 0.46990069211137353,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.029779248230381427,
+            0.08166314239111055,
+            -0.14423096944759117
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 33.84662102101071,
+          "first_lock_time_s": 26.363605,
+          "first_lock_image_id": 775,
+          "crossing_position_ned_m": [
+            -74.59374986550512,
+            1.288395058104068,
+            12.59423203091285
+          ],
+          "crossing_offset_width_down_m": [
+            0.08838522299828717,
+            -0.005578084276474172
+          ],
+          "last_image_id": 986,
+          "last_image_time_s": 33.376519141,
+          "blind_time_to_crossing_s": 0.4701018800107093,
+          "final_phase_to_crossing_s": 0.4670720210107149,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.044669742423869334,
+            0.05452287488534024,
+            -0.07411670071393746
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 47.265282244603085,
+          "first_lock_time_s": 34.380459,
+          "first_lock_image_id": 1016,
+          "crossing_position_ned_m": [
+            -111.4937437671669,
+            -5.167017947903258,
+            23.493070473156404
+          ],
+          "crossing_offset_width_down_m": [
+            -0.06702818846278759,
+            -0.006739241535475489
+          ],
+          "last_image_id": 1380,
+          "last_image_time_s": 46.511739187,
+          "blind_time_to_crossing_s": 0.7535430576030819,
+          "final_phase_to_crossing_s": 0.7509572446030859,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.06365398341476687,
+            0.05261171400764655,
+            0.010488035196586074
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 56.59191531923442,
+          "first_lock_time_s": 47.513453,
+          "first_lock_image_id": 1410,
+          "crossing_position_ned_m": [
+            -135.4937437566617,
+            -0.5157464317273955,
+            24.293084995676725
+          ],
+          "crossing_offset_width_down_m": [
+            0.2842436749383767,
+            0.005662322938537155
+          ],
+          "last_image_id": 1667,
+          "last_image_time_s": 56.073465396,
+          "blind_time_to_crossing_s": 0.5184499232344137,
+          "final_phase_to_crossing_s": 0.4923693192344203,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.030591807902221473,
+            0.06234181137733756,
+            -0.0727449132931586
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 65.181072558872,
+          "first_lock_time_s": 56.84956,
+          "first_lock_image_id": 1690,
+          "crossing_position_ned_m": [
+            -159.19374070339904,
+            -4.269360787217933,
+            24.85023447065326
+          ],
+          "crossing_offset_width_down_m": [
+            0.1306291577129078,
+            -0.04957488676866432
+          ],
+          "last_image_id": 1925,
+          "last_image_time_s": 64.67536196200001,
+          "blind_time_to_crossing_s": 0.5057105968719924,
+          "final_phase_to_crossing_s": 0.4877975588720034,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.0015150196638949302,
+            0.037872756577426794,
+            -0.0788170014672107
+          ]
+        }
+      ],
+      "notes": "Rejected ambiguous rim binding and disabled partial-only births; old stop/align reference.",
+      "hashes": {
+        "protocol.json": "92c9cdf0e415a86ee27cc58f80e4ef5f8e62f455d5ba4e58179d3ca9bd8014fd",
+        "score.json": "6f2917841dd0c6f0a2fa4d58861cf21d046a225f28623cc34f95df93ac9b003b",
+        "joint-score.json": "3c31f26d509f7158ec79075a010378426fb244383461583154075f87aacaccf0",
+        "input-independence.json": "6255786efb00c58a712aee871142182099ca1cb93342de068cc8d524533a2b41",
+        "estimator-inputs.jsonl.gz": "d4732047a6d98b850735ec910c9550c653c10d3c67b0d5274f16cba0e21738a5"
+      }
+    },
+    {
+      "name": "continuous-05-01",
+      "revision": "b40b74eae0d94833ebd1a946ad053c1e39f46fd8",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": true,
+        "continuous_path": true
+      },
+      "native_gates": 1,
+      "native_finish_s": null,
+      "contacts": 0,
+      "clean": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "scored_samples": 536,
+      "errors": {
+        "position": {
+          "count": 536,
+          "mae": 0.5919103325014097,
+          "rms": 0.6960096155594986,
+          "median": 0.4718602527798117,
+          "p95": 1.341880602255244,
+          "maximum": 2.0732107389487724
+        },
+        "velocity": {
+          "count": 536,
+          "mae": 0.6360567597341609,
+          "rms": 0.7852291007816583,
+          "median": 0.50953743879415,
+          "p95": 1.5741351437525861,
+          "maximum": 1.7547023045310013
+        },
+        "attitude": {
+          "count": 536,
+          "mae": 0.4575449720736088,
+          "rms": 0.504987558648766,
+          "median": 0.5581853154034615,
+          "p95": 0.6829950410209532,
+          "maximum": 0.954619556680917
+        },
+        "depth": {
+          "count": 536,
+          "mae": 0.4653326408987708,
+          "rms": 0.5573424285755308,
+          "median": 0.27875206986583656,
+          "p95": 0.8672563414037224,
+          "maximum": 0.9636039236090923
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.549238155051093,
+          "first_lock_time_s": 10.744095,
+          "first_lock_image_id": 307,
+          "crossing_position_ned_m": [
+            -23.2979677529061,
+            -0.5086079477454148,
+            -1.3517120114099765
+          ],
+          "crossing_offset_width_down_m": [
+            -0.10870576557676898,
+            -0.2515228668984461
+          ],
+          "last_image_id": 454,
+          "last_image_time_s": 15.635024427000001,
+          "blind_time_to_crossing_s": 0.9142137280510916,
+          "final_phase_to_crossing_s": 0.475582155051093,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.10801919821902345,
+            -0.10636696042979192,
+            -0.11592995869598754
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 16.788515,
+          "first_lock_image_id": 487
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "notes": "Continuous reference; legacy rim-template readiness ignored the learned joint shape.",
+      "hashes": {
+        "protocol.json": "d2402d1e64201c012b6ec45071384fc18cfa798b6e54b9c0e5ec75cec5f73d63",
+        "score.json": "957d4e28c61c813360ace3a5728f8d58aa58fe17f521b261b0436e1f534493ba",
+        "joint-score.json": "bbd25ffd02b0cdada979cde5d4b54fa19adbd355d8a65393748d07449f831529",
+        "input-independence.json": "066bbb586fd2629c549b7fadd880e50bd7c7bc60f21f866cd0bb24fba1c0577d",
+        "estimator-inputs.jsonl.gz": "fcf6b9963077f0d8a46421670597cb597f39062cc906804aeaa0f1db1d0c48c3"
+      }
+    },
+    {
+      "name": "continuous-05-02",
+      "revision": "c99ebb25ca21ff711abe5f0a76ecc0e570dfaebc",
+      "speed_setting_m_s": 5.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": true,
+        "continuous_path": true
+      },
+      "native_gates": 6,
+      "native_finish_s": 43.08039856,
+      "contacts": 0,
+      "clean": true,
+      "controller_error": null,
+      "scored_samples": 1816,
+      "errors": {
+        "position": {
+          "count": 1816,
+          "mae": 1.6498715720443702,
+          "rms": 2.2583573206182055,
+          "median": 0.8722739039189525,
+          "p95": 4.48561599382841,
+          "maximum": 5.174055936547517
+        },
+        "velocity": {
+          "count": 1816,
+          "mae": 0.38970801740494504,
+          "rms": 0.42878087651784647,
+          "median": 0.3584489476972795,
+          "p95": 0.7408371249257242,
+          "maximum": 1.05827289662324
+        },
+        "attitude": {
+          "count": 1816,
+          "mae": 0.298018356513868,
+          "rms": 0.32185653521271557,
+          "median": 0.28859094560285636,
+          "p95": 0.4889471886666602,
+          "maximum": 0.9266974269008942
+        },
+        "depth": {
+          "count": 1816,
+          "mae": 0.5515357598315365,
+          "rms": 0.8707125395543701,
+          "median": 0.3536583756141436,
+          "p95": 1.89346085138131,
+          "maximum": 3.77333533342685
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": true,
+          "crossing_imu_time_s": 16.249502354688957,
+          "first_lock_time_s": 10.575448,
+          "first_lock_image_id": 301,
+          "crossing_position_ned_m": [
+            -23.297967771555932,
+            -0.485753850560045,
+            -1.1929957040415866
+          ],
+          "crossing_offset_width_down_m": [
+            -0.08585164895929612,
+            -0.09280656232815045
+          ],
+          "last_image_id": 439,
+          "last_image_time_s": 15.156352358000001,
+          "blind_time_to_crossing_s": 1.0931499966889557,
+          "final_phase_to_crossing_s": 0.5188723546889573,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.11784200524701256,
+            -0.00990829600611844,
+            0.01727481873199941
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": true,
+          "crossing_imu_time_s": 21.214078543418957,
+          "first_lock_time_s": 16.489345999999998,
+          "first_lock_image_id": 479,
+          "crossing_position_ned_m": [
+            -46.89374908358704,
+            -2.3626005139126525,
+            3.8529205324203164
+          ],
+          "crossing_offset_width_down_m": [
+            0.1373895621547413,
+            -0.14689016097334665
+          ],
+          "last_image_id": 554,
+          "last_image_time_s": 18.991376716,
+          "blind_time_to_crossing_s": 2.2227018274189554,
+          "final_phase_to_crossing_s": 0.5412495434189566,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.16283255035893227,
+            0.007884680052080054,
+            -0.0008856603313400994
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": true,
+          "crossing_imu_time_s": 30.933924499907402,
+          "first_lock_time_s": 24.035778,
+          "first_lock_image_id": 705,
+          "crossing_position_ned_m": [
+            -74.59374982763818,
+            1.1015553780275953,
+            12.232709996110717
+          ],
+          "crossing_offset_width_down_m": [
+            -0.09845450134038768,
+            -0.3671000962032767
+          ],
+          "last_image_id": 844,
+          "last_image_time_s": 28.654614803,
+          "blind_time_to_crossing_s": 2.2793096969074007,
+          "final_phase_to_crossing_s": 0.534920499907404,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.12146719459673541,
+            0.22576610106718611,
+            0.039752573283296684
+          ]
+        },
+        {
+          "gate": 4,
+          "native_pass": true,
+          "crossing_imu_time_s": 39.11207996129107,
+          "first_lock_time_s": 31.430519999999998,
+          "first_lock_image_id": 927,
+          "crossing_position_ned_m": [
+            -111.49374377621425,
+            -5.003093881771585,
+            23.612794871823088
+          ],
+          "crossing_offset_width_down_m": [
+            0.09689589232709316,
+            0.11298513706150293
+          ],
+          "last_image_id": 1141,
+          "last_image_time_s": 38.555943905,
+          "blind_time_to_crossing_s": 0.5561360562910735,
+          "final_phase_to_crossing_s": 0.48496696129107164,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.11122223422975204,
+            0.035084951661628075,
+            -0.052070476145867906
+          ]
+        },
+        {
+          "gate": 5,
+          "native_pass": true,
+          "crossing_imu_time_s": 44.32703175171285,
+          "first_lock_time_s": 39.366185,
+          "first_lock_image_id": 1165,
+          "crossing_position_ned_m": [
+            -135.49374376915875,
+            -1.117736873004149,
+            24.226859205536392
+          ],
+          "crossing_offset_width_down_m": [
+            -0.31774677444659055,
+            -0.06056339349833733
+          ],
+          "last_image_id": 1291,
+          "last_image_time_s": 43.554821836,
+          "blind_time_to_crossing_s": 0.7722099157128497,
+          "final_phase_to_crossing_s": 0.5215897517128525,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.19750189464543497,
+            0.0603379244651055,
+            -0.002933076028664894
+          ]
+        },
+        {
+          "gate": 6,
+          "native_pass": true,
+          "crossing_imu_time_s": 49.4462895642575,
+          "first_lock_time_s": 44.5747,
+          "first_lock_image_id": 1318,
+          "crossing_position_ned_m": [
+            -159.19374069294489,
+            -4.379098372325489,
+            24.73416830646992
+          ],
+          "crossing_offset_width_down_m": [
+            0.02089155839503212,
+            -0.16564103751651013
+          ],
+          "last_image_id": 1449,
+          "last_image_time_s": 48.820620262000006,
+          "blind_time_to_crossing_s": 0.6256693022574922,
+          "final_phase_to_crossing_s": 0.4703315642574992,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.07053943122720832,
+            0.041806107420184806,
+            -0.027747673323929505
+          ]
+        }
+      ],
+      "notes": "Raw cropped top pixels use joint rim state; six clean ordered native passes.",
+      "hashes": {
+        "protocol.json": "98a9dd627d14688cc4c251caf76724d730fafe9d58742c56c74462040770b09b",
+        "score.json": "42215f9305d05e9a3462fd96bdfbbe131cb81bb8e8777638778733e26cc8eb33",
+        "joint-score.json": "376ebb934ac499f3cac09987a210d37a8cd9b85f79d1f1044c264ff2847263dc",
+        "input-independence.json": "4aa8416ed2427560c27129b887248c5b93f803f7f13e20825efdde6090d94411",
+        "estimator-inputs.jsonl.gz": "431e5ebd71777373ba4fecdc2db93f70c8c12c83a6a6baef85588760cff45b91"
+      },
+      "estimator_replay": {
+        "inputs": 6555,
+        "outputs": 1816,
+        "matched_live_states": 1816,
+        "exact_mean_and_covariance": true,
+        "gyro_attitude_override": null,
+        "native_inputs": 0,
+        "late_pixels": 0
+      },
+      "canonical_state_metrics": {
+        "full": {
+          "position": {
+            "count": 1816,
+            "mae": 1.6498920149927645,
+            "rms": 2.2583619576742193,
+            "median": 0.8722739039189525,
+            "p95": 4.48561599382841,
+            "maximum": 5.174055936547516
+          },
+          "velocity": {
+            "count": 1816,
+            "mae": 0.38965120859048513,
+            "rms": 0.4287352788278567,
+            "median": 0.3584489476972795,
+            "p95": 0.7408371249257242,
+            "maximum": 1.05827289662324
+          },
+          "attitude": {
+            "count": 1816,
+            "mae": 0.2980183567478874,
+            "rms": 0.32185653536766246,
+            "median": 0.2885909456028544,
+            "p95": 0.4889471886666653,
+            "maximum": 0.9266974269008972
+          },
+          "gate_center": {
+            "count": 1816,
+            "mae": 2.209960274799384,
+            "rms": 2.8048676680377733,
+            "median": 2.4358627979963217,
+            "p95": 5.149301477575256,
+            "maximum": 5.212299893290879
+          },
+          "gate_relative": {
+            "count": 1816,
+            "mae": 0.7401418956751122,
+            "rms": 1.2559753843928652,
+            "median": 0.39080316635919243,
+            "p95": 3.9921185942452184,
+            "maximum": 4.682453233162459
+          },
+          "gate_depth": {
+            "count": 1816,
+            "mae": 0.5515357598315352,
+            "rms": 0.8707125395543696,
+            "median": 0.35365837561413915,
+            "p95": 1.8934608513813092,
+            "maximum": 3.77333533342685
+          },
+          "gate_plane_yaw": {
+            "count": 1816,
+            "mae": 2.6546822048700798,
+            "rms": 3.2027369589314425,
+            "median": 2.0021739540519503,
+            "p95": 4.559266683251496,
+            "maximum": 11.857962791224459
+          },
+          "body_rate": {
+            "count": 1816,
+            "mae": 0.00571423020454357,
+            "rms": 0.01274393214886809,
+            "median": 0.002069455497866796,
+            "p95": 0.024397367938088516,
+            "maximum": 0.11897849675811203
+          },
+          "motor_channel": {
+            "count": 7264,
+            "mae": 0.007200542822089728,
+            "rms": 0.021650285758492524,
+            "median": 7.547762784290701e-05,
+            "p95": 0.020960622253888114,
+            "maximum": 0.28749021527506774
+          }
+        },
+        "startup": {
+          "position": {
+            "count": 86,
+            "mae": 0.21759663756805414,
+            "rms": 0.26092559367094215,
+            "median": 0.2587164942461304,
+            "p95": 0.47010336713129275,
+            "maximum": 0.5333671009826653
+          },
+          "velocity": {
+            "count": 86,
+            "mae": 0.3612244573786648,
+            "rms": 0.4101746291445399,
+            "median": 0.33229417163967667,
+            "p95": 0.7281374581266872,
+            "maximum": 0.9555903394503216
+          },
+          "attitude": {
+            "count": 86,
+            "mae": 0.13837003827562178,
+            "rms": 0.1945055745747576,
+            "median": 0.11052099623611059,
+            "p95": 0.45690078249097454,
+            "maximum": 0.48667240664102157
+          },
+          "gate_center": {
+            "count": 86,
+            "mae": 0.6705894252359464,
+            "rms": 0.6891387561251066,
+            "median": 0.5841535848859999,
+            "p95": 0.9797362033107309,
+            "maximum": 1.0312678999315348
+          },
+          "gate_relative": {
+            "count": 86,
+            "mae": 0.588752907831889,
+            "rms": 0.640943700290831,
+            "median": 0.46688345268383624,
+            "p95": 0.9998769427283919,
+            "maximum": 1.0492837192565505
+          },
+          "gate_depth": {
+            "count": 86,
+            "mae": 0.5857001757204428,
+            "rms": 0.6470890791116907,
+            "median": 0.5241933189054819,
+            "p95": 0.9987911599409802,
+            "maximum": 1.0486670555278437
+          },
+          "gate_plane_yaw": {
+            "count": 86,
+            "mae": 2.6820622434225876,
+            "rms": 3.224139271032895,
+            "median": 1.9058922092400659,
+            "p95": 6.552077205355687,
+            "maximum": 10.986195656174305
+          },
+          "body_rate": {
+            "count": 86,
+            "mae": 0.006540372615730665,
+            "rms": 0.01680448246816249,
+            "median": 0.0011877108263424639,
+            "p95": 0.029303549205279812,
+            "maximum": 0.1159576062447965
+          },
+          "motor_channel": {
+            "count": 344,
+            "mae": 0.03377902677490302,
+            "rms": 0.08929947355849133,
+            "median": 0.0003665079442659591,
+            "p95": 0.28710188305786993,
+            "maximum": 0.28749021527506774
+          }
+        },
+        "gate1": {
+          "position": {
+            "count": 337,
+            "mae": 0.24910098796151217,
+            "rms": 0.2895551316332677,
+            "median": 0.23861753275288283,
+            "p95": 0.5171993424970963,
+            "maximum": 0.7058152623956928
+          },
+          "velocity": {
+            "count": 337,
+            "mae": 0.2927820261135771,
+            "rms": 0.3378202550326812,
+            "median": 0.27950464889309007,
+            "p95": 0.6040687436575016,
+            "maximum": 0.9555903394503216
+          },
+          "attitude": {
+            "count": 337,
+            "mae": 0.20043395208815012,
+            "rms": 0.21904232038077856,
+            "median": 0.2145480175067667,
+            "p95": 0.3124050463446385,
+            "maximum": 0.48667240664102157
+          },
+          "gate_center": {
+            "count": 337,
+            "mae": 0.4224467981623622,
+            "rms": 0.46836053681435313,
+            "median": 0.2982281177189566,
+            "p95": 0.830132562455102,
+            "maximum": 1.0312678999315348
+          },
+          "gate_relative": {
+            "count": 337,
+            "mae": 0.2633302468271295,
+            "rms": 0.352500937130754,
+            "median": 0.17914018867398912,
+            "p95": 0.8501890648985095,
+            "maximum": 1.0492837192565505
+          },
+          "gate_depth": {
+            "count": 337,
+            "mae": 0.23560937141403163,
+            "rms": 0.34667828728014505,
+            "median": 0.14364751938973086,
+            "p95": 0.8473264984768022,
+            "maximum": 1.0486670555278437
+          },
+          "gate_plane_yaw": {
+            "count": 337,
+            "mae": 2.4820878446623804,
+            "rms": 2.829718496958208,
+            "median": -1.9803233790399415,
+            "p95": 4.325613055712954,
+            "maximum": 10.986195656174305
+          },
+          "body_rate": {
+            "count": 337,
+            "mae": 0.004667355416560608,
+            "rms": 0.010642359870424657,
+            "median": 0.0020280202202851965,
+            "p95": 0.018546621066541077,
+            "maximum": 0.1159576062447965
+          },
+          "motor_channel": {
+            "count": 1348,
+            "mae": 0.013117510201828128,
+            "rms": 0.04575889454537776,
+            "median": 0.0001865472664255574,
+            "p95": 0.02742530472000173,
+            "maximum": 0.28749021527506774
+          }
+        },
+        "gate2": {
+          "position": {
+            "count": 229,
+            "mae": 0.4119243911445616,
+            "rms": 0.4451855829541741,
+            "median": 0.44532120991631824,
+            "p95": 0.6590917720711099,
+            "maximum": 0.7642848668650961
+          },
+          "velocity": {
+            "count": 229,
+            "mae": 0.40501643647116653,
+            "rms": 0.4611947980647583,
+            "median": 0.30458389457708335,
+            "p95": 0.835785224670324,
+            "maximum": 0.9525460132721721
+          },
+          "attitude": {
+            "count": 229,
+            "mae": 0.31752630777141233,
+            "rms": 0.32731701260894325,
+            "median": 0.32531763209072834,
+            "p95": 0.4310138991749372,
+            "maximum": 0.4865875281576841
+          },
+          "gate_center": {
+            "count": 229,
+            "mae": 0.3954905100257843,
+            "rms": 0.528304942321045,
+            "median": 0.2300129076122543,
+            "p95": 1.124231687559957,
+            "maximum": 1.5270819953913009
+          },
+          "gate_relative": {
+            "count": 229,
+            "mae": 0.2891013627217685,
+            "rms": 0.34762388176636927,
+            "median": 0.24447906186486568,
+            "p95": 0.7007353490091013,
+            "maximum": 1.1670792497658322
+          },
+          "gate_depth": {
+            "count": 229,
+            "mae": 0.24316657359273625,
+            "rms": 0.31360785869793384,
+            "median": 0.22825037567454132,
+            "p95": 0.6303710390551608,
+            "maximum": 1.0923345621286948
+          },
+          "gate_plane_yaw": {
+            "count": 229,
+            "mae": 3.1035191371926385,
+            "rms": 3.267944823527926,
+            "median": 3.4630645743652173,
+            "p95": 4.312092915211748,
+            "maximum": 4.709437646913881
+          },
+          "body_rate": {
+            "count": 229,
+            "mae": 0.0040702940990285695,
+            "rms": 0.007045292403870575,
+            "median": 0.0020136436635688707,
+            "p95": 0.014503839881323722,
+            "maximum": 0.04281525951283824
+          },
+          "motor_channel": {
+            "count": 916,
+            "mae": 0.004946416780274528,
+            "rms": 0.0072135141352892805,
+            "median": 0.0005373269001330561,
+            "p95": 0.015539523214928588,
+            "maximum": 0.03329474384648076
+          }
+        },
+        "gate3": {
+          "position": {
+            "count": 460,
+            "mae": 0.6333215558664649,
+            "rms": 0.6894838791761381,
+            "median": 0.7008541421832604,
+            "p95": 0.9981120678315549,
+            "maximum": 1.226571868701033
+          },
+          "velocity": {
+            "count": 460,
+            "mae": 0.3989086949702608,
+            "rms": 0.43373886901146097,
+            "median": 0.3898577957794158,
+            "p95": 0.6983922503355802,
+            "maximum": 0.864254063343128
+          },
+          "attitude": {
+            "count": 460,
+            "mae": 0.4132166371993449,
+            "rms": 0.419868811576988,
+            "median": 0.400177121516919,
+            "p95": 0.5278872432979256,
+            "maximum": 0.9266974269008972
+          },
+          "gate_center": {
+            "count": 460,
+            "mae": 1.6840376917658795,
+            "rms": 2.1756454470572595,
+            "median": 0.9694717812697867,
+            "p95": 3.9106997982739036,
+            "maximum": 3.915564312269392
+          },
+          "gate_relative": {
+            "count": 460,
+            "mae": 1.412368023710671,
+            "rms": 2.2251060242841505,
+            "median": 0.3834654257516029,
+            "p95": 4.289519693678971,
+            "maximum": 4.682453233162459
+          },
+          "gate_depth": {
+            "count": 460,
+            "mae": 0.8992780849642045,
+            "rms": 1.4240331376062643,
+            "median": 0.3501366365881955,
+            "p95": 3.6004648473359224,
+            "maximum": 3.77333533342685
+          },
+          "gate_plane_yaw": {
+            "count": 460,
+            "mae": 2.3478042095686877,
+            "rms": 2.449145038700018,
+            "median": 2.504933459719421,
+            "p95": 3.439275257476803,
+            "maximum": 5.9691188967554165
+          },
+          "body_rate": {
+            "count": 460,
+            "mae": 0.004773521620886026,
+            "rms": 0.01157552692356297,
+            "median": 0.0011810233719279752,
+            "p95": 0.02147401487398963,
+            "maximum": 0.11897849675811203
+          },
+          "motor_channel": {
+            "count": 1840,
+            "mae": 0.004785260860144108,
+            "rms": 0.009654582447530063,
+            "median": 0.00012839866478342454,
+            "p95": 0.018594319858787015,
+            "maximum": 0.10630350310012887
+          }
+        },
+        "gate4": {
+          "position": {
+            "count": 383,
+            "mae": 2.3000233537680788,
+            "rms": 2.401457890272896,
+            "median": 2.0915750888062252,
+            "p95": 3.680201259243392,
+            "maximum": 4.061713959312311
+          },
+          "velocity": {
+            "count": 383,
+            "mae": 0.4548477608148123,
+            "rms": 0.49161143240688815,
+            "median": 0.3909436383846035,
+            "p95": 0.8496860934719651,
+            "maximum": 1.05827289662324
+          },
+          "attitude": {
+            "count": 383,
+            "mae": 0.3187003963473264,
+            "rms": 0.3392525065243139,
+            "median": 0.3017706673934274,
+            "p95": 0.546392214029672,
+            "maximum": 0.9022583297692216
+          },
+          "gate_center": {
+            "count": 383,
+            "mae": 3.101568725708026,
+            "rms": 3.1200474938354352,
+            "median": 3.176884522201679,
+            "p95": 3.8151970718378165,
+            "maximum": 3.8735419691002737
+          },
+          "gate_relative": {
+            "count": 383,
+            "mae": 0.8865873704706914,
+            "rms": 1.0130254579116151,
+            "median": 0.9244607545762195,
+            "p95": 1.475124314236942,
+            "maximum": 2.7458922726837027
+          },
+          "gate_depth": {
+            "count": 383,
+            "mae": 0.7184747389804893,
+            "rms": 0.84613131617304,
+            "median": 0.7190059317956266,
+            "p95": 1.2520232172947205,
+            "maximum": 2.570209868118596
+          },
+          "gate_plane_yaw": {
+            "count": 383,
+            "mae": 3.203073776588326,
+            "rms": 3.709910355022011,
+            "median": 3.2445576463294534,
+            "p95": 4.119321010804028,
+            "maximum": 11.162779931008343
+          },
+          "body_rate": {
+            "count": 383,
+            "mae": 0.008038879383842363,
+            "rms": 0.016634821308544254,
+            "median": 0.002928510206785351,
+            "p95": 0.03869421032929024,
+            "maximum": 0.09480596313853897
+          },
+          "motor_channel": {
+            "count": 1532,
+            "mae": 0.007862983468081793,
+            "rms": 0.012814461000033374,
+            "median": -0.00031076197451765375,
+            "p95": 0.02660088015741513,
+            "maximum": 0.13273825291110167
+          }
+        },
+        "gate5": {
+          "position": {
+            "count": 211,
+            "mae": 3.6783597939194586,
+            "rms": 3.683342845628444,
+            "median": 3.62681481384307,
+            "p95": 4.095785923602602,
+            "maximum": 4.136778171327438
+          },
+          "velocity": {
+            "count": 211,
+            "mae": 0.4196792926778064,
+            "rms": 0.43500796418482246,
+            "median": 0.39837860867601277,
+            "p95": 0.6273717627855294,
+            "maximum": 0.665115575391297
+          },
+          "attitude": {
+            "count": 211,
+            "mae": 0.25569891337668077,
+            "rms": 0.2698378820024945,
+            "median": 0.23716194638456747,
+            "p95": 0.4129221416544352,
+            "maximum": 0.7665922786039321
+          },
+          "gate_center": {
+            "count": 211,
+            "mae": 3.977589846540409,
+            "rms": 3.9839209601531316,
+            "median": 4.0627835449156935,
+            "p95": 4.166904506927931,
+            "maximum": 4.192116932254052
+          },
+          "gate_relative": {
+            "count": 211,
+            "mae": 0.3972566557608714,
+            "rms": 0.4323047081716616,
+            "median": 0.3510249193126398,
+            "p95": 0.6442736345701308,
+            "maximum": 0.6749371717590978
+          },
+          "gate_depth": {
+            "count": 211,
+            "mae": 0.3233878776562783,
+            "rms": 0.3835592519557352,
+            "median": 0.31595296789505767,
+            "p95": 0.595420982690845,
+            "maximum": 0.6378825463617588
+          },
+          "gate_plane_yaw": {
+            "count": 211,
+            "mae": 1.8694434992632298,
+            "rms": 2.315988058241742,
+            "median": 1.570161186196342,
+            "p95": 4.528037623119436,
+            "maximum": 11.857962791224459
+          },
+          "body_rate": {
+            "count": 211,
+            "mae": 0.007514521154341861,
+            "rms": 0.015921668202194376,
+            "median": 0.0025325043555739753,
+            "p95": 0.03674715041565084,
+            "maximum": 0.1074729686858544
+          },
+          "motor_channel": {
+            "count": 844,
+            "mae": 0.006765226889289908,
+            "rms": 0.009653416953621789,
+            "median": -0.000856487985501031,
+            "p95": 0.019337725511251253,
+            "maximum": 0.05399251689937695
+          }
+        },
+        "gate6": {
+          "position": {
+            "count": 196,
+            "mae": 4.436507163280471,
+            "rms": 4.459706780796125,
+            "median": 4.469795866619048,
+            "p95": 5.111869456258308,
+            "maximum": 5.174055936547516
+          },
+          "velocity": {
+            "count": 196,
+            "mae": 0.3568023735445822,
+            "rms": 0.3753011201427375,
+            "median": 0.3523787893645989,
+            "p95": 0.5264134193297154,
+            "maximum": 0.5753209046118828
+          },
+          "attitude": {
+            "count": 196,
+            "mae": 0.1777918055387721,
+            "rms": 0.1873821468483085,
+            "median": 0.16070907439257442,
+            "p95": 0.29476750264165774,
+            "maximum": 0.415039030739359
+          },
+          "gate_center": {
+            "count": 196,
+            "mae": 4.992481344288548,
+            "rms": 4.997174731860528,
+            "median": 5.140033191120814,
+            "p95": 5.200046068922854,
+            "maximum": 5.212299893290879
+          },
+          "gate_relative": {
+            "count": 196,
+            "mae": 0.5922335160165761,
+            "rms": 0.6591791209565494,
+            "median": 0.6620621198403474,
+            "p95": 1.007508676149225,
+            "maximum": 1.1569417689718546
+          },
+          "gate_depth": {
+            "count": 196,
+            "mae": 0.5582900512054416,
+            "rms": 0.6214349004956069,
+            "median": 0.6365551953894677,
+            "p95": 0.934330640046567,
+            "maximum": 1.0906980564760786
+          },
+          "gate_plane_yaw": {
+            "count": 196,
+            "mae": 2.920987891817662,
+            "rms": 4.695429496352284,
+            "median": 0.9872398819805996,
+            "p95": 11.055202604371681,
+            "maximum": 11.591212528369672
+          },
+          "body_rate": {
+            "count": 196,
+            "mae": 0.005162098031670034,
+            "rms": 0.011132211857278859,
+            "median": 0.002115387666115656,
+            "p95": 0.019724589530954767,
+            "maximum": 0.06367851216361009
+          },
+          "motor_channel": {
+            "count": 784,
+            "mae": 0.004503315544052098,
+            "rms": 0.0064830282471687265,
+            "median": 0.00030411759072448974,
+            "p95": 0.014173850779931212,
+            "maximum": 0.02833080469045557
+          }
+        }
+      },
+      "coordinate_3sigma_coverage": {
+        "position": 0.9977973568281938,
+        "velocity": 0.9981644640234949,
+        "attitude": 1.0
+      },
+      "estimate_sha256": "2f3ba597001bf9fe624fc62c3a0e918ce5d829d5f21232b3fa33121f9f412d56",
+      "definitions": {
+        "position": "Mean3D error norm[m]",
+        "velocity": "Mean3D error norm[m/s]",
+        "attitude": "Mean rotation-error angle[deg]",
+        "gate_plane_yaw": "Plane axis modulo180deg",
+        "body_rate": "Public gyro minus estimated bias versus private ATTITUDE rate channels, FRD rad/s",
+        "motor_channel": "Mean absolute channel error in raw reported output units; own sent-command model, not measured RPM"
+      }
+    },
+    {
+      "name": "continuous-08-01",
+      "revision": "c99ebb25ca21ff711abe5f0a76ecc0e570dfaebc",
+      "speed_setting_m_s": 8.0,
+      "settings": {
+        "gyro_attitude": true,
+        "joint_rim": true,
+        "direct_launch": true,
+        "continuous_path": true
+      },
+      "native_gates": 0,
+      "native_finish_s": null,
+      "contacts": 2,
+      "clean": false,
+      "controller_error": {
+        "type": "TimeoutError",
+        "message": "gate image exceeded the lookahead freshness interval"
+      },
+      "scored_samples": 718,
+      "errors": {
+        "position": {
+          "count": 718,
+          "mae": 1.9920177782060386,
+          "rms": 2.485266234141704,
+          "median": 1.443966066600398,
+          "p95": 4.851780439393916,
+          "maximum": 5.830629897124122
+        },
+        "velocity": {
+          "count": 718,
+          "mae": 1.5501193217010942,
+          "rms": 2.326758370137424,
+          "median": 0.9368700991725742,
+          "p95": 5.703280423021905,
+          "maximum": 7.598116160936141
+        },
+        "attitude": {
+          "count": 718,
+          "mae": 0.8220450993591544,
+          "rms": 1.4411074676070972,
+          "median": 0.2869117327367553,
+          "p95": 3.2984488019378344,
+          "maximum": 3.9621285359035623
+        },
+        "depth": {
+          "count": 718,
+          "mae": 1.1909565906977326,
+          "rms": 2.2163490695657746,
+          "median": 0.17719566203910714,
+          "p95": 6.412950710147734,
+          "maximum": 7.271243100262087
+        }
+      },
+      "normal_replay": true,
+      "poison_replay": true,
+      "native_gates_detail": [
+        {
+          "gate": 1,
+          "native_pass": false,
+          "crossing_imu_time_s": 15.030332253051565,
+          "first_lock_time_s": 10.387262999999999,
+          "first_lock_image_id": 295,
+          "crossing_position_ned_m": [
+            -23.29796757839204,
+            -0.4407751781582662,
+            -2.7581330517228553
+          ],
+          "crossing_offset_width_down_m": [
+            -0.04087316818187505,
+            -1.65794391551629
+          ],
+          "last_image_id": 413,
+          "last_image_time_s": 14.302046717000001,
+          "blind_time_to_crossing_s": 0.7282855360515637,
+          "final_phase_to_crossing_s": 0.2565022530515666,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            -0.07316438363761697,
+            -0.009213556186261958,
+            0.15292253798431665
+          ]
+        },
+        {
+          "gate": 2,
+          "native_pass": false,
+          "crossing_imu_time_s": 18.20684460377788,
+          "first_lock_time_s": 15.299036999999998,
+          "first_lock_image_id": 443,
+          "crossing_position_ned_m": [
+            -46.89374904921335,
+            -2.3312918448021103,
+            3.5809181309163063
+          ],
+          "crossing_offset_width_down_m": [
+            0.1686981979632312,
+            -0.4188925663105691
+          ],
+          "last_image_id": 509,
+          "last_image_time_s": 17.50191096,
+          "blind_time_to_crossing_s": 0.7049336437778813,
+          "final_phase_to_crossing_s": 0.30348560377788303,
+          "camera_updates_during_final": 0,
+          "estimated_gate_error_width_down_normal_m": [
+            0.21631327991858518,
+            -0.04337923307949186,
+            -0.302493432187587
+          ]
+        },
+        {
+          "gate": 3,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 18.421082,
+          "first_lock_image_id": 517
+        },
+        {
+          "gate": 4,
+          "native_pass": false,
+          "crossing_imu_time_s": null,
+          "first_lock_time_s": 22.290882,
+          "first_lock_image_id": 612
+        },
+        {
+          "gate": 5,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        },
+        {
+          "gate": 6,
+          "native_pass": false,
+          "crossing_imu_time_s": null
+        }
+      ],
+      "notes": "First crossing1.66m above gate center; native0/6 despite three estimated crossings. Two contact packets and gate4 visual timeout.",
+      "hashes": {
+        "protocol.json": "e76ecbd846a065d9c5b4dec883b87e6b52007b8f66d1380bb65c8c5d6f775918",
+        "score.json": "3f4cf28bcfcdb66774316a669da2189a2f63c2ab505fb84ac731fdf2103b5eaa",
+        "joint-score.json": "e82ee4dda7260bffc270241630e6dfb773c8e525e1cae008615fef5da611c383",
+        "input-independence.json": "2e828db251deea28391753142690dd39a53fc4470cf6ef45854a9b37e0cb0dc4",
+        "estimator-inputs.jsonl.gz": "112c9083a3e7c1d4b59779b5c0a351317c3f76941022c4904b0f58087f52772a"
+      },
+      "estimator_replay": {
+        "inputs": 2498,
+        "outputs": 718,
+        "matched_live_states": 718,
+        "exact_mean_and_covariance": true,
+        "gyro_attitude_override": null,
+        "native_inputs": 0,
+        "late_pixels": 0
+      },
+      "canonical_state_metrics": {
+        "full": {
+          "position": {
+            "count": 718,
+            "mae": 1.9920177782060386,
+            "rms": 2.485266234141704,
+            "median": 1.443966066600398,
+            "p95": 4.851780439393916,
+            "maximum": 5.830629897124122
+          },
+          "velocity": {
+            "count": 718,
+            "mae": 1.5501193217010942,
+            "rms": 2.326758370137424,
+            "median": 0.9368700991725742,
+            "p95": 5.703280423021905,
+            "maximum": 7.598116160936141
+          },
+          "attitude": {
+            "count": 718,
+            "mae": 0.8220450993591554,
+            "rms": 1.4411074676071,
+            "median": 0.2869117327367502,
+            "p95": 3.298448801937852,
+            "maximum": 3.9621285359035623
+          },
+          "gate_center": {
+            "count": 718,
+            "mae": 1.6974023828193805,
+            "rms": 2.111242628867991,
+            "median": 1.2347933666855844,
+            "p95": 3.9038932468225895,
+            "maximum": 5.064567065023638
+          },
+          "gate_relative": {
+            "count": 718,
+            "mae": 1.4502053426654065,
+            "rms": 2.4737721344523753,
+            "median": 0.5899673812562514,
+            "p95": 6.842412282395774,
+            "maximum": 8.076633423482857
+          },
+          "gate_depth": {
+            "count": 718,
+            "mae": 1.1909565906977324,
+            "rms": 2.2163490695657755,
+            "median": 0.17719566203910647,
+            "p95": 6.41295071014774,
+            "maximum": 7.271243100262087
+          },
+          "gate_plane_yaw": {
+            "count": 718,
+            "mae": 4.243137936598861,
+            "rms": 6.035216747653452,
+            "median": -0.31112790684619773,
+            "p95": 9.361816198073631,
+            "maximum": 32.40845324550395
+          },
+          "body_rate": {
+            "count": 718,
+            "mae": 0.008204513697768893,
+            "rms": 0.01815638598570052,
+            "median": 0.003004316482289192,
+            "p95": 0.030403867783057877,
+            "maximum": 0.17408977543092935
+          },
+          "motor_channel": {
+            "count": 2872,
+            "mae": 0.011264700809094018,
+            "rms": 0.0331848902453331,
+            "median": 0.00017374565511632523,
+            "p95": 0.03411887830439696,
+            "maximum": 0.2872333989555819
+          }
+        },
+        "startup": {
+          "position": {
+            "count": 79,
+            "mae": 0.12848977118829413,
+            "rms": 0.16202859387144936,
+            "median": 0.12932015420503967,
+            "p95": 0.32023316117382816,
+            "maximum": 0.3586926419103817
+          },
+          "velocity": {
+            "count": 79,
+            "mae": 0.37237452122286463,
+            "rms": 0.4358634963014975,
+            "median": 0.3811352834564692,
+            "p95": 0.9722333660420076,
+            "maximum": 1.0559811731810342
+          },
+          "attitude": {
+            "count": 79,
+            "mae": 0.11618331617331427,
+            "rms": 0.17320422938776342,
+            "median": 0.07920528748310188,
+            "p95": 0.3717333042569693,
+            "maximum": 0.4908776027967048
+          },
+          "gate_center": {
+            "count": 79,
+            "mae": 0.539742270949794,
+            "rms": 0.5803180973669176,
+            "median": 0.4951133509917201,
+            "p95": 0.9405889499930857,
+            "maximum": 1.0688054145482835
+          },
+          "gate_relative": {
+            "count": 79,
+            "mae": 0.5281183458105444,
+            "rms": 0.5739073909058332,
+            "median": 0.5133957815085294,
+            "p95": 0.9268853239185136,
+            "maximum": 1.0598945346794308
+          },
+          "gate_depth": {
+            "count": 79,
+            "mae": 0.5129508757343357,
+            "rms": 0.5664135197291307,
+            "median": 0.44595353494899115,
+            "p95": 0.9262320786305264,
+            "maximum": 1.0591829988097956
+          },
+          "gate_plane_yaw": {
+            "count": 79,
+            "mae": 6.189188325699158,
+            "rms": 6.343761645656475,
+            "median": -7.000068958068702,
+            "p95": 7.294104573345654,
+            "maximum": 7.925065413100791
+          },
+          "body_rate": {
+            "count": 79,
+            "mae": 0.008648179748190443,
+            "rms": 0.01930765866642592,
+            "median": 0.0025673978562328953,
+            "p95": 0.03454787248368932,
+            "maximum": 0.12194424344291102
+          },
+          "motor_channel": {
+            "count": 316,
+            "mae": 0.03805643226813768,
+            "rms": 0.09291197053306632,
+            "median": 0.00032828611410049,
+            "p95": 0.2871038831890749,
+            "maximum": 0.2872333989555819
+          }
+        },
+        "gate1": {
+          "position": {
+            "count": 298,
+            "mae": 0.8500457021706882,
+            "rms": 1.1051405016520495,
+            "median": 0.595518785870488,
+            "p95": 2.3359349214307574,
+            "maximum": 2.7951993721815205
+          },
+          "velocity": {
+            "count": 298,
+            "mae": 0.8101262336225893,
+            "rms": 1.0052483043035374,
+            "median": 0.5744711921637812,
+            "p95": 1.8809928146629264,
+            "maximum": 1.923912954340399
+          },
+          "attitude": {
+            "count": 298,
+            "mae": 0.20128682461424038,
+            "rms": 0.2444311200387999,
+            "median": 0.17605829668263553,
+            "p95": 0.43687767082685963,
+            "maximum": 0.8077559531492124
+          },
+          "gate_center": {
+            "count": 298,
+            "mae": 0.598590630722051,
+            "rms": 0.6836833406110014,
+            "median": 0.4680199409243643,
+            "p95": 1.0564152476859885,
+            "maximum": 1.0734174720482954
+          },
+          "gate_relative": {
+            "count": 298,
+            "mae": 0.7163401441807674,
+            "rms": 1.0081211282778213,
+            "median": 0.4149089223112077,
+            "p95": 2.4857751208528853,
+            "maximum": 2.920048374089885
+          },
+          "gate_depth": {
+            "count": 298,
+            "mae": 0.3413733173397551,
+            "rms": 0.4062037825078616,
+            "median": 0.28492056039383407,
+            "p95": 0.7721500362338217,
+            "maximum": 1.0591829988097956
+          },
+          "gate_plane_yaw": {
+            "count": 298,
+            "mae": 4.630839290373114,
+            "rms": 5.259199411179374,
+            "median": -5.8638122912913815,
+            "p95": 7.009148989040868,
+            "maximum": 7.925065413100791
+          },
+          "body_rate": {
+            "count": 298,
+            "mae": 0.008613064174118777,
+            "rms": 0.020847779020690675,
+            "median": 0.0028173507196090227,
+            "p95": 0.03235337464081084,
+            "maximum": 0.17408977543092935
+          },
+          "motor_channel": {
+            "count": 1192,
+            "mae": 0.016333765548011855,
+            "rms": 0.049212435464526305,
+            "median": 8.993432864576323e-05,
+            "p95": 0.04342972568069034,
+            "maximum": 0.2872333989555819
+          }
+        },
+        "gate2": {
+          "position": {
+            "count": 145,
+            "mae": 1.3387921123115076,
+            "rms": 1.3470121430333897,
+            "median": 1.3729980898210956,
+            "p95": 1.5023841001448495,
+            "maximum": 1.5528417113725645
+          },
+          "velocity": {
+            "count": 145,
+            "mae": 0.5695407289309186,
+            "rms": 0.6088077019670797,
+            "median": 0.599395688612046,
+            "p95": 0.9837573053755568,
+            "maximum": 1.0730659050660167
+          },
+          "attitude": {
+            "count": 145,
+            "mae": 0.3444862323348328,
+            "rms": 0.35433854416804583,
+            "median": 0.3434822341913852,
+            "p95": 0.4829519296724408,
+            "maximum": 0.6521005077360378
+          },
+          "gate_center": {
+            "count": 145,
+            "mae": 1.4137064898184322,
+            "rms": 1.636476958018758,
+            "median": 1.24404232808591,
+            "p95": 1.319933021103661,
+            "maximum": 5.064567065023638
+          },
+          "gate_relative": {
+            "count": 145,
+            "mae": 0.6520051531263619,
+            "rms": 1.0525313367697868,
+            "median": 0.4416672994258706,
+            "p95": 0.8351234271228262,
+            "maximum": 4.245483739347892
+          },
+          "gate_depth": {
+            "count": 145,
+            "mae": 0.597946748108871,
+            "rms": 1.0248225346530346,
+            "median": 0.3479955010538154,
+            "p95": 0.815409273115999,
+            "maximum": 4.231865161073152
+          },
+          "gate_plane_yaw": {
+            "count": 145,
+            "mae": 6.094607340920258,
+            "rms": 9.731439431015408,
+            "median": 3.490171721413236,
+            "p95": 19.356519011352106,
+            "maximum": 32.40845324550395
+          },
+          "body_rate": {
+            "count": 145,
+            "mae": 0.005262204659144482,
+            "rms": 0.012924150859111378,
+            "median": 0.001608051963233047,
+            "p95": 0.01900960677867379,
+            "maximum": 0.09354004436196948
+          },
+          "motor_channel": {
+            "count": 580,
+            "mae": 0.005281447945233766,
+            "rms": 0.009119875829646105,
+            "median": 0.00011418907405252865,
+            "p95": 0.02192820497999949,
+            "maximum": 0.05856989664150092
+          }
+        },
+        "gate3": {
+          "position": {
+            "count": 161,
+            "mae": 3.4067784523267126,
+            "rms": 3.5144564572512933,
+            "median": 3.566921084184999,
+            "p95": 4.749508665436262,
+            "maximum": 4.8754672653231355
+          },
+          "velocity": {
+            "count": 161,
+            "mae": 1.865580956803332,
+            "rms": 2.8537882913860853,
+            "median": 1.0211093808319236,
+            "p95": 7.339245583656899,
+            "maximum": 7.598116160936141
+          },
+          "attitude": {
+            "count": 161,
+            "mae": 0.6887904476119185,
+            "rms": 1.2641310261010357,
+            "median": 0.26864176092058295,
+            "p95": 3.2952725243498384,
+            "maximum": 3.9621285359035623
+          },
+          "gate_center": {
+            "count": 161,
+            "mae": 3.537817090518599,
+            "rms": 3.5678461787258904,
+            "median": 3.720563752385493,
+            "p95": 3.909478254921009,
+            "maximum": 3.9099432800200025
+          },
+          "gate_relative": {
+            "count": 161,
+            "mae": 0.7646016090886767,
+            "rms": 0.9571786598123039,
+            "median": 0.734264447948874,
+            "p95": 2.0999848356944906,
+            "maximum": 3.0500030982414628
+          },
+          "gate_depth": {
+            "count": 161,
+            "mae": 0.6314540104849955,
+            "rms": 0.7968741338807035,
+            "median": -0.09308366339650931,
+            "p95": 1.490120308205915,
+            "maximum": 2.7568746184301247
+          },
+          "gate_plane_yaw": {
+            "count": 161,
+            "mae": 0.9393895350364397,
+            "rms": 1.2423077882060076,
+            "median": -0.7015883125117629,
+            "p95": 2.9393186146009427,
+            "maximum": 4.697998285897653
+          },
+          "body_rate": {
+            "count": 161,
+            "mae": 0.009065700001099021,
+            "rms": 0.0173082797467039,
+            "median": 0.0039048199353075175,
+            "p95": 0.040460041539091336,
+            "maximum": 0.11423699863474555
+          },
+          "motor_channel": {
+            "count": 644,
+            "mae": 0.008603482547086812,
+            "rms": 0.01346395860647105,
+            "median": 8.719207008602015e-05,
+            "p95": 0.027976762532967547,
+            "maximum": 0.0827052022252388
+          }
+        },
+        "gate4": {
+          "position": {
+            "count": 114,
+            "mae": 3.8099908631166777,
+            "rms": 3.9946604013115747,
+            "median": 3.9079038230646947,
+            "p95": 5.4648275068374055,
+            "maximum": 5.830629897124122
+          },
+          "velocity": {
+            "count": 114,
+            "mae": 4.286193996680129,
+            "rms": 4.413923671731756,
+            "median": 3.935134348304672,
+            "p95": 6.0722754645145365,
+            "maximum": 6.411592966449543
+          },
+          "attitude": {
+            "count": 114,
+            "mae": 3.240343349568072,
+            "rms": 3.241511571871813,
+            "median": 3.249631138881054,
+            "p95": 3.3807902970635637,
+            "maximum": 3.443436524439328
+          },
+          "gate_center": {
+            "count": 114,
+            "mae": 2.3313939501050607,
+            "rms": 2.33829675057648,
+            "median": 2.368381402430319,
+            "p95": 2.5206990807897185,
+            "maximum": 2.529847957488897
+          },
+          "gate_relative": {
+            "count": 114,
+            "mae": 5.35207427018679,
+            "rms": 5.760448218393492,
+            "median": 5.995014799685137,
+            "p95": 7.732858059787421,
+            "maximum": 8.076633423482857
+          },
+          "gate_depth": {
+            "count": 114,
+            "mae": 4.95623867885837,
+            "rms": 5.317355906554084,
+            "median": -5.638776725237431,
+            "p95": 7.000047852896907,
+            "maximum": 7.271243100262087
+          },
+          "gate_plane_yaw": {
+            "count": 114,
+            "mae": 5.54055395063587,
+            "rms": 5.8712609931809965,
+            "median": 5.214847602816367,
+            "p95": 11.234553881946772,
+            "maximum": 11.247077437297142
+          },
+          "body_rate": {
+            "count": 114,
+            "mae": 0.0096627222399805,
+            "rms": 0.017451790839696363,
+            "median": 0.004682895270807827,
+            "p95": 0.031706654500837275,
+            "maximum": 0.08615701794519046
+          },
+          "motor_channel": {
+            "count": 456,
+            "mae": 0.00938265267966753,
+            "rms": 0.015595479230189451,
+            "median": 0.000605260378080591,
+            "p95": 0.03202374527129576,
+            "maximum": 0.0914032861325947
+          }
+        }
+      },
+      "coordinate_3sigma_coverage": {
+        "position": 0.7920148560817084,
+        "velocity": 0.8700092850510678,
+        "attitude": 0.999535747446611
+      },
+      "estimate_sha256": "a699f2c7a84a322ac6d0e8ec6908a5f47bf0819d4f46a26072e9cea4a45b56db",
+      "definitions": {
+        "position": "Mean3D error norm[m]",
+        "velocity": "Mean3D error norm[m/s]",
+        "attitude": "Mean rotation-error angle[deg]",
+        "gate_plane_yaw": "Plane axis modulo180deg",
+        "body_rate": "Public gyro minus estimated bias versus private ATTITUDE rate channels, FRD rad/s",
+        "motor_channel": "Mean absolute channel error in raw reported output units; own sent-command model, not measured RPM"
+      }
+    }
+  ],
+  "protocol": "Development attempts, changing one or more identified failure mechanisms between runs. Not a frozen reliability cohort. Timing and sensor noise differ.",
+  "inputs": "Public camera pixels, gyro/accelerometer, public timestamps/ACKs and own motor commands only. No native pose/course/race/actuator feedback in control or calibration.",
+  "scoring": "Native values read postflight only. One fixed stationary-start yaw/origin frame; no candidate-specific alignment or scale fitting. Full-flight MAE includes startup and failures.",
+  "limits": [
+    "Only one clean continuous5m/s attempt so far.8m/s failed at the first gate.",
+    "Position/map drift and depth error remain too large. Sub10 and high-accuracy full-state recovery are not achieved.",
+    "Motor output score compares own sent-channel model against raw reported channels, not measured RPM.",
+    "Exact input replay verifies determinism and input ownership, not estimator accuracy.",
+    "Scalar speed jerk is bounded; full Cartesian jerk is not thereby bounded.",
+    "Fixed8s startup allowance remains; camera exposure-to-command delay is unresolved."
+  ],
+  "rejected_force_noise": {
+    "protocol": {
+      "training": "work/thrust-response-20261116/train-05",
+      "heldout": "work/drift-20261116/continuous-08-01",
+      "mean": "Frozen thrust-response.model.json. No mean, curve, lag or bias refit. Conditional body attitude, velocity, gyro bias and force-bias predictor starts from the last public controller posterior sent before each raw IMU receipt; propagate causally with public gyro and own commands only.",
+      "training_unit": "Six declared pulse blocks: start-0.4s through end+1.0s, clipped at next pulse start to prevent duplicate samples. Only publicly airborne predictor states are eligible.",
+      "models": [
+        "fixed_sigma_0.5",
+        "existing_isotropic_command_change",
+        "fitted_constant_isotropic",
+        "fitted_acceleration_isotropic",
+        "fitted_net_acceleration_directional",
+        "directional_base0.5",
+        "isotropic_base0.5"
+      ],
+      "directional_covariance": "base_sigma^2 I + k^2 a_net_body a_net_body^T, a_net_body = expected_specific_force + R_body^T gravity",
+      "isotropic_covariance": "(base_sigma^2 + k^2 norm(a_net_body)^2) I",
+      "fitting": "Equal pulse-block average Gaussian negative log likelihood; no residual centering and no outlier removal. Leave-one-pulse-out CV. Free base in[0.05,5]m/s2 and k in[0,5]. Bounds are numerical, not learned from heldout.",
+      "selection": "Lowest mean held-pulse negative log likelihood. Within0.02nats/sample prefer fewer fitted parameters, then larger base_sigma. Fit the selected model on all training blocks and freeze coefficients, source/model/input hashes before inspecting heldout.",
+      "statistics": "Conditional normalized measurement residual q=r^T R^-1 r, not full EKF NIS because full prior cross-covariance is absent. Report Gaussian chi-square3 coverage at50/90/95/99%, meanq, RMS predicted/observed calibration, signed bias and heavy-tail frequency; regime bins for norm(a_net), phase and command change.",
+      "cadence_check": "Also evaluate deterministic20Hz thinning at four public-time phases0/12.5/25/37.5ms. Do not select phase or change parameters from those results.",
+      "heldout_rule": "No refit or fallback model selection. Report all frozen model comparisons. Selected model transfers provisionally only if mean NLL improves by>=0.1nat/sample over fixed0.5,95%coverage>=90%,99%coverage>=97%,and meanq in[1.5,6]. Otherwise reject as an uncalibrated heldout noise model.",
+      "limits": "This estimates effective conditional prediction error, which includes model and state error. It is not intrinsic accelerometer noise and may double count prediction uncertainty if copied directly into an EKF R without checking HPH+R. Gaussian coverage is a diagnostic, not a guarantee. No native reference fields are loaded."
+    },
+    "selected": "fitted_net_acceleration_directional",
+    "theta": [
+      0.19505140716489658,
+      0.9336782962236054
+    ],
+    "frozen_sha256": "4092af55e987de8a97fddc51daac4e8054ea14e902ee508bc068c5393b4959bd",
+    "training": {
+      "source": "/Users/hawking/Desktop/stuff/miniflight/work/thrust-response-20261116/train-05",
+      "samples": 833,
+      "pulse_blocks": [
+        {
+          "pulse": 0,
+          "start": 27.152315584011376,
+          "end": 27.339827292016707,
+          "score_end": 28.339827292016707
+        },
+        {
+          "pulse": 1,
+          "start": 36.32299279200379,
+          "end": 36.636948958970606,
+          "score_end": 37.636948958970606
+        },
+        {
+          "pulse": 2,
+          "start": 52.210118458024226,
+          "end": 52.407209041994065,
+          "score_end": 53.407209041994065
+        },
+        {
+          "pulse": 3,
+          "start": 58.1893273749738,
+          "end": 58.48968562495429,
+          "score_end": 59.48968562495429
+        },
+        {
+          "pulse": 4,
+          "start": 75.51818691700464,
+          "end": 75.73589849995915,
+          "score_end": 76.73589849995915
+        },
+        {
+          "pulse": 5,
+          "start": 86.28056699997978,
+          "end": 86.6106635829783,
+          "score_end": 87.6106635829783
+        }
+      ],
+      "inputs": {
+        "public-inputs.npz": "2da7141449bbb6aa959891514b598917ea50e9e5fd4a1daa4573ccbda29427f6",
+        "control.jsonl.gz": "f4fe910d315321098d9e8700174bae0750b3eded7299afd0c5c0819cc73d0561"
+      },
+      "predictor": "Last completed public posterior before this raw IMU receipt, causally propagated without the current force sample. Uses public R/v/gyro-bias/force-bias only. No native fields read."
+    },
+    "heldout": {
+      "source": "/Users/hawking/Desktop/stuff/miniflight/work/drift-20261116/continuous-08-01",
+      "samples": 1360,
+      "pulse_blocks": [],
+      "inputs": {
+        "public-inputs.npz": "36be9286bdbfd5563a67743d4c5f270ababb2340111c31690b341de1dd930828",
+        "control.jsonl.gz": "1a6d3ee51125c3026e147f50a165e80520b96b5754f979c195cf3e48798ac082"
+      },
+      "predictor": "Last completed public posterior before this raw IMU receipt, causally propagated without the current force sample. Uses public R/v/gyro-bias/force-bias only. No native fields read."
+    },
+    "cv": [
+      {
+        "name": "fixed_sigma_0.5",
+        "mean_nll": 1.9091430831217242
+      },
+      {
+        "name": "existing_isotropic_command_change",
+        "mean_nll": 1.1127845460140036
+      },
+      {
+        "name": "fitted_constant_isotropic",
+        "mean_nll": 1.0355496716307475
+      },
+      {
+        "name": "fitted_acceleration_isotropic",
+        "mean_nll": -0.7690480775794066
+      },
+      {
+        "name": "fitted_net_acceleration_directional",
+        "mean_nll": -2.1564063537661853
+      },
+      {
+        "name": "directional_base0.5",
+        "mean_nll": -1.0153987127924637
+      },
+      {
+        "name": "isotropic_base0.5",
+        "mean_nll": -0.263266821349546
+      }
+    ],
+    "heldout_summaries": {
+      "fixed_sigma_0.5": {
+        "samples": 1360,
+        "nll_without_constant": 32.02174932170181,
+        "mean_q": 68.2023817267633,
+        "median_q": 3.104992915342798,
+        "p99_q": 1091.0446526479645,
+        "coverage": {
+          "0.5": 0.45808823529411763,
+          "0.9": 0.6161764705882353,
+          "0.95": 0.6558823529411765,
+          "0.99": 0.725
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 0.5,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.5,
+          0.0
+        ]
+      },
+      "existing_isotropic_command_change": {
+        "samples": 1360,
+        "nll_without_constant": 24.410984187319976,
+        "mean_q": 48.30805621742881,
+        "median_q": 0.6676172263167728,
+        "p99_q": 901.0026040930125,
+        "coverage": {
+          "0.5": 0.7095588235294118,
+          "0.9": 0.8272058823529411,
+          "0.95": 0.850735294117647,
+          "0.99": 0.8808823529411764
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 1.9284319705664346,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.5,
+          0.0
+        ]
+      },
+      "fitted_constant_isotropic": {
+        "samples": 1360,
+        "nll_without_constant": 12.212061276525384,
+        "mean_q": 25.649091648703518,
+        "median_q": 1.1677047903292055,
+        "p99_q": 410.312713135269,
+        "coverage": {
+          "0.5": 0.6169117647058824,
+          "0.9": 0.7786764705882353,
+          "0.95": 0.8125,
+          "0.99": 0.8411764705882353
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 0.8153306716502166,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.8153306716502166,
+          0.0
+        ]
+      },
+      "fitted_acceleration_isotropic": {
+        "samples": 1360,
+        "nll_without_constant": 2.646015560014303,
+        "mean_q": 3.378768175134332,
+        "median_q": 0.46241080127274437,
+        "p99_q": 42.342200690081754,
+        "coverage": {
+          "0.5": 0.7919117647058823,
+          "0.9": 0.8654411764705883,
+          "0.95": 0.888235294117647,
+          "0.99": 0.9169117647058823
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 1.7504263919164635,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.21594668104199746,
+          0.5516857582933842
+        ]
+      },
+      "fitted_net_acceleration_directional": {
+        "samples": 1360,
+        "nll_without_constant": 65.23019486161832,
+        "mean_q": 135.35188999680406,
+        "median_q": 3.87267776353956,
+        "p99_q": 2294.9667996507815,
+        "coverage": {
+          "0.5": 0.3985294117647059,
+          "0.9": 0.6036764705882353,
+          "0.95": 0.6411764705882353,
+          "0.99": 0.7029411764705882
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 1.7084699325582842,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.19505140716489658,
+          0.9336782962236054
+        ]
+      },
+      "directional_base0.5": {
+        "samples": 1360,
+        "nll_without_constant": 10.123822509787175,
+        "mean_q": 21.410721388125605,
+        "median_q": 0.7238399100667813,
+        "p99_q": 354.99811087239414,
+        "coverage": {
+          "0.5": 0.6933823529411764,
+          "0.9": 0.8352941176470589,
+          "0.95": 0.8669117647058824,
+          "0.99": 0.9036764705882353
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 1.6618229250466756,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.5,
+          0.8718040768154415
+        ]
+      },
+      "isotropic_base0.5": {
+        "samples": 1360,
+        "nll_without_constant": 2.7551063973049303,
+        "mean_q": 3.553103099761735,
+        "median_q": 0.4118269628806752,
+        "p99_q": 46.157557581579596,
+        "coverage": {
+          "0.5": 0.799264705882353,
+          "0.9": 0.8676470588235294,
+          "0.95": 0.8838235294117647,
+          "0.99": 0.9154411764705882
+        },
+        "observed_coordinate_rms": 2.3840158998135075,
+        "predicted_coordinate_rms": 1.6491671241874417,
+        "residual_mean": [
+          0.4472501381313425,
+          0.03343743312410968,
+          0.15272031328600857
+        ],
+        "theta": [
+          0.5,
+          0.4991199500388018
+        ]
+      }
+    },
+    "accepted": false,
+    "refit": false,
+    "production_changed": false,
+    "interpretation": "Conditional residual calibration; not full EKF NIS or intrinsic sensor noise."
+  }
+}

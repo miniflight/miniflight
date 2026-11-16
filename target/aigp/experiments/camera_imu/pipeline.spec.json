@@ -208,8 +208,8 @@
     "globally_calibrated_posterior_coverage": null
   },
   "current_gaps": [
-    "The new visibility policy completed 1/2 full-course trials. The latest complete lap has position MAE 2.75 m and P95 7.05 m; global accuracy remains poor.",
-    "Crossings still use a mean-state projection and coarse visibility waypoints. Mapped height changes have a covariance-bounded visual outage interval; close-gate visual failures remain.",
+    "One continuous5m/s attempt completed6/6 in43.08s; position/velocity/attitude/depth MAE1.65m/0.39m/s/0.30deg/0.55m. The8m/s attempt missed gate1 and scored0/6. Global accuracy and reliability remain poor.",
+    "Optional continuous p/v/a gate-relative reference avoids normal stop/align modes. Scalar speed jerk is bounded, full Cartesian jerk is not. Crossing progress still uses mean-state geometry; no calibrated chance constraint is enforced.",
     "Gate binding uses confirmed nearer hypotheses; it does not report calibrated identity probabilities.",
     "True camera exposure and physical IMU integration intervals are unknown. The joint path uses published epochs and body-force observations without exact accelerometer preintegration.",
     "Mean motor command 0.21-0.335 has a public response fit and one complete independent validation flight. Mixed rotor commands, larger speeds and tilt need more validation; some startup commands exceed this interval.",
@@ -233,7 +233,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Keep the validated thrust curve frozen. Diagnose global body/map drift and dynamic public-IMU force residuals by phase, resolve close-gate visual losses, then compare a continuous3D crossing reference with the stop-and-align planner.",
+    "backend": "Keep the public thrust curve frozen. Resolve the first-gate camera outage and vertical-estimate failure at8m/s before increasing speed. Diagnose accumulated body/map corrections separately from relative crossing error. Validate force weighting on independent public data before installation.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -255,5 +255,6 @@
   },
   "joint_checkpoint": "gate-filter.validation.json",
   "course_checkpoint": "gate-filter.course.validation.json",
-  "thrust_checkpoint": "thrust-response.validation.json"
+  "thrust_checkpoint": "thrust-response.validation.json",
+  "continuous_checkpoint": "continuous.validation.json"
 }

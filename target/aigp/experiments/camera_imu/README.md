@@ -113,6 +113,28 @@ and reliability remain poor. [All outcomes](thrust-response.validation.json),
 [response validation](thrust-response.validation.png), [course plots](thrust-response.overview.png).
 Earlier development runs remain in [the original course report](gate-filter.course.validation.json).
 
+Continuous crossing reference, using the same public thrust model:
+
+```sh
+python -m target.aigp.experiments.camera_imu course OUTPUT --gates 6 --speed 5 \
+  --dynamics-model target/aigp/experiments/camera_imu/thrust-response.model.json \
+  --partial-gate --crossing-constraint --joint-estimator --moving-start \
+  --gyro-attitude --joint-rim --direct-launch --continuous-path
+```
+
+The latest 5 m/s setting passed 6/6 in 43.08 s without contact or reset. Position,
+velocity, attitude and depth MAE was 1.65 m / 0.39 m/s / 0.30 degrees / 0.55 m.
+The 8 m/s attempt missed the first gate by 1.66 m vertically: native 0/6,
+despite three estimated crossings. Its position/velocity MAE was 1.99 m / 1.55 m/s.
+Both estimator replays reproduce every mean and covariance exactly; normal and
+poisoned controller replays also match. Accuracy, speed and reliability remain
+unresolved. [All seven development attempts](continuous.validation.json) and
+[full-flight errors](continuous.validation.png) include the failures.
+The joint rim holds uncertain outer-frame dimensions and uses measured cropped
+corners directly. The continuous reference uses only gates learned in this flight.
+The public-only force-noise fit failed independent dynamic-flight coverage and
+was rejected. Its frozen parameters and negative outcome remain in the report.
+
 For response collection, use the joint course flags above with `--gates 1 --speed 2
 --shift 0 --thrust-excitation train` or `validate`. Fit before launching validation:
 
