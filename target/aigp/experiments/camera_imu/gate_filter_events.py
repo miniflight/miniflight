@@ -12,11 +12,13 @@ CONFIG_FIELDS={'thrust_curve','drag','camera_from_body','intrinsics','supported'
 
 def state(history):
     f=history.filter
+    motors=history._motor(history.time)
     return dict(time=float(history.time),position=f.p.tolist(),velocity=f.v.tolist(),rotation=f.R.tolist(),
         gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),size=float(f.size),
         gates={str(k):dict(index=i,center=g.tolist(),yaw=float(yaw)) for k,(i,g,yaw) in f.gates.items()},
         rim=None if f.rim is None else f.rim[1].tolist(),covariance_sha256=hashlib.sha256(f.P.tobytes()).hexdigest(),
-        force_accepted=f.force_accepted,force_rejected=f.force_rejected)
+        force_accepted=f.force_accepted,force_rejected=f.force_rejected,body_rates=(history.gyros[-1][1]-f.bg).tolist(),
+        motor_outputs=[0.]*4 if motors is None else motors.tolist())
 
 def export(source,root):
     counts=dict(inputs=0,states=0)
@@ -78,9 +80,10 @@ def replay(source,output,gyro_attitude=None):
                     new_pixels=sorted(set(history.results)-old_pixels),force_result=history.filter.last_force_result if history.filter.last_force_time!=old_force else None))
             for reference in expected.get(events,[]):
                 if gyro_attitude is None:
-                    if actual!=reference:raise AssertionError(f'Estimation state/covariance differs at input{events}')
+                    if any(k not in actual for k in reference) or {k:actual[k] for k in reference}!=reference:raise AssertionError(f'Estimation state/covariance differs at input{events}')
                     matched+=1
-                states.append(dict(sequence=events,**actual))
+                states.append(dict(sequence=events,**actual,position_covariance=history.filter.P[:3,:3].tolist(),
+                    velocity_covariance=history.filter.P[3:6,3:6].tolist(),attitude_covariance=history.filter.P[6:9,6:9].tolist()))
     if gyro_attitude is None and matched!=sum(len(v) for v in expected.values()):raise AssertionError('Recorded state has no matching input')
     with gzip.open(output/'estimates.jsonl.gz','wt') as h:
         for r in states:h.write(json.dumps(r,separators=(',',':'))+'\n')
