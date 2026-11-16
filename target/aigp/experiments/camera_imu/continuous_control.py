@@ -20,7 +20,9 @@ class GateController(joint.GateController):
     def end_direction(self,f,center):
         previous=f.gates.get(self.gate_number-1);future=f.gates.get(self.gate_number+1)
         before=previous[1] if previous is not None else center+(self.initial_start if self.initial_start is not None else self.inertial.position-center)
-        delta=(future[1] if future is not None else center)-before
+        delta=((future[1] if future is not None else center)-before).copy()
+        # Cross upright openings level; complete height changes before blind entry.
+        delta[2]=0.
         direction=unit(delta)
         return direction if direction @ self.direction>.2 else unit(self.direction)
 
@@ -40,7 +42,8 @@ class GateController(joint.GateController):
         future=f.gates.get(self.gate_number+1);self.future_index=None if future is None else future[0];self.entry_speed=None
         if future is not None:
             next_delta=future[1]-center;following=f.gates.get(self.gate_number+2)
-            next_end=unit(next_delta if following is None else following[1]-center)
+            end=next_delta if following is None else following[1]-center
+            next_end=unit(np.r_[end[:2],0.])
             if np.linalg.norm(next_delta)>.1:
                 preview=GateCurve(-next_delta,direction,next_end)
                 self.entry_speed=.95*preview.speed_limit(0.,self.config.max_speed)

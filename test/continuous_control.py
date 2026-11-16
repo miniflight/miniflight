@@ -7,6 +7,15 @@ from target.aigp.experiments.camera_imu import sensors,vision,continuous_control
 
 
 class ContinuousControlTest(unittest.TestCase):
+    def test_height_changes_end_with_level_crossing_velocity(self):
+        c,f=self.controller();index,center,yaw=f.gates[2];f.gates[2]=(index,center+[0.,0.,-8.],yaw)
+        c.drive(None)
+        self.assertEqual(c.curve.end_direction[2],0.)
+        self.assertAlmostEqual(c.curve.geometry(1.)[1][2],0.,places=12)
+        c.gate_number=2;c.build(f,f.gates[2][1],index,c.end_direction(f,f.gates[2][1]))
+        self.assertAlmostEqual(c.curve.geometry(1.)[0][2],0.,places=12)
+        self.assertAlmostEqual(c.curve.geometry(1.)[1][2],0.,places=12)
+
     def controller(self):
         model=dict(hover_thrust=.27,thrust_acceleration=60.,position_gain=4/3,velocity_gain=3.,attitude_gain=8.,max_rate=3.,
             thrust_curve=(18.,65.),body_resistance_per_m=(.047,)*3)
