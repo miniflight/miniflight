@@ -8,7 +8,8 @@ def unit(vector):
 
 class GateCurve:
     def __init__(self,start,start_direction,end_direction,start_curvature=None):
-        self.length=max(1.,float(np.linalg.norm(start)));self.end_direction=unit(end_direction)
+        self.length=float(np.linalg.norm(start));self.end_direction=unit(end_direction)
+        if self.length<1e-6:raise ValueError('A gate curve needs a nonzero chord')
         a=np.asarray(start,float);v0=self.length*unit(start_direction);v1=self.length*self.end_direction
         a0=np.zeros(3) if start_curvature is None else self.length**2*np.asarray(start_curvature)
         c2=.5*a0;d=-a-v0-c2;e=v1-v0-2*c2;f=-2*c2

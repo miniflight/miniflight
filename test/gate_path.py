@@ -4,6 +4,11 @@ from miniflight.gate_path import GateCurve,SpeedReference,unit
 
 
 class GatePathTest(unittest.TestCase):
+    def test_short_replans_cannot_fold_backward(self):
+        c=GateCurve([-.1,0.,0.],[1.,0.,0.],[1.,0.,0.])
+        self.assertTrue(all(c.derivatives(u)[1][0]>0. for u in np.linspace(0.,1.,101)))
+        with self.assertRaises(ValueError):GateCurve([0.,0.,0.],[1.,0.,0.],[1.,0.,0.])
+
     def test_curve_crosses_the_gate_with_nonzero_smooth_tangent(self):
         start=np.array([-24.,2.,-6.]);end=unit([1.,-.1,.3]);curve=GateCurve(start,[1.,0.,0.],end)
         np.testing.assert_allclose(curve.geometry(0.)[0],start)
