@@ -16,6 +16,31 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_full_rim_factor_contains_measured_outer_corners_of_the_same_gate(self):
+        import cv2
+        from target.aigp.experiments.camera_imu.gate_filter_live import full_rim_observation
+        from target.aigp.experiments.camera_imu.vision import best_pose
+        def pixels(points):
+            camera=(np.array(points)+[12.,0.,-.4]) @ CAMERA_FROM_BODY.T;h=camera @ K.T
+            return h[:,:2]/h[:,2,None]
+        aperture=pixels(POINTS);outer=pixels([[0.,-1.4,-1.35],[0.,1.4,-1.35],[0.,1.4,1.35],[0.,-1.4,1.35]])
+        image=np.zeros((360,640,3),np.uint8);cv2.fillConvexPoly(image,np.rint(outer).astype(np.int32),(0,0,220));cv2.fillConvexPoly(image,np.rint(aperture).astype(np.int32),(0,0,0))
+        measured=full_rim_observation(image,aperture,best_pose(aperture));self.assertIsNotNone(measured)
+        np.testing.assert_allclose(measured[0],outer[:2],atol=1.3)
+        np.testing.assert_allclose([measured[1]['width_m'],measured[1]['center_to_top_m']],[2.8,1.35],atol=.08)
+
+    def test_joint_aperture_and_rim_measurements_learn_shape_from_broad_seeds(self):
+        for scale in [.7,1.3]:
+            f=filter();f.attitude_corrections=False;f.broad_rim=True
+            index,center,yaw=f.gates[1];gate=Rotation.from_euler('z',yaw).as_matrix()
+            points=np.array([[0.,-1.4,-1.35],[0.,1.4,-1.35]])
+            camera=((points @ gate.T+center-f.p) @ f.R) @ f.C.T;h=camera @ f.K.T;top=h[:,:2]/h[:,2,None]
+            aperture=f.measurement(1,POINTS)[0];f.add_rim(2.8*scale,1.35*scale,.001)
+            self.assertGreater(f.P[f.rim[0],f.rim[0]],1.)
+            for _ in range(30):f.observe(1,POINTS,aperture);f.observe(1,None,top,rim=True)
+            np.testing.assert_allclose(f.rim[1],[2.8,1.35],atol=.015)
+            self.assertGreater(np.linalg.norm(f.P[index:index+3,f.rim[0]:f.rim[0]+2]),0.)
+
     def test_consider_attitude_keeps_its_mean_and_measurement_uncertainty(self):
         f=filter();f.attitude_corrections=False;R=f.R.copy();P=f.P[6:9,6:9].copy()
         pixels=f.measurement(1,POINTS)[0]

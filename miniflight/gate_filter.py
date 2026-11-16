@@ -39,6 +39,7 @@ class GateFilter:
         self.gyro_bias_walk=.0001;self.force_bias_walk=.05
         self.airborne=not supported
         self.attitude_corrections=True
+        self.broad_rim=False
 
     def copy(self):return deepcopy(self)
 
@@ -101,6 +102,7 @@ class GateFilter:
         # P90-P10 spread is about2.563 standard deviations for a Gaussian.
         scale_derivative=np.array([width,height])/1.5;dimensions=scale_derivative*self.size
         sigma=dimensions*max(.01,fractional_spread/2.563)
+        if self.broad_rim:sigma=np.maximum(dimensions,.75)
         P[:n,n:]=self.P[:,15,None]*scale_derivative;P[n:,:n]=P[:n,n:].T
         P[n:,n:]=np.diag(sigma**2)+np.outer(scale_derivative,scale_derivative)*self.P[15,15]
         self.P=P;self.rim=(n,dimensions)
@@ -147,6 +149,7 @@ class GateFilter:
         result=self.correct(residual,H,V,18.467 if len(residual)==4 else 26.125)
         result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
         result['gate_index']=self.gates[key][0]
+        result['rim_index']=None if self.rim is None else self.rim[0]
         return result
 
     def correct(self,residual,H,V,threshold):

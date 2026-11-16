@@ -8,6 +8,16 @@ from miniflight.gate_filter import GateFilter,GateHistory
 from miniflight.profiling import timed
 from . import course,sensors,vision
 from .gate_filter_events import state as estimator_state
+from .partial import outer_top,measure_rim,same_red_component
+
+
+def full_rim_observation(image,corners,pose):
+    top=outer_top(image,corners)
+    if top is None:top=outer_top(image)
+    dimensions=None if top is None else measure_rim(top[0],pose)
+    if (dimensions is None or not (1.5<dimensions[0]<6. and .75<dimensions[1]<4.5)
+            or not same_red_component(image,corners,top[0])):return None
+    return top[0],dict(width_m=float(dimensions[0]),center_to_top_m=float(dimensions[1]),fractional_spread=1.,samples=1)
 
 
 def outage_budget(relative,covariance,direction,aligning,maximum=4.5):
@@ -43,10 +53,11 @@ class Inertial(sensors.Inertial):
                     supported=sensors.SETTINGS.get('ground_support',False))
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
                 f.attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False)
+                f.broad_rim=sensors.SETTINGS.get('joint_rim',False)
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
                 self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
                     thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
-                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,history_s=2.))
+                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,history_s=2.))
             elif sample.time>self.time:
                 self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)
@@ -153,6 +164,11 @@ class GateController(course.GateController):
                 reprojection_rmse_px=float(pose[0]),minimum_side_px=float(np.min(np.linalg.norm(self.last_corners-np.roll(self.last_corners,1,axis=0),axis=1))),
                 velocity=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior'),
                 position_correction=[0.]*3,velocity_correction=[0.]*3,correction_enabled=False)
+            if sensors.SETTINGS.get('joint_rim'):
+                observed=full_rim_observation(frame.bgr,self.last_corners,pose)
+                if observed is not None:
+                    self.used_joint.add((frame.id,'top',self.gate_number))
+                    self.inertial.pixels(self.gate_number,stamp,frame.id,*observed)
         if partial is not None and partial['image_id']==frame.id and partial['gate_number']==self.gate_number and (frame.id,'top',self.gate_number) not in self.used_joint:
             self.used_joint.add((frame.id,'top',self.gate_number));self.inertial.pixels(self.gate_number,stamp,frame.id,partial['top_corners'],partial['template'])
             partial['velocity']=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior')
@@ -195,7 +211,8 @@ class Controller(course.Controller):
         if command is not None and h is not None:
             f=h.filter
             posterior=dict(position_covariance=f.P[:3,:3].tolist(),velocity_covariance=f.P[3:6,3:6].tolist(),attitude_covariance=f.P[6:9,6:9].tolist(),
-                gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets,airborne=f.airborne)
+                gyro_bias=f.bg.tolist(),force_bias=f.ba.tolist(),aperture_size_m=f.size,retargets=f.retargets,airborne=f.airborne,
+                rim_dimensions=None if f.rim is None else f.rim[1].tolist())
             if self.gate.gate_number in f.gates:
                 relative,cov,camera,camcov=f.relative(self.gate.gate_number)
                 posterior.update(relative_gate=relative.tolist(),relative_covariance=cov.tolist(),camera_gate=camera.tolist(),camera_covariance=camcov.tolist())
