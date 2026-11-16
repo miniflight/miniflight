@@ -135,6 +135,12 @@ corners directly. The continuous reference uses only gates learned in this fligh
 The public-only force-noise fit failed independent dynamic-flight coverage and
 was rejected. Its frozen parameters and negative outcome remain in the report.
 
+`--image-time-uncertainty` adds one shared 10 ms exposure-time nuisance per image.
+All contours from that image share it; the filter then marginalizes it. This is
+an uncertainty hypothesis based on the public frame cadence, not a measured delay
+or a timestamp shift. It remains optional: development replay improved the fast
+first-gate velocity estimate but worsened full-flight world-position error.
+
 For response collection, use the joint course flags above with `--gates 1 --speed 2
 --shift 0 --thrust-excitation train` or `validate`. Fit before launching validation:
 

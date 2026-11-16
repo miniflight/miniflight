@@ -16,6 +16,29 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_shared_image_timing_matches_a_correlated_batch_measurement(self):
+        f=filter();f.p[:]=0.;f.P=np.eye(len(f.P))*.2;batch=f.copy();sigma=.01
+        H=np.zeros((2,len(f.P)));H[:,0]=[1.,2.];rate=np.array([80.,-40.]);measurement=np.array([.3,-.2])
+        batch.correct(measurement,H,np.eye(2)+sigma**2*np.outer(rate,rate),np.inf)
+        f.image_time_sigma=sigma;f.begin_image()
+        for i in range(2):
+            h=np.r_[H[i],rate[i]][None];residual=measurement[i]-H[i,0]*f.p[0]-rate[i]*f.image_time_offset
+            f.correct(np.array([residual]),h,np.eye(1),np.inf)
+        f.end_image();np.testing.assert_allclose(f.p,batch.p,atol=1e-12);np.testing.assert_allclose(f.P,batch.P,atol=1e-12)
+
+    def test_image_epoch_derivative_matches_motion_projection(self):
+        f=filter();f.image_time_sigma=.01;f.angular_velocity=np.array([.2,-.3,.1]);f.begin_image()
+        pixels,H=f.measurement(1,POINTS);epsilon=1e-6
+        moved=f.copy();moved.end_image();moved.p+=moved.v*epsilon;moved.R=moved.R @ Rotation.from_rotvec(moved.angular_velocity*epsilon).as_matrix()
+        expected=(moved.measurement(1,POINTS)[0]-pixels).ravel()/epsilon
+        np.testing.assert_allclose(H[:,f.image_time_index],expected,atol=1e-4)
+
+    def test_image_timing_marginalization_preserves_new_landmark_indices(self):
+        f=filter();f.image_time_sigma=.01;f.begin_image();f.add_rim(2.8,1.35,.1)
+        f.add_gate(2,np.array([.1,-.5,20.]),np.array([1.,0.,0.]))
+        old=f.measurement(2,POINTS)[0];f.end_image();new=f.measurement(2,POINTS)[0]
+        np.testing.assert_array_equal(old,new);self.assertEqual(len(f.P),26);self.assertEqual(f.rim[0],20);self.assertEqual(f.gates[2][0],22)
+
     def test_joint_partial_tracking_does_not_require_a_frozen_template_or_depth_inversion(self):
         import cv2
         from unittest.mock import patch

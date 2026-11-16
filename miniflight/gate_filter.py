@@ -41,6 +41,8 @@ class GateFilter:
         self.attitude_corrections=True
         self.broad_rim=False
         self.partial_gate_births=True
+        self.image_time_sigma=0.;self.image_time_index=None;self.image_time_offset=0.
+        self.angular_velocity=np.zeros(3)
 
     def copy(self):return deepcopy(self)
 
@@ -52,10 +54,28 @@ class GateFilter:
             self.gates[key]=(index,center+dx[index:index+3],yaw+dx[index+3])
         if self.rim is not None:
             index,dimensions=self.rim;self.rim=(index,dimensions+dx[index:index+2])
+        if self.image_time_index is not None:self.image_time_offset+=dx[self.image_time_index]
+
+    def begin_image(self):
+        """All contours in this image share one uncertain exposure epoch."""
+        if self.image_time_index is not None:raise RuntimeError('Image timing state already active')
+        if self.image_time_sigma<=0:return
+        n=len(self.P);self.P=np.pad(self.P,((0,1),(0,1)));self.P[n,n]=self.image_time_sigma**2
+        self.image_time_index=n;self.image_time_offset=0.
+
+    def end_image(self):
+        index=self.image_time_index
+        if index is None:return
+        self.P=np.delete(np.delete(self.P,index,axis=0),index,axis=1)
+        self.gates={k:(i-int(i>index),g,yaw) for k,(i,g,yaw) in self.gates.items()}
+        if self.rim is not None:
+            i,d=self.rim;self.rim=(i-int(i>index),d)
+        self.image_time_index=None;self.image_time_offset=0.
 
     def predict(self,dt,gyro,motors,angle_uncertainty=None):
         if not 0.<dt<=.15:raise ValueError('Process interval must be positive elapsed public time, <=150ms')
         n=len(self.P);F=np.eye(n);Q=np.zeros((n,n));omega=np.asarray(gyro)-self.bg
+        self.angular_velocity=omega.copy()
         rotation_step=Rotation.from_rotvec(omega*dt).as_matrix()
         if not self.airborne:motors=None
         if motors is None:
@@ -140,6 +160,10 @@ class GateFilter:
                 H[rows,self.rim[0]]=world_J @ gate @ [0.,-.5 if i==0 else .5,0.]
                 H[rows,self.rim[0]+1]=world_J @ [0.,0.,-1.]
             else:H[rows,15]=world_J @ (offset/self.size)
+        if self.image_time_index is not None:
+            rate=H[:,:3] @ self.v+H[:,6:9] @ self.angular_velocity
+            pixels=pixels+rate.reshape(-1,2)*self.image_time_offset
+            H[:,self.image_time_index]=rate
         return pixels,H
 
     def observe(self,key,points,pixels,sigma_px=1.,noise=None,rim=False):
@@ -151,6 +175,8 @@ class GateFilter:
         result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
         result['gate_index']=self.gates[key][0]
         result['rim_index']=None if self.rim is None else self.rim[0]
+        if self.image_time_index is not None:
+            result.update(image_time_offset_s=float(self.image_time_offset),image_time_sigma_s=float(self.image_time_sigma))
         return result
 
     def correct(self,residual,H,V,threshold):
@@ -218,6 +244,34 @@ class GateHistory:
                 first,last=self._rate(self.time),self._rate(end);dt=end-self.time
                 self.filter.predict(dt,.5*(first+last),self._motor(middle),(last-first)*dt/np.sqrt(12));self.time=end
 
+    def _observe(self,row,stamp):
+        seed=row.get('seed')
+        if not row.get('rim'):
+            constrained=upright_seed(row['pixels'],self.filter.C @ self.filter.R.T @ [0.,0.,1.],self.filter.K)
+            if constrained is not None:seed=constrained
+        if row.get('rim'):
+            if self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
+            pixels=np.c_[row['pixels'],np.ones(2)];rays=pixels @ np.linalg.inv(self.filter.K).T @ self.filter.C @ self.filter.R.T
+            z=rays[:,2];width,height=self.filter.rim[1];edge=z[0]*rays[1]-z[1]*rays[0]
+            if self.filter.partial_gate_births and np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
+                top=rays*(width/np.linalg.norm(edge)*abs(z[::-1]))[:,None]
+                center=top.mean(axis=0)+[0.,0.,height];right=(top[1]-top[0])/width
+                camera=self.filter.C @ self.filter.R.T
+                seed=(camera @ center*(1.5/self.filter.size),camera @ right)
+        if row['key'] not in self.filter.gates:
+            if seed is None:
+                self.results[row['id']]=dict(accepted=False,reason='missing_full_landmark')
+                return
+            self.filter.add_gate(row['key'],*seed)
+        result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
+        if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
+            result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
+            result['nearer_landmark_bound']=True
+        if result['accepted']:
+            self.filter.last_visual[row['key']]=stamp
+            if not row.get('rim'):self.filter.last_full_visual[row['key']]=stamp
+        self.results[row['id']]=result
+
     def _replay(self,changed):
         choices=[i for i,(t,_) in enumerate(self.snapshots) if t<changed]
         if not choices:self.rejected_late+=1;return
@@ -240,35 +294,13 @@ class GateHistory:
                         slope=self.filter.thrust_curve[0]+2*self.filter.thrust_curve[1]*float(np.mean(motors))
                         self.filter.observe_acceleration(acceleration,motors,float(np.hypot(.5,slope*spread)))
                         self.filter.last_force_time=stamp
+            images={}
             for row in self.observations:
-                if row['time']==stamp:
-                    seed=row.get('seed')
-                    if not row.get('rim'):
-                        constrained=upright_seed(row['pixels'],self.filter.C @ self.filter.R.T @ [0.,0.,1.],self.filter.K)
-                        if constrained is not None:seed=constrained
-                    if row.get('rim'):
-                        if self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
-                        # Two observed top corners plus upright geometry can seed a nearer hypothesis.
-                        pixels=np.c_[row['pixels'],np.ones(2)];rays=pixels @ np.linalg.inv(self.filter.K).T @ self.filter.C @ self.filter.R.T
-                        z=rays[:,2];width,height=self.filter.rim[1];edge=z[0]*rays[1]-z[1]*rays[0]
-                        if self.filter.partial_gate_births and np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
-                            top=rays*(width/np.linalg.norm(edge)*abs(z[::-1]))[:,None]
-                            center=top.mean(axis=0)+[0.,0.,height];right=(top[1]-top[0])/width
-                            camera=self.filter.C @ self.filter.R.T
-                            seed=(camera @ center*(1.5/self.filter.size),camera @ right)
-                    if row['key'] not in self.filter.gates:
-                        if seed is None:
-                            self.results[row['id']]=dict(accepted=False,reason='missing_full_landmark')
-                            continue
-                        self.filter.add_gate(row['key'],*seed)
-                    result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
-                    if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
-                        result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
-                        result['nearer_landmark_bound']=True
-                    if result['accepted']:
-                        self.filter.last_visual[row['key']]=stamp
-                        if not row.get('rim'):self.filter.last_full_visual[row['key']]=stamp
-                    self.results[row['id']]=result
+                if row['time']==stamp:images.setdefault(row.get('image_id',row['id']),[]).append(row)
+            for rows in images.values():
+                self.filter.begin_image()
+                for row in rows:self._observe(row,stamp)
+                self.filter.end_image()
             self.snapshots.append((stamp,self.filter.copy()));self.repropagated+=1
         boundary=end-self.seconds;keep=max(0,np.searchsorted([t for t,_ in self.snapshots],boundary)-1)
         self.snapshots=self.snapshots[keep:];oldest=self.snapshots[0][0]

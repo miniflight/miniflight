@@ -55,10 +55,12 @@ class Inertial(sensors.Inertial):
                 f.attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False)
                 f.broad_rim=sensors.SETTINGS.get('joint_rim',False)
                 f.partial_gate_births=not sensors.SETTINGS.get('joint_rim',False)
+                f.image_time_sigma=.01 if sensors.SETTINGS.get('image_time_uncertainty',False) else 0.
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
                 self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
                     thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
-                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,history_s=2.))
+                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,
+                    image_time_sigma_s=f.image_time_sigma,history_s=2.))
             elif sample.time>self.time:
                 self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)

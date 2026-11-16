@@ -32,7 +32,9 @@ def export(source,root):
                 outputs.write(json.dumps(dict(sequence=row['sequence'],state=row['state']),separators=(',',':'),allow_nan=False)+'\n');counts['states']+=1
     return counts
 
-def replay(source,output,gyro_attitude=None):
+def replay(source,output,gyro_attitude=None,image_time_sigma=None):
+    overridden=gyro_attitude is not None or image_time_sigma is not None
+    if image_time_sigma is not None and (not np.isfinite(image_time_sigma) or image_time_sigma<0):raise ValueError('Invalid image-time uncertainty')
     output.mkdir(parents=True)
     expected={}
     with gzip.open(source/'estimator-states.jsonl.gz','rt') as h:
@@ -52,12 +54,13 @@ def replay(source,output,gyro_attitude=None):
                 if history is not None:raise ValueError('Estimator initialized twice')
                 seed=np.array(row['seed']);forces=seed[:,1:4].copy();rates=seed[:,4:7].copy();c=row['config']
                 rotation=stationary_rotation(forces.mean(axis=0)).as_rotation_matrix()
-                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births'}:raise ValueError('Unexpected estimator calibration fields')
+                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births','image_time_sigma_s'}:raise ValueError('Unexpected estimator calibration fields')
                 f=GateFilter(rotation,np.zeros(3),c['thrust_curve'],c['drag'],c['camera_from_body'],c['intrinsics'],supported=c['supported'])
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff(seed[:,0])))))
                 f.attitude_corrections=c['attitude_corrections'] if gyro_attitude is None else not gyro_attitude
                 f.broad_rim=c.get('broad_rim',False)
                 f.partial_gate_births=c.get('partial_gate_births',True)
+                f.image_time_sigma=c.get('image_time_sigma_s',0.) if image_time_sigma is None else image_time_sigma
                 history=GateHistory(f,float(seed[-1,0]),seed[-1,4:7],seconds=c['history_s'])
             elif history is None:raise ValueError('Estimator input precedes initialization')
             elif kind=='imu':history.imu(row['time'],row['gyro'],row['acceleration'])
@@ -79,22 +82,23 @@ def replay(source,output,gyro_attitude=None):
                 changes.append(dict(sequence=events,kind=kind,time=actual['time'],position_step=dp.tolist(),position_update=correction.tolist(),
                     new_pixels=sorted(set(history.results)-old_pixels),force_result=history.filter.last_force_result if history.filter.last_force_time!=old_force else None))
             for reference in expected.get(events,[]):
-                if gyro_attitude is None:
+                if not overridden:
                     if any(k not in actual for k in reference) or {k:actual[k] for k in reference}!=reference:raise AssertionError(f'Estimation state/covariance differs at input{events}')
                     matched+=1
                 states.append(dict(sequence=events,**actual,position_covariance=history.filter.P[:3,:3].tolist(),
                     velocity_covariance=history.filter.P[3:6,3:6].tolist(),attitude_covariance=history.filter.P[6:9,6:9].tolist()))
-    if gyro_attitude is None and matched!=sum(len(v) for v in expected.values()):raise AssertionError('Recorded state has no matching input')
+    if not overridden and matched!=sum(len(v) for v in expected.values()):raise AssertionError('Recorded state has no matching input')
     with gzip.open(output/'estimates.jsonl.gz','wt') as h:
         for r in states:h.write(json.dumps(r,separators=(',',':'))+'\n')
     with gzip.open(output/'corrections.jsonl.gz','wt') as h:
         for r in changes:h.write(json.dumps(r,separators=(',',':'))+'\n')
     with gzip.open(output/'pixel-factors.jsonl.gz','wt') as h:
         for key,value in history.results.items():h.write(json.dumps(dict(id=key,**value),separators=(',',':'))+'\n')
-    report=dict(inputs=events,outputs=len(states),matched_live_states=matched,exact_mean_and_covariance=gyro_attitude is None,
-        gyro_attitude_override=gyro_attitude,native_inputs=0,late_pixels=history.rejected_late)
+    report=dict(inputs=events,outputs=len(states),matched_live_states=matched,exact_mean_and_covariance=not overridden,
+        gyro_attitude_override=gyro_attitude,image_time_sigma_override=image_time_sigma,native_inputs=0,late_pixels=history.rejected_late)
     (output/'replay.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));return report
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);p.add_argument('--attitude',choices=('recorded','gyro','fusion'),default='recorded');a=p.parse_args()
-    replay(a.source,a.output,None if a.attitude=='recorded' else a.attitude=='gyro')
+    p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);p.add_argument('--attitude',choices=('recorded','gyro','fusion'),default='recorded')
+    p.add_argument('--image-time-sigma',type=float);a=p.parse_args()
+    replay(a.source,a.output,None if a.attitude=='recorded' else a.attitude=='gyro',a.image_time_sigma)
