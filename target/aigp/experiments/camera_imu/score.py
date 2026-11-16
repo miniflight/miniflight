@@ -33,6 +33,7 @@ def score(root):
     path = root/"flight.jsonl"
     decoder = common.MAVLink(None)
     positions, attitudes, ticks, race, collisions, arms, outcomes = [], [], [], [], [], [], []
+    rates,motors=[],[]
     accepted = set()
     resets = 0
     armed_at,disarmed_at=None,None
@@ -62,6 +63,9 @@ def score(root):
                                               message.vx, message.vy, message.vz])
                         elif kind == "ATTITUDE":
                             attitudes.append([message.time_boot_ms*.001, message.roll, -message.pitch, -message.yaw])
+                            rates.append([message.time_boot_ms*.001,-message.rollspeed,-message.pitchspeed,-message.yawspeed])
+                        elif kind=='ACTUATOR_OUTPUT_STATUS':
+                            motors.append([message.time_usec*1e-6,*message.actuator[:4]])
                         elif kind == "COLLISION":
                             collisions.append(dict(host=packet["received_at"], data=message.to_dict()))
         elif row["event"] == "update":
@@ -80,6 +84,9 @@ def score(root):
         elif row["event"] == "result":
             outcomes.append(row)
     assert accepted <= ALLOWED
+    # Private references stay in the scorer; estimator exports never open this file.
+    np.savez_compressed(root/'native-reference.npz',position_velocity=np.asarray(positions).reshape(-1,7),
+        attitude=np.asarray(attitudes).reshape(-1,4),body_rates=np.asarray(rates).reshape(-1,4),motor_outputs=np.asarray(motors).reshape(-1,5))
     if not positions or not attitudes:
         outcome=outcomes[-1] if outcomes else {}
         result=dict(scoring_status='missing_native_reference',passed_without_reset=False,gates=[],
