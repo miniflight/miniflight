@@ -1,9 +1,19 @@
 import unittest
 import numpy as np
-from miniflight.gate_path import GateCurve,SpeedReference,unit
+from miniflight.gate_path import GateCurve,SpeedReference,unit,crossing_direction
 
 
 class GatePathTest(unittest.TestCase):
+    def test_crossings_carry_only_consistent_height_changes(self):
+        previous=np.array([0.,0.,0.]);center=np.array([24.,0.,5.]);following=np.array([50.,1.,13.])
+        direction=crossing_direction(previous,center,following)
+        slope=direction[2]/np.linalg.norm(direction[:2]);self.assertGreater(slope,5/24);self.assertLess(slope,8/np.linalg.norm([26.,1.]))
+        self.assertEqual(crossing_direction(previous,center,[50.,0.,4.])[2],0.)
+        self.assertEqual(crossing_direction(previous,center,[50.,0.,5.])[2],0.)
+        self.assertEqual(crossing_direction(previous,center)[2],0.)
+        curve=GateCurve(previous-center,[1.,0.,0.],direction)
+        self.assertGreaterEqual(min(curve.derivatives(u)[1][2] for u in np.linspace(0.,1.,101)),-1e-10)
+
     def test_short_replans_cannot_fold_backward(self):
         c=GateCurve([-.1,0.,0.],[1.,0.,0.],[1.,0.,0.])
         self.assertTrue(all(c.derivatives(u)[1][0]>0. for u in np.linspace(0.,1.,101)))

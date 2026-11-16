@@ -1,7 +1,7 @@
 """Continuous p/v/a gate tracking from the current public estimator map only."""
 from dataclasses import replace
 import numpy as np
-from miniflight.gate_path import GateCurve,SpeedReference,unit
+from miniflight.gate_path import GateCurve,SpeedReference,unit,crossing_direction
 from miniflight.position import trajectory_acceleration,quadratic_resistance,acceleration_control
 from miniflight.control import BodyRates
 from . import gate_filter_live as joint,sensors
@@ -20,11 +20,8 @@ class GateController(joint.GateController):
     def end_direction(self,f,center):
         previous=f.gates.get(self.gate_number-1);future=f.gates.get(self.gate_number+1)
         before=previous[1] if previous is not None else center+(self.initial_start if self.initial_start is not None else self.inertial.position-center)
-        delta=((future[1] if future is not None else center)-before).copy()
-        # Cross upright openings level; complete height changes before blind entry.
-        delta[2]=0.
-        direction=unit(delta)
-        return direction if direction @ self.direction>.2 else unit(self.direction)
+        direction=crossing_direction(before,center,None if future is None else future[1])
+        return direction if direction @ self.direction>.2 else unit(np.r_[self.direction[:2],0.])
 
     def build(self,f,center,index,direction):
         start=self.inertial.position-center;start_direction=unit(-start);curvature=None
@@ -42,8 +39,7 @@ class GateController(joint.GateController):
         future=f.gates.get(self.gate_number+1);self.future_index=None if future is None else future[0];self.entry_speed=None
         if future is not None:
             next_delta=future[1]-center;following=f.gates.get(self.gate_number+2)
-            end=next_delta if following is None else following[1]-center
-            next_end=unit(np.r_[end[:2],0.])
+            next_end=crossing_direction(center,future[1],None if following is None else following[1])
             if np.linalg.norm(next_delta)>.1:
                 preview=GateCurve(-next_delta,direction,next_end)
                 self.entry_speed=.95*preview.speed_limit(0.,self.config.max_speed)

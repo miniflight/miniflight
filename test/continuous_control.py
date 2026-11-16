@@ -8,7 +8,7 @@ from target.aigp.experiments.camera_imu import sensors,vision,continuous_control
 
 class ContinuousControlTest(unittest.TestCase):
     def test_height_changes_end_with_level_crossing_velocity(self):
-        c,f=self.controller();index,center,yaw=f.gates[2];f.gates[2]=(index,center+[0.,0.,-8.],yaw)
+        c,f=self.controller();index,center,yaw=f.gates[2];f.gates[2]=(index,center+[0.,0.,8.],yaw)
         c.drive(None)
         self.assertEqual(c.curve.end_direction[2],0.)
         self.assertAlmostEqual(c.curve.geometry(1.)[1][2],0.,places=12)

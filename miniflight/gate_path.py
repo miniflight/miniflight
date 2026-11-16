@@ -6,6 +6,21 @@ def unit(vector):
     vector=np.asarray(vector,float);return vector/max(np.linalg.norm(vector),1e-9)
 
 
+def crossing_direction(previous,center,following=None):
+    """Carry monotone height changes; level at missing lookahead or a reversal."""
+    before=np.asarray(center,float)-previous;after=None if following is None else np.asarray(following,float)-center
+    horizontal=(before if after is None else before+after).copy();horizontal[2]=0.
+    slope=0.
+    if after is not None:
+        h0,h1=np.linalg.norm(before[:2]),np.linalg.norm(after[:2])
+        if min(h0,h1)>1e-6:
+            d0,d1=before[2]/h0,after[2]/h1
+            if d0*d1>0:
+                w0,w1=2*h1+h0,h1+2*h0;slope=(w0+w1)/(w0/d0+w1/d1)
+    horizontal[2]=slope*np.linalg.norm(horizontal[:2])
+    return unit(horizontal)
+
+
 class GateCurve:
     def __init__(self,start,start_direction,end_direction,start_curvature=None):
         self.length=float(np.linalg.norm(start));self.end_direction=unit(end_direction)
