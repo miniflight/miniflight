@@ -131,7 +131,7 @@ poisoned controller replays also match. Accuracy, speed and reliability remain
 unresolved. [All seven development attempts](continuous.validation.json) and
 [full-flight errors](continuous.validation.png) include the failures.
 The joint rim holds uncertain outer-frame dimensions and uses measured cropped
-corners directly. The continuous reference uses only gates learned in this flight.
+corners directly. By default the continuous reference uses gates learned in this flight.
 The public-only force-noise fit failed independent dynamic-flight coverage and
 was rejected. Its frozen parameters and negative outcome remain in the report.
 
@@ -145,6 +145,11 @@ first-gate velocity estimate but worsened full-flight world-position error.
 holding the other attitude corrections. Their noise directions are removed from
 the remaining pixel update, so the four corners contribute information once.
 It requires `--gyro-attitude`; gate location and nominal size are not tilt labels.
+
+`--route-prior ESTIMATED_MAP` supplies relative route geometry from an earlier
+public-camera flight to the planner. The navigation filter receives no saved gate
+states. The prior is rebased on current observations; its content and hash remain
+in the replay protocol. This is a repeat-course experiment, not an unseen-map lap.
 
 For response collection, use the joint course flags above with `--gates 1 --speed 2
 --shift 0 --thrust-excitation train` or `validate`. Fit before launching validation:

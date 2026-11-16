@@ -355,13 +355,18 @@ def public_course(root,shift):
     return result
 
 
-def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False):
+def one(root, shift, course_gates=None, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False,route_prior=None):
     """One corrected gate; remove pixels and raw traces after scoring and replay."""
     calibration=None if dynamics_model is None else dynamics_model.read_bytes()
     position_config=None if calibration is None else json.loads(calibration)['position_config']
+    planning_prior=None
+    if route_prior is not None:
+        from .route_prior import load
+        planning_prior=load(route_prior)
     root.mkdir(parents=True)
     original = dict(SETTINGS)
     SETTINGS.update(thrust_excitation=excitation,render_video=excitation is None,gyro_attitude=gyro_attitude,joint_rim=joint_rim,direct_launch=direct_launch,continuous_path=continuous_path,image_time_uncertainty=image_time_uncertainty,upright_attitude=upright_attitude)
+    SETTINGS['route_prior']=planning_prior
     SETTINGS.update(gates_to_pass=1, camera_correction=True, camera_window_s=.5, speed_m_s=2.,
                     beyond_m=1.5, maximum_blind_s=4.5, flight_timeout_s=20.,
                     lookahead_enabled=False, lookahead_during_final=False, height_alignment=False)
@@ -426,6 +431,7 @@ def main():
     parser.add_argument('--continuous-path',action='store_true')
     parser.add_argument('--image-time-uncertainty',action='store_true',help='Shared10ms exposure-time uncertainty prior; not a measured delay')
     parser.add_argument('--upright-attitude',action='store_true',help='Use upright edges for tilt; partition their pixel information once')
+    parser.add_argument('--route-prior',type=Path,help='Public estimated-map export for planning only')
     parser.add_argument('--thrust-excitation',choices=('train','validate'))
     parser.add_argument("--poison", action="store_true")
     parser.add_argument("--turn-sign", type=int, choices=(-1,1), default=1)
@@ -449,8 +455,9 @@ def main():
         if args.direct_launch and not args.joint_estimator:parser.error('direct launch requires --joint-estimator')
         if args.image_time_uncertainty and not args.joint_estimator:parser.error('image-time uncertainty requires --joint-estimator')
         if args.upright_attitude and not (args.joint_estimator and args.gyro_attitude):parser.error('upright attitude requires joint estimation with other attitude corrections held')
+        if args.route_prior is not None and not args.continuous_path:parser.error('route prior requires continuous path control')
         if args.continuous_path and (not args.joint_estimator or args.thrust_excitation):parser.error('continuous path requires joint estimation without excitation')
-        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude)
+        result=one(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude,args.route_prior)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():
