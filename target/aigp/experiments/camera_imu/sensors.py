@@ -1,12 +1,7 @@
 """One aperture, with an IMU frame rooted at the stationary shifted start."""
 
 from bisect import bisect_left, bisect_right
-from dataclasses import replace
 from enum import Enum, auto
-import json
-import mmap
-from pathlib import Path
-import struct
 
 import numpy as np
 import cv2
@@ -16,18 +11,15 @@ from common.math import Quaternion
 from miniflight import vehicle
 from miniflight.attitude import gyro_step, stationary_rotation
 from miniflight.position import PositionConfig, acceleration_control, quadratic_resistance
-from miniflight.state import Frame
 from miniflight.profiling import timed
 from target.aigp.controllers import BaseController
 from target.aigp.controllers.r1_motors import Controller as Motors
-from target.aigp.experiments.producer_imu import ProducerImuClient
 
 
 from . import vision
 from .motion import GateMotion,transverse_velocity
 from .gravity import GateGravity
 from .partial import RimTemplate,outer_top,relative_from_top,predicted_aperture,same_red_component
-from target.aigp.native import BASE
 
 
 ALLOWED = frozenset(("HEARTBEAT", "COMMAND_ACK", "HIGHRES_IMU"))
@@ -44,87 +36,6 @@ def velocity_target(delta,gain,speed,vertical_speed=None):
     desired[:2]*=min(1.,speed/max(np.linalg.norm(desired[:2]),1e-9))
     desired[2]=np.clip(desired[2],-vertical_speed,vertical_speed)
     return desired
-
-
-class CameraClock:
-    """Read capture and timestamp boundaries, without reading rendered poses."""
-
-    def __init__(self, path):
-        with Path(path).open("r+b") as source:
-            self.mapping = mmap.mmap(source.fileno(), 0)
-        self.index = 0
-        self.captures, self.stamps = {}, {}
-        self.latest = None
-
-    def close(self):
-        self.mapping.close()
-
-    def read(self):
-        count = struct.unpack_from("<Q", self.mapping)[0]
-        if count >= (len(self.mapping)-4096)//512:
-            raise RuntimeError("camera clock probe exhausted")
-        output = []
-        while self.index < count:
-            d = struct.unpack_from("<16Q", self.mapping, 4096+self.index*512)
-            if not d[15]:
-                break
-            self.index += 1
-            kind, identity = d[0], d[11]
-            if kind == 1:
-                origin = struct.unpack("<d", struct.pack("<Q", d[5]))[0]
-                scale = struct.unpack("<d", struct.pack("<Q", d[6]))[0]
-                self.captures[identity] = [d[4], None, origin, scale]
-            elif kind == 8 and identity in self.captures:
-                self.captures[identity][1] = d[2]
-            elif kind == 2:
-                self.latest = identity
-            elif kind == 5 and self.latest in self.captures:
-                low, high, origin, scale = self.captures[self.latest]
-                if high is not None:
-                    self.stamps[d[9]] = [low*scale+16777216-origin, high*scale+16777216-origin]
-            elif kind == 4 and d[9] in self.stamps:
-                output.append([d[10], d[9], *self.stamps[d[9]]])
-        return output
-
-
-class SensorClient(ProducerImuClient):
-    def __init__(self, calls, camera_clock=None, **kwargs):
-        super().__init__(calls, **kwargs)
-        self.camera_clock = camera_clock
-        self.capture_times = {}
-        self.filtered = 0
-
-    def _receive(self, message, now):
-        if message.get_type() not in ALLOWED:
-            return None
-        return super()._receive(message, now)
-
-    def poll(self, timeout=0.):
-        packets = super().poll(timeout)
-        timing = self.calls("camera_clock", {}, self.camera_clock)
-        self.capture_times.update({(frame, stamp): (low+high)/2 for frame, stamp, low, high in timing})
-        output = []
-        for packet in packets:
-            if not isinstance(packet.data, bytes) and packet.data.get_type() not in ALLOWED:
-                self.filtered += 1
-                continue
-            if isinstance(packet.decoded, Frame):
-                key = packet.decoded.id, packet.decoded.time_ns
-                value = self.capture_times.get(key)
-                frame = None if value is None else replace(packet.decoded, time_ns=round(value*1e9))
-                packet = replace(packet, decoded=frame)
-            output.append(packet)
-        return tuple(output)
-
-    def read(self, timeout=1.):
-        state = super().read(timeout)
-        original = state.frame
-        if original is not None:
-            value = self.capture_times.get((original.id, original.time_ns))
-            state = replace(state, frame=None if value is None else replace(original, time_ns=round(value*1e9)))
-        assert state.motion is None and state.attitude is None and self.gates is None
-        self.state = state
-        return state
 
 
 class Phase(Enum):
@@ -236,7 +147,8 @@ class GateController(BaseController):
 
     def __init__(self):
         supplied=SETTINGS.get('position_config')
-        config=dict(supplied) if supplied is not None else json.loads((BASE.parents[1]/"test/fixtures/vq1_r1_sub10.config.json").read_text())
+        if supplied is None:raise ValueError('Public controller requires a publicly identified dynamics model')
+        config=dict(supplied)
         config.update(max_speed=SETTINGS["speed_m_s"], max_acceleration=3., max_horizontal_acceleration=3., max_tilt=.45)
         self.config = PositionConfig(**config)
         self.inertial = Inertial()

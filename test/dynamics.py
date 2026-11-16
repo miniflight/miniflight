@@ -6,12 +6,39 @@ from target.aigp.experiments.camera_imu.dynamics import load,FIELDS
 
 
 class PublicCalibrationTest(unittest.TestCase):
+    def test_replay_uses_only_its_recorded_configuration_and_restores_the_caller(self):
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import runner,sensors
+        metadata=dict(process='public_camera_imu_course',revision='test',settings=dict(continuous_course=True))
+        def inspect(*args,**kwargs):
+            self.assertFalse(sensors.SETTINGS.get('upright_attitude',False));self.assertFalse(sensors.SETTINGS.get('image_time_uncertainty',False))
+            self.assertNotIn('unrecorded_option',sensors.SETTINGS)
+            raise RuntimeError('configuration checked')
+        with tempfile.TemporaryDirectory() as directory,patch.dict(sensors.SETTINGS,upright_attitude=True,image_time_uncertainty=True,unrecorded_option=7):
+            before=dict(sensors.SETTINGS);path=Path(directory)/'flight.jsonl';path.write_text(json.dumps(dict(event='metadata',metadata=metadata))+'\n')
+            with patch.object(runner,'execute',side_effect=inspect),self.assertRaisesRegex(RuntimeError,'configuration checked'):runner.replay(path)
+            self.assertEqual(sensors.SETTINGS,before)
+
     def test_public_course_rejects_native_fitted_default_before_launch(self):
         from unittest.mock import patch
         from target.aigp.experiments.camera_imu import runner,sensors
         with patch.dict(sensors.SETTINGS,position_config=None),patch.object(runner.native,'launch',side_effect=AssertionError('launched')):
             with self.assertRaisesRegex(ValueError,'publicly identified'):
                 runner.public_course(Path('/unused'),-.5)
+            with self.assertRaisesRegex(ValueError,'publicly identified'):
+                sensors.GateController()
+
+    def test_archived_process_replay_names_its_recorded_revision(self):
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import runner,sensors
+        settings=dict(sensors.SETTINGS)
+        for process,archived in [('camera_imu',{}),('public_camera_imu_course',dict(continuous_course=True,route_prior={'points':{}}))]:
+            with tempfile.TemporaryDirectory() as directory,patch.object(runner,'execute',side_effect=AssertionError('controller executed')):
+                path=Path(directory)/'flight.jsonl'
+                path.write_text(json.dumps(dict(metadata=dict(process=process,revision='old-source-revision',settings=archived)))+'\n')
+                with self.assertRaisesRegex(ValueError,'recorded revision old-source-revision'):
+                    runner.replay(path)
+        self.assertEqual(sensors.SETTINGS,settings)
 
     def test_client_delay_uses_receipt_and_send_return_without_exposure_claim(self):
         from target.aigp.experiments.camera_imu.pipeline_latency import measure

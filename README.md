@@ -1,7 +1,12 @@
 # miniflight
 
 Python control routines and vehicle adapters. The current target is the AI-GP
-flight simulator. `r1_beautiful` initializes attitude from stationary specific
+flight simulator. The [camera + IMU pilot](target/aigp/experiments/camera_imu/README.md)
+uses public sensors and our motor commands; native state is scoring-only.
+[The controller model](controller.md) defines the physics, persistent state,
+mapping/control loop and accuracy requirements for survey and racing.
+
+`r1_beautiful` is a privileged simulator baseline. It initializes attitude from stationary specific
 force and one native heading, then propagates the full rotation with the gyro.
 Position, velocity and course/reference remain privileged. The follower computes
 PID feedback and sends body rates and thrust; VQ1 supplies rate control, mixing

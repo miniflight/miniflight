@@ -7,7 +7,8 @@
       "inflight_resets": 0,
       "privileged_navigation_inputs": 0
     },
-    "time_goal_s": 10.0
+    "time_goal_s": 10.0,
+    "immediate": "Low full-state error and a coherent stateful survey/racing controller; error targets precede speed."
   },
   "priors": {
     "camera": {
@@ -115,7 +116,7 @@
       "produces": "Time-indexed position, velocity and acceleration reference",
       "owns": "Flight objective and feasibility constraints",
       "required_method": "Choose minimum-time feasible short trajectory with crossing margin, actuator and camera-visibility constraints",
-      "current_method": "Position waypoints with coarse visibility alignment, plus optional predictive crossing constraint. Near a gate, brake and align in the transverse plane if the constant-velocity crossing prediction exceeds0.55m. Joint posterior chance constraints and a timed trajectory remain absent."
+      "current_method": "Optional continuous gate-relative quintic p/v/a reference with monotone height tangents, scalar speed acceleration/jerk limits and feedback. No calibrated crossing chance constraint or persistent map backend."
     },
     {
       "stage": "control",
@@ -208,12 +209,12 @@
     "globally_calibrated_posterior_coverage": null
   },
   "current_gaps": [
-    "One continuous5m/s attempt completed6/6 in43.08s; position/velocity/attitude/depth MAE1.65m/0.39m/s/0.30deg/0.55m. The8m/s attempt missed gate1 and scored0/6. Global accuracy and reliability remain poor.",
-    "Optional continuous p/v/a gate-relative reference avoids normal stop/align modes. Scalar speed jerk is bounded, full Cartesian jerk is not. Crossing progress still uses mean-state geometry; no calibrated chance constraint is enforced.",
-    "Gate binding uses confirmed nearer hypotheses; it does not report calibrated identity probabilities.",
-    "True camera exposure and physical IMU integration intervals are unknown. The joint path uses published epochs and body-force observations without exact accelerometer preintegration.",
-    "Mean motor command 0.21-0.335 has a public response fit and one complete independent validation flight. Mixed rotor commands, larger speeds and tilt need more validation; some startup commands exceed this interval.",
-    "Own commands now use causal public send epochs and public force detects pad release. Actual actuator application time is unknown; the planner still consumes the latest IMU posterior."
+    "The best recent clean six-gate development lap took31.65s with position/velocity/attitude/depth MAE1.02m/0.41m/s/1.06deg/0.38m. Updated two-start profiles often stopped after two gates. High accuracy and robustness remain unachieved.",
+    "The per-flight joint map is discarded after export. Persistent posterior refinement, map-frame relocalization and loop closure across flights are not implemented.",
+    "Mission ordinals still double as landmark roles. Farther gates can be assigned to the next slot before a nearer gate becomes visible; identity uncertainty needs an explicit representation.",
+    "The continuous reference can point the camera away from descending gates. Complete learned-map projection audits are optimistic if next-gate geometry is not available causally.",
+    "Exposure time, actuator application time and exact physical IMU integration intervals remain unknown.10ms is an image-time uncertainty prior, not a measured delay.",
+    "Public thrust validation covers mean commands0.21-0.335 in short response windows. Dynamic drag transfer remains unvalidated; no candidate drag/scale/background update was installed."
   ],
   "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
   "retention": {
@@ -233,15 +234,20 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Keep the public thrust curve frozen. Resolve the first-gate camera outage and vertical-estimate failure at8m/s before increasing speed. Diagnose accumulated body/map corrections separately from relative crossing error. Validate force weighting on independent public data before installation.",
+    "backend": "Freeze the ideal-controller contract, keep one public measurement boundary, and prove persistent joint map/state refinement on one gate across two flights with independent starts. No immutable XYZ route adapter.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
       "crossing_prediction_p95_error_m": 0.2,
       "nominal_3sigma_crossing_interval_coverage": 0.95,
-      "controller_p95_compute_ms": 10.0
+      "controller_p95_compute_ms": 10.0,
+      "position_mae_m": 0.1,
+      "velocity_mae_m_s": 0.1,
+      "attitude_mae_deg": 0.2,
+      "depth_mae_m": 0.1,
+      "gate_center_mae_m": 0.15
     },
-    "acceptance": "Five prospective unchanged six-gate flights from both shifts: six native-valid ordered gates, zero contacts/resets, exact normal and poisoned replay. Report MAE/P95/max by phase and retain every failure. Velocity/depth diagnostic targets remain goals.",
+    "acceptance": "First validate one-gate map reuse with fixed map gauge and live refinement; then five prospective unchanged six-gate flights from both starts, zero contacts/resets, all state errors/availability, and exact normal/poison/estimator replay. Targets are requirements, not achieved results.",
     "planner_condition": "abs(mean crossing offset)+3*sigma_crossing <=0.55m in both transverse axes; calibrate coverage before treating this as a probability. Include position/landmark/velocity cross-covariances."
   },
   "calibration": {
@@ -256,5 +262,25 @@
   "joint_checkpoint": "gate-filter.validation.json",
   "course_checkpoint": "gate-filter.course.validation.json",
   "thrust_checkpoint": "thrust-response.validation.json",
-  "continuous_checkpoint": "continuous.validation.json"
+  "continuous_checkpoint": "continuous.validation.json",
+  "controller_contract": {
+    "theory": "../../../../controller.md",
+    "belief": "Joint drone state, revisable map, calibration and observation identity with their correlations.",
+    "online": "Predict and correct state/map from current measurements, plan observable motion and command motors.",
+    "between_flights": "Retain constraints and map uncertainty; relocalize each new start, refine map/calibration using public data and validate separately.",
+    "scoring": "Native state after outputs freeze only; no calibration or navigation labels.",
+    "implemented": "Short-window joint gate/drone filter and public-sensor feedback path.",
+    "missing": [
+      "persistent cross-flight map posterior and constraints",
+      "relocalization in one retained map frame",
+      "landmark identity separate from route ordinal",
+      "calibrated uncertainty-aware perception planning"
+    ]
+  },
+  "accuracy_checkpoint": "accuracy.validation.json",
+  "retired_modes": [
+    "instrumented camera/IMU live capture",
+    "old joint-turn pilot",
+    "immutable planning-only route snapshot"
+  ]
 }

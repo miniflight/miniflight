@@ -11,7 +11,6 @@ from . import sensors as single
 
 ALLOWED = single.ALLOWED
 vision = single.vision
-CameraClock, SensorClient = single.CameraClock, single.SensorClient
 SETTINGS = single.SETTINGS
 SETTINGS.update(gates_to_pass=2, beyond_m=4., handoff_distance_m=5., lookahead_enabled=True,
                 lookahead_start_m=12., lookahead_interval_s=.1, lookahead_max_age_s=2.,
@@ -238,14 +237,3 @@ class GateController(single.GateController):
                     and self.inertial.time-self.measurement_time()<=SETTINGS['maximum_blind_s']):
                 raise TimeoutError("gate image exceeded the lookahead freshness interval")
         return request
-
-
-class Controller(single.BaseController):
-    targets = ("vq1.r1",)
-
-    def __init__(self):
-        self.gate = GateController()
-        self.motor = single.Motors(position=self.gate)
-
-    def update(self, telemetry, frames, race_state):
-        return self.motor.update(telemetry, frames, None)

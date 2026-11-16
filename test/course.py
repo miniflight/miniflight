@@ -219,7 +219,7 @@ class WireBoundaryTest(unittest.TestCase):
         cv2.rectangle(image,(220,150),(340,270),(0,0,0),-1)
         corners=np.array([[219.5,149.5],[340.5,149.5],[340.5,270.5],[219.5,270.5]])
         q=vision.CAMERA_FROM_BODY.T
-        with patch.dict(sensors.SETTINGS,continuous_course=True,camera_correction=True,camera_position_min_side_px=20.):
+        with patch.dict(sensors.SETTINGS,position_config=dict(hover_thrust=.27,thrust_acceleration=60.),continuous_course=True,camera_correction=True,camera_position_min_side_px=20.):
             controller=sensors.GateController()
             controller.locked=0;controller.count=3;controller.anchor=np.array([20.,0.,0.])
             controller.direction=np.array([1.,0.,0.]);controller.camera_fusion_started=True
