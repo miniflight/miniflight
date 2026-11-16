@@ -90,6 +90,9 @@ class JointGateTest(unittest.TestCase):
         request=c.drive(np.array([0.,-.5,-1.]));self.assertEqual((request.roll_rate,request.pitch_rate,request.yaw_rate),(0.,0.,0.));self.assertGreater(request.thrust,.27)
         json.dumps(c.signal)
         c.inertial.position[2]=-.25
+        c.inertial.history=SimpleNamespace(filter=SimpleNamespace(airborne=False))
+        request=c.drive(np.array([0.,-.5,-1.]));self.assertEqual((request.roll_rate,request.pitch_rate,request.yaw_rate),(0.,0.,0.));self.assertFalse(c.launch_cleared)
+        c.inertial.history.filter.airborne=True
         with patch.object(course.GateController,'drive',return_value=None):c.drive(np.array([0.,-.5,-1.]))
         self.assertTrue(c.launch_cleared)
         json.dumps(c.signal)
@@ -121,6 +124,25 @@ class JointGateTest(unittest.TestCase):
             with patch.object(c,'drive',return_value=None):c.update((),(),None)
             self.assertIs(c.phase,sensors.Phase.TRACKING);np.testing.assert_array_equal(c.inertial.position,[.2,-.5,-1.])
             np.testing.assert_array_equal(c.inertial.velocity,[.1,.3,.2]);self.assertEqual(c.inertial.times,[.5,1.])
+
+    def test_direct_launch_requires_public_liftoff_and_preserves_flight_velocity(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from common.math import Quaternion
+        from target.aigp.experiments.camera_imu import sensors
+        state=SimpleNamespace(motion=None,attitude=None,imu_increments=(),time=1.)
+        settings=dict(position_config=dict(hover_thrust=.27,thrust_acceleration=60.),visual_initialization=True,continuous_origin=True,moving_start=True,direct_launch=True,shift_right_m=.5)
+        with patch.dict(sensors.SETTINGS,**settings),patch.object(sensors,'vehicle',SimpleNamespace(state=state)):
+            c=sensors.GateController();c.phase=sensors.Phase.SHIFTING;c.locked=1;c.setup_started=0.;c.setup_steady=.8
+            c.inertial.rotation=Quaternion();c.inertial.time=1.;c.inertial.position=np.array([.2,.4,-.5]);c.inertial.velocity=np.array([.7,.4,-.5])
+            c.inertial.history=SimpleNamespace(filter=SimpleNamespace(airborne=False));c.inertial.times=[.5,1.];c.inertial.rotations=[CAMERA_FROM_BODY.T.copy()]*2
+            c.anchor=np.array([20.,1.,-1.]);c.last_image_time=1.;c.last_image_id=1;c.direction=np.array([1.,0.,0.])
+            c.last_relative_gate=c.anchor-c.inertial.position;c.last_relative_position=c.inertial.position.copy()
+            c.last_corners=np.zeros((4,2));c.last_gate_corners=np.zeros((4,3));c.previous=(c.inertial.position.copy(),CAMERA_FROM_BODY.T,np.zeros((4,2)),None)
+            with patch.object(c,'drive',return_value=None):
+                c.update((),(),None);self.assertIs(c.phase,sensors.Phase.SHIFTING)
+                c.inertial.history.filter.airborne=True;c.setup_steady=.8;c.update((),(),None)
+            self.assertIs(c.phase,sensors.Phase.TRACKING);np.testing.assert_array_equal(c.inertial.position,[.2,.4,-.5]);np.testing.assert_array_equal(c.inertial.velocity,[.7,.4,-.5])
 
     def test_visual_updates_cannot_turn_real_rotation_into_gyro_bias(self):
         f=filter();prior=f.bg.copy();P=f.P[9:12,9:12].copy();pixels=f.measurement(1,POINTS)[0]

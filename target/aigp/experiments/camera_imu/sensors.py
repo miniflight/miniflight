@@ -509,8 +509,13 @@ class GateController(BaseController):
                 start_speed=.5 if SETTINGS.get('moving_start') else .15
                 steady=distance<.1 and np.linalg.norm(self.inertial.velocity[1:])<start_speed and abs(self.inertial.velocity[0])<.5
                 if SETTINGS.get('moving_start'):steady=steady and now-self.measurement_time()<.2
+                if SETTINGS.get('direct_launch'):
+                    h=getattr(self.inertial,'history',None)
+                    steady=(h is not None and h.filter.airborne and self.inertial.position[2]<-.4
+                        and abs(target[1]-self.inertial.position[1])<.2 and np.linalg.norm(self.inertial.velocity)<2.
+                        and now-self.measurement_time()<.2)
             self.setup_steady = (self.setup_steady or now) if steady else None
-            setup_complete=self.setup_steady is not None and now-self.setup_steady>=.4
+            setup_complete=self.setup_steady is not None and now-self.setup_steady>=(.1 if SETTINGS.get('direct_launch') else .4)
             if now-self.setup_started > 10. and not setup_complete:
                 raise TimeoutError("IMU shift and settle exceeded ten seconds")
             if setup_complete:
