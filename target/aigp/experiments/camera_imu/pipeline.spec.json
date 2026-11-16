@@ -35,7 +35,7 @@
         "public JPEG camera stream/header timestamps",
         "public HIGHRES_IMU sample timestamps, gyro and acceleration",
         "our sent motor commands",
-        "optional joint map posterior from public observations in the same stationary launch frame"
+        "optional joint map posterior learned from earlier public observations"
       ],
       "produces": "Raw public-input replay dataset",
       "owns": "Clock mapping and delivery order",
@@ -83,6 +83,7 @@
       ],
       "required_method": "Fixed-lag error-state EKF with joint vehicle/current-next landmark covariance. Apply raw pixel factors at their estimated image epochs; replay subsequent public gyro, own commands and visual events. Keep a bounded history and predict to the command epoch. Published sample elapsed time supports the gyro/command model, not exact accelerometer preintegration.",
       "current_method": "Optional joint error-state EKF (--joint-estimator): raw aperture/top pixels and public body specific force update p/v/attitude/biases and gate geometry together. Rewind and replay every later process and measurement event. The default course observer remains complementary.",
+      "cold_start": "Optional fresh image/IMU window searches all map-gate pairs and fits p/v/R without a launch pose. Confirm distinct assignments, condition latest pixels with inherited map covariance, then propagate own commands to publication. Asynchronous solver and pixel-bearing acquisition keep motor feedback active.",
       "target_state": {
         "vehicle_error_coordinates": 15,
         "known_aperture_consider_coordinates": 1,
@@ -211,7 +212,7 @@
   },
   "current_gaps": [
     "The best recent clean six-gate development lap took31.65s with position/velocity/attitude/depth MAE1.02m/0.41m/s/1.06deg/0.38m. Updated two-start profiles often stopped after two gates. High accuracy and robustness remain unachieved.",
-    "Joint map/rim/size covariance can be restored and refined from the same launch frame. Arbitrary-start relocalization, retrospective smoothing and loop closure are not implemented.",
+    "Cold localization before gate1 is implemented; coverage depends on observable mapped landmarks. Unknown ground-launch lifecycle, retrospective smoothing and loop closure remain unimplemented.",
     "Mission ordinals still double as landmark roles. Farther gates can be assigned to the next slot before a nearer gate becomes visible; identity uncertainty needs an explicit representation.",
     "The continuous reference can point the camera away from descending gates. Complete learned-map projection audits are optimistic if next-gate geometry is not available causally.",
     "Exposure time, actuator application time and exact physical IMU integration intervals remain unknown.10ms is an image-time uncertainty prior, not a measured delay.",
@@ -235,7 +236,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Retain joint map/state uncertainty and validate pixel-to-map relocalization from an unknown starting displacement, then retrospective map refinement.",
+    "backend": "Expand unknown-start view coverage and reduce correlated map/body drift; retain public keyframe constraints for retrospective map refinement.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -273,7 +274,7 @@
     "implemented": "Short-window joint gate/drone filter and public-sensor feedback path.",
     "missing": [
       "persistent keyframe constraints and retrospective map refinement",
-      "relocalization in one retained map frame",
+      "broad-view cold localization and unknown-ground-launch lifecycle",
       "landmark identity separate from route ordinal",
       "calibrated uncertainty-aware perception planning"
     ]

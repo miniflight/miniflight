@@ -256,7 +256,7 @@ class Controller(base.single.BaseController):
         return command
 
 
-def execute(calls,record,path,reader=None,client=None):
+def execute(calls,record,path,reader=None,client=None,controller_factory=None):
     """Own sensor/command lifetime; native GO, validity, counters and finish are unused."""
     client=WireClient(calls,record_camera=True) if client is None else client
     controller_type=Controller
@@ -266,7 +266,7 @@ def execute(calls,record,path,reader=None,client=None):
         from .thrust_control import Controller as controller_type
     if base.SETTINGS.get('continuous_path'):
         from .continuous_control import Controller as controller_type
-    controller=RecordedController(lambda:controller_type(calls),record,signals=lambda c:c.gate.signal)
+    controller=RecordedController(lambda:controller_type(calls) if controller_factory is None else controller_factory(calls),record,signals=lambda c:c.gate.signal)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
     began=calls.monotonic();ready=None;error=None;reason=None;armed_at=None
@@ -287,7 +287,7 @@ def execute(calls,record,path,reader=None,client=None):
             raise TimeoutError('sensor-only course deadline exceeded')
         if ready is None or now<ready:
             return None
-        if now-ready>5. and controller.controller.gate.inertial.rotation is None:
+        if now-ready>5. and controller.controller.gate.inertial.rotation is None and not getattr(controller.controller,'localizing',False):
             raise TimeoutError('public IMU initialization exceeded five seconds')
         feedback=state.rate_feedback
         if cleanup.arm_phase is ArmPhase.ARM_REQUESTED and (feedback is None or now-feedback.received_at>.3):

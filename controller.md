@@ -178,15 +178,16 @@ replay. Under 10 seconds remains a separate speed target.
 
 The current code has a joint gate/drone error-state filter with a short replay
 window, measured aperture/rim factors, command-model prediction and motor
-feedback. It can retain the joint map posterior between flights from the same
-launch frame. General relocalization, retrospective smoothing and calibrated
-crossing probabilities remain unimplemented. Timing and some dynamics
+feedback. It retains the joint map posterior and can cold-localize from an
+unknown airborne pose before gate1, without setup-pilot spatial state. View
+coverage, retrospective smoothing and calibrated crossing probabilities remain
+incomplete. Timing and some dynamics
 remain uncertain. Learned-map laps reached 27.38 s and 27.62 s; the next repeat
 stopped at 3/6. The faster lap had position/velocity/attitude/depth MAE
 1.90 m / 0.46 m/s / 0.50 deg / 0.29 m. The targets above remain unachieved.
 
-Next validate camera-to-map localization after an unknown starting displacement
-and reduce common drone/map drift. Keep landmark identity separate from route
+Next expand cold-localization view coverage and reduce common drone/map drift.
+Keep landmark identity separate from route
 order and include camera visibility in descent/braking trajectories.
 
 References supporting this design:

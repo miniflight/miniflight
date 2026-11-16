@@ -53,17 +53,21 @@ def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitu
             if kind=='init':
                 if history is not None:raise ValueError('Estimator initialized twice')
                 seed=np.array(row['seed']);forces=seed[:,1:4].copy();rates=seed[:,4:7].copy();c=row['config']
-                rotation=stationary_rotation(forces.mean(axis=0)).as_rotation_matrix()
-                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births','image_time_sigma_s','upright_attitude','map_prior'}:raise ValueError('Unexpected estimator calibration fields')
-                f=GateFilter(rotation,np.zeros(3),c['thrust_curve'],c['drag'],c['camera_from_body'],c['intrinsics'],supported=c['supported'])
-                f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff(seed[:,0])))))
-                f.attitude_corrections=c['attitude_corrections'] if gyro_attitude is None else not gyro_attitude
-                f.broad_rim=c.get('broad_rim',False)
-                f.partial_gate_births=c.get('partial_gate_births',True)
-                f.image_time_sigma=c.get('image_time_sigma_s',0.) if image_time_sigma is None else image_time_sigma
-                f.upright_attitude=c.get('upright_attitude',False) if upright_attitude is None else upright_attitude
-                if c.get('map_prior') is not None:f.restore_map(c['map_prior'])
-                history=GateHistory(f,float(seed[-1,0]),seed[-1,4:7],seconds=c['history_s'])
+                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births','image_time_sigma_s','upright_attitude','map_prior','bootstrap_views','bootstrap_commands'}:raise ValueError('Unexpected estimator calibration fields')
+                if 'bootstrap_views' in c:
+                    from miniflight.relocalization import bootstrap
+                    history,_=bootstrap(c,seed,c['bootstrap_views']);f=history.filter
+                else:
+                    rotation=stationary_rotation(forces.mean(axis=0)).as_rotation_matrix()
+                    f=GateFilter(rotation,np.zeros(3),c['thrust_curve'],c['drag'],c['camera_from_body'],c['intrinsics'],supported=c['supported'])
+                    f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff(seed[:,0])))))
+                    f.attitude_corrections=c['attitude_corrections'];f.broad_rim=c.get('broad_rim',False);f.partial_gate_births=c.get('partial_gate_births',True)
+                    f.image_time_sigma=c.get('image_time_sigma_s',0.);f.upright_attitude=c.get('upright_attitude',False)
+                    if c.get('map_prior') is not None:f.restore_map(c['map_prior'])
+                    history=GateHistory(f,float(seed[-1,0]),seed[-1,4:7],seconds=c['history_s'])
+                if gyro_attitude is not None:f.attitude_corrections=not gyro_attitude
+                if image_time_sigma is not None:f.image_time_sigma=image_time_sigma
+                if upright_attitude is not None:f.upright_attitude=upright_attitude
             elif history is None:raise ValueError('Estimator input precedes initialization')
             elif kind=='imu':history.imu(row['time'],row['gyro'],row['acceleration'])
             elif kind=='command':history.command(row['time'],row['motors'])

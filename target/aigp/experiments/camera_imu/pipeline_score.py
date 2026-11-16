@@ -38,7 +38,7 @@ def score(root):
                     nearest_center_error_m=float(distances[nearest]),second_distance_gap_m=float(distances[indices[1]]-distances[nearest])))
     time=np.array([t['imu_time'] for t in ticks]);dt=np.diff(time,append=time[-1]);dt=np.maximum(0.,dt)
     phases={key:float(sum(dt[i] for i,t in enumerate(ticks) if t['phase']==key)) for key in sorted({t['phase'] for t in ticks})}
-    velocity=np.array([t['velocity'] for t in ticks]);age=np.array([np.nan if t.get('measurement_time') is None else t['imu_time']-t['measurement_time'] for t in ticks])
+    velocity=np.array([t.get('velocity',[np.nan]*3) for t in ticks]);age=np.array([np.nan if t.get('measurement_time') is None else t['imu_time']-t['measurement_time'] for t in ticks])
     claims=[r for r in associations if r['scored_gate'] is not None];wrong=[r for r in claims if r['scored_gate']!=r['assigned_gate']]
     score=json.loads((root/'score.json').read_text());margins=[]
     for g in score.get('gates',[]):

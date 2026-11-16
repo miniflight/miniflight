@@ -2,7 +2,7 @@
 import argparse,gzip,hashlib,json
 from pathlib import Path
 import numpy as np
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation,Slerp
 from .vision import CAMERA_FROM_BODY
 from .geometry import gate_openings
 from .gate_filter_score import statistics
@@ -20,16 +20,27 @@ def score(source,root):
     path=root/'estimates.jsonl.gz';estimate_hash=hashlib.sha256(path.read_bytes()).hexdigest()
     with gzip.open(path,'rt') as h:rows=[json.loads(l) for l in h]
     with gzip.open(source/'control.jsonl.gz','rt') as h:control=[json.loads(l) for l in h]
-    control=[r for r in control if r['phase'] in ['SHIFTING','TRACKING','FINAL_IMU','HANDOFF'] and r.get('joint_posterior')]
-    n=np.genfromtxt(source/'state-errors.csv',delimiter=',',names=True)
-    assert len(rows)==len(control)==len(n);t=np.array([r['time'] for r in rows]);np.testing.assert_array_equal(t,n['time'])
-    local0=np.array(control[0]['camera_orientation']) @ CAMERA_FROM_BODY
-    world0=Rotation.from_euler('xyz',[n['estimated_attitude_'+a+'_deg'][0] for a in ['roll','pitch','yaw']],degrees=True).as_matrix()
-    yaw=Rotation.from_matrix(world0 @ local0.T).as_euler('xyz')[2];align=Rotation.from_euler('z',yaw).as_matrix()
-    origin=np.array([n['estimated_position_'+a][0] for a in 'ned'])-align @ control[0]['position']
+    fixed=(source/'score-frame.json').exists()
+    control=[r for r in control if r['phase'] in ['SHIFTING','TRACKING','FINAL_IMU','HANDOFF']+(['ACQUIRING'] if fixed else []) and r.get('joint_posterior')]
+    assert len(rows)==len(control);t=np.array([r['time'] for r in rows])
+    if fixed:
+        frame=json.loads((source/'score-frame.json').read_text())
+        if frame['scale']!=1.:raise ValueError('Scoring map scale must remain fixed')
+        yaw=frame['yaw_rad'];align=Rotation.from_euler('z',yaw).as_matrix();origin=np.array(frame['origin_m'])
+        with np.load(source/'native-reference.npz',allow_pickle=False) as reference:
+            motion=interpolate(reference['position_velocity'],t);a=reference['attitude']
+        a=a[np.r_[True,np.diff(a[:,0])>0]];np_=motion[:,:3];nv=motion[:,3:]
+        nr=Slerp(a[:,0],Rotation.from_euler('xyz',a[:,1:]))(np.clip(t,a[0,0],a[-1,0])).as_matrix()
+    else:
+        n=np.genfromtxt(source/'state-errors.csv',delimiter=',',names=True)
+        assert len(rows)==len(n);np.testing.assert_array_equal(t,n['time'])
+        local0=np.array(control[0]['camera_orientation']) @ CAMERA_FROM_BODY
+        world0=Rotation.from_euler('xyz',[n['estimated_attitude_'+a+'_deg'][0] for a in ['roll','pitch','yaw']],degrees=True).as_matrix()
+        yaw=Rotation.from_matrix(world0 @ local0.T).as_euler('xyz')[2];align=Rotation.from_euler('z',yaw).as_matrix()
+        origin=np.array([n['estimated_position_'+a][0] for a in 'ned'])-align @ control[0]['position']
+        np_=np.column_stack([n['native_position_'+a] for a in 'ned']);nv=np.column_stack([n['native_velocity_'+a] for a in 'ned'])
+        nr=Rotation.from_euler('xyz',np.column_stack([n['native_attitude_'+a+'_deg'] for a in ['roll','pitch','yaw']]),degrees=True).as_matrix()
     p=np.array([r['position'] for r in rows]) @ align.T+origin;v=np.array([r['velocity'] for r in rows]) @ align.T;R=align @ np.array([r['rotation'] for r in rows])
-    np_=np.column_stack([n['native_position_'+a] for a in 'ned']);nv=np.column_stack([n['native_velocity_'+a] for a in 'ned'])
-    nr=Rotation.from_euler('xyz',np.column_stack([n['native_attitude_'+a+'_deg'] for a in ['roll','pitch','yaw']]),degrees=True).as_matrix()
     pe=p-np_;ve=v-nv;ae=Rotation.from_matrix(np.swapaxes(R,1,2) @ nr).as_rotvec()
     all_openings=gate_openings();centers=all_openings.mean(axis=1);key=np.array([r['gate_number'] for r in control]);truth=centers[key-1]
     map_est=np.full((len(t),3),np.nan);heading=np.full(len(t),np.nan)
@@ -57,7 +68,7 @@ def score(source,root):
         velocity=align @ np.array([r['velocity_covariance'] for r in rows]) @ align.T,attitude=np.array([r['attitude_covariance'] for r in rows]))
     coverage={k:float(np.mean(abs(e)<=3*np.sqrt(np.maximum(0,np.diagonal(covariance[k],axis1=1,axis2=2))))) for k,e in [('position',pe),('velocity',ve),('attitude',ae)]}
     result=dict(metrics=metrics,coordinate_3sigma_coverage=coverage,private_reference_coverage=private_coverage,estimate_sha256=estimate_hash,
-        alignment=dict(yaw_rad=float(yaw),origin_m=origin.tolist(),scale=1.,method='Same fixed initial frame as recorded flight; no candidate-specific alignment or scale fit.'),
+        alignment=dict(yaw_rad=float(yaw),origin_m=origin.tolist(),scale=1.,method='Frozen learned-map frame; no test-start alignment.' if fixed else 'Same fixed initial frame as recorded flight; no candidate-specific alignment or scale fit.'),
         gate_available_fraction=float(np.mean(np.isfinite(map_est[:,0]))),
         definitions=dict(position='Mean3D error norm[m]',velocity='Mean3D error norm[m/s]',attitude='Mean rotation-error angle[deg]',gate_plane_yaw='Plane axis modulo180deg',
             body_rate='Public gyro minus estimated bias versus private ATTITUDE rate channels, FRD rad/s',motor_channel='Mean absolute channel error in raw reported output units; own sent-command model, not measured RPM'),

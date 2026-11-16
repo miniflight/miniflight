@@ -148,7 +148,11 @@ def _replay(path, poison=False):
                 actual["signals"] = {key: actual["signals"][key] for key in expected["signals"]}
             omitted = {"host_time", "native_race"} if poison else {"host_time"}
             assert {k:v for k,v in expected.items() if k not in omitted} == {k:v for k,v in actual.items() if k not in omitted}, "controller update differs"
-    outcome, client = execute(calls, compare_updates, path.with_name("native.jsonl"), client=client)
+    factory=None
+    if metadata.get('fixture') is not None:
+        from .unknown_start import Controller
+        factory=lambda calls:Controller(calls,metadata['fixture'])
+    outcome, client = execute(calls, compare_updates, path.with_name("native.jsonl"), client=client,controller_factory=factory)
     calls.finish()
     assert not updates
     expected = {key:outcomes[-1][key] for key in outcome}
@@ -160,15 +164,16 @@ def _replay(path, poison=False):
                 corrupted_pose_packets=changed,corrupted_navigation_packets=changed, native_gate_counter_zeroed=poison, outcome=outcome)
 
 
-def public_course(root,shift):
+def public_course(root,shift,fixture=None,scoring_frame=None):
     """Run the ordinary camera/MAVLink interface; no capture/IMU DLLs are loaded."""
     if SETTINGS.get('position_config') is None:raise ValueError('Public course requires a publicly identified dynamics model')
     root.mkdir(parents=True)
     SETTINGS['shift_right_m']=shift
-    sources=tuple(sorted(HERE.glob('*.py')))
+    sources=tuple(sorted(HERE.glob('*.py')))+tuple(HERE.parents[3]/'miniflight'/name for name in ['gate_filter.py','relocalization.py'])
     metadata=dict(process='public_camera_imu_course',revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
         settings=SETTINGS,shift_right_m=shift,position_used_for='offline scoring',native_taps_loaded=False,
         sources={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources})
+    if fixture is not None:metadata['fixture']=fixture
     (root/'protocol.json').write_text(json.dumps(metadata,indent=2)+'\n')
     for source in sources:
         dest=root/'source'/source.name;dest.parent.mkdir(exist_ok=True);dest.write_bytes(source.read_bytes())
@@ -181,12 +186,17 @@ def public_course(root,shift):
                 record(**row);count+=1
                 if count%64==0 and (root/'flight.jsonl').stat().st_size>SETTINGS.get('trace_limit_mib',384)*1024**2:
                     raise RuntimeError('temporary public-sensor trace exceeded its size limit')
-            outcome,_=execute(Calls(bounded),bounded,root/'native.jsonl',reader)
+            factory=None
+            if fixture is not None:
+                from .unknown_start import Controller
+                factory=lambda calls:Controller(calls,fixture)
+            outcome,_=execute(Calls(bounded),bounded,root/'native.jsonl',reader,controller_factory=factory)
             if outcome.get('estimated_map') is not None:
                 (root/'estimated-map.json').write_text(json.dumps(outcome['estimated_map'],indent=2)+'\n')
             print(json.dumps(outcome),flush=True)
     from .pipeline import export_public
     export_public(root)
+    if scoring_frame is not None:shutil.copyfile(scoring_frame,root/'score-frame.json')
     from .score import score
     result=score(root)
     if SETTINGS.get('render_video',True) and any(g.get('first_lock_time_s') is not None for g in result['gates']):
@@ -199,10 +209,12 @@ def public_course(root,shift):
     return result
 
 
-def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False,map_prior=None):
+def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False,map_prior=None,unknown_start=False,scoring_frame=None):
     """Public course; remove pixels and raw traces after scoring and replay."""
     if dynamics_model is None:raise ValueError('Public course requires a publicly identified dynamics model')
     if not math.isfinite(shift):raise ValueError('The sideways setup shift must be finite')
+    if unknown_start and (map_prior is None or scoring_frame is None or not joint_estimator):raise ValueError('Unknown start needs joint estimation, a learned map and a separate scoring frame')
+    fixture=dict(target=[5.,shift,3.],yaw=.18 if shift>=0 else -.18,delay_s=8.) if unknown_start else None
     calibration=dynamics_model.read_bytes()
     position_config=json.loads(calibration)['position_config']
     prior=None
@@ -239,7 +251,7 @@ def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=
         with tempfile.TemporaryDirectory(prefix="raw-", dir=root) as temporary:
             raw = Path(temporary)/"flight"
             try:
-                result = public_course(raw, shift)
+                result = public_course(raw,0. if unknown_start else shift,fixture,scoring_frame)
                 checked = replay(raw/"flight.jsonl", poison=True)
                 checked.pop("outcome")
                 (root/"input-independence.json").write_text(json.dumps(checked, indent=2)+"\n")
@@ -249,11 +261,12 @@ def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=
                 raise
             finally:
                 for name in ("protocol.json", "score.json", "replay.json", "camera-errors.csv",
-                             'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz'):
+                             'course-camera-imu.mp4','video.json','state-errors.csv','last-camera.jpg','control.jsonl.gz','score-frame.json'):
                     if (raw/name).exists():
                         shutil.copyfile(raw/name, root/name)
                 for name in ('pipeline.json','public-inputs.npz','public-observations.jsonl.gz','pipeline-timing.csv.gz','client-latency.csv.gz','architecture-score.json','estimated-map.json','estimator-inputs.jsonl.gz','estimator-states.jsonl.gz','native-reference.npz'):
                     if (raw/name).exists():shutil.copyfile(raw/name,root/name)
+                if fixture is not None and (raw/'source').exists():shutil.copytree(raw/'source',root/'source',dirs_exist_ok=True)
                 size = sum(path.stat().st_size for path in raw.rglob("*") if path.is_file())
                 (root/"retention.json").write_text(json.dumps(dict(temporary_bytes_removed=size, raw_recordings_retained=False))+"\n")
     finally:
@@ -281,6 +294,8 @@ def main():
     parser.add_argument('--speed',type=float,default=2.)
     parser.add_argument('--dynamics-model',type=Path)
     parser.add_argument('--map-prior',type=Path,help='Joint public map from the same stationary launch frame')
+    parser.add_argument('--unknown-start',action='store_true',help='Displace with an independent pilot, then cold-localize without its state')
+    parser.add_argument('--scoring-frame',type=Path,help='Fixed learned-map alignment, opened only by the postflight scorer')
     parser.add_argument('--partial-gate',action='store_true')
     args = parser.parse_args()
     if args.mode=='course':
@@ -293,7 +308,7 @@ def main():
         if args.image_time_uncertainty and not args.joint_estimator:parser.error('image-time uncertainty requires --joint-estimator')
         if args.upright_attitude and not (args.joint_estimator and args.gyro_attitude):parser.error('upright attitude requires joint estimation with other attitude corrections held')
         if args.continuous_path and (not args.joint_estimator or args.thrust_excitation):parser.error('continuous path requires joint estimation without excitation')
-        result=run_course(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude,args.map_prior)
+        result=run_course(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude,args.map_prior,args.unknown_start,args.scoring_frame)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():

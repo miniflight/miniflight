@@ -110,7 +110,7 @@ def score(root):
                 'gate_number','estimated_gates_passed','visibility_alignment','alignment_relative_gate','alignment_hint','search_hint','camera_observation',
                 'motor_commands','alignment_height_step','gyro','rate_request','rate_integral','visual_gravity','partial_gate',
                 'full_image_time','partial_retargets','aperture_corners_measured','measurement_time','association_counts','crossing','crossing_alignment',
-                'joint_posterior','brake_test_active','brake_test_state','launch_cleared','excitation','visual_outage','reference')
+                'joint_posterior','brake_test_active','brake_test_state','launch_cleared','excitation','visual_outage','reference','localization','localization_hold')
         with gzip.open(root/'control.jsonl.gz','wt') as stream:
             for tick in ticks:
                 stream.write(json.dumps({key:tick[key] for key in fields if key in tick},separators=(',',':'))+'\n')
@@ -121,6 +121,10 @@ def score(root):
     requested = settings.get("gates_to_pass", 2)
     openings = gate_openings()[:requested]
     local_to_native = Rotation.from_euler("z", attitudes[0][3]).as_matrix()
+    fixed_frame=json.loads((root/'score-frame.json').read_text()) if (root/'score-frame.json').exists() else None
+    if fixed_frame is not None:
+        if fixed_frame['scale']!=1.:raise ValueError('Scoring map scale must remain fixed')
+        local_to_native=Rotation.from_euler('z',fixed_frame['yaw_rad']).as_matrix()
     scored_phases=("SHIFTING","TRACKING","FINAL_IMU","HANDOFF") if settings.get('continuous_origin') else ("TRACKING","FINAL_IMU","HANDOFF")
     approach = [tick for tick in ticks if tick["phase"] in scored_phases]
     histories = {tick["imu_history_start"] for tick in approach}
@@ -202,7 +206,7 @@ def score(root):
     if settings.get('continuous_course') and approach:
         a=np.array(attitudes);a=a[np.r_[True,np.diff(a[:,0])>0]]
         orientations=Slerp(a[:,0],Rotation.from_euler('xyz',a[:,1:4]))
-        origin=position_at(approach[0]['imu_history_start'])
+        origin=np.array(fixed_frame['origin_m']) if fixed_frame is not None else position_at(approach[0]['imu_history_start'])
         rows=[]
         for tick in approach:
             stamp=tick['imu_time']
@@ -224,7 +228,7 @@ def score(root):
         with (root/'state-errors.csv').open('w') as stream:
             writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
         result['local_state_errors']={key:statistics([row[key] for row in rows]) for key in ['position_error_m','velocity_error_m_s','attitude_error_deg']}
-        result['state_alignment']='One fixed yaw/origin alignment at stationary start; no scale fit.'
+        result['state_alignment']='Fixed saved-map scoring frame; no test-start alignment.' if fixed_frame is not None else 'One fixed yaw/origin alignment at stationary start; no scale fit.'
     (root/"score.json").write_text(json.dumps(result, indent=2)+"\n")
     print(json.dumps(result, indent=2))
     return result

@@ -3,8 +3,8 @@
 The [controller model](../../../../controller.md) defines the physics, joint
 drone/map state, online work, between-flight refinement and accuracy targets.
 The present implementation is an experimental public-sensor course pilot.
-Maps can be retained between flights from the same stationary launch frame.
-Relocalization from an arbitrary start remains unimplemented.
+Maps can be retained between flights. Optional cold localization estimates an
+unknown airborne starting pose and velocity against the saved map before gate1.
 
 Run one gate with the joint observer and continuous reference:
 
@@ -23,9 +23,20 @@ explicit public dynamics model is required; there is no native-fixture fallback.
 
 Use `--map-prior PREVIOUS/estimated-map.json` to retain the joint gate/rim/size
 posterior. The next flight starts with fresh position and velocity, keeps map
-cross-covariances and corrects the map online. Both flights must share the same
-launch frame and calibration. Rejected lookahead pixels cannot establish a lock;
+cross-covariances and corrects the map online. Both flights must share calibration;
+default startup assumes the original launch frame. Rejected pixels cannot establish a lock;
 the mapped path guides acquisition until the estimator admits a real image.
+
+Add `--unknown-start --scoring-frame FRAME.json` to test cold localization. The
+harness moves the drone, discards the setup pilot, and starts a fresh controller
+without its pose or history. While unlocalized, public gyro/force feedback and a
+bounded pixel-bearing pitch correction maintain an acquisition view. Map-pair
+hypotheses fit position, velocity and attitude over a fresh image/IMU window;
+ambiguous associations wait. The search runs outside the motor-control process.
+`FRAME.json` contains the prior exact-scoring metrics' `alignment` object, frozen
+before this trial. It is opened by postflight scoring, never navigation.
+[Cold-start trials and all MAEs](relocalization.validation.json),
+[error plots](relocalization.validation.png), [startup](relocalization.startup.png).
 
 The joint filter retains drone/gate covariance and rewinds delayed pixel updates.
 The nominal 1.5 m aperture supplies scale with a 0.03 m consider uncertainty.
