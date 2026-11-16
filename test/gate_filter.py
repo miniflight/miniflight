@@ -16,6 +16,22 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_joint_partial_tracking_does_not_require_a_frozen_template_or_depth_inversion(self):
+        import cv2
+        from unittest.mock import patch
+        from miniflight.replay import Calls
+        from miniflight.state import Frame
+        from target.aigp.experiments.camera_imu import gate_filter_live,sensors
+        config=dict(hover_thrust=.27,thrust_acceleration=60.,thrust_curve=(18.,65.),body_resistance_per_m=(.047,)*3)
+        with patch.dict(sensors.SETTINGS,position_config=config,joint_rim=True,partial_gate=True):
+            c=gate_filter_live.GateController(Calls());c.locked=1;c.gate_number=1
+            f=filter();f.add_rim(2.8,1.35,.1);c.inertial.history=GateHistory(f,1.,[0.,0.,0.]);c.inertial.sync()
+            image=np.zeros((360,640,3),np.uint8);cv2.rectangle(image,(100,120),(300,359),(0,0,220),-1);cv2.rectangle(image,(125,145),(275,359),(0,0,0),-1)
+            self.assertIsNone(c.rim_template.model())
+            with patch.object(sensors,'relative_from_top',side_effect=AssertionError('metric inversion')):
+                self.assertTrue(c.observe_partial(Frame(10,1000000000,0.,image),1.,np.eye(3),f.p))
+            np.testing.assert_allclose(c.partial_observation['top_corners'],[[100.,120.],[300.,120.]],atol=1.3)
+
     def test_full_rim_factor_contains_measured_outer_corners_of_the_same_gate(self):
         import cv2
         from target.aigp.experiments.camera_imu.gate_filter_live import full_rim_observation

@@ -5,6 +5,29 @@ from .vision import K_INV
 from target.aigp.experiments.gate_pose import fit_outline
 
 
+def fit_top_edges(contour):
+    """Use observed top/side boundaries; a cropped bottom supplies no line."""
+    hull=cv2.convexHull(contour);points=contour.reshape(-1,2)
+    points=points[[abs(cv2.pointPolygonTest(hull,tuple(map(float,p)),True))<=1 for p in points]].astype(float)
+    seed=cv2.boxPoints(cv2.minAreaRect(hull))
+    if cv2.contourArea(seed,oriented=True)<0:seed=seed[::-1]
+    seed=np.roll(seed,-np.argmin(seed.sum(axis=1)),axis=0)
+    edge=np.roll(seed,-1,axis=0)-seed;length=np.linalg.norm(edge,axis=1)
+    if np.min(length)<1e-6:return None
+    relative=points[:,None]-seed[None];fraction=np.sum(relative*edge,axis=2)/length**2
+    distance=abs(relative[:,:,0]*edge[:,1]-relative[:,:,1]*edge[:,0])/length
+    nearest=np.argmin(distance,axis=1);lines={};residual=[]
+    for i in [0,1,3]:
+        samples=points[(nearest==i)&(fraction[:,i]>.15)&(fraction[:,i]<.85)]
+        if len(samples)<3:return None
+        vx,vy,x,y=cv2.fitLine(samples.astype(np.float32),cv2.DIST_HUBER,0,.01,.01).ravel()
+        line=np.array([-vy,vx,vy*x-vx*y]);lines[i]=line
+        residual.append(float(np.sqrt(np.mean((samples @ line[:2]+line[2])**2))))
+    top=np.array([np.cross(lines[3],lines[0]),np.cross(lines[0],lines[1])])
+    if np.min(abs(top[:,2]))<1e-9:return None
+    return top[:,:2]/top[:,2,None],max(residual)
+
+
 def same_red_component(image,aperture,top):
     """Associate two feature types in pixels before comparing their noisy depth."""
     blue,green,red=cv2.split(image.astype(np.float32)/255)
@@ -39,11 +62,16 @@ def outer_top(image,opening=None):
             if y+h>=height:continue
         elif y+h<height:continue
         # Discard the cropped contour's bottom edge; retain measured top/side intersections.
-        fit=fit_outline(contour,(height+2,width,3))
-        if fit is None:continue
-        residual=float(max(np.array(fit[1])[[0,1,3]]))
+        if opening is None:
+            fit=fit_top_edges(contour)
+            if fit is None:continue
+            top,residual=fit
+        else:
+            fit=fit_outline(contour,(height+2,width,3))
+            if fit is None:continue
+            top=fit[0][:2];residual=float(max(np.array(fit[1])[[0,1,3]]))
         if residual>.8:continue
-        candidates.append((cv2.contourArea(cv2.convexHull(contour)),fit[0][:2],residual))
+        candidates.append((cv2.contourArea(cv2.convexHull(contour)),top,residual))
     if not candidates:return None
     _,top,residual=max(candidates,key=lambda c:c[0])
     return top,residual

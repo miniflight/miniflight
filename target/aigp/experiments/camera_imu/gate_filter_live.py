@@ -152,6 +152,25 @@ class GateController(course.GateController):
                 raise TimeoutError('joint gate measurement exceeded two seconds' if budget['budget_s']==2. else 'joint gate measurement exceeded its mapped visibility budget')
         return request
 
+    def observe_partial(self,frame,stamp,rotation,position,full_relative=None,full_corners=None):
+        if not sensors.SETTINGS.get('joint_rim'):
+            return super().observe_partial(frame,stamp,rotation,position,full_relative,full_corners)
+        h=self.inertial.history
+        if not sensors.SETTINGS.get('partial_gate') or self.locked is None or h is None:return False
+        if self.gate_number not in h.filter.gates or h.filter.rim is None:return False
+        top=outer_top(frame.bgr)
+        if top is None:return False
+        if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):
+            self.association_counts['same_component_full_preferred']+=1;return False
+        # The filter projects its learned shape. A partial view need not supply a metric pose.
+        template=dict(width_m=3.,center_to_top_m=1.5,fractional_spread=1.,samples=0,seed_only=True)
+        self.record_visual(frame,stamp,'outer_top',top[0],edge_residual_px=top[1],template=template)
+        self.partial_observation=dict(gate_number=self.gate_number,image_id=frame.id,capture_time=stamp,
+            top_corners=top[0].tolist(),edge_residual_px=top[1],template=template,
+            position_relative_gate=(-self.gate_relative()).tolist(),metric_source='joint posterior; observation is pixels only',velocity=None)
+        self.association_counts['partial_updates']+=1
+        return True
+
     def observe(self,frame,stamp,position,rotation):
         super().observe(frame,stamp,position,rotation)
         if self.locked is None:return
