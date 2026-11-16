@@ -34,7 +34,8 @@
       "receives": [
         "public JPEG camera stream/header timestamps",
         "public HIGHRES_IMU sample timestamps, gyro and acceleration",
-        "our sent motor commands"
+        "our sent motor commands",
+        "optional joint map posterior from public observations in the same stationary launch frame"
       ],
       "produces": "Raw public-input replay dataset",
       "owns": "Clock mapping and delivery order",
@@ -116,7 +117,7 @@
       "produces": "Time-indexed position, velocity and acceleration reference",
       "owns": "Flight objective and feasibility constraints",
       "required_method": "Choose minimum-time feasible short trajectory with crossing margin, actuator and camera-visibility constraints",
-      "current_method": "Optional continuous gate-relative quintic p/v/a reference with monotone height tangents, scalar speed acceleration/jerk limits and feedback. No calibrated crossing chance constraint or persistent map backend."
+      "current_method": "Continuous gate-relative quintic p/v/a reference with monotone height tangents, scalar speed acceleration/jerk limits and force-bias feedback. Joint map posterior reuse supports the same launch frame; camera visibility constraints are not enforced."
     },
     {
       "stage": "control",
@@ -210,7 +211,7 @@
   },
   "current_gaps": [
     "The best recent clean six-gate development lap took31.65s with position/velocity/attitude/depth MAE1.02m/0.41m/s/1.06deg/0.38m. Updated two-start profiles often stopped after two gates. High accuracy and robustness remain unachieved.",
-    "The per-flight joint map is discarded after export. Persistent posterior refinement, map-frame relocalization and loop closure across flights are not implemented.",
+    "Joint map/rim/size covariance can be restored and refined from the same launch frame. Arbitrary-start relocalization, retrospective smoothing and loop closure are not implemented.",
     "Mission ordinals still double as landmark roles. Farther gates can be assigned to the next slot before a nearer gate becomes visible; identity uncertainty needs an explicit representation.",
     "The continuous reference can point the camera away from descending gates. Complete learned-map projection audits are optimistic if next-gate geometry is not available causally.",
     "Exposure time, actuator application time and exact physical IMU integration intervals remain unknown.10ms is an image-time uncertainty prior, not a measured delay.",
@@ -234,7 +235,7 @@
     ]
   },
   "next_checkpoint": {
-    "backend": "Freeze the ideal-controller contract, keep one public measurement boundary, and prove persistent joint map/state refinement on one gate across two flights with independent starts. No immutable XYZ route adapter.",
+    "backend": "Retain joint map/state uncertainty and validate pixel-to-map relocalization from an unknown starting displacement, then retrospective map refinement.",
     "inputs": "Raw public replay dataset and measured pixels; no native fitting labels",
     "diagnostic_targets": {
       "velocity_rms_m_s": 0.3,
@@ -271,7 +272,7 @@
     "scoring": "Native state after outputs freeze only; no calibration or navigation labels.",
     "implemented": "Short-window joint gate/drone filter and public-sensor feedback path.",
     "missing": [
-      "persistent cross-flight map posterior and constraints",
+      "persistent keyframe constraints and retrospective map refinement",
       "relocalization in one retained map frame",
       "landmark identity separate from route ordinal",
       "calibrated uncertainty-aware perception planning"

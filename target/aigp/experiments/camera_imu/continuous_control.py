@@ -47,9 +47,11 @@ class GateController(joint.GateController):
     def drive(self,target):
         now=self.inertial.time;dt=0. if self.last_drive is None else max(0.,now-self.last_drive);self.last_drive=now
         h=self.inertial.history
-        if self.phase not in (sensors.Phase.TRACKING,sensors.Phase.FINAL_IMU) or h is None or self.gate_number not in h.filter.gates:
+        mapped_acquisition=self.phase is sensors.Phase.ACQUIRING and sensors.SETTINGS.get('map_prior') is not None
+        if (self.phase not in (sensors.Phase.TRACKING,sensors.Phase.FINAL_IMU) and not mapped_acquisition) or h is None or self.gate_number not in h.filter.gates:
             return super().drive(target)
         f=h.filter;index,center,_=f.gates[self.gate_number];relative=self.inertial.position-center
+        if self.direction is None:self.direction=unit((center-self.inertial.position)*[1.,1.,0.])
         direction=self.end_direction(f,center);future=f.gates.get(self.gate_number+1);future_index=None if future is None else future[0]
         changed=self.curve is None or self.plan_key!=self.gate_number or self.plan_index!=index
         if not changed and self.gate_remaining()>5. and now-self.replanned>.5:

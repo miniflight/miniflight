@@ -57,11 +57,13 @@ class Inertial(sensors.Inertial):
                 f.partial_gate_births=not sensors.SETTINGS.get('joint_rim',False)
                 f.image_time_sigma=.01 if sensors.SETTINGS.get('image_time_uncertainty',False) else 0.
                 f.upright_attitude=sensors.SETTINGS.get('upright_attitude',False)
+                prior=sensors.SETTINGS.get('map_prior')
+                if prior is not None:f.restore_map(prior)
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
                 self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
                     thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
                     intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,
-                    image_time_sigma_s=f.image_time_sigma,upright_attitude=f.upright_attitude,history_s=2.))
+                    image_time_sigma_s=f.image_time_sigma,upright_attitude=f.upright_attitude,history_s=2.,**({} if prior is None else dict(map_prior=prior))))
             elif sample.time>self.time:
                 self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
                 self.history.imu(sample.time,sample.gyro,sample.acceleration);self.times.append(sample.time)
@@ -122,6 +124,9 @@ class GateController(course.GateController):
         h=getattr(self.inertial,'history',None)
         if h is not None and self.gate_number in h.filter.gates:return h.filter.last_visual.get(self.gate_number,-np.inf)
         return super().measurement_time()
+
+    def lookahead_admitted(self,observed):
+        return self.inertial.history.filter.last_visual.get(self.gate_number)==observed['time']
 
     def fuse_lookahead(self,frame,stamp):
         observed=self.lookahead;key=self.gate_number+1
@@ -197,6 +202,9 @@ class GateController(course.GateController):
             partial['velocity']=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior')
         self.fuse_lookahead(frame,stamp)
         f=self.inertial.history.filter
+        if self.gate_number not in f.last_visual:
+            self.locked=None
+            if self.phase is not sensors.Phase.SHIFTING:self.phase=sensors.Phase.ACQUIRING
         if self.gate_number in f.gates:
             self.anchor=f.gates[self.gate_number][1].copy();self.last_relative_gate=self.gate_relative();self.last_relative_position=f.p.copy()
             self.full_image_time=f.last_full_visual.get(self.gate_number)

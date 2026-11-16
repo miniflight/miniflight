@@ -49,6 +49,30 @@ class GateFilter:
 
     def copy(self):return deepcopy(self)
 
+    def map_state(self):
+        gates=[dict(id=k,center=g.tolist(),yaw=float(y)) for k,(i,g,y) in sorted(self.gates.items()) if k>0]
+        indices=[15]+[i+j for k,(i,g,y) in sorted(self.gates.items()) if k>0 for j in range(4)]
+        if self.rim is not None:indices+=list(range(self.rim[0],self.rim[0]+2))
+        return dict(gates=gates,rim=None if self.rim is None else self.rim[1].tolist(),covariance=self.P[np.ix_(indices,indices)].tolist())
+
+    def restore_map(self,prior):
+        """Retain joint map/size uncertainty; a fresh flight supplies its own p/v prior."""
+        if self.gates or self.rim is not None or len(self.P)!=16:raise ValueError('Map restoration requires a fresh filter')
+        if set(prior)!={'gates','rim','covariance'} or any(set(r)!={'id','center','yaw'} for r in prior['gates']):raise ValueError('Unexpected map prior fields')
+        gates=prior['gates'];rim=prior['rim'];covariance=np.asarray(prior['covariance'],float)
+        n=4*len(gates)+(0 if rim is None else 2);ids=[r['id'] for r in gates]
+        values=np.array([[*r['center'],r['yaw']] for r in gates],float)
+        if (not gates or len(set(ids))!=len(ids) or any(type(k) is not int or k<=0 for k in ids)
+                or values.shape!=(len(gates),4) or not np.isfinite(values).all()
+                or covariance.shape!=(n+1,n+1) or not np.isfinite(covariance).all()
+                or not np.allclose(covariance,covariance.T,atol=1e-10) or np.linalg.eigvalsh(covariance)[0]<-1e-8
+                or not np.isclose(covariance[0,0],self.P[15,15])
+                or (rim is not None and (np.shape(rim)!=(2,) or not np.isfinite(rim).all() or min(rim)<=0))):raise ValueError('Invalid joint map prior')
+        self.P=np.pad(self.P,((0,n),(0,n)));indices=[15]+list(range(16,16+n))
+        self.P[np.ix_(indices,indices)]=covariance
+        self.gates={r['id']:(16+4*j,np.array(r['center'],float),float(r['yaw'])) for j,r in enumerate(gates)}
+        if rim is not None:self.rim=(16+4*len(gates),np.array(rim,float))
+
     def inject(self,dx):
         self.p+=dx[:3];self.v+=dx[3:6];self.R=self.R @ Rotation.from_rotvec(dx[6:9]).as_matrix()
         self.bg+=dx[9:12];self.ba+=dx[12:15]

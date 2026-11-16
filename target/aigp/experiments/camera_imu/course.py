@@ -338,6 +338,7 @@ def execute(calls,record,path,reader=None,client=None):
         if history is not None:
             f=history.filter
             outcome['estimated_map']=dict(frame='Initial stationary camera/IMU local frame',source='Public pixels, IMU and own commands only',
+                dynamics_model_sha256=base.SETTINGS['dynamics_model_sha256'],camera_from_body=base.vision.CAMERA_FROM_BODY.tolist(),intrinsics=base.vision.K.tolist(),posterior=f.map_state(),
                 gates=[dict(id=key,center=center.tolist(),yaw=yaw,covariance=f.P[index:index+4,index:index+4].tolist(),last_seen=f.last_visual.get(key))
                     for key,(index,center,yaw) in f.gates.items() if key>0])
     record(event='result',**outcome)

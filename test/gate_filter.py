@@ -16,6 +16,23 @@ def filter():
 
 
 class JointGateTest(unittest.TestCase):
+    def test_map_transfer_keeps_cross_covariance_without_old_flight_motion(self):
+        f=filter();f.add_rim(2.8,1.35,.1);f.add_gate(2,[1.,-.5,25.],[1.,0.,0.])
+        H=np.zeros((1,len(f.P)));H[0,[16,22]]=[-1.,1.]
+        f.correct(np.array([.1]),H,np.eye(1),np.inf)
+        prior=f.map_state();fresh=GateFilter(np.eye(3),np.zeros(3),f.thrust_curve,f.drag,f.C,f.K)
+        fresh.restore_map(prior)
+        self.assertEqual(fresh.map_state(),prior);self.assertGreater(abs(fresh.P[16,20]),0.)
+        np.testing.assert_array_equal(fresh.p,np.zeros(3));np.testing.assert_array_equal(fresh.v,np.zeros(3))
+        np.testing.assert_array_equal(fresh.R,np.eye(3));self.assertFalse(fresh.last_visual)
+        self.assertGreater(abs(fresh.P[15,fresh.rim[0]]),0.)
+
+    def test_map_transfer_rejects_private_fields_and_invalid_covariance(self):
+        f=filter();prior=f.map_state();fresh=GateFilter(np.eye(3),np.zeros(3),f.thrust_curve,f.drag,f.C,f.K)
+        with self.assertRaises(ValueError):fresh.restore_map(dict(prior,native_position=[0.,0.,0.]))
+        prior['covariance'][1][1]=-1.
+        with self.assertRaises(ValueError):fresh.restore_map(prior)
+
     def test_shared_image_timing_matches_a_correlated_batch_measurement(self):
         f=filter();f.p[:]=0.;f.P=np.eye(len(f.P))*.2;batch=f.copy();sigma=.01
         H=np.zeros((2,len(f.P)));H[:,0]=[1.,2.];rate=np.array([80.,-40.]);measurement=np.array([.3,-.2])

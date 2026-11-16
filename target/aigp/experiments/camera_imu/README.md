@@ -3,7 +3,8 @@
 The [controller model](../../../../controller.md) defines the physics, joint
 drone/map state, online work, between-flight refinement and accuracy targets.
 The present implementation is an experimental public-sensor course pilot.
-Persistent cross-flight SLAM and relocalization remain unimplemented.
+Maps can be retained between flights from the same stationary launch frame.
+Relocalization from an arbitrary start remains unimplemented.
 
 Run one gate with the joint observer and continuous reference:
 
@@ -19,6 +20,12 @@ actual flight motion. The runtime receives camera pixels, public gyro and
 accelerometer samples, public timing/ACKs and our own motor commands. Native pose,
 course, actuator reports and race state enter the postflight scorer only. An
 explicit public dynamics model is required; there is no native-fixture fallback.
+
+Use `--map-prior PREVIOUS/estimated-map.json` to retain the joint gate/rim/size
+posterior. The next flight starts with fresh position and velocity, keeps map
+cross-covariances and corrects the map online. Both flights must share the same
+launch frame and calibration. Rejected lookahead pixels cannot establish a lock;
+the mapped path guides acquisition until the estimator admits a real image.
 
 The joint filter retains drone/gate covariance and rewinds delayed pixel updates.
 The nominal 1.5 m aperture supplies scale with a 0.03 m consider uncertainty.
@@ -60,9 +67,15 @@ The curve covers mean commands 0.21–0.335. Its independent short-window vertic
 response RMS was 0.039 m; this does not establish full-flight navigation accuracy
 or actuator delay. [Calibration record](thrust-response.validation.json).
 
-A single clean six-gate run reached 31.65 s, with position/velocity/attitude/depth
-MAE 1.02 m / 0.41 m/s / 1.06 deg / 0.38 m. Other trials failed. Super-low MAE, the
-five-flight robustness criterion and under 10 s remain unachieved.
+Joint map reuse and admitted handoffs completed six gates in 27.38 s and 27.62 s
+from opposite setup shifts. The next repeat stopped at 3/6. Position/velocity/
+attitude/depth MAE on the faster lap: 1.90 m / 0.46 m/s / 0.50 deg / 0.29 m.
+Low MAE, five clean repeats and under 10 s remain unachieved.
+[All eight new trials](map.validation.json) and [plots](map.validation.png).
+Fixed-command estimation replays raised gate-relative MAE from 0.36/0.38 m to
+17.60/12.40 m when image factors were removed. Removing only the upright tilt
+factor improved attitude MAE from 0.50/0.49 deg to 0.21/0.16 deg; this variant
+still needs closed-loop validation. The same record retains both ablations.
 [All recent development outcomes](accuracy.validation.json) and
 [error overview](accuracy.validation.png) retain failures and partial flights.
 [Earlier continuous trials](continuous.validation.json) remain available.

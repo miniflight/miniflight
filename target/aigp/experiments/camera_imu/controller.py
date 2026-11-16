@@ -124,6 +124,8 @@ class GateController(single.GateController):
             self.signal["height_alignment"] = True
         return super().drive(target)
 
+    def lookahead_admitted(self,observed):return True
+
     @timed('visual_total')
     def observe(self, frame, stamp, position, rotation):
         if self.handoff_at is not None and stamp <= self.handoff_at:
@@ -180,7 +182,7 @@ class GateController(single.GateController):
                 shift_displacement=self.shift_displacement.tolist(), motion_available=False, attitude_available=False)
             handoff_target = self.handoff_target
             fresh = self.lookahead is not None and self.inertial.time-self.lookahead['time'] <= SETTINGS['lookahead_max_age_s']
-            if self.lookahead_count >= SETTINGS["lock_frames"] and (fresh or not SETTINGS.get('continuous_course')):
+            if self.lookahead_count >= SETTINGS["lock_frames"] and (fresh or not SETTINGS.get('continuous_course')) and self.lookahead_admitted(self.lookahead):
                 observed = self.lookahead
                 self.anchor = observed["center"].copy()
                 self.direction = (self.anchor-self.inertial.position)*[1, 1, 0]

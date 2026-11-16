@@ -178,17 +178,16 @@ replay. Under 10 seconds remains a separate speed target.
 
 The current code has a joint gate/drone error-state filter with a short replay
 window, measured aperture/rim factors, command-model prediction and motor
-feedback. It has not implemented persistent cross-flight SLAM, reliable
-relocalization or calibrated crossing probabilities. Timing and some dynamics
-remain uncertain. A clean 31.65 s six-gate run still had position/velocity/attitude/
-depth MAE 1.02 m / 0.41 m/s / 1.06 deg / 0.38 m; other profiles failed. The targets above and a
-robust fast lap are not achieved.
+feedback. It can retain the joint map posterior between flights from the same
+launch frame. General relocalization, retrospective smoothing and calibrated
+crossing probabilities remain unimplemented. Timing and some dynamics
+remain uncertain. Learned-map laps reached 27.38 s and 27.62 s; the next repeat
+stopped at 3/6. The faster lap had position/velocity/attitude/depth MAE
+1.90 m / 0.46 m/s / 0.50 deg / 0.29 m. The targets above remain unachieved.
 
-The next implementation should preserve one joint belief and separate landmark
-identity from route order. First prove repeatable estimation on one gate across
-flights, with map reuse and live refinement, before increasing route length or
-speed. Keep the calibrated public model and raw measurement boundary; remove
-abandoned runtime branches instead of adding another pilot for each experiment.
+Next validate camera-to-map localization after an unknown starting displacement
+and reduce common drone/map drift. Keep landmark identity separate from route
+order and include camera visibility in descent/braking trajectories.
 
 References supporting this design:
 

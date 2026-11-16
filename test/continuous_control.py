@@ -45,3 +45,18 @@ class ContinuousControlTest(unittest.TestCase):
         request=c.drive(None);a,b=f.thrust_curve
         upward=a*request.thrust+b*request.thrust**2
         self.assertAlmostEqual(9.81-upward+f.ba[2],0.,places=10)
+
+    def test_rejected_lookahead_cannot_be_promoted_to_a_lock(self):
+        c,f=self.controller();c.gate_number=2
+        self.assertFalse(c.lookahead_admitted(dict(time=1.)))
+        f.last_visual[2]=.9
+        self.assertFalse(c.lookahead_admitted(dict(time=1.)))
+        self.assertTrue(c.lookahead_admitted(dict(time=.9)))
+
+    def test_known_map_guides_acquisition_without_claiming_a_visual_lock(self):
+        c,f=self.controller();c.phase=sensors.Phase.ACQUIRING;c.locked=None;c.direction=None
+        with patch.dict(sensors.SETTINGS,map_prior=f.map_state()):
+            for t in np.arange(0.,.5,.02):
+                c.inertial.history.time=float(t);c.inertial.sync();c.drive(None)
+        self.assertGreater(c.signal['reference']['velocity'][0],0.);self.assertIsNone(c.locked)
+        self.assertFalse(f.last_visual)
