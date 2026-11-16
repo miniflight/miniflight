@@ -36,13 +36,18 @@ def collect(path):
     return arrays,dict(profiles=profiles,updates=updates,sends=sends,arms=arms,observations=observations)
 
 
-def analyze(root):
+def export_public(root):
     from .gate_filter_events import export
     export(root/'flight.jsonl',root)
     arrays,events=collect(root/'flight.jsonl')
     np.savez_compressed(root/'public-inputs.npz',**arrays)
     with gzip.open(root/'public-observations.jsonl.gz','wt') as stream:
         for observed in events['observations']:stream.write(json.dumps(observed,separators=(',',':'))+'\n')
+    return arrays,events
+
+
+def analyze(root):
+    arrays,events=export_public(root)
     # Native truth first enters this report here, after the public replay inputs are saved.
     score=json.loads((root/'score.json').read_text());protocol=json.loads((root/'protocol.json').read_text())
     arm=next((r['host_time'] for r in events['arms'] if r['arguments']['armed']),None)

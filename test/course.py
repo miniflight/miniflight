@@ -16,6 +16,32 @@ import cv2
 
 
 class WireBoundaryTest(unittest.TestCase):
+    def test_public_replay_exports_survive_before_any_score_exists(self):
+        import gzip,json,tempfile
+        from pathlib import Path
+        from target.aigp.experiments.camera_imu.pipeline import export_public
+        rows=[dict(event='public_imu',samples=[dict(time=1.,received_at=2.,acceleration=[0.,0.,-9.81],gyro=[0.,0.,0.])]),
+            dict(event='call',name='race',result=[dict(native_position=[1234.,0.,0.])])]
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'flight.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            export_public(root)
+            with np.load(root/'public-inputs.npz') as public:
+                self.assertNotIn('native_position',public.files);np.testing.assert_array_equal(public['acceleration'],[[0.,0.,-9.81]])
+            self.assertTrue((root/'estimator-inputs.jsonl.gz').exists());self.assertFalse((root/'score.json').exists())
+
+    def test_video_tracking_requires_the_joint_filter_admission(self):
+        from target.aigp.experiments.camera_imu.video import admitted
+        state=dict(joint_posterior=dict(last_accepted_image_time=1.))
+        self.assertTrue(admitted(state,1.));self.assertFalse(admitted(state,1.1));self.assertFalse(admitted(state,.9))
+        self.assertFalse(admitted(dict(joint_posterior={}),1.));self.assertTrue(admitted({},1.))
+
+    def test_continuous_final_counts_filter_admissions_instead_of_detections(self):
+        from target.aigp.experiments.camera_imu.score import final_camera_updates
+        ticks=[dict(image_id=i,image_time=t,accepted_images=i,joint_posterior=dict(last_accepted_image_time=a))
+            for i,t,a in [(10,1.,1.),(11,1.1,1.),(12,1.2,1.2)]]
+        self.assertEqual(final_camera_updates(ticks,True),1)
+        with self.assertRaises(AssertionError):final_camera_updates(ticks,False)
+
     def test_own_send_uses_the_causal_public_clock_envelope(self):
         client=WireClient(Calls())
         client.imu_offsets.extend([100.010,100.002,100.018])

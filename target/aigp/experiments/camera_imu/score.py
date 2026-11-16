@@ -29,6 +29,14 @@ def armed_contacts(collisions,armed_at,disarmed_at):
     return [c for c in collisions if c['host']>=armed_at and (disarmed_at is None or c['host']<=disarmed_at)]
 
 
+def final_camera_updates(ticks,continuous):
+    if not continuous:
+        assert len({tick['image_id'] for tick in ticks})==1
+        assert len({tick['accepted_images'] for tick in ticks})==1
+    stamps={tick['joint_posterior']['last_accepted_image_time'] if tick.get('joint_posterior') else tick['image_time'] for tick in ticks}
+    return max(0,len(stamps)-1)
+
+
 def score(root):
     path = root/"flight.jsonl"
     decoder = common.MAVLink(None)
@@ -166,15 +174,13 @@ def score(root):
             final = [tick for tick in gate_ticks if tick["phase"] == "FINAL_IMU"]
             previous = [tick for tick in final if tick["imu_time"] <= crossing]
             if previous:
-                assert len({tick["image_id"] for tick in final}) == 1
-                assert len({tick["accepted_images"] for tick in final}) == 1
                 tick = previous[-1]
                 estimate = local_to_native @ (np.array(tick["gate_center"])-tick["position"])
                 truth = center-position_at(tick["imu_time"])
                 gate.update(last_image_id=tick["image_id"], last_image_time_s=tick["image_time"],
                     blind_time_to_crossing_s=crossing-tick["image_time"],
                     final_phase_to_crossing_s=crossing-final[0]["imu_time"],
-                    camera_updates_during_final=0,
+                    camera_updates_during_final=final_camera_updates(previous,settings.get('continuous_path',False)),
                     estimated_gate_error_width_down_normal_m=(basis @ (estimate-truth)).tolist())
         result["gates"].append(gate)
     native_finish=bool(settings.get('continuous_course') and requested==6 and result['native_completed'] and result['valid_race']

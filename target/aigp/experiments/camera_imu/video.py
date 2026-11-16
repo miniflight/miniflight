@@ -19,6 +19,13 @@ from . import vision
 GREEN, AMBER, BLUE = (90, 245, 110), (30, 195, 255), (255, 190, 70)
 
 
+def admitted(state,stamp):
+    joint=state.get('joint_posterior')
+    if joint is None:return True
+    accepted=joint.get('last_accepted_image_time')
+    return accepted is not None and abs(accepted-stamp)<1e-6
+
+
 def dashed(image, corners, color):
     points = np.asarray(corners)
     for a, b in zip(points, np.roll(points, -1, axis=0), strict=True):
@@ -48,17 +55,18 @@ def render(root):
     updates = [r for r in map(json.loads, path.open()) if r["event"] == "update" and r.get("signals", {}).get("phase") in ("TRACKING", "FINAL_IMU", "HANDOFF")]
     if not updates:
         raise ValueError("Recording has no approach frames")
-    accepted, ahead, partial = {}, {}, {}
+    accepted, detected, ahead, partial = {}, {}, {}, {}
     clock = {}
     for row in updates:
         state = row["signals"]
         if state.get('aperture_corners_measured',True) and state.get("image_id") is not None and "image_corners" in state:
-            accepted.setdefault((state["gate_number"], state["image_id"]), row)
+            key=(state['gate_number'],state['image_id']);detected.setdefault(key,row)
+            if admitted(state,state['image_time']):accepted.setdefault(key,row)
         candidate = state.get("lookahead")
         if candidate is not None:
             ahead.setdefault(candidate["image_id"], candidate)
         clipped=state.get('partial_gate')
-        if clipped is not None:partial.setdefault((clipped['gate_number'],clipped['image_id']),clipped)
+        if clipped is not None and admitted(state,clipped['capture_time']):partial.setdefault((clipped['gate_number'],clipped['image_id']),clipped)
     for row in map(json.loads, path.open()):
         if row["event"] == "call" and row["name"] == "camera_clock":
             clock.update({(frame, stamp):(low+high)/2 for frame, stamp, low, high in row.get("result", [])})
@@ -128,6 +136,10 @@ def render(root):
                     draw_measured(image,np.array(partial[(gate,frame.id)]['top_corners']),(245,115,245))
                     mode,color='partial rim + gyro',(245,115,245)
                     detail='two measured top corners; frame size learned from complete views'
+                elif (gate,frame.id) in detected:
+                    draw_measured(image,np.array(detected[(gate,frame.id)]['signals']['image_corners']),(70,100,255))
+                    mode,color='filter rejected',(70,100,255)
+                    detail='measured aperture corners; not admitted to the estimate'
                 elif "gate_corners" in state:
                     p = np.array([np.interp(t, times, axis) for axis in positions.T])
                     xyz = (np.array(state["gate_corners"])-p) @ rotation(t).as_matrix()

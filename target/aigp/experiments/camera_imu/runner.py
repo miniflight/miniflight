@@ -341,6 +341,8 @@ def public_course(root,shift):
             if outcome.get('estimated_map') is not None:
                 (root/'estimated-map.json').write_text(json.dumps(outcome['estimated_map'],indent=2)+'\n')
             print(json.dumps(outcome),flush=True)
+    from .pipeline import export_public
+    export_public(root)
     from .score import score
     result=score(root)
     if SETTINGS.get('render_video',True) and any(g.get('first_lock_time_s') is not None for g in result['gates']):
