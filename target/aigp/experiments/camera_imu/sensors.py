@@ -554,7 +554,7 @@ class GateController(BaseController):
         for frame in self.pending:
             stamp = frame.time_ns*1e-9
             pose = self.inertial.camera_pose(stamp)
-            if pose is not None and self.phase is not Phase.FINAL_IMU:
+            if pose is not None and (self.phase is not Phase.FINAL_IMU or (SETTINGS.get('continuous_path') and self.gate_remaining()>.15)):
                 self.observe(frame, stamp, *pose)
         self.pending = [frame for frame in self.pending if frame.time_ns*1e-9 > now]
         if self.locked is None:

@@ -264,6 +264,8 @@ def execute(calls,record,path,reader=None,client=None):
         from .gate_filter_live import Controller as controller_type
     if base.SETTINGS.get('thrust_excitation'):
         from .thrust_control import Controller as controller_type
+    if base.SETTINGS.get('continuous_path'):
+        from .continuous_control import Controller as controller_type
     controller=RecordedController(lambda:controller_type(calls),record,signals=lambda c:c.gate.signal)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
