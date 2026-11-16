@@ -1,0 +1,125 @@
+{
+  "source_revision": "a415cceaafc4f4f57349b6faf5e964fe2bed3ad2",
+  "theory_sha256": "8261dd84ca4f8a27069bb33048881e4bf5cc9d7e51f88e493e271e8b28732a5f",
+  "code_added": 83,
+  "code_removed": 1966,
+  "code_net_removed": 1883,
+  "deleted_code_files": [
+    "target/aigp/experiments/camera_imu/gate_return_score.py",
+    "target/aigp/experiments/camera_imu/joint_control.py",
+    "target/aigp/experiments/camera_imu/joint_estimator.py",
+    "target/aigp/experiments/camera_imu/joint_score.py",
+    "target/aigp/experiments/camera_imu/native/camera.c",
+    "target/aigp/experiments/camera_imu/native/identify.lua",
+    "target/aigp/experiments/camera_imu/native/imu.c",
+    "target/aigp/experiments/camera_imu/native/load.c",
+    "target/aigp/experiments/camera_imu/native/snapshot.S",
+    "target/aigp/experiments/camera_imu/probes.py",
+    "target/aigp/experiments/camera_imu/route_prior.py",
+    "target/aigp/experiments/camera_imu/turn.py",
+    "test/route_prior.py"
+  ],
+  "unit_tests": {
+    "passed": 131,
+    "elapsed_s": 4.436
+  },
+  "native_check": {
+    "gates": 1,
+    "clean": true,
+    "controller_error": null,
+    "normal_replay": true,
+    "poisoned_replay": true,
+    "poisoned_navigation_packets": 6341,
+    "wire_commands": 586,
+    "estimator_replay": {
+      "inputs": 2567,
+      "outputs": 585,
+      "matched_live_states": 585,
+      "exact_mean_and_covariance": true,
+      "gyro_attitude_override": null,
+      "image_time_sigma_override": null,
+      "upright_attitude_override": null,
+      "native_inputs": 0,
+      "late_pixels": 0
+    },
+    "retention": {
+      "temporary_bytes_removed": 81595345,
+      "raw_recordings_retained": false
+    }
+  },
+  "recent_estimator_replays": {
+    "runs": 14,
+    "all_exact": true,
+    "total_outputs": 8588
+  },
+  "retired": [
+    "old instrumented capture/IMU runtime",
+    "old joint-turn pilot",
+    "immutable planning-only route snapshot",
+    "native dynamics fixture fallback"
+  ],
+  "retained": [
+    "current public measurement boundary",
+    "joint filter and continuous reference",
+    "public calibration",
+    "scorers and raw-input replay",
+    "generic tested math",
+    "all failure/numeric evidence"
+  ],
+  "model_sha256": "65a824eaa20ae011dd53cc3ea54cf09554b94bb83d970738abdf6f1b0b2618d7",
+  "clip_bytes_removed": 24476610,
+  "removed_clips": [
+    {
+      "path": "work/accuracy-20261116/drag-validation-six/course-camera-imu.mp4",
+      "bytes": 1675889
+    },
+    {
+      "path": "work/accuracy-20261116/drag-validation-three/course-camera-imu.mp4",
+      "bytes": 2444877
+    },
+    {
+      "path": "work/accuracy-20261116/one8-baseline-plus-02/course-camera-imu.mp4",
+      "bytes": 1068159
+    },
+    {
+      "path": "work/accuracy-20261116/one8-timed-minus/course-camera-imu.mp4",
+      "bytes": 994214
+    },
+    {
+      "path": "work/accuracy-20261116/one8-timed-plus/course-camera-imu.mp4",
+      "bytes": 925881
+    },
+    {
+      "path": "work/accuracy-20261116/six8-monotone-minus/course-camera-imu.mp4",
+      "bytes": 6725398
+    },
+    {
+      "path": "work/accuracy-20261116/six8-monotone-plus/course-camera-imu.mp4",
+      "bytes": 2355344
+    },
+    {
+      "path": "work/accuracy-20261116/six8-survey-minus/course-camera-imu.mp4",
+      "bytes": 1622075
+    },
+    {
+      "path": "work/accuracy-20261116/six8-survey-plus/course-camera-imu.mp4",
+      "bytes": 2693338
+    },
+    {
+      "path": "work/accuracy-20261116/six8-upright-minus/course-camera-imu.mp4",
+      "bytes": 1924658
+    },
+    {
+      "path": "work/accuracy-20261116/six8-upright-plus/course-camera-imu.mp4",
+      "bytes": 2046777
+    }
+  ],
+  "raw_camera": {
+    "file": "work/accuracy-20261116/six8-survey-minus/raw-public-camera.npz",
+    "wire_bytes": 8650732,
+    "frames": 110,
+    "cap_bytes": 16777216
+  },
+  "accuracy_goal_achieved": false,
+  "limitations": "Cleanup validates behavior/input ownership, not low enough MAE or persistent cross-flight SLAM. Current one-gate p/v/attitude/depth MAE0.63m/0.27m/s/0.31deg/0.19m still misses targets."
+}

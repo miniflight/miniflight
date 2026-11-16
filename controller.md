@@ -42,6 +42,19 @@ must carry their correlations. A new rectangle can be a previously seen gate, th
 next gate or a farther gate; counting it as the next gate does not establish its
 identity. Ambiguous observations remain tentative.
 
+The first flight starts with priors. Quiet IMU measurements initialize tilt;
+visible gate pixels and known dimensions seed uncertain landmark hypotheses.
+Initialize velocity from a justified rest prior, or infer initial motion from
+several views. A later flight matches current observations to retained landmarks
+to estimate its starting pose in the same map.
+
+Each update predicts motion from the IMU and previous motor commands, predicts
+what the camera should see, and compares that prediction with the new pixels.
+The discrepancy corrects the drone state and map together. Planning uses this
+updated estimate to choose the next short movement; motor feedback executes it.
+The resulting measurements begin the next update. This is how the controller
+builds its state while navigating, rather than waiting for a finished map.
+
 The first survey takeoff defines an arbitrary local origin. Gravity defines down; the initial
 heading defines the horizontal axes. Monocular vision alone leaves metric scale
 undetermined. Known gate dimensions provide a scale prior, and sufficiently varied
