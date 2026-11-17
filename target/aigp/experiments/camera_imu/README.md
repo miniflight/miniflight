@@ -91,6 +91,28 @@ still needs closed-loop validation. The same record retains both ablations.
 [error overview](accuracy.validation.png) retain failures and partial flights.
 [Earlier continuous trials](continuous.validation.json) remain available.
 
+Command/body response is measured independently of navigation. Fit the small
+rotational response model on an older public flight, then freeze it before a new
+flight. Forecasts hold the last command and use no future gyro, force or pixels:
+
+```sh
+python -m target.aigp.experiments.camera_imu.proprioception fit OLD response.json \
+  --calibration target/aigp/experiments/camera_imu/thrust-response.model.json
+python -m target.aigp.experiments.camera_imu.proprioception evaluate NEW CHECK \
+  --model response.json --estimates NEW-EXACT
+```
+
+`course ... --camera-gap 0.1` withholds100ms of images every3s after tracking.
+The IMU and motor feedback continue. `gate_filter_events SOURCE OUTPUT
+--camera-gap 0.4` instead removes image factors from the same fixed-command
+flight; it tests estimation, not closed-loop completion. Finish now requires
+1m of estimated clearance beyond the last gate. [All response/gap scores and
+failed flights](proprioception.validation.json), [prediction plots](proprioception.response.png)
+and [paired gap plots](proprioception.paired.png) retain the measurements.
+Effective public-clock lags do not separate physical actuation from sensor
+publication delay. The rotational response model remains a diagnostic; live
+attitude propagation continues to use gyro measurements.
+
 The removed instrumented, old joint-turn and immutable route-snapshot modes are
 in Git history. Archived process traces require their recorded revision; current
 code rejects unsupported profiles rather than replaying them through a different

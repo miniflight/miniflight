@@ -11,7 +11,7 @@ def statistics(values):
 
 
 def collect(path):
-    imu=[];camera=[];sends=[];profiles=[];updates=[];arms=[];observations=[]
+    imu=[];camera=[];sends=[];profiles=[];updates=[];arms=[];observations=[];gaps=[]
     with path.open() as stream:
         for row in map(json.loads,stream):
             event=row.get('event')
@@ -20,6 +20,7 @@ def collect(path):
             elif event=='public_camera':camera.append(row)
             elif event=='profile':profiles.append(row)
             elif event=='visual_measurement':observations.append(row)
+            elif event=='camera_gap':gaps.append({k:row[k] for k in ['image_id','capture_time','start','end']})
             elif event=='update':updates.append(row)
             elif event=='call':
                 if row['name']=='send' and row['arguments'].get('kind')=='MotorControls':sends.append(row)
@@ -33,7 +34,7 @@ def collect(path):
         frame_shape_hw=np.array([r['shape'][:2] for r in camera],dtype=np.int32).reshape(-1,2),
         motor_sent_host_time=np.array([r['host_time'] for r in sends]),
         motor_outputs=np.array([r['arguments']['outputs'] for r in sends]).reshape(-1,4))
-    return arrays,dict(profiles=profiles,updates=updates,sends=sends,arms=arms,observations=observations)
+    return arrays,dict(profiles=profiles,updates=updates,sends=sends,arms=arms,observations=observations,gaps=gaps)
 
 
 def export_public(root):
@@ -78,7 +79,7 @@ def analyze(root):
     rate_error=np.array(rate_error).reshape(-1,3)
     motors=np.array([r['arguments']['outputs'] for r in commands]).reshape(-1,4)
     accepted_frame_ids={f['id'] for row in events['updates'] for f in row.get('frames',[])}
-    report=dict(revision=protocol['revision'],input_contract=dict(
+    report=dict(revision=protocol['revision'],camera_gaps=events['gaps'],input_contract=dict(
         public_imu_samples=len(arrays['imu_time']),decoded_camera_frames=len(arrays['frame_id']),controller_frame_ids=len(accepted_frame_ids),
         unaligned_camera_frames=int(np.sum(arrays['frame_time_estimated_ns']<0)),
         imu_published_interval_ms=statistics(imu_dt[imu_dt>0]*1000),imu_nonincreasing_timestamps=int(np.sum(imu_dt<=0)),

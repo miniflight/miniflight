@@ -209,10 +209,11 @@ def public_course(root,shift,fixture=None,scoring_frame=None):
     return result
 
 
-def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False,map_prior=None,unknown_start=False,scoring_frame=None):
+def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=False,crossing_constraint=False,joint_estimator=False,brake_test=False,moving_start=False,excitation=None,gyro_attitude=False,joint_rim=False,direct_launch=False,continuous_path=False,image_time_uncertainty=False,upright_attitude=False,map_prior=None,unknown_start=False,scoring_frame=None,camera_gap_s=0.):
     """Public course; remove pixels and raw traces after scoring and replay."""
     if dynamics_model is None:raise ValueError('Public course requires a publicly identified dynamics model')
     if not math.isfinite(shift):raise ValueError('The sideways setup shift must be finite')
+    if not math.isfinite(camera_gap_s) or not 0<=camera_gap_s<3.:raise ValueError('Camera gaps must be in[0,3)s')
     if unknown_start and (map_prior is None or scoring_frame is None or not joint_estimator):raise ValueError('Unknown start needs joint estimation, a learned map and a separate scoring frame')
     fixture=dict(target=[5.,shift,3.],yaw=.18 if shift>=0 else -.18,delay_s=8.) if unknown_start else None
     calibration=dynamics_model.read_bytes()
@@ -227,10 +228,10 @@ def run_course(root, shift, gates=6, speed=2., dynamics_model=None,partial_gate=
         prior=data['posterior']
     root.mkdir(parents=True)
     original = dict(SETTINGS)
-    SETTINGS.update(thrust_excitation=excitation,render_video=excitation is None,gyro_attitude=gyro_attitude,joint_rim=joint_rim,direct_launch=direct_launch,continuous_path=continuous_path,image_time_uncertainty=image_time_uncertainty,upright_attitude=upright_attitude,map_prior=prior)
+    SETTINGS.update(camera_gap_s=camera_gap_s,thrust_excitation=excitation,render_video=excitation is None,gyro_attitude=gyro_attitude,joint_rim=joint_rim,direct_launch=direct_launch,continuous_path=continuous_path,image_time_uncertainty=image_time_uncertainty,upright_attitude=upright_attitude,map_prior=prior)
     SETTINGS.update(continuous_course=True,sensor_interface='public_camera_and_HIGHRES_IMU',camera_correction=True,maximum_blind_s=4.5,
         gates_to_pass=gates,speed_m_s=speed,
-        beyond_m=4.,finish_beyond_m=0. if gates==6 else 1.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
+        beyond_m=4.,finish_beyond_m=1.,flight_timeout_s=30.,course_timeout_s=180.,trace_limit_mib=384,
         camera_position_min_side_px=20.,camera_velocity_min_side_px=20.,
         vertical_speed_limit_m_s=3.,
         camera_window_s=1.,
@@ -296,6 +297,7 @@ def main():
     parser.add_argument('--map-prior',type=Path,help='Joint public map from the same stationary launch frame')
     parser.add_argument('--unknown-start',action='store_true',help='Displace with an independent pilot, then cold-localize without its state')
     parser.add_argument('--scoring-frame',type=Path,help='Fixed learned-map alignment, opened only by the postflight scorer')
+    parser.add_argument('--camera-gap',type=float,default=0.,help='Withhold this many camera seconds every3s, starting1s after visual tracking')
     parser.add_argument('--partial-gate',action='store_true')
     args = parser.parse_args()
     if args.mode=='course':
@@ -308,7 +310,7 @@ def main():
         if args.image_time_uncertainty and not args.joint_estimator:parser.error('image-time uncertainty requires --joint-estimator')
         if args.upright_attitude and not (args.joint_estimator and args.gyro_attitude):parser.error('upright attitude requires joint estimation with other attitude corrections held')
         if args.continuous_path and (not args.joint_estimator or args.thrust_excitation):parser.error('continuous path requires joint estimation without excitation')
-        result=run_course(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude,args.map_prior,args.unknown_start,args.scoring_frame)
+        result=run_course(args.path.resolve(),args.shift,args.gates,args.speed,args.dynamics_model,args.partial_gate,args.crossing_constraint,args.joint_estimator,args.brake_test,args.moving_start,args.thrust_excitation,args.gyro_attitude,args.joint_rim,args.direct_launch,args.continuous_path,args.image_time_uncertainty,args.upright_attitude,args.map_prior,args.unknown_start,args.scoring_frame,args.camera_gap)
         from .plots import plot
         if (args.path/'state-errors.csv').exists():plot(args.path.resolve())
         if (args.path/'pipeline.json').exists():

@@ -267,6 +267,8 @@ def execute(calls,record,path,reader=None,client=None,controller_factory=None):
     if base.SETTINGS.get('continuous_path'):
         from .continuous_control import Controller as controller_type
     controller=RecordedController(lambda:controller_type(calls) if controller_factory is None else controller_factory(calls),record,signals=lambda c:c.gate.signal)
+    from .camera_gaps import CameraGaps
+    gaps=CameraGaps(base.SETTINGS.get('camera_gap_s',0.),record)
     cleanup=AIGPSimulator(Controller,client=client,clock=calls)
     score_reader=RaceReader(calls,reader)
     began=calls.monotonic();ready=None;error=None;reason=None;armed_at=None
@@ -295,6 +297,8 @@ def execute(calls,record,path,reader=None,client=None,controller_factory=None):
             raise StopIteration
         telemetry=tuple(p for p in client.packets if not isinstance(p.data,bytes))
         frames=tuple(p.decoded for p in client.packets if isinstance(p.decoded,Frame))
+        gate=controller.controller.gate
+        frames=gaps.select(frames,state.time,gate.signal.get('phase')=='TRACKING' and gate.signal.get('joint_posterior') is not None)
         return telemetry,frames,None
     def send(command):
         nonlocal armed_at

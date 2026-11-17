@@ -1,0 +1,320 @@
+{
+  "schema": 1,
+  "training_source": "work/unknown-20261116/live-active-plus-01",
+  "training_public_sha256": "d960e46bc5e543ac258812d90a62a163002bb6446b1ff6d8726733fc4c15ac27",
+  "calibration_sha256": "65a824eaa20ae011dd53cc3ea54cf09554b94bb83d970738abdf6f1b0b2618d7",
+  "position_config": {
+    "hover_thrust": 0.2740096079028543,
+    "thrust_acceleration": 53.64539483762455,
+    "position_gain": 1.3333333333333333,
+    "velocity_gain": 3.0,
+    "attitude_gain": 8.0,
+    "max_rate": 3.0,
+    "thrust_curve": [
+      17.957933783450514,
+      65.12082062981247
+    ],
+    "body_resistance_per_m": [
+      0.0476857765387268,
+      0.0476857765387268,
+      0.0476857765387268
+    ]
+  },
+  "rotation_coefficients": [
+    [
+      12.039857539707647,
+      11.823379680778956,
+      0.023449506915917465
+    ],
+    [
+      11.863039137107824,
+      11.589424050539078,
+      0.01288056422156857
+    ],
+    [
+      5.840830383645297,
+      4.398350621800494,
+      0.019504982494324204
+    ]
+  ],
+  "force_lag_s": 0.005,
+  "rotation_lag_s": 0.015,
+  "training_delay_profiles": [
+    {
+      "lag_s": 0.0,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6618827756026743,
+        "rms": 0.9563538710177417,
+        "p95": 1.9950345452349534,
+        "maximum": 8.31320747946857
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.5974029612094849,
+        1.0243654443459353,
+        0.28651135371645303
+      ],
+      "rotation_loss": 0.1407447746299404
+    },
+    {
+      "lag_s": 0.005,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6567605763390377,
+        "rms": 0.9504857106663935,
+        "p95": 1.9918080020102678,
+        "maximum": 8.31320747946857
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.3253312045094245,
+        0.8434481459770504,
+        0.25701449047500524
+      ],
+      "rotation_loss": 0.10094029331498022
+    },
+    {
+      "lag_s": 0.01,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.655125171415346,
+        "rms": 0.9516367728985882,
+        "p95": 1.985047352050974,
+        "maximum": 8.31320747946857
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.100991784169404,
+        0.694431788318424,
+        0.23221332996829333
+      ],
+      "rotation_loss": 0.07358363764785804
+    },
+    {
+      "lag_s": 0.015,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6572645869593948,
+        "rms": 0.9585416010744191,
+        "p95": 1.9908156820721596,
+        "maximum": 8.31320747946857
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        0.9813411868915934,
+        0.6094227202315774,
+        0.21573309529948723
+      ],
+      "rotation_loss": 0.06156934792269998
+    },
+    {
+      "lag_s": 0.02,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6638079110519801,
+        "rms": 0.9704778521858477,
+        "p95": 2.0118624380729724,
+        "maximum": 8.28768795082993
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.0216527152085568,
+        0.622113142021503,
+        0.2080417623222524
+      ],
+      "rotation_loss": 0.06629605506966837
+    },
+    {
+      "lag_s": 0.025,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6729584060520096,
+        "rms": 0.987198286941024,
+        "p95": 2.027652848909066,
+        "maximum": 8.28768795082993
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.204261599926755,
+        0.7416431573598798,
+        0.20813326801322368
+      ],
+      "rotation_loss": 0.08787466434140692
+    },
+    {
+      "lag_s": 0.03,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6840889854947685,
+        "rms": 1.0072998141636686,
+        "p95": 2.0511941016536976,
+        "maximum": 9.21178545390229
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.4926747370139797,
+        0.9304337123539648,
+        0.2149899504396427
+      ],
+      "rotation_loss": 0.12661991827899655
+    },
+    {
+      "lag_s": 0.035,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.6967823432377985,
+        "rms": 1.029497311431163,
+        "p95": 2.0856498571591238,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        1.8480498548346447,
+        1.168371578478277,
+        0.22840877682090263
+      ],
+      "rotation_loss": 0.1835187864560871
+    },
+    {
+      "lag_s": 0.04,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7115595303096631,
+        "rms": 1.051833266698735,
+        "p95": 2.1134377741560852,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        2.256227818532622,
+        1.4433589671163116,
+        0.24788875782031078
+      ],
+      "rotation_loss": 0.2598678050981646
+    },
+    {
+      "lag_s": 0.045,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7275121542915748,
+        "rms": 1.0748954230297023,
+        "p95": 2.179150559353138,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        2.713611438394016,
+        1.7484535607836107,
+        0.2742211811119666
+      ],
+      "rotation_loss": 0.3566997272180877
+    },
+    {
+      "lag_s": 0.05,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7437834486657768,
+        "rms": 1.0998655182885915,
+        "p95": 2.2170587692659502,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        3.2059660089609787,
+        2.072006401224018,
+        0.3051676268853217
+      ],
+      "rotation_loss": 0.4718549572144301
+    },
+    {
+      "lag_s": 0.055,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7605879808575331,
+        "rms": 1.1245673239531364,
+        "p95": 2.264178596940841,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        3.715764189898255,
+        2.3958641634751165,
+        0.3415621296994498
+      ],
+      "rotation_loss": 0.596159742855039
+    },
+    {
+      "lag_s": 0.06,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7772819520282421,
+        "rms": 1.1487122091249031,
+        "p95": 2.3029585917086353,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        4.179437875082341,
+        2.661224851769215,
+        0.3847874919548983
+      ],
+      "rotation_loss": 0.7109015888234644
+    },
+    {
+      "lag_s": 0.065,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.7938237329593453,
+        "rms": 1.1737657034969047,
+        "p95": 2.3236282579000767,
+        "maximum": 9.763805767499587
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        4.512951702956583,
+        2.8049482554249496,
+        0.4351881760082158
+      ],
+      "rotation_loss": 0.7915307629439913
+    },
+    {
+      "lag_s": 0.07,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.810202573877251,
+        "rms": 1.1993144544322136,
+        "p95": 2.3709567938856093,
+        "maximum": 9.782871028580225
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        4.636579585048297,
+        2.8114193892050072,
+        0.49363625913671216
+      ],
+      "rotation_loss": 0.8338010750856981
+    },
+    {
+      "lag_s": 0.075,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.826523624884427,
+        "rms": 1.2247205924198483,
+        "p95": 2.412265633905077,
+        "maximum": 9.986628853025916
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        4.636579585046931,
+        2.8114193892449206,
+        0.5589679121882893
+      ],
+      "rotation_loss": 0.8682972889652358
+    },
+    {
+      "lag_s": 0.08,
+      "axial_force": {
+        "count": 6986,
+        "mae": 0.8426368769734465,
+        "rms": 1.2495488023158583,
+        "p95": 2.457155024191455,
+        "maximum": 9.986628853025916
+      },
+      "rotation_acceleration_mae_rad_s2": [
+        4.636579585047004,
+        2.8114193892446178,
+        0.629745959502319
+      ],
+      "rotation_loss": 0.904691523082231
+    }
+  ],
+  "equation": "omega_dot[j]=gain[j]*mixed_command_force[j]-damping[j]*omega[j]+offset[j]",
+  "force_units": "Specific force m/s2, not newtons. Axial lag fit holds the prior thrust curve fixed; vertical drag is omitted in that lag diagnostic.",
+  "timing": "Effective lag on the arrival-aligned public clock; physical actuation and IMU publication delays are not separately identified.",
+  "role": "Diagnostic only. This fitted rotational model does not replace live gyro propagation or change controller commands."
+}

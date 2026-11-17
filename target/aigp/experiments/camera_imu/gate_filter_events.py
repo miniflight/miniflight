@@ -32,8 +32,12 @@ def export(source,root):
                 outputs.write(json.dumps(dict(sequence=row['sequence'],state=row['state']),separators=(',',':'),allow_nan=False)+'\n');counts['states']+=1
     return counts
 
-def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitude=None):
-    overridden=gyro_attitude is not None or image_time_sigma is not None or upright_attitude is not None
+def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitude=None,camera_gap_s=0.):
+    overridden=gyro_attitude is not None or image_time_sigma is not None or upright_attitude is not None or camera_gap_s>0
+    from .camera_gaps import CameraGaps
+    mask=CameraGaps(camera_gap_s);omitted_pixels=0
+    if camera_gap_s:
+        with gzip.open(source/'control.jsonl.gz','rt') as h:mask.epoch=next(r['imu_time'] for r in map(json.loads,h) if r['phase']=='TRACKING')+1.
     if image_time_sigma is not None and (not np.isfinite(image_time_sigma) or image_time_sigma<0):raise ValueError('Invalid image-time uncertainty')
     output.mkdir(parents=True)
     expected={}
@@ -71,6 +75,7 @@ def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitu
             elif history is None:raise ValueError('Estimator input precedes initialization')
             elif kind=='imu':history.imu(row['time'],row['gyro'],row['acceleration'])
             elif kind=='command':history.command(row['time'],row['motors'])
+            elif mask.interval(row['time']) is not None:omitted_pixels+=1
             else:
                 pixels=np.array(row['pixels']);template=row['template'];seed=None
                 if template is None:
@@ -101,10 +106,10 @@ def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitu
     with gzip.open(output/'pixel-factors.jsonl.gz','wt') as h:
         for key,value in history.results.items():h.write(json.dumps(dict(id=key,**value),separators=(',',':'))+'\n')
     report=dict(inputs=events,outputs=len(states),matched_live_states=matched,exact_mean_and_covariance=not overridden,
-        gyro_attitude_override=gyro_attitude,image_time_sigma_override=image_time_sigma,upright_attitude_override=upright_attitude,native_inputs=0,late_pixels=history.rejected_late)
+        gyro_attitude_override=gyro_attitude,image_time_sigma_override=image_time_sigma,upright_attitude_override=upright_attitude,camera_gap_s=camera_gap_s,omitted_pixels=omitted_pixels,native_inputs=0,late_pixels=history.rejected_late)
     (output/'replay.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));return report
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);p.add_argument('--attitude',choices=('recorded','gyro','fusion'),default='recorded')
-    p.add_argument('--image-time-sigma',type=float);p.add_argument('--upright-attitude',action=argparse.BooleanOptionalAction,default=None);a=p.parse_args()
-    replay(a.source,a.output,None if a.attitude=='recorded' else a.attitude=='gyro',a.image_time_sigma,a.upright_attitude)
+    p.add_argument('--image-time-sigma',type=float);p.add_argument('--upright-attitude',action=argparse.BooleanOptionalAction,default=None);p.add_argument('--camera-gap',type=float,default=0.);a=p.parse_args()
+    replay(a.source,a.output,None if a.attitude=='recorded' else a.attitude=='gyro',a.image_time_sigma,a.upright_attitude,a.camera_gap)

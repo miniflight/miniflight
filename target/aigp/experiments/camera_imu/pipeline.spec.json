@@ -215,7 +215,8 @@
     "Cold localization before gate1 is implemented; coverage depends on observable mapped landmarks. Unknown ground-launch lifecycle, retrospective smoothing and loop closure remain unimplemented.",
     "Mission ordinals still double as landmark roles. Farther gates can be assigned to the next slot before a nearer gate becomes visible; identity uncertainty needs an explicit representation.",
     "The continuous reference can point the camera away from descending gates. Complete learned-map projection audits are optimistic if next-gate geometry is not available causally.",
-    "Exposure time, actuator application time and exact physical IMU integration intervals remain unknown.10ms is an image-time uncertainty prior, not a measured delay.",
+    "Public command-response tests support effective force/rotation lags near5/15ms on held-out data. The force profile is shallow over0-15ms. Exposure time, physical actuator application time and exact physical IMU integration intervals remain unknown.10ms is an image-time uncertainty prior, not a measured delay.",
+    "A400ms-gap failure contains a10.3m/s native velocity reversal over22ms of reported time that is absent from the surrounding public accelerometer integral. Impact/constraint impulse is a hypothesis; immediate inertial recovery of this event is unvalidated.",
     "Public thrust validation covers mean commands0.21-0.335 in short response windows. Dynamic drag transfer remains unvalidated; no candidate drag/scale/background update was installed."
   ],
   "acceptance_protocol": "Freeze source and calibration hashes, declare trial count and starts, report every attempt, score each stage and the full native flight, then remove raw recordings after exact normal/poisoned replay.",
