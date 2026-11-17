@@ -236,6 +236,6 @@ class GateController(single.GateController):
                     image_corners=self.lookahead["corners"].tolist())
         if self.gate_number >= 2 and self.phase is single.Phase.TRACKING and self.locked is not None and self.inertial.time-self.measurement_time() > SETTINGS["lookahead_max_age_s"]:
             if not (SETTINGS.get('continuous_course') and getattr(self,'alignment_active',False)
-                    and self.inertial.time-self.measurement_time()<=SETTINGS['maximum_blind_s']):
+                    and self.inertial.time-self.measurement_time()<=getattr(self,'recovery_budget_s',SETTINGS['maximum_blind_s'])):
                 raise TimeoutError("gate image exceeded the lookahead freshness interval")
         return request

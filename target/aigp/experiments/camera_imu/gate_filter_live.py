@@ -155,7 +155,9 @@ class GateController(course.GateController):
             if h is not None and self.gate_number in h.filter.gates:
                 relative,covariance,_,_=h.filter.relative(self.gate_number)
                 budget=outage_budget(relative,covariance,self.direction,self.alignment_active,sensors.SETTINGS['maximum_blind_s'])
-            age=float(self.inertial.time-self.measurement_time());self.signal['visual_outage']=dict(budget,image_age_s=age)
+            age=float(self.inertial.time-self.measurement_time())
+            if getattr(self,'recovery_stop',None) is not None:budget['budget_s']=getattr(self,'recovery_budget_s',sensors.SETTINGS['maximum_blind_s'])
+            self.signal['visual_outage']=dict(budget,image_age_s=age)
             if age>budget['budget_s']:
                 raise TimeoutError('joint gate measurement exceeded two seconds' if budget['budget_s']==2. else 'joint gate measurement exceeded its mapped visibility budget')
         return request

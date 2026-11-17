@@ -13,9 +13,18 @@ class GateController(joint.GateController):
         self.curve=None;self.plan_key=None;self.plan_index=None;self.future_index=None
         self.last_reference=None;self.initial_start=None;self.speed_reference=None;self.last_drive=None;self.replanned=-np.inf
         self.entry_speed=None
+        self.recovery_stop=None
+        self.recovery_released=-np.inf
         self.tracking_config=replace(self.config,max_acceleration=5.,max_horizontal_acceleration=9.,max_tilt=.9)
 
-    def final_approach_ready(self):return True
+    def final_approach_ready(self):
+        if not sensors.SETTINGS.get('view_recovery',False):return True
+        if self.recovery_stop is not None:return False
+        return self.inertial.time-self.inertial.history.filter.last_full_visual.get(self.gate_number,-np.inf)<.3
+
+    def update(self,telemetry,frames,race_state):
+        if sensors.SETTINGS.get('view_recovery',False) and self.recovery_stop is not None and self.phase is sensors.Phase.FINAL_IMU:self.phase=sensors.Phase.TRACKING
+        return super().update(telemetry,frames,race_state)
 
     def end_direction(self,f,center):
         previous=f.gates.get(self.gate_number-1);future=f.gates.get(self.gate_number+1)
@@ -66,6 +75,22 @@ class GateController(joint.GateController):
         if u>.999 and relative @ self.curve.end_direction>0.:
             tangent=self.curve.end_direction;reference=tangent*float(relative @ tangent);curvature=np.zeros(3)
         velocity=tangent*speed;feedforward=tangent*at+curvature*speed*speed
+        yaw=f.gates[self.gate_number][2];normal=np.array([np.cos(yaw),np.sin(yaw),0.])
+        if normal @ self.direction<0:normal=-normal
+        remaining=-float(relative @ normal);side=relative+(remaining*normal)
+        age=now-self.measurement_time();forward=float(self.inertial.velocity @ direction)
+        braking=3.+max(0.,forward)**2/4.
+        unsafe=sensors.SETTINGS.get('view_recovery',False) and remaining>2. and np.isfinite(age) and (age>.35 or (now-self.recovery_released>.75 and remaining<max(8.,braking) and np.linalg.norm(side)>.5))
+        if self.recovery_stop is None and unsafe:
+            self.recovery_stop=float(relative @ normal)
+            self.recovery_budget_s=min(8.,max(4.5,age+max(0.,remaining-18.)/3.+2.))
+        recovering=self.recovery_stop is not None
+        if recovering:
+            reference=normal*float(relative @ normal);velocity=normal*min(3.,max(0.,remaining-8.));feedforward=np.zeros(3)
+            self.speed_reference=SpeedReference(0.)
+            settled=age<.3 and np.linalg.norm(side)<.4 and np.linalg.norm(self.inertial.velocity)<2.
+            if settled:
+                self.recovery_stop=None;self.curve=None;self.last_reference=None;self.recovery_released=now
         acceleration,_=trajectory_acceleration(relative,self.inertial.velocity,(reference,velocity,feedforward),(0.,0.,0.),dt,
             kp=self.config.position_gain*self.config.velocity_gain,ki=0.,kd=self.config.velocity_gain,integral_limit=0.)
         acceleration=np.array(acceleration);acceleration[:2]*=min(1.,4.5/max(np.linalg.norm(acceleration[:2]),1e-9));acceleration[2]=np.clip(acceleration[2],-3.,3.)
@@ -75,10 +100,10 @@ class GateController(joint.GateController):
         horizontal=np.sqrt(max(0.,maximum*maximum-up*up));compensation[:2]*=min(1.,horizontal/max(np.linalg.norm(compensation[:2]),1e-9))
         request=acceleration_control(self.tracking_config,compensation,self.inertial.rotation.to_euler(),0.)
         thrust=float(np.clip(request.thrust,.21,.325))
-        self.alignment_active=False;self.signal.update(visibility_alignment=False,crossing_alignment=False)
+        self.alignment_active=recovering;self.signal.update(visibility_alignment=recovering,crossing_alignment=False)
         self.signal['reference']=dict(gate=self.gate_number,time=float(now),position_relative_gate=reference.tolist(),velocity=velocity.tolist(),acceleration=feedforward.tolist(),
             parameter=float(u),speed_m_s=float(speed),target_speed_m_s=float(cap),tangential_acceleration_m_s2=float(at),replanned=bool(changed),
-            position_error_m=float(np.linalg.norm(reference-relative)),force_limit_active=bool(abs(thrust-request.thrust)>1e-9),maximum_balanced_command=.325)
+            position_error_m=float(np.linalg.norm(reference-relative)),force_limit_active=bool(abs(thrust-request.thrust)>1e-9),maximum_balanced_command=.325,recovery=recovering,measurement_age_s=float(age))
         self.last_reference=(reference.copy(),velocity.copy(),feedforward.copy(),at)
         return BodyRates(request.roll_rate,request.pitch_rate,request.yaw_rate,thrust)
 

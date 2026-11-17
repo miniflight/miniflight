@@ -113,6 +113,13 @@ Effective public-clock lags do not separate physical actuation from sensor
 publication delay. The rotational response model remains a diagnostic; live
 attitude propagation continues to use gyro measurements.
 
+`--view-recovery` enables an experimental slow approach/centering recovery.
+Seven200ms-gap development trials did not establish a complete lap; it is off
+by default. [All recovery failures and MAEs](recovery.validation.json) and
+[plots](recovery.validation.png) retain the results. [Position-derived velocity](recovery.collision.png)
+supports a collision at the upper gate3 frame for the earlier10.3m/s reversal.
+The public accelerometer does not represent that impulse.
+
 The removed instrumented, old joint-turn and immutable route-snapshot modes are
 in Git history. Archived process traces require their recorded revision; current
 code rejects unsupported profiles rather than replaying them through a different

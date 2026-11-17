@@ -7,6 +7,18 @@ from target.aigp.experiments.camera_imu import sensors,vision,continuous_control
 
 
 class ContinuousControlTest(unittest.TestCase):
+    def setUp(self):
+        settings=patch.dict(sensors.SETTINGS,view_recovery=True);settings.start();self.addCleanup(settings.stop)
+
+    def test_disabled_candidate_preserves_the_normal_controller(self):
+        c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync()
+        with patch.dict(sensors.SETTINGS,view_recovery=False):
+            c.drive(None);self.assertIsNone(c.recovery_stop);self.assertTrue(c.final_approach_ready())
+    def test_final_commit_requires_a_fresh_full_opening_and_no_recovery(self):
+        c,f=self.controller();self.assertFalse(c.final_approach_ready())
+        f.last_full_visual[1]=0.;self.assertTrue(c.final_approach_ready())
+        c.recovery_stop=-6.;self.assertFalse(c.final_approach_ready())
+
     def test_height_changes_end_with_level_crossing_velocity(self):
         c,f=self.controller();index,center,yaw=f.gates[2];f.gates[2]=(index,center+[0.,0.,8.],yaw)
         c.drive(None)
@@ -45,6 +57,32 @@ class ContinuousControlTest(unittest.TestCase):
         request=c.drive(None);a,b=f.thrust_curve
         upward=a*request.thrust+b*request.thrust**2
         self.assertAlmostEqual(9.81-upward+f.ba[2],0.,places=10)
+
+    def test_recovery_brakes_before_an_off_height_crossing(self):
+        c,f=self.controller();f.p[0]=14.;f.v[0]=5.;f.last_visual[1]=0.;c.inertial.sync()
+        c.drive(None)
+        self.assertTrue(c.signal['reference']['recovery'])
+        np.testing.assert_array_equal(c.signal['reference']['velocity'],[0.,0.,0.])
+        self.assertEqual(c.signal['reference']['position_relative_gate'][2],0.)
+
+    def test_far_recovery_approaches_slowly_instead_of_waiting_outside_view(self):
+        c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
+        self.assertTrue(c.signal['reference']['recovery'])
+        self.assertEqual(c.signal['reference']['velocity'][0],3.)
+        self.assertLessEqual(c.recovery_budget_s,8.)
+
+    def test_recovery_releases_after_fresh_aligned_stationary_view(self):
+        c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
+        self.assertIsNotNone(c.recovery_stop)
+        f.p[2]=-2.;f.v[:]=0.;f.last_visual[1]=.6;c.inertial.sync();c.drive(None)
+        self.assertIsNone(c.recovery_stop);self.assertIsNone(c.curve)
+
+    def test_recovery_release_does_not_chatter_on_small_alignment_changes(self):
+        c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
+        f.p[2]=-2.;f.v[0]=1.2;f.last_visual[1]=.6;c.inertial.sync();c.drive(None)
+        self.assertIsNone(c.recovery_stop)
+        f.p[0]=14.;f.p[2]=-1.4;c.inertial.history.time=.62;f.last_visual[1]=.62;c.inertial.sync();c.drive(None)
+        self.assertIsNone(c.recovery_stop)
 
     def test_rejected_lookahead_cannot_be_promoted_to_a_lock(self):
         c,f=self.controller();c.gate_number=2
