@@ -69,7 +69,7 @@ class ColdInertial(joint.Inertial):
         ordered=sorted(self.applied_commands,key=lambda r:r[0]);before=[r for r in ordered if r[0]<=result['time']]
         commands=before[-1:]+[r for r in ordered if r[0]>result['time']]
         c=dict(thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),intrinsics=vision.K.tolist(),
-            supported=False,attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False),broad_rim=sensors.SETTINGS.get('joint_rim',False),partial_gate_births=False,
+            supported=False,localization=sensors.SETTINGS.get('map_localization',False),attitude_corrections=sensors.SETTINGS.get('map_localization',False) or not sensors.SETTINGS.get('gyro_attitude',False),broad_rim=sensors.SETTINGS.get('joint_rim',False),partial_gate_births=False,
             image_time_sigma_s=.01 if sensors.SETTINGS.get('image_time_uncertainty',False) else 0.,upright_attitude=sensors.SETTINGS.get('upright_attitude',False),history_s=2.,map_prior=prior,bootstrap_views=views,bootstrap_commands=commands)
         self.history,_=bootstrap(c,seed,views,result);self.bootstrap_image=views[-1]['image_id'];self.event('init',seed=seed.tolist(),config=c)
         self.times=[t for t,_ in self.history.snapshots];self.positions=[s.p.copy() for _,s in self.history.snapshots];self.velocities=[s.v.copy() for _,s in self.history.snapshots]
@@ -78,7 +78,7 @@ class ColdInertial(joint.Inertial):
         return True
 
 
-class ColdGate(continuous.GateController):
+class ColdAcquisition:
     def __init__(self,calls):
         super().__init__(calls);self.inertial=ColdInertial(self.config,getattr(calls,'record',None),calls);self.inertial.timing=self.timing
         self.hold_thrust=self.config.hover_thrust;self.hold_time=None
@@ -101,9 +101,15 @@ class ColdGate(continuous.GateController):
         request=super().update(telemetry,frames,None);self.signal['localization']=self.inertial.last_result;return request
 
 
+class ColdGate(ColdAcquisition,continuous.GateController):pass
+
+
+class ColdGateBasic(ColdAcquisition,joint.GateController):pass
+
+
 class ColdController(joint.Controller):
     def __init__(self,calls):
-        self.gate=ColdGate(calls);self.motor=sensors.Motors(position=self.gate);self.timing=self.gate.timing;self.motor.timing=self.timing
+        self.gate=(ColdGate if sensors.SETTINGS.get('continuous_path') else ColdGateBasic)(calls);self.motor=sensors.Motors(position=self.gate);self.timing=self.gate.timing;self.motor.timing=self.timing
 
     def sent(self,command,stamp):
         if self.gate.inertial.history is None:

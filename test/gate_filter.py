@@ -383,3 +383,61 @@ class JointGateTest(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class LocalizationRecoveryTest(unittest.TestCase):
+    def test_map_residuals_cannot_flip_the_vehicle(self):
+        f=filter();f.localization=True;f.attitude_corrections=True
+        pixels,H=f.measurement(1,POINTS)
+        result=f.correct(np.tile([1.,2.],4),H,np.eye(8),1000.)
+        self.assertTrue(result['accepted']);self.assertGreater(f.R[2,2],.2);self.assertLessEqual(Rotation.from_matrix(filter().R.T @ f.R).magnitude(),.05+1e-10)
+
+    def scene(self,initial_velocity,actual_velocity,map_sigma=.3,distance=6.,gap_s=0.,trace=None,initial_height_error=0.):
+        f=GateFilter(np.eye(3),np.zeros(3),[18.,65.],[.047]*3,CAMERA_FROM_BODY,K,supported=True)
+        f.add_gate(1,CAMERA_FROM_BODY @ [distance,0.,0.],CAMERA_FROM_BODY @ [0.,1.,0.]);f.localization=True;f.v[0]=initial_velocity;f.p[2]=initial_height_error
+        f.P[16:,16:]=np.eye(4)*map_sigma**2
+        original=f.gates[1][1].copy();h=GateHistory(f,0.,np.zeros(3),seconds=2.)
+        for j,t in enumerate(np.arange(.02,.62,.02)):
+            h.imu(float(t),np.zeros(3))
+            if j%2 or t<gap_s:
+                if trace is not None:trace.append((float(t),h.filter.v[0],h.filter.motion_resets))
+                continue
+            cam=(POINTS+[distance,0.,0.]-[actual_velocity*t,0.,0.]) @ CAMERA_FROM_BODY.T;pixel=cam @ K.T;pixel=pixel[:,:2]/pixel[:,2,None]
+            h.observe(dict(id=j,image_id=j,time=float(t),key=1,pixels=pixel,points=POINTS,seed=None))
+            if trace is not None:trace.append((float(t),h.filter.v[0],h.filter.motion_resets))
+        return h.filter,original
+
+    def test_visual_sequence_recovers_an_unmeasured_velocity_reversal_without_moving_map(self):
+        f,original=self.scene(5.,-2.)
+        self.assertGreater(f.motion_resets,0);self.assertLess(abs(f.v[0]+2.),1.)
+        np.testing.assert_array_equal(f.gates[1][1],original)
+        self.assertGreater(np.linalg.eigvalsh(f.P).min(),-1e-8)
+
+    def test_consistent_motion_does_not_trigger_impulse_recovery(self):
+        f,_=self.scene(1.,1.);self.assertEqual(f.motion_resets,0)
+
+    def test_unresolved_far_gate_only_widens_uncertainty(self):
+        f,_=self.scene(5.,-2.,distance=20.);self.assertEqual(f.motion_resets,0);self.assertGreater(f.motion_widenings,0)
+
+    def test_velocity_recovery_after_two_hundred_ms_without_camera(self):
+        f,_=self.scene(5.,-2.,gap_s=.2);self.assertGreater(f.motion_resets,0);self.assertLess(abs(f.v[0]+2.),1.)
+
+    def test_returning_camera_recovers_wrong_height_without_velocity_impulse(self):
+        f,_=self.scene(1.,1.,initial_height_error=2.);self.assertGreater(f.motion_resets,0);self.assertLess(abs(f.p[2]),.1)
+
+    def test_position_only_rim_correction_preserves_attitude(self):
+        f=filter();f.localization=True;f.add_rim(3.,1.5,.1);R=f.R.copy();_,H=f.measurement(1,None,rim=True)
+        result=f.correct(np.array([1.,2.,1.,2.]),H,np.eye(4),1000.,position_only=True)
+        self.assertTrue(result['accepted']);np.testing.assert_array_equal(f.R,R)
+
+    def test_partial_rim_must_match_projected_gate(self):
+        from types import SimpleNamespace
+        from collections import Counter
+        from unittest.mock import patch
+        from target.aigp.experiments.camera_imu import gate_filter_live as live,sensors
+        f=filter();f.localization=True;f.add_rim(3.,1.5,.1);expected,_=f.measurement(1,None,rim=True)
+        c=SimpleNamespace(inertial=SimpleNamespace(history=SimpleNamespace(filter=f)),locked=1,gate_number=1,record_visual=lambda *a,**kw:None,gate_relative=lambda:f.relative(1)[0],association_counts=Counter(),partial_observation=None)
+        frame=SimpleNamespace(id=1,bgr=np.zeros((1,1,3),np.uint8))
+        with patch.dict(sensors.SETTINGS,joint_rim=True,partial_gate=True):
+            bad=expected.mean(axis=0)+(expected-expected.mean(axis=0))*5.
+            with patch.object(live,'outer_top',return_value=(bad,0.)):self.assertFalse(live.GateController.observe_partial(c,frame,0.,np.eye(3),np.zeros(3)))
+            with patch.object(live,'outer_top',return_value=(expected,0.)):self.assertTrue(live.GateController.observe_partial(c,frame,0.,np.eye(3),np.zeros(3)))

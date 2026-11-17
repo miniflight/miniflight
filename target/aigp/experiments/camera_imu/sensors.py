@@ -470,7 +470,7 @@ class GateController(BaseController):
                 self.observe(frame, stamp, *pose)
         self.pending = [frame for frame in self.pending if frame.time_ns*1e-9 > now]
         if self.locked is None:
-            if now-self.acquire_started > 5.:
+            if now-self.acquire_started > max(5.,getattr(self,'recovery_budget_s',0.) if SETTINGS.get('map_localization',False) else 0.):
                 raise TimeoutError("no confirmed opening in the largest visible gate rim")
             self.signal = dict(phase=self.phase.name, imu_time=now, position=self.inertial.position.tolist(),
                 velocity=self.inertial.velocity.tolist(), target=[0., 0., 0.],
@@ -478,7 +478,7 @@ class GateController(BaseController):
             return self.drive(np.zeros(3))
         p, v = self.inertial.position, self.inertial.velocity
         remaining = self.gate_remaining()
-        if self.phase is Phase.TRACKING and remaining <= SETTINGS["final_distance_m"] and self.final_approach_ready():
+        if self.phase is Phase.TRACKING and remaining <= getattr(self,'final_distance_m',SETTINGS["final_distance_m"]) and self.final_approach_ready():
             self.phase, self.final_at = Phase.FINAL_IMU, now
         stop_beyond=SETTINGS.get('finish_beyond_m',SETTINGS['stop_beyond_m']) if getattr(self,'gate_number',1)==SETTINGS.get('gates_to_pass',1) else SETTINGS['stop_beyond_m']
         if remaining < -stop_beyond:

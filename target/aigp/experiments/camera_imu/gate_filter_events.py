@@ -32,8 +32,8 @@ def export(source,root):
                 outputs.write(json.dumps(dict(sequence=row['sequence'],state=row['state']),separators=(',',':'),allow_nan=False)+'\n');counts['states']+=1
     return counts
 
-def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitude=None,camera_gap_s=0.):
-    overridden=gyro_attitude is not None or image_time_sigma is not None or upright_attitude is not None or camera_gap_s>0
+def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitude=None,camera_gap_s=0.,localization=None):
+    overridden=gyro_attitude is not None or image_time_sigma is not None or upright_attitude is not None or camera_gap_s>0 or localization is not None
     from .camera_gaps import CameraGaps
     mask=CameraGaps(camera_gap_s);omitted_pixels=0
     if camera_gap_s:
@@ -56,8 +56,9 @@ def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitu
             old_force=None if history is None else history.filter.last_force_time
             if kind=='init':
                 if history is not None:raise ValueError('Estimator initialized twice')
-                seed=np.array(row['seed']);forces=seed[:,1:4].copy();rates=seed[:,4:7].copy();c=row['config']
-                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births','image_time_sigma_s','upright_attitude','map_prior','bootstrap_views','bootstrap_commands'}:raise ValueError('Unexpected estimator calibration fields')
+                seed=np.array(row['seed']);forces=seed[:,1:4].copy();rates=seed[:,4:7].copy();c=dict(row['config'])
+                if localization is not None:c.update(localization=localization,attitude_corrections=True if localization else c['attitude_corrections'])
+                if not CONFIG_FIELDS<=set(c)<=CONFIG_FIELDS|{'broad_rim','partial_gate_births','image_time_sigma_s','upright_attitude','map_prior','bootstrap_views','bootstrap_commands','localization'}:raise ValueError('Unexpected estimator calibration fields')
                 if 'bootstrap_views' in c:
                     from miniflight.relocalization import bootstrap
                     history,_=bootstrap(c,seed,c['bootstrap_views']);f=history.filter
@@ -65,7 +66,7 @@ def replay(source,output,gyro_attitude=None,image_time_sigma=None,upright_attitu
                     rotation=stationary_rotation(forces.mean(axis=0)).as_rotation_matrix()
                     f=GateFilter(rotation,np.zeros(3),c['thrust_curve'],c['drag'],c['camera_from_body'],c['intrinsics'],supported=c['supported'])
                     f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff(seed[:,0])))))
-                    f.attitude_corrections=c['attitude_corrections'];f.broad_rim=c.get('broad_rim',False);f.partial_gate_births=c.get('partial_gate_births',True)
+                    f.localization=c.get('localization',False);f.attitude_corrections=c['attitude_corrections'];f.broad_rim=c.get('broad_rim',False);f.partial_gate_births=c.get('partial_gate_births',True)
                     f.image_time_sigma=c.get('image_time_sigma_s',0.);f.upright_attitude=c.get('upright_attitude',False)
                     if c.get('map_prior') is not None:f.restore_map(c['map_prior'])
                     history=GateHistory(f,float(seed[-1,0]),seed[-1,4:7],seconds=c['history_s'])

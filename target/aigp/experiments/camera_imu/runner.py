@@ -297,11 +297,13 @@ def main():
     parser.add_argument('--map-prior',type=Path,help='Joint public map from the same stationary launch frame')
     parser.add_argument('--unknown-start',action='store_true',help='Displace with an independent pilot, then cold-localize without its state')
     parser.add_argument('--scoring-frame',type=Path,help='Fixed learned-map alignment, opened only by the postflight scorer')
-    parser.add_argument('--view-recovery',action='store_true',help='Experimental brake/align/reacquire controller; not validated for complete laps')
+    parser.add_argument('--map-localization',action='store_true',help='Hold learned map geometry and correct body pose from pixels')
+    parser.add_argument('--view-recovery',action='store_true',help='Experimental brake/align/reacquire controller; use with --map-localization')
     parser.add_argument('--camera-gap',type=float,default=0.,help='Withhold this many camera seconds every3s, starting1s after visual tracking')
     parser.add_argument('--partial-gate',action='store_true')
     args = parser.parse_args()
     if args.mode=='course':
+        SETTINGS['map_localization']=args.map_localization
         if args.dynamics_model is None:parser.error('course requires --dynamics-model; see dynamics.model.json for the public-data calibration')
         if not math.isfinite(args.shift):parser.error('The sideways setup shift must be finite')
         if not 0<args.speed<=(12. if args.continuous_path else 8.):parser.error('course speed exceeds the selected controller limit')

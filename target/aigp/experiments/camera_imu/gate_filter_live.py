@@ -52,7 +52,8 @@ class Inertial(sensors.Inertial):
                     self.config.thrust_curve,self.config.body_resistance_per_m,vision.CAMERA_FROM_BODY,vision.K,
                     supported=sensors.SETTINGS.get('ground_support',False))
                 f.gyro_noise=max(.001,float(max(rates.std(axis=0))*np.sqrt(np.median(np.diff([s.time for s in self.seed])))))
-                f.attitude_corrections=not sensors.SETTINGS.get('gyro_attitude',False)
+                f.localization=sensors.SETTINGS.get('map_localization',False)
+                f.attitude_corrections=f.localization or not sensors.SETTINGS.get('gyro_attitude',False)
                 f.broad_rim=sensors.SETTINGS.get('joint_rim',False)
                 f.partial_gate_births=not sensors.SETTINGS.get('joint_rim',False)
                 f.image_time_sigma=.01 if sensors.SETTINGS.get('image_time_uncertainty',False) else 0.
@@ -62,7 +63,7 @@ class Inertial(sensors.Inertial):
                 self.history=GateHistory(f,self.time,sample.gyro,seconds=2.)
                 self.event('init',seed=[[float(s.time),*s.acceleration,*s.gyro] for s in self.seed],config=dict(
                     thrust_curve=list(self.config.thrust_curve),drag=list(self.config.body_resistance_per_m),camera_from_body=vision.CAMERA_FROM_BODY.tolist(),
-                    intrinsics=vision.K.tolist(),supported=not f.airborne,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,
+                    intrinsics=vision.K.tolist(),supported=not f.airborne,localization=f.localization,attitude_corrections=f.attitude_corrections,broad_rim=f.broad_rim,partial_gate_births=f.partial_gate_births,
                     image_time_sigma_s=f.image_time_sigma,upright_attitude=f.upright_attitude,history_s=2.,**({} if prior is None else dict(map_prior=prior))))
             elif sample.time>self.time:
                 self.event('imu',time=float(sample.time),gyro=list(sample.gyro),acceleration=list(sample.acceleration))
@@ -110,6 +111,7 @@ class GateController(course.GateController):
     def __init__(self,calls):
         super().__init__(calls);self.inertial=Inertial(self.config,getattr(calls,'record',None));self.inertial.timing=self.timing
         self.brake_state='waiting';self.brake_steady=None;self.used_joint=set();self.launch_cleared=False
+        self.reacquire_since=None
 
     @property
     def anchor(self):
@@ -170,6 +172,11 @@ class GateController(course.GateController):
         if self.gate_number not in h.filter.gates or h.filter.rim is None:return False
         top=outer_top(frame.bgr)
         if top is None:return False
+        if h.filter.localization:
+            prediction=h.filter.measurement(self.gate_number,None,rim=True)
+            if prediction is None:return False
+            expected=prediction[0];width=np.linalg.norm(expected[1]-expected[0]);observed=np.linalg.norm(top[0][1]-top[0][0])
+            if width<4. or not .65<observed/width<1.5 or np.linalg.norm(np.mean(top[0],axis=0)-expected.mean(axis=0))>width:return False
         if full_corners is not None and same_red_component(frame.bgr,full_corners,top[0]):
             self.association_counts['same_component_full_preferred']+=1;return False
         # The filter projects its learned shape. A partial view need not supply a metric pose.
@@ -194,7 +201,7 @@ class GateController(course.GateController):
                 reprojection_rmse_px=float(pose[0]),minimum_side_px=float(np.min(np.linalg.norm(self.last_corners-np.roll(self.last_corners,1,axis=0),axis=1))),
                 velocity=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior'),
                 position_correction=[0.]*3,velocity_correction=[0.]*3,correction_enabled=False)
-            if sensors.SETTINGS.get('joint_rim'):
+            if sensors.SETTINGS.get('joint_rim') and not sensors.SETTINGS.get('map_localization',False):
                 observed=full_rim_observation(frame.bgr,self.last_corners,pose)
                 if observed is not None:
                     self.used_joint.add((frame.id,'top',self.gate_number))
@@ -204,9 +211,13 @@ class GateController(course.GateController):
             partial['velocity']=dict(time=self.inertial.time,velocity=self.inertial.velocity.tolist(),source='joint posterior')
         self.fuse_lookahead(frame,stamp)
         f=self.inertial.history.filter
-        if self.gate_number not in f.last_visual:
+        if self.gate_number not in f.last_visual or (f.localization and self.inertial.time-f.last_visual[self.gate_number]>2.):
+            if f.localization:
+                if self.reacquire_since is None:self.reacquire_since=self.inertial.time
+                self.acquire_started=self.reacquire_since
             self.locked=None
             if self.phase is not sensors.Phase.SHIFTING:self.phase=sensors.Phase.ACQUIRING
+        elif f.last_visual[self.gate_number]==stamp:self.reacquire_since=None
         if self.gate_number in f.gates:
             self.anchor=f.gates[self.gate_number][1].copy();self.last_relative_gate=self.gate_relative();self.last_relative_position=f.p.copy()
             self.full_image_time=f.last_full_visual.get(self.gate_number)

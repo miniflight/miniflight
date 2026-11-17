@@ -190,6 +190,13 @@ Next expand cold-localization view coverage and reduce common drone/map drift.
 Keep landmark identity separate from route
 order and include camera visibility in descent/braking trajectories.
 
+The optional map-localization observer now holds surveyed geometry while
+reinitializing body motion from consistent returning pixel views. Recovery
+must distinguish a fresh full opening from a partial bar, and commit to the
+IMU approach before the upward-tilted camera loses the gate. One200ms-gap run
+completed6/6 in78.66s; position MAE1.86m and velocity spikes remain unresolved.
+[Measurements and every failed trial](target/aigp/experiments/camera_imu/estimator-recovery.validation.json).
+
 References supporting this design:
 
 - [Active SLAM, Placed et al.](https://arxiv.org/abs/2207.00254): motion can be chosen to improve the map as well as reach a destination.

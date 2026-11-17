@@ -46,6 +46,7 @@ class GateFilter:
         self.image_time_sigma=0.;self.image_time_index=None;self.image_time_offset=0.
         self.angular_velocity=np.zeros(3)
         self.upright_attitude=False;self.last_gravity_time=-np.inf;self.gravity_accepted=0
+        self.localization=False;self.motion_views={};self.motion_resets=0;self.motion_widenings=0;self.last_motion_reset=-np.inf
 
     def copy(self):return deepcopy(self)
 
@@ -209,7 +210,7 @@ class GateFilter:
         if split is not None:
             Q=split['remaining'];result=self.correct(Q @ residual,Q @ H,np.eye(len(Q)),NIS[len(Q)])
             result['gravity']=gravity
-        else:result=self.correct(residual,H,V,NIS[len(residual)])
+        else:result=self.correct(residual,H,V,NIS[len(residual)],position_only=rim and self.localization)
         result['innovation_rms_px']=float(np.sqrt(np.mean(residual**2)))
         result['gate_index']=self.gates[key][0]
         result['rim_index']=None if self.rim is None else self.rim[0]
@@ -217,7 +218,7 @@ class GateFilter:
             result.update(image_time_offset_s=float(self.image_time_offset),image_time_sigma_s=float(self.image_time_sigma))
         return result
 
-    def correct(self,residual,H,V,threshold,*,gravity=False):
+    def correct(self,residual,H,V,threshold,*,gravity=False,position_only=False):
         S=H @ self.P @ H.T+V
         solved=np.linalg.solve(S,residual);nis=float(residual @ solved)
         result=dict(accepted=nis<=threshold,nis=nis,dof=len(residual))
@@ -230,6 +231,11 @@ class GateFilter:
         K[9:12]=0.
         # Known nominal size is a consider parameter: carry its correlations, never fit its mean.
         K[15]=0.
+        if self.localization:K[16:]=0.
+        if position_only:K[6:9]=0.
+        if self.localization:
+            angle=K[6:9] @ residual;K[6:9]*=min(1.,.05/max(np.linalg.norm(angle),1e-12))
+            if (self.R @ Rotation.from_rotvec(K[6:9] @ residual).as_matrix())[2,2]<.2:K[6:9]=0.
         dx=K @ residual;A=np.eye(len(self.P))-K @ H
         covariance=A @ self.P @ A.T+K @ V @ K.T
         self.inject(dx);reset=np.eye(len(self.P));reset[6:9,6:9]-=.5*skew(dx[6:9])
@@ -285,7 +291,7 @@ class GateHistory:
                 self.filter.predict(dt,.5*(first+last),self._motor(middle),(last-first)*dt/np.sqrt(12));self.time=end
 
     def _observe(self,row,stamp):
-        seed=row.get('seed')
+        seed=row.get('seed');motion_seed=None
         if not row.get('rim'):
             constrained=upright_seed(row['pixels'],self.filter.C @ self.filter.R.T @ [0.,0.,1.],self.filter.K)
             if constrained is not None:seed=constrained
@@ -293,18 +299,42 @@ class GateHistory:
             if self.filter.rim is None:self.filter.add_rim(*row['rim_prior'])
             pixels=np.c_[row['pixels'],np.ones(2)];rays=pixels @ np.linalg.inv(self.filter.K).T @ self.filter.C @ self.filter.R.T
             z=rays[:,2];width,height=self.filter.rim[1];edge=z[0]*rays[1]-z[1]*rays[0]
-            if self.filter.partial_gate_births and np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
+            if np.prod(z)>0 and np.min(abs(z)/np.linalg.norm(rays,axis=1))>.04 and np.linalg.norm(edge)>1e-9:
                 top=rays*(width/np.linalg.norm(edge)*abs(z[::-1]))[:,None]
                 center=top.mean(axis=0)+[0.,0.,height];right=(top[1]-top[0])/width
                 camera=self.filter.C @ self.filter.R.T
-                seed=(camera @ center*(1.5/self.filter.size),camera @ right)
+                motion_seed=(camera @ center*(1.5/self.filter.size),camera @ right)
+                if self.filter.partial_gate_births:seed=motion_seed
+        f=self.filter
+        motion_seed=motion_seed if row.get('rim') else seed
+        support=min(np.linalg.norm(np.asarray(row['pixels'])-np.roll(row['pixels'],1,axis=0),axis=1))
+        if f.localization and motion_seed is not None and row['key'] in f.gates and support>=(100. if row.get('rim') else 20.):
+            key=row['key'];position=f.gates[key][1]-f.R @ f.C.T @ np.asarray(motion_seed[0])*(f.size/1.5)
+            views=f.motion_views.setdefault((key,bool(row.get('rim'))),[])
+            if not views or views[-1][1]!=row['image_id']:views.append((stamp,row['image_id'],position.copy()))
+            views[:]=[v for v in views if stamp-v[0]<=.3]
+            if len(views)>=5 and stamp-views[0][0]>=.12 and stamp-f.last_motion_reset>.5:
+                time=np.array([v[0]-stamp for v in views]);xyz=np.array([v[2] for v in views]);X=np.c_[np.ones(len(time)),time]
+                fit=np.linalg.lstsq(X,xyz,rcond=None)[0];error=np.sqrt(np.mean((X @ fit-xyz)**2))
+                if error<.1 and np.linalg.norm(fit[0]-f.p)<3. and (np.linalg.norm(fit[1]-f.v)>2.5 or np.linalg.norm(fit[0]-f.p)>.75):
+                    if support<60.:
+                        L=np.zeros((len(f.P),3));L[:3]=np.eye(3)*min(.15,stamp-views[0][0]);L[3:6]=np.eye(3)
+                        f.P+=L @ L.T*10.**2;f.motion_widenings+=1;f.last_motion_reset=stamp
+                    else:
+                        # Restart body motion from the visual batch, preserving map correlations.
+                        A=np.eye(len(f.P));A[:6]=0.;index=f.gates[key][0];A[:3,index:index+3]=np.eye(3)
+                        f.P=A @ f.P @ A.T;f.P[:3,:3]+=np.eye(3)*.25**2;f.P[3:6,3:6]=np.eye(3)*3.**2
+                        f.p=fit[0].copy();f.v=fit[1].copy();f.motion_resets+=1;f.last_motion_reset=stamp
+                        f.last_visual[key]=stamp
+                        if not row.get('rim'):f.last_full_visual[key]=stamp
+                        self.results[row['id']]=dict(accepted=True,visual_motion_restart=True,fit_rms_m=float(error));return
         if row['key'] not in self.filter.gates:
             if seed is None:
                 self.results[row['id']]=dict(accepted=False,reason='missing_full_landmark')
                 return
             self.filter.add_gate(row['key'],*seed)
         result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
-        if not result['accepted'] and seed is not None and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
+        if not result['accepted'] and seed is not None and not self.filter.localization and self.filter.consider_nearer(row['key'],row.get('image_id',row['id']),stamp,seed):
             result=self.filter.observe(row['key'],row['points'],row['pixels'],row.get('sigma_px',1.),rim=row.get('rim',False))
             result['nearer_landmark_bound']=True
         if result['accepted']:

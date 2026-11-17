@@ -15,7 +15,7 @@ class ContinuousControlTest(unittest.TestCase):
         with patch.dict(sensors.SETTINGS,view_recovery=False):
             c.drive(None);self.assertIsNone(c.recovery_stop);self.assertTrue(c.final_approach_ready())
     def test_final_commit_requires_a_fresh_full_opening_and_no_recovery(self):
-        c,f=self.controller();self.assertFalse(c.final_approach_ready())
+        c,f=self.controller();f.last_full_visual.clear();self.assertFalse(c.final_approach_ready())
         f.last_full_visual[1]=0.;self.assertTrue(c.final_approach_ready())
         c.recovery_stop=-6.;self.assertFalse(c.final_approach_ready())
 
@@ -34,6 +34,7 @@ class ContinuousControlTest(unittest.TestCase):
         with patch.dict(sensors.SETTINGS,position_config=model,speed_m_s=5.):c=continuous_control.GateController(Calls())
         f=GateFilter(np.eye(3),np.zeros(3),model['thrust_curve'],model['body_resistance_per_m'],vision.CAMERA_FROM_BODY,vision.K)
         for key,center in [(1,[20.,0.,-2.]),(2,[45.,3.,-5.])]:f.add_gate(key,vision.CAMERA_FROM_BODY @ center,vision.CAMERA_FROM_BODY @ [0.,1.,0.])
+        f.last_full_visual[1]=0.
         c.inertial.history=GateHistory(f,0.,[0.,0.,0.]);c.inertial.sync();c.phase=sensors.Phase.TRACKING;c.locked=1;c.direction=np.array([1.,0.,0.])
         return c,f
 
@@ -46,7 +47,7 @@ class ContinuousControlTest(unittest.TestCase):
     def test_normal_reference_keeps_forward_motion_without_settle_modes(self):
         c,f=self.controller()
         for t in np.arange(0.,1.,.02):
-            c.inertial.history.time=float(t);c.inertial.sync();request=c.drive(None)
+            c.inertial.history.time=float(t);f.last_full_visual[1]=float(t);c.inertial.sync();request=c.drive(None)
             self.assertTrue(np.isfinite([request.roll_rate,request.pitch_rate,request.yaw_rate,request.thrust]).all())
             self.assertGreaterEqual(request.thrust,.21);self.assertLessEqual(request.thrust,.325)
         self.assertGreater(c.signal['reference']['velocity'][0],0.)
@@ -74,12 +75,12 @@ class ContinuousControlTest(unittest.TestCase):
     def test_recovery_releases_after_fresh_aligned_stationary_view(self):
         c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
         self.assertIsNotNone(c.recovery_stop)
-        f.p[2]=-2.;f.v[:]=0.;f.last_visual[1]=.6;c.inertial.sync();c.drive(None)
+        f.p[2]=-2.;f.v[:]=0.;f.last_visual[1]=.6;f.last_full_visual[1]=.6;c.inertial.sync();c.drive(None)
         self.assertIsNone(c.recovery_stop);self.assertIsNone(c.curve)
 
     def test_recovery_release_does_not_chatter_on_small_alignment_changes(self):
         c,f=self.controller();f.last_visual[1]=0.;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
-        f.p[2]=-2.;f.v[0]=1.2;f.last_visual[1]=.6;c.inertial.sync();c.drive(None)
+        f.p[2]=-2.;f.v[0]=1.2;f.last_visual[1]=.6;f.last_full_visual[1]=.6;c.inertial.sync();c.drive(None)
         self.assertIsNone(c.recovery_stop)
         f.p[0]=14.;f.p[2]=-1.4;c.inertial.history.time=.62;f.last_visual[1]=.62;c.inertial.sync();c.drive(None)
         self.assertIsNone(c.recovery_stop)
@@ -98,3 +99,26 @@ class ContinuousControlTest(unittest.TestCase):
                 c.inertial.history.time=float(t);c.inertial.sync();c.drive(None)
         self.assertGreater(c.signal['reference']['velocity'][0],0.);self.assertIsNone(c.locked)
         self.assertFalse(f.last_visual)
+
+    def test_fresh_bar_cannot_release_recovery_without_full_opening(self):
+        c,f=self.controller();c.inertial.history.time=.6;f.last_visual[1]=.6;c.inertial.sync();c.drive(None)
+        self.assertIsNotNone(c.recovery_stop)
+
+    def test_upward_camera_moves_commit_before_the_fixed_close_range(self):
+        c,f=self.controller();c.drive(None);self.assertGreater(c.final_distance_m,2.5)
+
+    def test_committed_imu_approach_does_not_reenter_visual_hold(self):
+        c,f=self.controller();c.phase=sensors.Phase.FINAL_IMU;c.inertial.history.time=.6;c.inertial.sync();c.drive(None)
+        self.assertIsNone(c.recovery_stop)
+
+    def test_historical_measurement_cannot_keep_rejected_track_locked(self):
+        from types import SimpleNamespace
+        from target.aigp.experiments.camera_imu import course
+        c,f=self.controller();f.localization=True;f.last_visual[1]=0.;c.inertial.history.time=10.;c.inertial.sync()
+        frame=SimpleNamespace(id=10)
+        with patch.object(course.GateController,'observe',return_value=None):
+            c.observe(frame,9.9,np.zeros(3),np.eye(3))
+            self.assertIsNone(c.locked);self.assertEqual(c.acquire_started,10.)
+            c.locked=1;c.phase=sensors.Phase.TRACKING;c.inertial.history.time=10.1;c.inertial.sync()
+            c.observe(frame,10.,np.zeros(3),np.eye(3))
+            self.assertEqual(c.acquire_started,10.)

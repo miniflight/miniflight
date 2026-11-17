@@ -1,6 +1,7 @@
 """Continuous p/v/a gate tracking from the current public estimator map only."""
 from dataclasses import replace
 import numpy as np
+from scipy.spatial.transform import Rotation
 from miniflight.gate_path import GateCurve,SpeedReference,unit,crossing_direction
 from miniflight.position import trajectory_acceleration,quadratic_resistance,acceleration_control
 from miniflight.control import BodyRates
@@ -78,15 +79,29 @@ class GateController(joint.GateController):
         yaw=f.gates[self.gate_number][2];normal=np.array([np.cos(yaw),np.sin(yaw),0.])
         if normal @ self.direction<0:normal=-normal
         remaining=-float(relative @ normal);side=relative+(remaining*normal)
-        age=now-self.measurement_time();forward=float(self.inertial.velocity @ direction)
+        if sensors.SETTINGS.get('view_recovery',False):
+            corners=np.array([[0.,-.75,-.75],[0.,.75,-.75],[0.,.75,.75],[0.,-.75,.75]]) @ Rotation.from_euler('z',yaw).as_matrix().T
+            self.final_distance_m=2.5
+            for distance in np.arange(1.5,8.1,.25):
+                camera=(corners+distance*normal) @ f.R @ f.C.T;pixel=camera @ f.K.T
+                if np.min(camera[:,2])<=.1:continue
+                pixel=pixel[:,:2]/pixel[:,2,None]
+                if np.all(pixel>[20.,20.]) and np.all(pixel<[620.,340.]):
+                    self.final_distance_m=max(2.5,min(8.,distance+max(0.,float(self.inertial.velocity @ normal))*.3+.5));break
+        full_time=f.last_full_visual.get(self.gate_number)
+        if full_time is None:full_time=self.acquire_started if self.acquire_started is not None else now
+        age=now-full_time;forward=float(self.inertial.velocity @ direction)
         braking=3.+max(0.,forward)**2/4.
-        unsafe=sensors.SETTINGS.get('view_recovery',False) and remaining>2. and np.isfinite(age) and (age>.35 or (now-self.recovery_released>.75 and remaining<max(8.,braking) and np.linalg.norm(side)>.5))
+        unsafe=sensors.SETTINGS.get('view_recovery',False) and self.phase is not sensors.Phase.FINAL_IMU and remaining>2. and np.isfinite(age) and (age>.35 or (now-self.recovery_released>.75 and remaining<max(8.,braking) and np.linalg.norm(side)>.5))
         if self.recovery_stop is None and unsafe:
             self.recovery_stop=float(relative @ normal)
             self.recovery_budget_s=min(8.,max(4.5,age+max(0.,remaining-18.)/3.+2.))
         recovering=self.recovery_stop is not None
         if recovering:
             reference=normal*float(relative @ normal);velocity=normal*min(3.,max(0.,remaining-8.));feedforward=np.zeros(3)
+            bearing=self.hint_bearing()
+            if age>.35 and bearing is not None:
+                reference[2]=relative[2]+float(np.clip(8.*(bearing+.1),-3.,3.))
             self.speed_reference=SpeedReference(0.)
             settled=age<.3 and np.linalg.norm(side)<.4 and np.linalg.norm(self.inertial.velocity)<2.
             if settled:

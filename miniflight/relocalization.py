@@ -104,13 +104,14 @@ def bootstrap(config,imu,views,result=None):
     f=GateFilter(result['rotation'],np.zeros(3),config['thrust_curve'],config['drag'],C,K)
     f.P[:3,:3]=np.eye(3)*1000.**2;f.P[3:6,3:6]=np.eye(3)*3.**2;f.P[6:9,6:9]=np.eye(3)*np.pi**2
     f.restore_map(config['map_prior']);f.p=np.array(result['position']);f.v=np.array(result['velocity'])
+    f.localization=config.get('localization',False)
     stamp=result['time'];f.image_time_sigma=config.get('image_time_sigma_s',0.)
     rows=np.array(imu);f.angular_velocity=np.array([np.interp(stamp,rows[:,0],rows[:,i]) for i in range(4,7)]);f.begin_image()
     for key,index in zip(result['ids']+result.get('verification_ids',[]),result['pair']+result.get('verification_pairs',[])):
         accepted=f.observe(key,POINTS,np.array(views[-1]['pixels'][index]),sigma_px=1.5)
         if not accepted['accepted']:raise ValueError('Localized gate failed joint admission')
         f.last_visual[key]=stamp;f.last_full_visual[key]=stamp
-    f.end_image();f.attitude_corrections=config['attitude_corrections'];f.broad_rim=config.get('broad_rim',False)
+    f.end_image();f.localization=config.get('localization',False);f.attitude_corrections=config['attitude_corrections'];f.broad_rim=config.get('broad_rim',False)
     f.partial_gate_births=config.get('partial_gate_births',True);f.upright_attitude=config.get('upright_attitude',False)
     gyro=np.array([np.interp(stamp,rows[:,0],rows[:,i]) for i in range(4,7)])
     h=GateHistory(f,stamp,gyro,seconds=config['history_s'])

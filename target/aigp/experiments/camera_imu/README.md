@@ -113,12 +113,27 @@ Effective public-clock lags do not separate physical actuation from sensor
 publication delay. The rotational response model remains a diagnostic; live
 attitude propagation continues to use gyro measurements.
 
-`--view-recovery` enables an experimental slow approach/centering recovery.
-Seven200ms-gap development trials did not establish a complete lap; it is off
-by default. [All recovery failures and MAEs](recovery.validation.json) and
+`--view-recovery` enables experimental slow approach/centering recovery and is
+off by default. Seven earlier standalone200ms-gap trials did not complete a lap. [All recovery failures and MAEs](recovery.validation.json) and
 [plots](recovery.validation.png) retain the results. [Position-derived velocity](recovery.collision.png)
 supports a collision at the upper gate3 frame for the earlier10.3m/s reversal.
 The public accelerometer does not represent that impulse.
+
+`--map-localization` holds learned gate geometry during pixel updates and allows
+bounded camera attitude correction. A consistent visual sequence can restart
+body position/velocity with broad covariance. Partial bars must match the
+projected gate and cannot rotate the attitude estimate. Stale historical locks
+return to acquisition. With `--view-recovery`, the final-approach distance follows
+the camera frustum; the fixed upward20deg camera loses a level gate before2.5m.
+
+The accepted200ms-gap profile uses the joint observer flags above, `--gates 6
+--speed 4 --continuous-path --unknown-start --map-prior LEARNED/estimated-map.json
+--scoring-frame FRAME.json --map-localization --view-recovery --camera-gap 0.2`.
+It completed6/6 in78.66s including setup. Position MAE remains1.86m and velocity
+has transient spikes; this is one completion, not a robust or fast-lap result.
+[Every trial and MAE](estimator-recovery.validation.json),
+[accepted state errors](estimator-recovery.validation.png),
+[controlled reversal test](estimator-recovery.controlled.png).
 
 The removed instrumented, old joint-turn and immutable route-snapshot modes are
 in Git history. Archived process traces require their recorded revision; current
