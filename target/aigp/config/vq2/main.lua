@@ -204,6 +204,14 @@ local function advance()
 
         if valid(game_mode) and valid(game_mode.OpponentsPopup) then
             game_mode.OpponentsPopup:ConfirmPopup()
+            local hud = controller():GetHUD()
+            if valid(hud) and valid(hud.ResultsScreen) then
+                local results = hud.ResultsScreen
+                results.ResultGrid:SetIsEnabled(false) -- Pending grid selections block MAVLink reset.
+                results.ResultGridAlt:SetIsEnabled(false)
+                print("[DirectVQ2] results_grids_enabled=" ..
+                    tostring(results.ResultGrid:GetIsEnabled() or results.ResultGridAlt:GetIsEnabled()) .. "\n")
+            end
             print("[DirectVQ2] opponents_confirmed=true\n")
             stage = "start_race"
         end
