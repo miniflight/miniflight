@@ -57,7 +57,8 @@ def replay(path, *, client_type=ProcessClient, wrap_controller=None):
                                   client=client, race_reader=RaceReader(calls), clock=calls, finish_before=metadata.get("finish_before_s"),
                                   race_status_path=metadata.get("race_status_path"), launcher=Launcher(calls),
                                   startup_timeout=metadata.get("startup_timeout_s", 120),
-                                  race_status_timeout=metadata.get("race_status_timeout_s"))
+                                  race_status_timeout=metadata.get("race_status_timeout_s"),
+                                  imu_loss_timeout=metadata.get("imu_loss_timeout_s"))
         execute = lambda: simulator.rollout(attach=metadata.get("attach", True), simulator_args=metadata.get("simulator_args", ()))
     else:
         reset, course = None, tuple(client.receive(packet) for packet in metadata["course"])

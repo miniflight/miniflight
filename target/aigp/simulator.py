@@ -46,12 +46,16 @@ class AIGPSimulator:
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
                  timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None,
-                 race_reader=None, clock=time, finish_before=None, launcher=launch, race_status_timeout=None):
+                 race_reader=None, clock=time, finish_before=None, launcher=launch, race_status_timeout=None,
+                 imu_loss_timeout=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
         race_status_timeout = timeout if race_status_timeout is None else race_status_timeout
-        if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout, race_status_timeout)):
+        imu_loss_timeout = timeout if imu_loss_timeout is None else imu_loss_timeout
+        if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout, race_status_timeout, imu_loss_timeout)):
             raise ValueError("timeouts must be positive and finite")
+        if imu_loss_timeout < timeout:
+            raise ValueError("IMU loss timeout must cover the permitted feedback age")
         if finish_before is not None and (not math.isfinite(finish_before) or finish_before <= 0):
             raise ValueError("finish deadline must be positive and finite")
         if target not in TARGETS:
@@ -65,6 +69,7 @@ class AIGPSimulator:
         self.clock = clock
         self.launcher = launcher
         self.timeout = timeout
+        self.imu_loss_timeout = imu_loss_timeout
         self.race_status_timeout = race_status_timeout
         self.finish_before = finish_before
         self.startup_timeout = startup_timeout
@@ -119,10 +124,12 @@ class AIGPSimulator:
                 if race_phase in (RacePhase.UNOBSERVED, RacePhase.WAITING_FOR_GO):
                     if now >= startup_deadline:
                         raise TimeoutError("race never reported GO before the startup deadline")
-                # Rate feedback loss ends control permanently; only native finish can end the wait.
+                # Stop producing commands when feedback ages out. A brief transport gap can end on the next read.
                 if (race_phase is RacePhase.RUNNING
                         and self.phase is RolloutPhase.CONTROLLER_READY
                         and feedback is not None and now - feedback.received_at >= self.timeout):
+                    if now - feedback.received_at < self.imu_loss_timeout:
+                        return None
                     self.stop()
                     finish_deadline = now + FINISH_WAIT_SECONDS
                     self.phase = RolloutPhase.WAITING_FOR_FINISH
@@ -151,7 +158,10 @@ class AIGPSimulator:
                     if now >= startup_deadline:
                         raise TimeoutError("controller did not receive its required startup telemetry")
                     return
-                if now - feedback.received_at > self.timeout:
+                feedback_age = now - feedback.received_at
+                if feedback_age > self.timeout:
+                    if feedback_age < self.imu_loss_timeout:
+                        return
                     raise TimeoutError("controller returned a command for stale IMU telemetry")
                 if self.arm_phase is ArmPhase.IDLE:
                     self.vehicle.validate(command)

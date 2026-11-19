@@ -55,7 +55,8 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
 def rollout(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False,
             race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None, *,
             target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None, timesync=False, record_camera=True,
-            client_type=ProcessClient, wrap_controller=None, race_status_timeout=None, extra_sources=(), control_inputs=None):
+            client_type=ProcessClient, wrap_controller=None, race_status_timeout=None, extra_sources=(), control_inputs=None,
+            imu_loss_timeout=None):
     trace = Path(trace)
     camera = camera or record_frames
     simulator_args = (("-RenderOffScreen",) if offscreen else ()) if simulator_args is None else tuple(simulator_args)
@@ -79,6 +80,8 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         metadata["sources"][key] = sha256(path)
     if control_inputs is not None:
         metadata["control_inputs"] = control_inputs
+    if imu_loss_timeout is not None:
+        metadata["imu_loss_timeout_s"] = imu_loss_timeout
     executable = BASE / ".runtime" / TARGETS[target][0] / SHIPPING
     if name == "r1_motors" or reference is not None:
         controller = make()
@@ -100,7 +103,8 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
                              preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), target, hz=hz, client=client, timeout=timeout, startup_timeout=startup_timeout,
                                   race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before,
-                                  launcher=Launcher(calls), race_status_timeout=race_status_timeout)
+                                  launcher=Launcher(calls), race_status_timeout=race_status_timeout,
+                                  imu_loss_timeout=imu_loss_timeout)
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:
