@@ -34,7 +34,7 @@ class TrialPhase(Enum):
     INTERRUPTED = auto()
 
 
-def fresh_race(reader, record, timeout=120, course_packets=(), client=None, clock=time):
+def fresh_race(reader, record, timeout=120, course_packets=(), client=None, clock=time, *, require_pose=True):
     client = RecordedClient(record, camera_port=None) if client is None else client
     phase = ResetPhase.WAITING_FOR_PEER_AND_RACE
     requested, fresh, before, course = None, None, None, []
@@ -57,13 +57,14 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
                     phase = ResetPhase.WAITING_FOR_FRESH_STATE
             for state in states:
                 record(event="race", native_race=asdict(state))
-                fresh = None
                 if (phase is not ResetPhase.WAITING_FOR_PEER_AND_RACE
                         and state.phase is RacePhase.WAITING_FOR_GO and state.active_gate_index == 0 and state.time_seconds <= 0):
                     fresh = asdict(state)
             first_request = phase is ResetPhase.WAITING_FOR_PEER_AND_RACE
-            retry = phase is ResetPhase.WAITING_FOR_ACK and now-requested >= 1
-            if client.connected and states and (first_request or retry):
+            retry = phase is ResetPhase.WAITING_FOR_ACK and now-requested >= 1 and bool(states)
+            stalled_countdown = (not require_pose and phase is ResetPhase.WAITING_FOR_FRESH_STATE
+                                 and fresh is None and now-requested >= 3)
+            if client.connected and ((first_request and states) or retry or stalled_countdown):
                 if first_request:
                     before = asdict(states[-1])  # Drain old observations before requesting reset.
                 client.reset()
@@ -73,7 +74,14 @@ def fresh_race(reader, record, timeout=120, course_packets=(), client=None, cloc
                 continue
             pose = client.telemetry.get("LOCAL_POSITION_NED")
             attitude, race = client.telemetry.get("ATTITUDE"), client.race_telemetry
+            imu = client.telemetry.get("HIGHRES_IMU")
+            if (not require_pose and phase is ResetPhase.WAITING_FOR_FRESH_STATE and fresh is not None
+                    and imu is not None and race is not None and min(imu._host_received_at, race.received_at) > requested
+                    and imu.time_usec // 1000 <= race.sim_boot_time_ms):
+                packets = tuple(course) if client.gates is not None else course_packets
+                return reader, dict(before=before, after=fresh, requests=reset_requests, imu_time_us=imu.time_usec), packets
             if (phase is ResetPhase.WAITING_FOR_FRESH_STATE and fresh is not None
+                    and require_pose
                     and pose is not None and attitude is not None and race is not None
                     and min(pose._host_received_at, attitude._host_received_at, race.received_at) > requested
                     and max(pose.time_boot_ms, attitude.time_boot_ms) <= race.sim_boot_time_ms
