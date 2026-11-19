@@ -55,7 +55,7 @@ def flight_controller(name, reference=None, position_config=None, integral_gain=
 def rollout(name, trace, camera=False, record_frames=False, signals=None, reference=None, offscreen=False, attach=False,
             race_reader=None, course_packets=(), position_config=None, integral_gain=0.0, finish_before=None, *,
             target="vq1.r1", hz=50.0, timeout=None, startup_timeout=120.0, simulator_args=None, timesync=False, record_camera=True,
-            client_type=ProcessClient, wrap_controller=None):
+            client_type=ProcessClient, wrap_controller=None, race_status_timeout=None, extra_sources=(), control_inputs=None):
     trace = Path(trace)
     camera = camera or record_frames
     simulator_args = (("-RenderOffScreen",) if offscreen else ()) if simulator_args is None else tuple(simulator_args)
@@ -68,13 +68,17 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         timeout = .3 if name == "r1_motors" else 1.0
     sources = subprocess.check_output(["git", "ls-files", "*.py", "*.lua"], cwd=ROOT, text=True).splitlines()
     metadata = dict(target=target, controller=name, hz=hz, timeout=timeout, startup_timeout_s=startup_timeout, finish_before_s=finish_before, camera=camera, recorded_frames=record_frames, attach=attach,
+                    race_status_timeout_s=race_status_timeout,
                     simulator_args=simulator_args, timesync=timesync, camera_packets_recorded=record_camera, process="flight", race_status_path=str(trace.with_suffix(".native.jsonl")),
                     reference=None if reference is None else dict(path=str(reference.resolve()), sha256=sha256(reference), duration_s=reference_duration),
                     revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-                    sources={path: sha256(ROOT / path) for path in sources})
-    controller_source = Path(inspect.getfile(load_controller(name))).resolve()
-    key = str(controller_source.relative_to(ROOT)) if controller_source.is_relative_to(ROOT) else str(controller_source)
-    metadata["sources"][key] = sha256(controller_source)
+                    sources={path: sha256(ROOT / path) for path in sources if (ROOT / path).is_file()})
+    for source in (inspect.getfile(load_controller(name)), *extra_sources):
+        path = Path(source).resolve()
+        key = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+        metadata["sources"][key] = sha256(path)
+    if control_inputs is not None:
+        metadata["control_inputs"] = control_inputs
     executable = BASE / ".runtime" / TARGETS[target][0] / SHIPPING
     if name == "r1_motors" or reference is not None:
         controller = make()
@@ -84,16 +88,19 @@ def rollout(name, trace, camera=False, record_frames=False, signals=None, refere
         if name == "r1_motors":
             metadata["rate_pid"] = dict(kp=controller.kp, ki=controller.ki)
     if race_reader is not None:
-        metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=race_reader.stream.tell())
+        offset = 0 if race_reader.stream is None else race_reader.stream.tell()
+        metadata["native_race_source"] = dict(path=str(race_reader.path.resolve()), initial_offset=offset)
     result = None
     with recording(trace, metadata) as record, ExitStack() as cleanup:
         calls = Calls(record)
         if race_reader is None:
-            race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), timeout)))
+            reader_timeout = timeout if race_status_timeout is None else race_status_timeout
+            race_reader = cleanup.enter_context(closing(RaceStateReader(trace.with_suffix(".native.jsonl"), reader_timeout)))
         client = client_type(calls, camera_port=5600 if camera else None, course_packets=course_packets, timesync=timesync, record_camera=record_camera,
                              preview=trace.with_suffix(".frame.jpg") if camera else None)
         simulator = AIGPSimulator(RecordedController(make, record, frames=record_frames, signals=signals), target, hz=hz, client=client, timeout=timeout, startup_timeout=startup_timeout,
-                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before, launcher=Launcher(calls))
+                                  race_status_path=trace.with_suffix(".native.jsonl"), monitor_path=trace.with_suffix(".png"), race_reader=RaceReader(calls, race_reader), clock=calls, finish_before=finish_before,
+                                  launcher=Launcher(calls), race_status_timeout=race_status_timeout)
         try:
             result = simulator.rollout(attach=attach, simulator_args=simulator_args)
         finally:

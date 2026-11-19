@@ -45,10 +45,12 @@ class AIGPSimulator:
     """Run one controller; own its connection, clock, and race lifecycle."""
 
     def __init__(self, controller, target="vq1.r1", hz=50.0,
-                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None, race_reader=None, clock=time, finish_before=None, launcher=launch):
+                 timeout=1.0, startup_timeout=120.0, client=None, race_status_path=None, monitor_path=None,
+                 race_reader=None, clock=time, finish_before=None, launcher=launch, race_status_timeout=None):
         if not math.isfinite(hz) or not 0 < hz < 100:
             raise ValueError("hz must be positive and below 100 (VQ1 specification)")
-        if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout)):
+        race_status_timeout = timeout if race_status_timeout is None else race_status_timeout
+        if not all(math.isfinite(value) and value > 0 for value in (timeout, startup_timeout, race_status_timeout)):
             raise ValueError("timeouts must be positive and finite")
         if finish_before is not None and (not math.isfinite(finish_before) or finish_before <= 0):
             raise ValueError("finish deadline must be positive and finite")
@@ -63,6 +65,7 @@ class AIGPSimulator:
         self.clock = clock
         self.launcher = launcher
         self.timeout = timeout
+        self.race_status_timeout = race_status_timeout
         self.finish_before = finish_before
         self.startup_timeout = startup_timeout
         self.client = SimulatorClient() if client is None else client
@@ -87,7 +90,7 @@ class AIGPSimulator:
             self.vehicle.connect()
             process = cleanup.enter_context(self.launcher(self.target, simulator_args, attach=attach,
                                                    race_status_path=self.race_status_path))
-            race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.timeout)
+            race_reader = self.race_reader if self.race_reader is not None else RaceStateReader(self.race_status_path, self.race_status_timeout)
             if self.race_reader is None:
                 cleanup.callback(race_reader.close)
             cleanup.callback(self.stop)
@@ -165,11 +168,13 @@ class AIGPSimulator:
     def save_monitor(self):
         self.monitor.save(self.monitor_path.with_suffix(".csv"))
         race = self.status
+        motion_source = getattr(self.client, "motion_source", "MAVLink.LOCAL_POSITION_NED (privileged)")
+        motion_clock = getattr(self.client, "motion_clock", "LOCAL_POSITION_NED.time_boot_ms / 1000 (seconds)")
         with self.monitor_path.with_suffix(".sources.json").open("x") as output:
             json.dump(dict(target=self.target, hz=self.hz, position_samples=len(self.monitor.motion),
-                           position_source="MAVLink.LOCAL_POSITION_NED (privileged)",
+                           position_source=motion_source,
                            position_frame="local NED metres; velocity in m/s",
-                           device_time="LOCAL_POSITION_NED.time_boot_ms / 1000 (seconds)",
+                           device_time=motion_clock,
                            host_received_at="Packet.received_at (host monotonic seconds)",
                            reference_source="target/aigp/config/race.lua: mesh bounds centers (privileged)",
                            reference_frame="local NED metres relative to starting grid",
@@ -178,7 +183,7 @@ class AIGPSimulator:
                            clocks_synchronized=False, race_state=None if race is None else asdict(race)), output, indent=2)
         outcome = "not observed" if race is None else f"completed={race.completed}, valid={race.valid}, gate={race.active_gate_index}"
         self.monitor.plot(self.monitor_path, () if race is None else race.gate_centers,
-                          title=f"{self.target}: MAVLink LOCAL_POSITION_NED (privileged)\nNative Lua race: {outcome}",
+                          title=f"{self.target}: {motion_source}\nNative Lua race: {outcome}",
                           reference_label="Lua mesh bounds centers (privileged)")
         print(f"Rollout plot: {self.monitor_path}", flush=True)
 
@@ -194,7 +199,7 @@ class AIGPSimulator:
             if previous is not None and previous.started and (not state.started or state.active_gate_index < previous.active_gate_index):
                 raise RuntimeError("native race reset during control")
         if (self.status is not None and self.status.started
-                and self.clock.monotonic() - self.status.received_at > self.timeout):
+                and self.clock.monotonic() - self.status.received_at > self.race_status_timeout):
             raise TimeoutError("native race state is stale")
         if self.status is not None and self.status.started and self.finish_before is not None:
             race_time = self.status.finish_time_seconds if self.status.completed else self.status.time_seconds
