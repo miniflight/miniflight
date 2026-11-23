@@ -1,11 +1,15 @@
+<div align="center">
+
 # aigp
 
-<img align="right" width="320" src="media/vq1-sub10.gif" alt="VQ1 R1 motor-control flight">
+<img width="320" src="media/vq1-sub10.gif" alt="VQ1 R1 motor-control flight">
 
 Run a controller against the AI-GP simulator. Put your controller in
 `target/aigp/controllers/`. Start with [setup](#setup) for a first VQ1 lap.
 
-<br clear="right">
+[Commands](docs/vehicle-api.md) | [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) | [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)
+
+</div>
 
 ## setup
 
@@ -113,5 +117,3 @@ Omit `--controller` to open the simulator alone. Use `--attach --controller zero
 with an open VQ1 R1 sim. It stays open when the controller exits.
 `WINE` and `WINESERVER` select a different Wine installation.
 Pass Unreal options after `--`. Use full option names before it.
-
-[Commands](docs/vehicle-api.md) · [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) · [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)
