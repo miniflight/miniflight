@@ -1,7 +1,11 @@
 # aigp
 
+<img align="right" width="320" src="media/vq1-sub10.gif" alt="VQ1 R1 motor-control flight">
+
 Run a controller against the AI-GP simulator. Put your controller in
 `target/aigp/controllers/`. Start with [setup](#setup) for a first VQ1 lap.
+
+<br clear="right">
 
 ## setup
 
@@ -52,8 +56,6 @@ and waits for fresh native race state and pose before starting the next flight.
 and thrust. `zero` sends zero thrust.
 
 `r1_motors` adds our rate PI and mixer, then sends four individual motor controls.
-
-![VQ1 R1 motor-control flight](media/vq1-sub10.gif)
 
 With a **9.819 s** reference, `r1_motors` flew ten native laps in
 **9.780–9.860 s**. Each cleared all six gates with zero collisions. All 6,423
