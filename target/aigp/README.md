@@ -5,7 +5,7 @@
 Run a controller against the AI-GP simulator. Put your controller in
 `target/aigp/controllers/`. Start with [setup](#setup) for a first VQ1 lap.
 
-[Commands](docs/vehicle-api.md) | [VQ1 specification](docs/VQ1-Technical-Specification-00.02.pdf) | [VQ2 specification](docs/VQ2-Technical-Specification-00.03.pdf)
+[Commands](docs/vehicle-api.md) | [VQ1 spec](docs/VQ1-Technical-Specification-00.02.pdf) | [VQ2 spec](docs/VQ2-Technical-Specification-00.03.pdf)
 
 <img width="320" src="media/vq1-sub10.gif" alt="VQ1 R1 motor-control flight">
 
