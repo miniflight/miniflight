@@ -1,25 +1,47 @@
 # aigp
 
-Run a controller against the AIGP simulator. Put your controller in `controllers/`.
+Run a controller against the AI-GP simulator. Put your controller in
+`target/aigp/controllers/`. Start with [setup](#setup) for a first VQ1 lap.
 
-Install dependencies from the repository root with Python 3.11 or newer:
+## setup
+
+macOS needs [Game Porting Toolkit](https://github.com/Gcenx/homebrew-wine) in `/Applications`.
 
 ```sh
+brew install git-lfs python@3.11
+brew install --cask gcenx/wine/game-porting-toolkit
+```
+
+Tested on macOS. Linux support is experimental and needs an x86_64 desktop with
+Wine, wineserver, git-lfs, and Python 3.11.4 or newer. Use your Python
+executable in place of `python3.11`.
+
+```sh
+git lfs install
+git clone https://github.com/miniflight/miniflight.git
+cd miniflight
+git lfs pull
+python3.11 -m venv .venv
+source .venv/bin/activate
 python -m pip install -e ".[aigp]"
+python -m target.aigp.simulator vq1.r1 --controller r1_body_rates
 ```
 
-Run:
+## examples
+
+Run from the repo root with the virtual environment active.
 
 ```sh
-cd target/aigp
-python simulator.py vq1.r1 --controller r1_gates
-python simulator.py vq1.r1 --controller r1_body_rates
-python simulator.py vq2.r1 --controller zero
-python simulator.py vq2.r2 --controller zero
+python -m target.aigp.simulator vq1.r1 --controller r1_gates
+python -m target.aigp.simulator vq1.r1 --controller r1_body_rates
+python -m target.aigp.simulator vq2.r1 --controller zero
+python -m target.aigp.simulator vq2.r2 --controller zero
 ```
 
-Targets select the build and track. Runs use the direct arena.
-Training and Qualification event selection is not implemented.
+Targets select the build and track and launch straight into the arena.
+For stock VQ2 Track Practice, see the [VQ2 checkpoint](../../examples/aigp/vq2-sub20/).
+It includes a clean **19.928 s** lap using camera, IMU and a carried map. The
+ten-run repeat had one clean sub-20 lap.
 
 The VQ1 arena disables interaction with its results grids: pending selections
 can block an ACKed MAVLink reset. The repeat runner still uses command 31000
@@ -31,13 +53,14 @@ and thrust. `zero` sends zero thrust.
 
 `r1_motors` adds our rate PI and mixer, then sends four individual motor controls.
 
-![VQ1 R1 flight in 9.819 seconds](media/vq1-sub10.gif)
+![VQ1 R1 motor-control flight](media/vq1-sub10.gif)
 
-One recorded `r1_motors` flight: **9.819 s**, six gates, zero collisions, exact
-command and signal replay. Native camera footage plays at normal speed.
-Continuous flight reliability is still being improved.
+With a **9.819 s** reference, `r1_motors` flew ten native laps in
+**9.780–9.860 s**. Each cleared all six gates with zero collisions. All 6,423
+control updates replayed exactly. See the [verification record](../../test/fixtures/vq1_r1_sub10.validation.json).
 
-Run its recorded six-gate verification from the repository root:
+Run the six-gate regression from the repo root. It flies a fresh lap and
+checks the recorded commands against replay.
 
 ```sh
 python -m test.aigp_regression r1_motors
@@ -53,11 +76,17 @@ timeout; the runner sends zero thrust and disarms during cleanup.
 Cleanup waits for a newly received disarmed heartbeat. Missing confirmation fails
 an otherwise successful run; an existing flight error is preserved.
 
-Implement `update(telemetry, frames, race_state)` and return a command. Read physical
-observations through `vehicle.state`; AIGP events retain their raw packets.
-The runner handles timing, arming, race finish,
-and shutdown. See the [controller interface](controllers/README.md) and
-[packet formats](docs/wiring.md).
+Put your code in `target/aigp/controllers/mine.py` and export
+`class Controller(BaseController)` with `update(telemetry, frames, race_state)`.
+Return a command. See the [small controller example](controllers/README.md).
+
+```sh
+python -m target.aigp.simulator vq1.r1 --controller mine
+```
+
+Read physical observations through `vehicle.state`. AIGP events retain
+their raw packets. The runner handles timing, arming, race finish, and
+shutdown. See the [packet formats](docs/wiring.md).
 
 Or call the runner directly:
 
@@ -72,31 +101,14 @@ result = sim.rollout()
 Create a new `AIGPSimulator` for each run.
 See [examples](../../examples/aigp/) and [recording and probes](experiments/README.md).
 
-## setup
-
-macOS needs [Game Porting Toolkit](https://github.com/Gcenx/homebrew-wine) in `/Applications`.
-
-```sh
-brew install git-lfs python@3.11
-brew install --cask gcenx/wine/game-porting-toolkit
-```
-
-Tested on macOS. Linux support is experimental and needs an x86_64 desktop with
-Wine, wineserver, git-lfs, and Python 3.11 or newer.
-
-```sh
-git lfs install
-git clone https://github.com/miniflight/miniflight.git
-cd miniflight
-git lfs pull
-```
+## runner details
 
 `native.py` extracts and launches the simulator through Wine. `client.py` handles
 UDP. `simulator.py` runs the controller. Generated files go in `.runtime/`.
 
 Run one simulator at a time. Ctrl+C stops the controller and the simulator it launched.
 Omit `--controller` to open the simulator alone. Use `--attach --controller zero`
-to connect to a running simulator; it stays open when the controller exits.
+with an open VQ1 R1 sim. It stays open when the controller exits.
 `WINE` and `WINESERVER` select a different Wine installation.
 Pass Unreal options after `--`. Use full option names before it.
 
