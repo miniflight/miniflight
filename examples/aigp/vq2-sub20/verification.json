@@ -1,0 +1,254 @@
+{
+  "base_commit": "fd7f446989e456aa360f987c74cc18d4d3968253",
+  "rednose_commit": "28d4a7f69e80e1c3e0d24ca0733d7daeaeade3d0",
+  "python": "3.11.14",
+  "deps": {
+    "numpy": "2.4.6",
+    "opencv-python": "5.0.0.93",
+    "opencv-python-headless": "5.0.0.93",
+    "scipy": "1.17.1",
+    "pymavlink": "2.4.49",
+    "cffi": "2.1.1",
+    "cma": "4.6.0",
+    "matplotlib": "3.11.2",
+    "pytest": "9.1.1"
+  },
+  "pace_m_s": 18.35,
+  "sources": {
+    "repo/target/aigp/experiments/practice.py": "6d061e2217d98c48af8ae541cacf17a8127a0b145f1721b6e2c6d2382257826e",
+    "repo/work/pose-odometry/fly_learned_course.py": "260100629d9099a6dd4d8f6c366147d7e8a9ed6f56cb69a7c97df734a2f09618",
+    "repo/target/aigp/experiments/public_race.py": "28d7864c68021db8b0472cac0d9a0e7523630d4b433179a51fc98c0d96c1efdc",
+    "repo/target/aigp/experiments/flight_response.py": "320d7e8d0e68de4e817541e52965ad0aa3e460a43bd688de7c64525b2a3a782f",
+    "reference-harness/frontier-qualification/trial.py": "bfb630eb7c82f58f7030d0ba5d37be350e5678259025df35f488d9f674309f12",
+    "repo/target/aigp/experiments/gate_pose.py": "2a1a3e4d40a8275840e5c762cf540c25cef3876e1f3027a46aa5bc00123ffd4b",
+    "repo/work/pose-odometry/fly_one_gate.py": "e2c484d6b2e74871e132a3cbea0b83b7d177408dcaa0e4629e95e09c114aee45",
+    "repo/work/pose-odometry/fly_rednose.py": "0caea891ab30443b0ccbc63a9c02a00d645973f9495c32fff119e01f12468a61",
+    "repo/work/pose-odometry/launch_reference.py": "0934f947ffc0b852fea5c7e204a42c480fa2cbcc51d6c40ff1dc4299ea62de25",
+    "repo/work/pose-odometry/learned_line.py": "5f06f56b6f40ef369b04d240ace45c64905dd08261e98c81f34b47fb0d8bf9e0",
+    "repo/work/pose-odometry/mapped.py": "d3ad724dde5f0dd0a2e45d95e0cd9018cece1afce38814f8ebfe078d58e65f49",
+    "repo/work/pose-odometry/plan_corridor.py": "c8159449b94464647f1707b8a4bcd8ecacbe95391b5016f336ffba70af309152",
+    "repo/work/pose-odometry/rednose_model.py": "f3880b8009de17e2e77326c456a69128d1a6d0f73751f89f661d1d03141cd07f",
+    "repo/work/pose-odometry/rednose_replay.py": "385f3ef2b7c81667780fb73a9a95cf6b0eaa8feb5f185e606367e0db22fb1bae",
+    "repo/work/pose-odometry/refine_gate_map.py": "e7b7e9b3e433284e8d01181aa80c0b505de62cfc270d33400e903b0124ad64d2",
+    "repo/work/pose-odometry/rim.py": "a584fdbffdfed208dead8cc1dda967a9167341b6737abb3581f67e95376f0444",
+    "repo/work/pose-odometry/vanishing.py": "33669be83da6f4ebf2b535066c53b25acb0d75c2745161605336a0ca920637bc",
+    "repo/work/pose-odometry/visual_clock.py": "e3f9ae1faf7ea108a4247f9dd0ed18f766fa5fcf7d81e5ceb1cdbc14951a9083",
+    "dependencies/rednose_repo/rednose/helpers/ekf_sym.py": "e56d50c5c6cd11f1ebc2b682e1b30e60fee89856a8225a30bdf4b2ce0a7b7dc0",
+    "flight-controls/timing-isolation/observer.py": "10e59950862ffeaf97b0ab289a12e1e5b19505278eded8749c7c30aac4179fbd",
+    "flight-controls/partial-relock/observer.py": "0ba6c1cd065909c108d5a9aba76596e5f2521014690a6d7351e077fb5e63ddab",
+    "flight-controls/partial-relock/relock.py": "8170024950c48c5bc9449c8b88895b3594fd92387ef7d97d01256c50c3b2a365",
+    "flight-controls/partial-relock/witness.py": "f9ff7bac16bcc0fe2008f4cea98f8f87ec59f1925aa61f285a2abe64f4836251",
+    "flight-controls/partial-relock/rectify.py": "8586c8d6cdf8fa090a384dd8a86ce38df151bfe830434095c2bdb1f835408195",
+    "flight-controls/learned-feedforward/correction.npz": "9e2ba2111e69588ab85de75c4f40054ca411ba2ccc74b2cc2374819d2336288b",
+    "flight-controls/current-actuators/response.json": "6beaa40898fdd61afc14a9a30ece64f2c74ac657747710cdf01b48e1f060ca85"
+  },
+  "inputs": {
+    "gate-map-in.json": "7d8d4443ebab776c44242d1b1416230a899c5b4dfe71d82dccbf688847c13a80",
+    "line.npz": "1f307cd9723f00211b4141539ac6f9a567bea8dccefcaf9399893466ba4c8349",
+    "map.json": "990404eff0a642ad1517c4a9ca249728823fdb6d8a0298d8d8dc624ba05a81c1",
+    "plan.npz": "462d6c5d01711ab3d66311d4719a2b133aa88d508556a22eafa9eefa71e3d506"
+  },
+  "collective_strength": 0.45,
+  "acceleration_feedback": 0.38,
+  "verified": [
+    {
+      "lap": 1658,
+      "native_duration_ns": 19929412841,
+      "contacts": 0,
+      "gate_count": 17,
+      "map": "carried",
+      "unified_attitude": false,
+      "plan_sha256": "462d6c5d01711ab3d66311d4719a2b133aa88d508556a22eafa9eefa71e3d506"
+    },
+    {
+      "lap": 1671,
+      "native_duration_ns": 19927881240,
+      "contacts": 0,
+      "gate_count": 17,
+      "map": "carried",
+      "unified_attitude": false,
+      "plan_sha256": "462d6c5d01711ab3d66311d4719a2b133aa88d508556a22eafa9eefa71e3d506"
+    },
+    {
+      "lap": 1746,
+      "native_duration_ns": 23082395553,
+      "contacts": 0,
+      "gate_count": 17,
+      "map": "carried",
+      "unified_attitude": true,
+      "plan_sha256": "86cea4b6bda97bd1484d0942a406fd25092bcfc55e57f6e5237bfe62b14388c5"
+    }
+  ],
+  "fastest_verified_streak": 1,
+  "standardized_repeat": {
+    "rows": [
+      {
+        "attempt": 1664,
+        "active_gate_index": 7,
+        "contacts": 1,
+        "time_seconds": 10.792,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 29.675571095867788,
+        "superseded_frames": 31
+      },
+      {
+        "attempt": 1665,
+        "active_gate_index": 2,
+        "contacts": 1,
+        "time_seconds": 4.375,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 28.566143750140327,
+        "superseded_frames": 11
+      },
+      {
+        "attempt": 1666,
+        "active_gate_index": 2,
+        "contacts": 1,
+        "time_seconds": 4.377,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 34.12432324876136,
+        "superseded_frames": 11
+      },
+      {
+        "attempt": 1667,
+        "active_gate_index": 7,
+        "contacts": 1,
+        "time_seconds": 10.799,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 31.03802934892883,
+        "superseded_frames": 48
+      },
+      {
+        "attempt": 1668,
+        "active_gate_index": 7,
+        "contacts": 2,
+        "time_seconds": 10.732000000000001,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 31.148327400660495,
+        "superseded_frames": 42
+      },
+      {
+        "attempt": 1669,
+        "active_gate_index": 8,
+        "contacts": 0,
+        "time_seconds": 11.484,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "gate 9 plane passed without a confirmed crossing"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 28.63346524754888,
+        "superseded_frames": 34
+      },
+      {
+        "attempt": 1670,
+        "active_gate_index": 2,
+        "contacts": 2,
+        "time_seconds": 4.384,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 29.043180946246135,
+        "superseded_frames": 16
+      },
+      {
+        "attempt": 1671,
+        "active_gate_index": 17,
+        "contacts": 0,
+        "time_seconds": 19.92788124,
+        "clean_full": true,
+        "error": null,
+        "verified_sub20": true,
+        "streak": 1,
+        "powered": true,
+        "camera_p95_ms": 38.247437001700746,
+        "superseded_frames": 76
+      },
+      {
+        "attempt": 1672,
+        "active_gate_index": 2,
+        "contacts": 1,
+        "time_seconds": 4.382,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 30.354062750120647,
+        "superseded_frames": 21
+      },
+      {
+        "attempt": 1673,
+        "active_gate_index": 7,
+        "contacts": 2,
+        "time_seconds": 10.805,
+        "clean_full": false,
+        "error": {
+          "type": "RuntimeError",
+          "message": "native collision"
+        },
+        "verified_sub20": false,
+        "streak": 0,
+        "powered": true,
+        "camera_p95_ms": 31.879770998784807,
+        "superseded_frames": 25
+      }
+    ],
+    "best_streak": 1,
+    "completed": true
+  },
+  "media": {
+    "lap": 1671,
+    "native_time_s": 19.92788124,
+    "instantaneous_source_frames": 110,
+    "median_source_frame_gap_s": 0.18020499999999995,
+    "first_source_offset_s": -0.07354076230174122,
+    "last_source_offset_s": 19.880893237698263
+  }
+}
